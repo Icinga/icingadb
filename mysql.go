@@ -1,4 +1,4 @@
-package connection
+package icingadb_connection
 
 import (
 	"container/list"
