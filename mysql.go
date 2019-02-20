@@ -184,7 +184,7 @@ func (dbw *DBWrapper) sqlTryTransaction(f func(*sql.Tx) error, concurrencySafety
 
 	errTx := f(tx)
 	if errTx != nil {
-		dbw.sqlRollback(tx, quiet)
+		dbw.SqlRollback(tx, quiet)
 		return errTx
 	}
 
@@ -242,7 +242,7 @@ func (dbw *DBWrapper) SqlCommit(tx *sql.Tx, quiet bool) error {
 }
 
 // Wrapper around tx.Rollback() for auto-logging
-func (dbw *DBWrapper) sqlRollback(tx *sql.Tx, quiet bool) error {
+func (dbw *DBWrapper) SqlRollback(tx *sql.Tx, quiet bool) error {
 	var err error
 	if !quiet {
 		benchmarc := benchmark.NewBenchmark()
