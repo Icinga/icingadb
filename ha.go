@@ -81,7 +81,7 @@ func (h *HA) IsResponsible() bool {
 	return h.getResponsibility() == TakeoverSync
 }
 
-func (h *HA) Run(rdb *redis.Client, dbw *connection.DBWrapper, chEnv chan *connection.Environment, chErr chan error) {
+func (h *HA) Run(rdb *redis.Client, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment, chErr chan error) {
 	go cleanUpInstancesAsync(dbw, chErr)
 
 	if errRun := h.run(rdb, dbw, chEnv); errRun != nil {
@@ -91,14 +91,14 @@ func (h *HA) Run(rdb *redis.Client, dbw *connection.DBWrapper, chEnv chan *conne
 }
 
 // cleanUpInstancesAsync cleans up icingadb_instance periodically.
-func cleanUpInstancesAsync(dbw *connection.DBWrapper, chErr chan error) {
+func cleanUpInstancesAsync(dbw *icingadb_connection.DBWrapper, chErr chan error) {
 	if errCI := cleanUpInstances(dbw); errCI != nil {
 		chErr <- errCI
 	}
 }
 
 // cleanUpInstances cleans up icingadb_instance periodically.
-func cleanUpInstances(dbw *connection.DBWrapper) error {
+func cleanUpInstances(dbw *icingadb_connection.DBWrapper) error {
 	every5m := time.NewTicker(5 * time.Minute)
 	defer every5m.Stop()
 
@@ -123,10 +123,10 @@ func cleanUpInstances(dbw *connection.DBWrapper) error {
 	}
 }
 
-func (h *HA) run(rdb *redis.Client, dbw *connection.DBWrapper, chEnv chan *connection.Environment) error {
+func (h *HA) run(rdb *redis.Client, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment) error {
 	log.WithFields(log.Fields{"context": "HA"}).Info("Waiting for Icinga 2 to tell us its environment")
 
-	var env *connection.Environment = nil
+	var env *icingadb_connection.Environment = nil
 	var hasEnv bool
 
 	env, hasEnv = <-chEnv
