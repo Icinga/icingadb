@@ -5,9 +5,9 @@ import (
 	"git.icinga.com/icingadb-connection"
 	"github.com/go-redis/redis"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"sync/atomic"
 	"time"
-	log "github.com/sirupsen/logrus"
 )
 
 // responsibility tells whether we're responsible for our environment.
@@ -92,35 +92,34 @@ func (h *HA) Run(rdb *redis.Client, dbw *icingadb_connection.DBWrapper, chEnv ch
 
 // cleanUpInstancesAsync cleans up icingadb_instance periodically.
 func cleanUpInstancesAsync(dbw *icingadb_connection.DBWrapper, chErr chan error) {
-	if errCI := cleanUpInstances(dbw); errCI != nil {
-		chErr <- errCI
-	}
-}
-
-// cleanUpInstances cleans up icingadb_instance periodically.
-func cleanUpInstances(dbw *icingadb_connection.DBWrapper) error {
 	every5m := time.NewTicker(5 * time.Minute)
 	defer every5m.Stop()
 
 	for {
 		<-every5m.C
 
-		log.WithFields(log.Fields{"context": "HA"}).Info("Cleaning up icingadb_instance")
-
-		errTx := dbw.SqlTransaction(true, true, func(tx *sql.Tx) error {
-			_, errExec := dbw.SqlExec(
-				tx,
-				"delete from icingadb_instance by heartbeat",
-				`DELETE FROM icingadb_instance WHERE ? - heartbeat >= 30`,
-				time.Now().Unix(),
-			)
-
-			return errExec
-		})
-		if errTx != nil {
-			return errTx
+		if errCI := cleanUpInstances(dbw); errCI != nil {
+			chErr <- errCI
 		}
 	}
+}
+
+// cleanUpInstances cleans up icingadb_instance periodically.
+func cleanUpInstances(dbw *icingadb_connection.DBWrapper) error {
+
+	log.WithFields(log.Fields{"context": "HA"}).Info("Cleaning up icingadb_instance")
+
+	errTx := dbw.SqlTransaction(true, true, func(tx *sql.Tx) error {
+		_, errExec := dbw.SqlExec(
+			tx,
+			"delete from icingadb_instance by heartbeat",
+			`DELETE FROM icingadb_instance WHERE ? - heartbeat >= 30`,
+			time.Now().Unix(),
+		)
+
+		return errExec
+	})
+	return errTx
 }
 
 func (h *HA) run(rdb *redis.Client, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment) error {
