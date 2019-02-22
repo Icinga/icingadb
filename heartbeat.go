@@ -15,7 +15,7 @@ func Sha1bytes(bytes []byte) []byte {
 }
 
 
-func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *icingadb_connection.Environment, chErr chan error) {
+func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *icingadb_connection.Environment) error {
 	log.Info("Starting Events broker")
 
 	subscription := rdb.Rdb.Subscribe()
@@ -24,20 +24,20 @@ func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *icingad
 
 	if err := subscription.Subscribe(
 		"icinga:config:dump", "icinga:config:delete", "icinga:config:update", "icinga:stats"); err != nil {
-		chErr <- err
+		return err
 	}
 
 	for {
 		msg, err := subscription.ReceiveMessage()
 		if err != nil {
-			chErr <- err
+			return err
 		}
 
 		switch msg.Channel {
 		case "icinga:stats":
 			var unJson interface{} = nil
 			if err = json.Unmarshal([]byte(msg.Payload), &unJson); err != nil {
-				chErr <- err
+				return err
 			}
 
 			environment := unJson.(map[string]interface{})["IcingaApplication"].(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["environment"].(string)
