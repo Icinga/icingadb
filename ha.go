@@ -13,29 +13,25 @@ const (
 	// readyForTakeover says that we aren't responsible, but we could take over.
 	resp_ReadyForTakeover = iota
 	// TakeoverNoSync says that we've taken over, but we aren't actually syncing config, yet.
-	resp_TakeoverNoSync = iota
+	resp_TakeoverNoSync
 	// TakeoverSync says that we've taken over and are actually syncing config.
-	resp_TakeoverSync = iota
+	resp_TakeoverSync
 	// stop says that we've taken over and are actually syncing config, but we're going to stop it.
-	resp_Stop = iota
+	resp_Stop
 	// notReadyForTakeover says that we aren't responsible and can't take over.
-	resp_NotReadyForTakeover = iota
+	resp_NotReadyForTakeover
 )
 
-// responsibilityAction tells the next action on the database.
-type responsibilityAction uint8
-
-// noAction says that we won't do anything.
-const noAction responsibilityAction = 0
-
-// tryTakeover says that we're going to try to take over.
-const tryTakeover responsibilityAction = 1
-
-// doTakeover says that we're going to take over.
-const doTakeover responsibilityAction = 2
-
-// ceaseOperation says that we're going to release our responsibility.
-const ceaseOperation responsibilityAction = 3
+const (
+	// noAction says that we won't do anything.
+	action_NoAction = iota
+	// tryTakeover says that we're going to try to take over.
+	action_TryTakeover
+	// doTakeover says that we're going to take over.
+	action_DoTakeover
+	// ceaseOperation says that we're going to release our responsibility.
+	action_CeaseOperation
+)
 
 type HA struct {
 	ourUUID      uuid.UUID
@@ -141,7 +137,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 	everySecond := time.NewTicker(time.Second)
 	defer everySecond.Stop()
 
-	var nextAction responsibilityAction
+	var nextAction = 0
 	var theirUUID uuid.UUID
 
 	// Even if Icinga 2 is offline now, Redis may be filled
@@ -161,7 +157,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				continue
 			}
 
-			nextAction = tryTakeover
+			nextAction = action_TryTakeover
 		case resp_TakeoverNoSync:
 			if !h.icinga2IsAlive() {
 				log.WithFields(log.Fields{
@@ -174,7 +170,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				continue
 			}
 
-			nextAction = tryTakeover
+			nextAction = action_TryTakeover
 		case resp_TakeoverSync:
 			if !h.icinga2IsAlive() {
 				log.WithFields(log.Fields{
@@ -187,12 +183,12 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				continue
 			}
 
-			nextAction = doTakeover
+			nextAction = action_DoTakeover
 		case resp_Stop:
 			if atomic.LoadUint64(&h.runningCriticalOperations) == 0 && time.Now().Unix()-atomic.LoadInt64(&h.lastCriticalOperationEnd) >= 5 {
-				nextAction = ceaseOperation
+				nextAction = action_CeaseOperation
 			} else {
-				nextAction = doTakeover
+				nextAction = action_DoTakeover
 			}
 		case resp_NotReadyForTakeover:
 			if h.icinga2IsAlive() {
@@ -206,13 +202,13 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				continue
 			}
 
-			nextAction = noAction
+			nextAction = action_NoAction
 		}
 
 		switch nextAction {
-		case noAction:
+		case action_NoAction:
 			break
-		case tryTakeover, doTakeover:
+		case action_TryTakeover, action_DoTakeover:
 			var justTakenOver bool
 
 			errTx := dbw.SqlTransactionQuiet(true, true, func(tx *sql.Tx) error {
@@ -351,7 +347,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 					"their_uuid": theirUUID.String(),
 				}).Info("Other instance is responsible")
 			}
-		case ceaseOperation:
+		case action_CeaseOperation:
 			errTx := dbw.SqlTransactionQuiet(true, true, func(tx *sql.Tx) error {
 				rows, errFA := dbw.SqlFetchAllQuiet(
 					tx,
