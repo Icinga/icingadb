@@ -7,10 +7,10 @@ import (
 )
 
 func TestHA_setResponsibility(t *testing.T) {
-	responsibilities := [5]responsibility{ readyForTakeover, TakeoverNoSync, TakeoverSync, stop }
+	responsibilities := [6]uint32{ resp_ReadyForTakeover, resp_TakeoverNoSync, resp_TakeoverSync, resp_Stop, resp_NotReadyForTakeover }
 	h := new(HA)
 
-	previous := responsibility(0)
+	previous := uint32(0)
 	for _,r := range responsibilities {
 		assert.Equal(t, previous, h.setResponsibility(r), "Should be equal")
 		previous = r
@@ -19,9 +19,9 @@ func TestHA_setResponsibility(t *testing.T) {
 
 func TestHA_IsResponsible(t *testing.T) {
 	h := new(HA)
-	h.setResponsibility(TakeoverSync)
+	h.setResponsibility(resp_TakeoverSync)
 	assert.True(t, h.IsResponsible(), "Should be responsible")
-	h.setResponsibility(TakeoverNoSync)
+	h.setResponsibility(resp_TakeoverNoSync)
 	assert.False(t, h.IsResponsible(), "Should not be responsible")
 }
 
