@@ -236,66 +236,105 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (*sql.Tx, err
 		isoLvl = sql.LevelReadCommitted
 	}
 
-	var err error
-	var tx *sql.Tx
-	if quiet {
-		tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
-	} else {
-		benchmarc := benchmark.NewBenchmark()
-		tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
-		benchmarc.Stop()
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
 
-		//DbIoSeconds.WithLabelValues("mysql", "begin").Observe(benchmarc.Seconds())
+		var err error
+		var tx *sql.Tx
+		if quiet {
+			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
+		} else {
+			benchmarc := benchmark.NewBenchmark()
+			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
+			benchmarc.Stop()
 
-		log.WithFields(log.Fields{
-			"context":   "sql",
-			"benchmark": benchmarc,
-		}).Debug("BEGIN transaction")
+			//DbIoSeconds.WithLabelValues("mysql", "begin").Observe(benchmarc.Seconds())
+
+			log.WithFields(log.Fields{
+				"context":   "sql",
+				"benchmark": benchmarc,
+			}).Debug("BEGIN transaction")
+		}
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+		}
+
+		return tx, err
 	}
-
-	return tx, err
 }
 
 // Wrapper around tx.Commit() for auto-logging
 func (dbw *DBWrapper) SqlCommit(tx *sql.Tx, quiet bool) error {
-	var err error
-	if quiet {
-		err = tx.Commit()
-	} else {
-		benchmarc := benchmark.NewBenchmark()
-		err = tx.Commit()
-		benchmarc.Stop()
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
 
-		//DbIoSeconds.WithLabelValues("mysql", "commit").Observe(benchmarc.Seconds())
+		var err error
+		if quiet {
+			err = tx.Commit()
+		} else {
+			benchmarc := benchmark.NewBenchmark()
+			err = tx.Commit()
+			benchmarc.Stop()
 
-		log.WithFields(log.Fields{
-			"context":   "sql",
-			"benchmark": benchmarc,
-		}).Debug("COMMIT transaction")
+			//DbIoSeconds.WithLabelValues("mysql", "commit").Observe(benchmarc.Seconds())
+
+			log.WithFields(log.Fields{
+				"context":   "sql",
+				"benchmark": benchmarc,
+			}).Debug("COMMIT transaction")
+		}
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+		}
+
+		return err
 	}
-
-	return err
 }
 
 // Wrapper around tx.Rollback() for auto-logging
 func (dbw *DBWrapper) SqlRollback(tx *sql.Tx, quiet bool) error {
-	var err error
-	if !quiet {
-		benchmarc := benchmark.NewBenchmark()
-		err = tx.Rollback()
-		benchmarc.Stop()
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
 
-		//DbIoSeconds.WithLabelValues("mysql", "rollback").Observe(benchmarc.Seconds())
+		var err error
+		if !quiet {
+			benchmarc := benchmark.NewBenchmark()
+			err = tx.Rollback()
+			benchmarc.Stop()
 
-		log.WithFields(log.Fields{
-			"context":   "sql",
-			"benchmark": benchmarc,
-		}).Debug("ROLLBACK transaction")
-	} else {
-		err = tx.Rollback()
+			//DbIoSeconds.WithLabelValues("mysql", "rollback").Observe(benchmarc.Seconds())
+
+			log.WithFields(log.Fields{
+				"context":   "sql",
+				"benchmark": benchmarc,
+			}).Debug("ROLLBACK transaction")
+		} else {
+			err = tx.Rollback()
+		}
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+		}
+
+		return err
 	}
-
-	return err
 }
 
 // Wrapper around Db.SqlQuery() for auto-logging
