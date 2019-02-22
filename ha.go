@@ -9,23 +9,18 @@ import (
 	"time"
 )
 
-// responsibility tells whether we're responsible for our environment.
-type responsibility uint8
-
-// readyForTakeover says that we aren't responsible, but we could take over.
-const readyForTakeover responsibility = 0
-
-// TakeoverNoSync says that we've taken over, but we aren't actually syncing config, yet.
-const TakeoverNoSync responsibility = 1
-
-// TakeoverSync says that we've taken over and are actually syncing config.
-const TakeoverSync responsibility = 2
-
-// stop says that we've taken over and are actually syncing config, but we're going to stop it.
-const stop responsibility = 3
-
-// notReadyForTakeover says that we aren't responsible and can't take over.
-const notReadyForTakeover responsibility = 4
+const (
+	// readyForTakeover says that we aren't responsible, but we could take over.
+	resp_ReadyForTakeover = iota
+	// TakeoverNoSync says that we've taken over, but we aren't actually syncing config, yet.
+	resp_TakeoverNoSync = iota
+	// TakeoverSync says that we've taken over and are actually syncing config.
+	resp_TakeoverSync = iota
+	// stop says that we've taken over and are actually syncing config, but we're going to stop it.
+	resp_Stop = iota
+	// notReadyForTakeover says that we aren't responsible and can't take over.
+	resp_NotReadyForTakeover = iota
+)
 
 // responsibilityAction tells the next action on the database.
 type responsibilityAction uint8
@@ -58,7 +53,7 @@ type HA struct {
 // RunCriticalOperation runs op and manages HA#runningCriticalOperations if we're responsible.
 func (h *HA) RunCriticalOperation(op func() error) error {
 	switch h.getResponsibility() {
-	case TakeoverSync, stop:
+	case resp_TakeoverSync, resp_Stop:
 		atomic.AddUint64(&h.runningCriticalOperations, 1)
 
 		err := op()
@@ -77,7 +72,7 @@ func (h *HA) Icinga2HeartBeat() {
 }
 
 func (h *HA) IsResponsible() bool {
-	return h.getResponsibility() == TakeoverSync
+	return h.getResponsibility() == resp_TakeoverSync
 }
 
 func (h *HA) Run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment, chErr chan error) {
@@ -154,7 +149,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 
 	for {
 		switch h.getResponsibility() {
-		case readyForTakeover:
+		case resp_ReadyForTakeover:
 			if !h.icinga2IsAlive() {
 				log.WithFields(log.Fields{
 					"context": "HA",
@@ -162,12 +157,12 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 					"env":     env.Name,
 				}).Warn("Icinga 2 detected as not running, stopping.")
 
-				h.setResponsibility(notReadyForTakeover)
+				h.setResponsibility(resp_NotReadyForTakeover)
 				continue
 			}
 
 			nextAction = tryTakeover
-		case TakeoverNoSync:
+		case resp_TakeoverNoSync:
 			if !h.icinga2IsAlive() {
 				log.WithFields(log.Fields{
 					"context": "HA",
@@ -175,12 +170,12 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 					"env":     env.Name,
 				}).Warn("Icinga 2 detected as not running, stopping.")
 
-				h.setResponsibility(stop)
+				h.setResponsibility(resp_Stop)
 				continue
 			}
 
 			nextAction = tryTakeover
-		case TakeoverSync:
+		case resp_TakeoverSync:
 			if !h.icinga2IsAlive() {
 				log.WithFields(log.Fields{
 					"context": "HA",
@@ -188,18 +183,18 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 					"env":     env.Name,
 				}).Warn("Icinga 2 detected as not running, stopping.")
 
-				h.setResponsibility(stop)
+				h.setResponsibility(resp_Stop)
 				continue
 			}
 
 			nextAction = doTakeover
-		case stop:
+		case resp_Stop:
 			if atomic.LoadUint64(&h.runningCriticalOperations) == 0 && time.Now().Unix()-atomic.LoadInt64(&h.lastCriticalOperationEnd) >= 5 {
 				nextAction = ceaseOperation
 			} else {
 				nextAction = doTakeover
 			}
-		case notReadyForTakeover:
+		case resp_NotReadyForTakeover:
 			if h.icinga2IsAlive() {
 				log.WithFields(log.Fields{
 					"context": "HA",
@@ -207,7 +202,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 					"env":     env.Name,
 				}).Info("Icinga 2 detected as running again.")
 
-				h.setResponsibility(readyForTakeover)
+				h.setResponsibility(resp_ReadyForTakeover)
 				continue
 			}
 
@@ -326,15 +321,15 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				return errTx
 			}
 
-			if justTakenOver && h.getResponsibility() != stop {
+			if justTakenOver && h.getResponsibility() != resp_Stop {
 				if h.responsibleSince == (time.Time{}) {
 					h.responsibleSince = time.Now()
-					h.setResponsibility(TakeoverNoSync)
+					h.setResponsibility(resp_TakeoverNoSync)
 				} else {
 					responsibleFor := time.Now().Sub(h.responsibleSince).Seconds()
 
 					if responsibleFor >= 5.0 {
-						if h.setResponsibility(TakeoverSync) == TakeoverNoSync {
+						if h.setResponsibility(resp_TakeoverSync) == resp_TakeoverNoSync {
 							log.WithFields(log.Fields{
 								"context":    "HA",
 								"env":        env.Name,
@@ -394,7 +389,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 			}).Info("Other instance is responsible. Ceasing operations.")
 
 			h.responsibleSince = time.Time{}
-			h.setResponsibility(notReadyForTakeover)
+			h.setResponsibility(resp_NotReadyForTakeover)
 		}
 
 		select {
@@ -416,11 +411,11 @@ func (h *HA) icinga2IsAlive() bool {
 }
 
 // getResponsibility gets the responsibility.
-func (h *HA) getResponsibility() responsibility {
-	return responsibility(atomic.LoadUint32(&h.responsibility))
+func (h *HA) getResponsibility() uint32 {
+	return atomic.LoadUint32(&h.responsibility)
 }
 
 // setResponsibility sets the responsibility and returns the previous one.
-func (h *HA) setResponsibility(r responsibility) responsibility {
-	return responsibility(atomic.SwapUint32(&h.responsibility, uint32(r)))
+func (h *HA) setResponsibility(r uint32) uint32 {
+	return atomic.SwapUint32(&h.responsibility, uint32(r))
 }
