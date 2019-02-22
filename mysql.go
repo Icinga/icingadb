@@ -14,11 +14,14 @@ import (
 // Either a connection or a transaction
 type DbClient interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
+	Ping() error
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
+	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
 // Database wrapper including helper functions
 type DBWrapper struct {
-	Db                    *sql.DB
+	Db                    DbClient
 	ConnectedAtomic       *uint32 //uint32 to be able to use atomic operations
 	ConnectionUpCondition *sync.Cond
 	ConnectionLostCounter int
