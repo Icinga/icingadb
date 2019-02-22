@@ -3,7 +3,6 @@ package icingadb_ha_lib
 import (
 	"database/sql"
 	"git.icinga.com/icingadb-connection"
-	"github.com/go-redis/redis"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"sync/atomic"
@@ -81,7 +80,7 @@ func (h *HA) IsResponsible() bool {
 	return h.getResponsibility() == TakeoverSync
 }
 
-func (h *HA) Run(rdb *redis.Client, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment, chErr chan error) {
+func (h *HA) Run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment, chErr chan error) {
 	go cleanUpInstancesAsync(dbw, chErr)
 
 	if errRun := h.run(rdb, dbw, chEnv); errRun != nil {
@@ -122,7 +121,7 @@ func cleanUpInstances(dbw *icingadb_connection.DBWrapper) error {
 	return errTx
 }
 
-func (h *HA) run(rdb *redis.Client, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment) error {
+func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment) error {
 	log.WithFields(log.Fields{"context": "HA"}).Info("Waiting for Icinga 2 to tell us its environment")
 
 	var env *icingadb_connection.Environment = nil
