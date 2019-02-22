@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"git.icinga.com/icingadb-connection"
 	log "github.com/sirupsen/logrus"
-	)
+)
 
 // Compute SHA1
 func Sha1bytes(bytes []byte) []byte {
@@ -14,14 +14,11 @@ func Sha1bytes(bytes []byte) []byte {
 	return hash.Sum(nil)
 }
 
-
 func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *icingadb_connection.Environment) error {
 	log.Info("Starting Events broker")
 
 	subscription := rdb.Rdb.Subscribe()
 	defer subscription.Close();
-
-
 	if err := subscription.Subscribe(
 		"icinga:config:dump", "icinga:config:delete", "icinga:config:update", "icinga:stats"); err != nil {
 		return err

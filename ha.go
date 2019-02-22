@@ -123,9 +123,9 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 		return nil
 	}
 
-	var errNR error
-	if h.ourUUID, errNR = uuid.NewRandom(); errNR != nil {
-		return errNR
+	var err error
+	if h.ourUUID, err = uuid.NewRandom(); err != nil {
+		return err
 	}
 
 	log.WithFields(log.Fields{
