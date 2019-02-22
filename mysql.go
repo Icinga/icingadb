@@ -479,27 +479,108 @@ func sqlTryFetchAllQuiet(db DbClient, queryDescription string, query string, arg
 	return res, nil
 }
 
-// Wrapper around tx.SqlExec() for auto-logging
-func (dbw *DBWrapper) SqlExec(tx *sql.Tx, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	benchmarc := benchmark.NewBenchmark()
-	res, err := tx.Exec(sql, args...)
-	benchmarc.Stop()
+// Wrapper around tx.Exec() for auto-logging
+func (dbw *DBWrapper) SqlExecTx(tx *sql.Tx, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
 
-	//DbIoSeconds.WithLabelValues("mysql", opDescription).Observe(benchmarc.Seconds())
+		benchmarc := benchmark.NewBenchmark()
+		res, err := tx.Exec(sql, args...)
+		benchmarc.Stop()
 
-	log.WithFields(log.Fields{
-		"context":       "sql",
-		"benchmark":     benchmarc,
-		"affected_rows": prettyPrintedRowsAffected{res},
-		"args":          prettyPrintedArgs{args},
-		"query":         prettyPrintedSql{sql},
-	}).Debug("Finished Exec")
+		//DbIoSeconds.WithLabelValues("mysql", opDescription).Observe(benchmarc.Seconds())
 
-	return res, err
+		log.WithFields(log.Fields{
+			"context":       "sql",
+			"benchmark":     benchmarc,
+			"affected_rows": prettyPrintedRowsAffected{res},
+			"args":          prettyPrintedArgs{args},
+			"query":         prettyPrintedSql{sql},
+		}).Debug("Finished Exec")
+
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+		}
+
+		return res, err
+	}
 }
 
 // No logging, no benchmarking
-func (dbw *DBWrapper) SqlExecQuiet(tx *sql.Tx, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	res, err := tx.Exec(sql, args...)
-	return res, err
+func (dbw *DBWrapper) SqlExecTxQuiet(tx *sql.Tx, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
+
+		res, err := tx.Exec(sql, args...)
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+		}
+
+		return res, err
+	}
+}
+
+// Wrapper around sql.Exec() for auto-logging
+func (dbw *DBWrapper) SqlExec(opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
+
+		benchmarc := benchmark.NewBenchmark()
+		res, err := dbw.Db.Exec(sql, args...)
+		benchmarc.Stop()
+
+		//DbIoSeconds.WithLabelValues("mysql", opDescription).Observe(benchmarc.Seconds())
+
+		log.WithFields(log.Fields{
+			"context":       "sql",
+			"benchmark":     benchmarc,
+			"affected_rows": prettyPrintedRowsAffected{res},
+			"args":          prettyPrintedArgs{args},
+			"query":         prettyPrintedSql{sql},
+		}).Debug("Finished Exec")
+
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+		}
+
+		return res, err
+	}
+}
+
+// No logging, no benchmarking
+func (dbw *DBWrapper) SqlExecQuiet(opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
+
+		res, err := dbw.Db.Exec(sql, args...)
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+		}
+
+		return res, err
+	}
 }
