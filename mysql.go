@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"context"
 	"database/sql"
-	"git.icinga.com/icingadb/icingadb/benchmark"
+	"git.icinga.com/icingadb/icingadb-utils-lib"
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
@@ -151,7 +151,7 @@ func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFai
 			continue
 		}
 
-		benchmarc := benchmark.NewBenchmark()
+		benchmarc := icingadb_utils.NewBenchmark()
 		errTx := dbw.sqlTryTransaction(f, concurrencySafety, false)
 		benchmarc.Stop()
 
@@ -259,7 +259,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (*sql.Tx, err
 		if quiet {
 			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
 		} else {
-			benchmarc := benchmark.NewBenchmark()
+			benchmarc := icingadb_utils.NewBenchmark()
 			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
 			benchmarc.Stop()
 
@@ -293,7 +293,7 @@ func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 		if quiet {
 			err = tx.Commit()
 		} else {
-			benchmarc := benchmark.NewBenchmark()
+			benchmarc := icingadb_utils.NewBenchmark()
 			err = tx.Commit()
 			benchmarc.Stop()
 
@@ -325,7 +325,7 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 
 		var err error
 		if !quiet {
-			benchmarc := benchmark.NewBenchmark()
+			benchmarc := icingadb_utils.NewBenchmark()
 			err = tx.Rollback()
 			benchmarc.Stop()
 
@@ -372,7 +372,7 @@ func (dbw *DBWrapper) SqlFetchAll(db DbClient, queryDescription string, query st
 }
 
 func sqlTryFetchAll(db DbClient, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
-	benchmarc := benchmark.NewBenchmark()
+	benchmarc := icingadb_utils.NewBenchmark()
 	rows, errQuery := db.Query(query, args...)
 	benchmarc.Stop()
 
@@ -541,7 +541,7 @@ func (dbw *DBWrapper) SqlExecTx(tx DbTransaction, opDescription string, sql stri
 			continue
 		}
 
-		benchmarc := benchmark.NewBenchmark()
+		benchmarc := icingadb_utils.NewBenchmark()
 		res, err := tx.Exec(sql, args...)
 		benchmarc.Stop()
 
@@ -594,7 +594,7 @@ func (dbw *DBWrapper) SqlExec(opDescription string, sql string, args ...interfac
 			continue
 		}
 
-		benchmarc := benchmark.NewBenchmark()
+		benchmarc := icingadb_utils.NewBenchmark()
 		res, err := dbw.Db.Exec(sql, args...)
 		benchmarc.Stop()
 

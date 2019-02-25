@@ -1,7 +1,7 @@
 package icingadb_connection
 
 import (
-	"git.icinga.com/icingadb/icingadb/benchmark"
+	"git.icinga.com/icingadb/icingadb-utils-lib"
 	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
 	"sync"
@@ -219,7 +219,7 @@ func (rdbw *RDBWrapper) HGetAll(key string) (map[string]string, error) {
 			continue
 		}
 
-		benchmarc := benchmark.NewBenchmark()
+		benchmarc := icingadb_utils.NewBenchmark()
 		res, errHGA := rdbw.Rdb.HGetAll(key).Result()
 
 		if errHGA != nil {
@@ -248,9 +248,9 @@ func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([
 	for {
 		if !rdbw.IsConnected() {
 			rdbw.WaitForConnection()
-			continue
+		continue
 		}
-		benchmarc := benchmark.NewBenchmark()
+		benchmarc := icingadb_utils.NewBenchmark()
 		c, e := rdbw.Rdb.TxPipelined(fn)
 
 		if e != nil {
