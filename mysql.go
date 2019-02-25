@@ -12,24 +12,22 @@ import (
 	"time"
 )
 
-type DbClient interface {
-	Query(query string, args ...interface{}) (*sql.Rows, error)
-	Ping() error
-	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
-	Exec(query string, args ...interface{}) (sql.Result, error)
-}
-
-type DbTransaction interface {
-	Query(query string, args ...interface{}) (*sql.Rows, error)
-	Exec(query string, args ...interface{}) (sql.Result, error)
-	Commit() error
-	Rollback() error
-}
-
 // This is used in SqlFetchAll and SqlFetchAllQuiet
 type DbClientOrTransaction interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+type DbClient interface {
+	DbClientOrTransaction
+	Ping() error
+	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
+}
+
+type DbTransaction interface {
+	DbClientOrTransaction
+	Commit() error
+	Rollback() error
 }
 
 // Database wrapper including helper functions
