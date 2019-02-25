@@ -308,44 +308,43 @@ var yesNo = map[bool]string{
 	false: "n",
 }
 
-func ConvertValueForDb(in interface{}) interface{} {
+func ConvertValueForDb(in interface{}) (interface{}, error) {
 	switch value := in.(type) {
 	case []byte:
 	case string:
 	case float64:
 	case int64:
 	case nil:
-		break
 	case float32:
-		return float64(value)
+		return float64(value), nil
 	case uint:
-		return int64(value)
+		return int64(value), nil
 	case uint8:
-		return int64(value)
+		return int64(value), nil
 	case uint16:
-		return int64(value)
+		return int64(value), nil
 	case uint32:
-		return int64(value)
+		return int64(value), nil
 	case uint64:
-		return int64(value)
+		return int64(value), nil
 	case int:
-		return int64(value)
+		return int64(value), nil
 	case int8:
-		return int64(value)
+		return int64(value), nil
 	case int16:
-		return int64(value)
+		return int64(value), nil
 	case int32:
-		return int64(value)
+		return int64(value), nil
 	case bool:
-		return yesNo[value]
+		return yesNo[value], nil
 	default:
-		panic(fmt.Sprintf(
+		return nil, errors.New(fmt.Sprintf(
 			"bad type %s, expected one of []byte, string, float{32,64}, {,u}int{,8,16,32,64}, bool, nil",
 			reflect.TypeOf(in).Name(),
 		))
 	}
 
-	return in
+	return in, nil
 }
 
 func MakePlaceholderList(x int) string {
