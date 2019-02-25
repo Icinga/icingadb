@@ -638,3 +638,26 @@ func (dbw *DBWrapper) SqlExecQuiet(opDescription string, sql string, args ...int
 		return res, err
 	}
 }
+
+func IsRetryableError(err error) bool {
+	if strings.Contains(err.Error(), "Deadlock found when trying to get lock") {
+		return true
+	}
+	return false
+}
+
+func (dbw *DBWrapper) WithRetry(f func() (sql.Result, error)) (sql.Result, error) {
+	for {
+		res, err := f()
+
+		if err != nil {
+			if IsRetryableError(err) {
+				continue
+			} else {
+				return nil, err
+			}
+		}
+
+		return res, err
+	}
+}
