@@ -6,17 +6,24 @@ import (
 	"database/sql"
 	"git.icinga.com/icingadb/icingadb/benchmark"
 	log "github.com/sirupsen/logrus"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
-// Either a connection or a transaction
 type DbClient interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	Ping() error
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
+type DbTransaction interface {
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Commit() error
+	Rollback() error
 }
 
 // Database wrapper including helper functions
@@ -77,7 +84,7 @@ func (dbw *DBWrapper) getConnectionCheckInterval() time.Duration {
 	return 15 * time.Second
 }
 
-func (dbw *DBWrapper) Query(query string, args ...interface{}) (*sql.Rows, error) {
+func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -270,7 +277,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (*sql.Tx, err
 }
 
 // Wrapper around tx.Commit() for auto-logging
-func (dbw *DBWrapper) SqlCommit(tx *sql.Tx, quiet bool) error {
+func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -304,7 +311,7 @@ func (dbw *DBWrapper) SqlCommit(tx *sql.Tx, quiet bool) error {
 }
 
 // Wrapper around tx.Rollback() for auto-logging
-func (dbw *DBWrapper) SqlRollback(tx *sql.Tx, quiet bool) error {
+func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -522,7 +529,7 @@ func sqlTryFetchAllQuiet(db DbClient, queryDescription string, query string, arg
 }
 
 // Wrapper around tx.Exec() for auto-logging
-func (dbw *DBWrapper) SqlExecTx(tx *sql.Tx, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+func (dbw *DBWrapper) SqlExecTx(tx DbTransaction, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -555,7 +562,7 @@ func (dbw *DBWrapper) SqlExecTx(tx *sql.Tx, opDescription string, sql string, ar
 }
 
 // No logging, no benchmarking
-func (dbw *DBWrapper) SqlExecTxQuiet(tx *sql.Tx, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+func (dbw *DBWrapper) SqlExecTxQuiet(tx DbTransaction, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
