@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/go-sql-driver/mysql"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"sync"
@@ -71,11 +70,9 @@ func NewTestDBW(db DbClient) DBWrapper {
 }
 
 func TestNewDBWrapper(t *testing.T) {
-	_, err := NewDBWrapper("mysql", "icingadb:icingadb@tcp(127.0.0.1:3306)/icingadb")
-	if err != nil {
-		logrus.Error(err.Error())
-	}
-	assert.Nil(t, err)
+	_, err := NewDBWrapper("mysql", "asdasd")
+	assert.NotNil(t, err)
+	//TODO: Add more tests here
 }
 
 func TestRDBWrapper_CheckConnection(t *testing.T) {
