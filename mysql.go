@@ -26,6 +26,12 @@ type DbTransaction interface {
 	Rollback() error
 }
 
+// This is used in SqlFetchAll and SqlFetchAllQuiet
+type DbClientOrTransaction interface {
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	Exec(query string, args ...interface{}) (sql.Result, error)
+}
+
 // Database wrapper including helper functions
 type DBWrapper struct {
 	Db                    DbClient
@@ -350,7 +356,7 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 }
 
 // Wrapper around Db.SqlQuery() for auto-logging
-func (dbw *DBWrapper) SqlFetchAll(db DbClient, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+func (dbw *DBWrapper) SqlFetchAll(db DbClientOrTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -371,7 +377,7 @@ func (dbw *DBWrapper) SqlFetchAll(db DbClient, queryDescription string, query st
 	}
 }
 
-func sqlTryFetchAll(db DbClient, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
 	benchmarc := icingadb_utils.NewBenchmark()
 	rows, errQuery := db.Query(query, args...)
 	benchmarc.Stop()
@@ -451,7 +457,7 @@ func sqlTryFetchAll(db DbClient, queryDescription string, query string, args ...
 }
 
 // No logging, no benchmarking
-func (dbw *DBWrapper) SqlFetchAllQuiet(db DbClient, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+func (dbw *DBWrapper) SqlFetchAllQuiet(db DbClientOrTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -472,7 +478,7 @@ func (dbw *DBWrapper) SqlFetchAllQuiet(db DbClient, queryDescription string, que
 	}
 }
 
-func sqlTryFetchAllQuiet(db DbClient, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+func sqlTryFetchAllQuiet(db DbClientOrTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
 	rows, errQuery := db.Query(query, args...)
 
 	if errQuery != nil {
