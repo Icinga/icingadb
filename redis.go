@@ -272,3 +272,9 @@ func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([
 		return c, e
 	}
 }
+
+func (rdbw *RDBWrapper) Subscribe() PubSubWrapper {
+	ps := rdbw.Rdb.Subscribe()
+	psw := PubSubWrapper{ps: ps, rdbw: rdbw}
+	return psw
+}
