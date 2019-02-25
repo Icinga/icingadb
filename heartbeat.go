@@ -17,7 +17,7 @@ func Sha1bytes(bytes []byte) []byte {
 func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *icingadb_connection.Environment) error {
 	log.Info("Starting Events broker")
 
-	subscription := rdb.Rdb.Subscribe()
+	subscription := rdb.Subscribe()
 	defer subscription.Close();
 	if err := subscription.Subscribe(
 		"icinga:config:dump", "icinga:config:delete", "icinga:config:update", "icinga:stats"); err != nil {
