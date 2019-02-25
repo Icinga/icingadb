@@ -2,7 +2,7 @@ package icingadb_ha_lib
 
 import (
 	"database/sql"
-	"git.icinga.com/icingadb-connection"
+	"git.icinga.com/icingadb/icingadb-connection-lib"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"sync/atomic"
@@ -100,7 +100,7 @@ func cleanUpInstances(dbw *icingadb_connection.DBWrapper) error {
 	log.WithFields(log.Fields{"context": "HA"}).Info("Cleaning up icingadb_instance")
 
 	errTx := dbw.SqlTransaction(true, true, func(tx *sql.Tx) error {
-		_, errExec := dbw.SqlExec(
+		_, errExec := dbw.SqlExecTx(
 			tx,
 			"delete from icingadb_instance by heartbeat",
 			`DELETE FROM icingadb_instance WHERE ? - heartbeat >= 30`,
@@ -224,7 +224,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 					}
 
 					if len(rows) > 0 {
-						_, errExec := dbw.SqlExecQuiet(
+						_, errExec := dbw.SqlExecTxQuiet(
 							tx,
 							"update icingadb_instance by id",
 							`UPDATE icingadb_instance SET environment_id=?, heartbeat=? WHERE id = ?`,
@@ -236,7 +236,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 							return errExec
 						}
 					} else {
-						_, errExec := dbw.SqlExecQuiet(
+						_, errExec := dbw.SqlExecTxQuiet(
 							tx,
 							"insert into icingadb_instance",
 							`INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, ?)`,
@@ -271,7 +271,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 						justTakenOver = true
 					} else if time.Now().Unix()-rows[0][1].(int64) >= 10 {
 						{
-							_, errExec := dbw.SqlExecQuiet(
+							_, errExec := dbw.SqlExecTxQuiet(
 								tx,
 								"update icingadb_instance by environment_id",
 								`UPDATE icingadb_instance SET responsible=? WHERE environment_id = ?`,
@@ -283,7 +283,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 							}
 						}
 
-						_, errExec := dbw.SqlExecQuiet(
+						_, errExec := dbw.SqlExecTxQuiet(
 							tx,
 							"update icingadb_instance by id",
 							`UPDATE icingadb_instance SET responsible=? WHERE id = ?`,
@@ -297,7 +297,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 						justTakenOver = true
 					}
 				} else {
-					_, errExec := dbw.SqlExecQuiet(
+					_, errExec := dbw.SqlExecTxQuiet(
 						tx,
 						"update icingadb_instance by id",
 						`UPDATE icingadb_instance SET responsible=? WHERE id = ?`,
@@ -362,7 +362,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				}
 
 				if len(rows) > 0 {
-					_, errExec := dbw.SqlExecQuiet(
+					_, errExec := dbw.SqlExecTxQuiet(
 						tx,
 						"update icingadb_instance",
 						`UPDATE icingadb_instance SET responsible=? WHERE id = ?`,

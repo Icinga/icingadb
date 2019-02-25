@@ -2,7 +2,7 @@ package icingadb_ha_lib
 
 import (
 	"encoding/json"
-	"git.icinga.com/icingadb-connection"
+	"git.icinga.com/icingadb/icingadb-connection-lib"
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/assert"
 	"testing"
