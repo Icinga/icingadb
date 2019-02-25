@@ -1,10 +1,15 @@
 package icingadb_ha_lib
 
 import (
+	"git.icinga.com/icingadb/icingadb-connection-lib"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
+
+var testID, _ = uuid.FromBytes(make([]byte, 16))
+var testEnv = make([]byte, 20)
 
 func TestHA_setResponsibility(t *testing.T) {
 	responsibilities := [6]uint32{ resp_ReadyForTakeover, resp_TakeoverNoSync, resp_TakeoverSync, resp_Stop, resp_NotReadyForTakeover }
@@ -31,4 +36,49 @@ func TestHA_icinga2IsAlive(t *testing.T) {
 	assert.True(t, h.icinga2IsAlive(), "Should be alive")
 	h.icinga2MTime = h.icinga2MTime - 15
 	assert.False(t, h.icinga2IsAlive(), "Should be dead")
+}
+
+func Test_cleanUpInstances(t *testing.T) {
+	var dbw, err = icingadb_connection.NewDBWrapper(
+		"mysql",
+		"root:foo@tcp(127.0.0.1:3306)/icingadb?" +
+			"innodb_strict_mode=1&sql_mode='STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION,PIPES_AS_CONCAT,ANSI_QUOTES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER'")
+	assert.NoError(t, err, "SQL error")
+
+	_, err = dbw.SqlExec(
+		"insert into icingadb_instance",
+		`INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, ?)`,
+		testID[:],
+		testEnv,
+		time.Now().Unix() - 25,
+		"n",
+	)
+
+	assert.NoError(t, err, "SQL error")
+
+	rows, err := dbw.SqlFetchAll(dbw.Db, "", "SELECT 1 FROM icingadb_instance WHERE id = ?", testID[:])
+
+	assert.Equal(t, 1, len(rows))
+
+	err = cleanUpInstances(dbw)
+
+	assert.NoError(t, err, "Clean up failed")
+
+	rows, err = dbw.SqlFetchAll(dbw.Db, "", "SELECT 1 FROM icingadb_instance WHERE id = ?", testID[:])
+
+	assert.NoError(t, err, "SQL error")
+
+	assert.Equal(t, 1, len(rows))
+
+	time.Sleep(time.Second * 5)
+
+	err = cleanUpInstances(dbw)
+
+	assert.NoError(t, err, "Clean up failed")
+
+	rows, err = dbw.SqlFetchAll(dbw.Db, "", "SELECT 1 FROM icingadb_instance WHERE id = ?", testID[:])
+
+	assert.NoError(t, err, "SQL error")
+
+	assert.Equal(t, 0, len(rows))
 }
