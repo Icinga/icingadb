@@ -35,7 +35,7 @@ type DBWrapper struct {
 }
 
 func (dbw *DBWrapper) IsConnected() bool {
-	return *dbw.ConnectedAtomic != 0
+	return atomic.LoadUint32(dbw.ConnectedAtomic) != 0
 }
 
 func (dbw *DBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
