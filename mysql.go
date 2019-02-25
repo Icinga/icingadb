@@ -56,6 +56,11 @@ func NewDBWrapper(dbType string, dbDsn string) (*DBWrapper, error) {
 	dbw := DBWrapper{Db: db, ConnectedAtomic: new(uint32)}
 	dbw.ConnectionUpCondition = sync.NewCond(&sync.Mutex{})
 
+	err = dbw.Db.Ping()
+	if err != nil {
+		return nil, err
+	}
+
 	go func() {
 		for {
 			dbw.checkConnection(true)
