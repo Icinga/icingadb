@@ -230,7 +230,7 @@ func (rdbw *RDBWrapper) HGetAll(key string) (map[string]string, error) {
 
 		benchmarc.Stop()
 
-		//DbIoSeconds.WithLabelValues("redis", "hgetall").Observe(benchmarc.Seconds())
+		DbIoSeconds.WithLabelValues("redis", "hgetall").Observe(benchmarc.Seconds())
 
 		log.WithFields(log.Fields{
 			"context":   "redis",
@@ -261,7 +261,7 @@ func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([
 
 		benchmarc.Stop()
 
-		//DbIoSeconds.WithLabelValues("redis", "multi").Observe(benchmarc.Seconds())
+		DbIoSeconds.WithLabelValues("redis", "multi").Observe(benchmarc.Seconds())
 
 		log.WithFields(log.Fields{
 			"context":   "redis",
