@@ -73,7 +73,7 @@ func NewTestDBW(db DbClient) DBWrapper {
 
 func TestNewDBWrapper(t *testing.T) {
 	_, err := NewDBWrapper("mysql", "asdasd")
-	assert.NotNil(t, err)
+	assert.Error(t, err)
 	//TODO: Add more tests here
 }
 
@@ -122,7 +122,7 @@ func TestDBWrapper_SqlCommit(t *testing.T) {
 
 	<- done
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	mockTx.AssertExpectations(t)
 	mockDb.AssertExpectations(t)
 }
@@ -151,7 +151,7 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 
 	<- done
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	mockDb.AssertExpectations(t)
 }
 
@@ -188,7 +188,7 @@ func TestDBWrapper_WithRetry(t *testing.T) {
 		}
 	})
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	assert.Equal(t, 2, tries)
 
 	_, err = dbw.WithRetry(func() (result sql.Result, e error) {
@@ -222,7 +222,7 @@ func TestDBWrapper_SqlQuery(t *testing.T) {
 
 	<- done
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	mockDb.AssertExpectations(t)
 }
 
@@ -250,7 +250,7 @@ func TestDBWrapper_SqlExec(t *testing.T) {
 
 	<- done
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	mockDb.AssertExpectations(t)
 }
 
@@ -278,7 +278,7 @@ func TestDBWrapper_SqlExecQuiet(t *testing.T) {
 
 	<- done
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	mockDb.AssertExpectations(t)
 }
 
@@ -307,7 +307,7 @@ func TestDBWrapper_SqlExecTx(t *testing.T) {
 
 	<- done
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	mockTx.AssertExpectations(t)
 	mockDb.AssertExpectations(t)
 }
@@ -337,7 +337,7 @@ func TestDBWrapper_SqlExecTxQuiet(t *testing.T) {
 
 	<- done
 
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 	mockTx.AssertExpectations(t)
 	mockDb.AssertExpectations(t)
 }
