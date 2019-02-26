@@ -152,6 +152,7 @@ func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, er
 		}
 
 		res, err := dbw.Db.Query(query, args...)
+		DbOperationsQuery.Inc()
 
 		if err != nil {
 			if !dbw.checkConnection(false) {
@@ -187,7 +188,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransactio
 			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
 			benchmarc.Stop()
 
-			//DbIoSeconds.WithLabelValues("mysql", "begin").Observe(benchmarc.Seconds())
+			DbIoSeconds.WithLabelValues("mysql", "begin").Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -221,7 +222,7 @@ func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 			err = tx.Commit()
 			benchmarc.Stop()
 
-			//DbIoSeconds.WithLabelValues("mysql", "commit").Observe(benchmarc.Seconds())
+			DbIoSeconds.WithLabelValues("mysql", "commit").Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -253,7 +254,7 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 			err = tx.Rollback()
 			benchmarc.Stop()
 
-			//DbIoSeconds.WithLabelValues("mysql", "rollback").Observe(benchmarc.Seconds())
+			DbIoSeconds.WithLabelValues("mysql", "rollback").Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -322,12 +323,13 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opDescription st
 			benchmarc = icingadb_utils.NewBenchmark()
 		}
 		res, err := db.Exec(sql, args...)
+		DbOperationsExec.Inc()
 		if !quiet {
 			benchmarc.Stop()
 		}
 
 		if !quiet {
-			//DbIoSeconds.WithLabelValues("mysql", opDescription).Observe(benchmarc.Seconds())
+			DbIoSeconds.WithLabelValues("mysql", opDescription).Observe(benchmarc.Seconds())
 			log.WithFields(log.Fields{
 				"context":       "sql",
 				"benchmark":     benchmarc,
@@ -376,6 +378,7 @@ func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query str
 		benchmarc = icingadb_utils.NewBenchmark()
 	}
 	rows, errQuery := db.Query(query, args...)
+	DbOperationsQuery.Inc()
 	if !quiet {
 		benchmarc.Stop()
 	}
@@ -384,7 +387,7 @@ func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query str
 
 	defer func() {
 		if !quiet {
-			//DbIoSeconds.WithLabelValues("mysql", queryDescription).Observe(benchmarc.Seconds())
+			DbIoSeconds.WithLabelValues("mysql", queryDescription).Observe(benchmarc.Seconds())
 			log.WithFields(log.Fields{
 				"context":       "sql",
 				"benchmark":     benchmarc,
@@ -472,7 +475,7 @@ func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFai
 			benchmarc.Stop()
 		}
 
-		//DbIoSeconds.WithLabelValues("mysql", "transaction").Observe(benchmarc.Seconds())
+		DbIoSeconds.WithLabelValues("mysql", "transaction").Observe(benchmarc.Seconds())
 
 		if !quiet {
 			log.WithFields(log.Fields{
