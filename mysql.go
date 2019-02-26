@@ -163,7 +163,7 @@ func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, er
 }
 
 // Wrapper around Db.BeginTx() for auto-logging
-func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (*sql.Tx, error) {
+func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransaction, error) {
 	var isoLvl sql.IsolationLevel
 	if concurrencySafety {
 		isoLvl = sql.LevelSerializable
@@ -455,7 +455,7 @@ func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query str
 }
 
 // sqlTransaction executes the given function inside a transaction.
-func (dbw DBWrapper) sqlTransactionInternal(concurrencySafety bool, retryOnConnectionFailure bool, quiet bool, f func(*sql.Tx) error) error {
+func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFailure bool, quiet bool, f func(DbTransaction) error) error {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -511,7 +511,7 @@ func (dbw DBWrapper) sqlTransactionInternal(concurrencySafety bool, retryOnConne
 }
 
 // Executes the given function inside a transaction
-func (dbw *DBWrapper) sqlTryTransaction(f func(*sql.Tx) error, concurrencySafety bool, quiet bool) error {
+func (dbw *DBWrapper) sqlTryTransaction(f func(transaction DbTransaction) error, concurrencySafety bool, quiet bool) error {
 	tx, errBegin := dbw.SqlBegin(concurrencySafety, quiet)
 	if errBegin != nil {
 		return errBegin
