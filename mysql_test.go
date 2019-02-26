@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -65,7 +66,7 @@ func (m *DbMock) Exec(query string, args ...interface{}) (sql.Result, error) {
 }
 
 func NewTestDBW(db DbClient) DBWrapper {
-	dbw := DBWrapper{Db: db, ConnectedAtomic: new(uint32)}
+	dbw := DBWrapper{Db: db, ConnectedAtomic: new(uint32), ConnectionLostCounterAtomic: new(uint32)}
 	dbw.ConnectionUpCondition = sync.NewCond(&sync.Mutex{})
 	return dbw
 }
@@ -80,20 +81,20 @@ func TestRDBWrapper_CheckConnection(t *testing.T) {
 	mockDb := new(DbMock)
 	dbw := NewTestDBW(mockDb)
 
-	dbw.ConnectionLostCounter = 180239812
+	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 512312312)
 	mockDb.On("Ping").Return(nil).Once()
 	assert.True(t, dbw.checkConnection(false), "DBWrapper should be connected")
-	assert.Equal(t, 0, dbw.ConnectionLostCounter)
+	assert.Equal(t, uint32(0), atomic.LoadUint32(dbw.ConnectionLostCounterAtomic))
 
-	dbw.ConnectionLostCounter = 0
+	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 0)
 	mockDb.On("Ping").Return(mysql.ErrInvalidConn).Once()
 	assert.False(t, dbw.checkConnection(false), "DBWrapper should not be connected")
-	assert.Equal(t, 0, dbw.ConnectionLostCounter)
+	assert.Equal(t, uint32(0), atomic.LoadUint32(dbw.ConnectionLostCounterAtomic))
 
-	dbw.ConnectionLostCounter = 10
+	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 10)
 	mockDb.On("Ping").Return(mysql.ErrInvalidConn).Once()
 	assert.False(t, dbw.checkConnection(true), "DBWrapper should not be connected")
-	assert.Equal(t, 11, dbw.ConnectionLostCounter)
+	assert.Equal(t, uint32(11), atomic.LoadUint32(dbw.ConnectionLostCounterAtomic))
 }
 
 func TestDBWrapper_SqlCommit(t *testing.T) {
@@ -333,22 +334,22 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 
 	//Should return 5s, if not connected and counter < 4
 	dbw.CompareAndSetConnected(false)
-	dbw.ConnectionLostCounter = 0
+	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 0)
 	assert.Equal(t, 5*time.Second, dbw.getConnectionCheckInterval())
 
 	//Should return 10s, if not connected and 4 <= counter < 8
 	dbw.CompareAndSetConnected(false)
-	dbw.ConnectionLostCounter = 4
+	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 4)
 	assert.Equal(t, 10*time.Second, dbw.getConnectionCheckInterval())
 
 	//Should return 30s, if not connected and 8 <= counter < 11
 	dbw.CompareAndSetConnected(false)
-	dbw.ConnectionLostCounter = 8
+	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 8)
 	assert.Equal(t, 30*time.Second, dbw.getConnectionCheckInterval())
 
 	//Should return 60s, if not connected and 11 <= counter < 14
 	dbw.CompareAndSetConnected(false)
-	dbw.ConnectionLostCounter = 11
+	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 11)
 	assert.Equal(t, 60*time.Second, dbw.getConnectionCheckInterval())
 
 	//dbw.ConnectionLostCounter = 14

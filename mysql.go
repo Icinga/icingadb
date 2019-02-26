@@ -36,7 +36,7 @@ func NewDBWrapper(dbType string, dbDsn string) (*DBWrapper, error) {
 		return nil, err
 	}
 
-	dbw := DBWrapper{Db: db, ConnectedAtomic: new(uint32)}
+	dbw := DBWrapper{Db: db, ConnectedAtomic: new(uint32), ConnectionLostCounterAtomic: new(uint32)}
 	dbw.ConnectionUpCondition = sync.NewCond(&sync.Mutex{})
 
 	err = dbw.Db.Ping()
@@ -56,10 +56,10 @@ func NewDBWrapper(dbType string, dbDsn string) (*DBWrapper, error) {
 
 // Database wrapper including helper functions
 type DBWrapper struct {
-	Db                    DbClient
-	ConnectedAtomic       *uint32 //uint32 to be able to use atomic operations
-	ConnectionUpCondition *sync.Cond
-	ConnectionLostCounter int
+	Db                   		 DbClient
+	ConnectedAtomic  		     *uint32 //uint32 to be able to use atomic operations
+	ConnectionUpCondition		 *sync.Cond
+	ConnectionLostCounterAtomic	 *uint32 //uint32 to be able to use atomic operations
 }
 
 func (dbw *DBWrapper) IsConnected() bool {
@@ -76,13 +76,14 @@ func (dbw *DBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
 
 func (dbw *DBWrapper) getConnectionCheckInterval() time.Duration {
 	if !dbw.IsConnected() {
-		if dbw.ConnectionLostCounter < 4 {
+		v := atomic.LoadUint32(dbw.ConnectionLostCounterAtomic)
+		if v < 4 {
 			return 5 * time.Second
-		} else if dbw.ConnectionLostCounter < 8 {
+		} else if v < 8 {
 			return 10 * time.Second
-		} else if dbw.ConnectionLostCounter < 11 {
+		} else if v < 11 {
 			return 30 * time.Second
-		} else if dbw.ConnectionLostCounter < 14 {
+		} else if v < 14 {
 			return 60 * time.Second
 		} else {
 			log.Fatal("Could not connect to SQL for over 5 minutes. Shutting down...")
@@ -101,7 +102,7 @@ func (dbw *DBWrapper) checkConnection(isTicker bool) bool {
 				"error":   err,
 			}).Error("SQL connection lost. Trying to reconnect")
 		} else if isTicker {
-			dbw.ConnectionLostCounter++
+			atomic.AddUint32(dbw.ConnectionLostCounterAtomic, 1)
 
 			log.WithFields(log.Fields{
 				"context": "sql",
@@ -113,7 +114,7 @@ func (dbw *DBWrapper) checkConnection(isTicker bool) bool {
 	} else {
 		if dbw.CompareAndSetConnected(true) {
 			log.Info("SQL connection established")
-			dbw.ConnectionLostCounter = 0
+			atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 0)
 			dbw.ConnectionUpCondition.Broadcast()
 		}
 
@@ -178,7 +179,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransactio
 		}
 
 		var err error
-		var tx *sql.Tx
+		var tx DbTransaction
 		if quiet {
 			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
 		} else {
