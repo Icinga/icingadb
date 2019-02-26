@@ -12,10 +12,10 @@ var testID, _ = uuid.FromBytes(make([]byte, 16))
 var testEnv = make([]byte, 20)
 
 func TestHA_setResponsibility(t *testing.T) {
-	responsibilities := [6]uint32{ resp_ReadyForTakeover, resp_TakeoverNoSync, resp_TakeoverSync, resp_Stop, resp_NotReadyForTakeover }
+	responsibilities := [6]int32{ resp_ReadyForTakeover, resp_TakeoverNoSync, resp_TakeoverSync, resp_Stop, resp_NotReadyForTakeover }
 	h := new(HA)
 
-	previous := uint32(0)
+	previous := int32(0)
 	for _,r := range responsibilities {
 		assert.Equal(t, previous, h.setResponsibility(r), "Should be equal")
 		previous = r
@@ -36,6 +36,39 @@ func TestHA_icinga2IsAlive(t *testing.T) {
 	assert.True(t, h.icinga2IsAlive(), "Should be alive")
 	h.icinga2MTime = h.icinga2MTime - 15
 	assert.False(t, h.icinga2IsAlive(), "Should be dead")
+}
+
+func TestHA_handleResponsibility(t *testing.T) {
+	h := new(HA)
+	h.ourEnv = &icingadb_connection.Environment{make([]byte, 20), "test"}
+	h.setResponsibility(resp_ReadyForTakeover)
+	var cont bool
+	var na int
+
+	print(h.icinga2MTime)
+
+	cont, na = h.handleResponsibility()
+	assert.True(t, cont)
+	assert.Equal(t, action_TryTakeover, na)
+	assert.Equal(t, resp_NotReadyForTakeover, h.getResponsibility())
+
+	//AWAKEN
+	h.icinga2MTime = time.Now().Unix()
+	cont, na = h.handleResponsibility()
+	assert.True(t, cont)
+	assert.Equal(t, resp_ReadyForTakeover, h.getResponsibility())
+
+	h.setResponsibility(resp_TakeoverSync)
+	cont, na = h.handleResponsibility()
+	assert.False(t, cont)
+	assert.Equal(t, action_DoTakeover, na)
+	assert.Equal(t, resp_TakeoverSync, h.getResponsibility())
+
+	//SLEEP
+	h.icinga2MTime = 0
+	cont, na = h.handleResponsibility()
+	assert.True(t, cont)
+	assert.Equal(t, na, action_DoTakeover)
 }
 
 func Test_cleanUpInstances(t *testing.T) {
