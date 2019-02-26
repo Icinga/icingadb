@@ -1,4 +1,4 @@
-package icingadb_ha_lib
+package icingadb_ha
 
 import (
 	"git.icinga.com/icingadb/icingadb-connection-lib"

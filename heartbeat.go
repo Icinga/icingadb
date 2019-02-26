@@ -1,4 +1,4 @@
-package icingadb_ha_lib
+package icingadb_ha
 
 import (
 	"crypto/sha1"
