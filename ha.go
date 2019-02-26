@@ -112,6 +112,72 @@ func cleanUpInstances(dbw *icingadb_connection.DBWrapper) error {
 	return errTx
 }
 
+func (h *HA) handleResponsibility() (cont bool, nextAction int) {
+	switch h.getResponsibility() {
+	case resp_ReadyForTakeover:
+		if !h.icinga2IsAlive() {
+			log.WithFields(log.Fields{
+				"context": "HA",
+				"uuid":    h.ourUUID.String(),
+				"env":     h.ourEnv.Name,
+			}).Warn("Icinga 2 detected as not running, stopping.")
+
+			h.setResponsibility(resp_NotReadyForTakeover)
+			cont = true
+		}
+
+		nextAction = action_TryTakeover
+	case resp_TakeoverNoSync:
+		if !h.icinga2IsAlive() {
+			log.WithFields(log.Fields{
+				"context": "HA",
+				"uuid":    h.ourUUID.String(),
+				"env":     h.ourEnv.Name,
+			}).Warn("Icinga 2 detected as not running, stopping.")
+
+			h.setResponsibility(resp_Stop)
+			cont = true
+		}
+
+		nextAction = action_TryTakeover
+	case resp_TakeoverSync:
+		if !h.icinga2IsAlive() {
+			log.WithFields(log.Fields{
+				"context": "HA",
+				"uuid":    h.ourUUID.String(),
+				"env":     h.ourEnv.Name,
+			}).Warn("Icinga 2 detected as not running, stopping.")
+
+			h.setResponsibility(resp_Stop)
+			cont = true
+		}
+
+		nextAction = action_DoTakeover
+	case resp_Stop:
+		if atomic.LoadUint64(&h.runningCriticalOperations) == 0 && time.Now().Unix()-atomic.LoadInt64(&h.lastCriticalOperationEnd) >= 5 {
+			nextAction = action_CeaseOperation
+		} else {
+			nextAction = action_DoTakeover
+		}
+		cont = false
+	case resp_NotReadyForTakeover:
+		if h.icinga2IsAlive() {
+			log.WithFields(log.Fields{
+				"context": "HA",
+				"uuid":    h.ourUUID.String(),
+				"env":     h.ourEnv.Name,
+			}).Info("Icinga 2 detected as running again.")
+
+			h.setResponsibility(resp_ReadyForTakeover)
+			cont = true
+		}
+
+		nextAction = action_NoAction
+	}
+
+	return
+}
+
 func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment) error {
 	log.WithFields(log.Fields{"context": "HA"}).Info("Waiting for Icinga 2 to tell us its environment")
 
@@ -135,72 +201,15 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 	everySecond := time.NewTicker(time.Second)
 	defer everySecond.Stop()
 
-	var nextAction = 0
 	var theirUUID uuid.UUID
 
 	// Even if Icinga 2 is offline now, Redis may be filled
 	h.Icinga2HeartBeat()
 
 	for {
-		switch h.getResponsibility() {
-		case resp_ReadyForTakeover:
-			if !h.icinga2IsAlive() {
-				log.WithFields(log.Fields{
-					"context": "HA",
-					"uuid":    h.ourUUID.String(),
-					"env":     h.ourEnv.Name,
-				}).Warn("Icinga 2 detected as not running, stopping.")
-
-				h.setResponsibility(resp_NotReadyForTakeover)
-				continue
-			}
-
-			nextAction = action_TryTakeover
-		case resp_TakeoverNoSync:
-			if !h.icinga2IsAlive() {
-				log.WithFields(log.Fields{
-					"context": "HA",
-					"uuid":    h.ourUUID.String(),
-					"env":     h.ourEnv.Name,
-				}).Warn("Icinga 2 detected as not running, stopping.")
-
-				h.setResponsibility(resp_Stop)
-				continue
-			}
-
-			nextAction = action_TryTakeover
-		case resp_TakeoverSync:
-			if !h.icinga2IsAlive() {
-				log.WithFields(log.Fields{
-					"context": "HA",
-					"uuid":    h.ourUUID.String(),
-					"env":     h.ourEnv.Name,
-				}).Warn("Icinga 2 detected as not running, stopping.")
-
-				h.setResponsibility(resp_Stop)
-				continue
-			}
-
-			nextAction = action_DoTakeover
-		case resp_Stop:
-			if atomic.LoadUint64(&h.runningCriticalOperations) == 0 && time.Now().Unix()-atomic.LoadInt64(&h.lastCriticalOperationEnd) >= 5 {
-				nextAction = action_CeaseOperation
-			} else {
-				nextAction = action_DoTakeover
-			}
-		case resp_NotReadyForTakeover:
-			if h.icinga2IsAlive() {
-				log.WithFields(log.Fields{
-					"context": "HA",
-					"uuid":    h.ourUUID.String(),
-					"env":     h.ourEnv.Name,
-				}).Info("Icinga 2 detected as running again.")
-
-				h.setResponsibility(resp_ReadyForTakeover)
-				continue
-			}
-
-			nextAction = action_NoAction
+		cont, nextAction := h.handleResponsibility()
+		if cont {
+			continue
 		}
 
 		switch nextAction {
