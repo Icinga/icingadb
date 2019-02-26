@@ -34,6 +34,7 @@ const (
 
 type HA struct {
 	ourUUID      uuid.UUID
+	ourEnv *icingadb_connection.Environment
 	icinga2MTime int64
 	// responsibility tells whether we're responsible for our environment.
 	responsibility uint32
@@ -114,10 +115,8 @@ func cleanUpInstances(dbw *icingadb_connection.DBWrapper) error {
 func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment) error {
 	log.WithFields(log.Fields{"context": "HA"}).Info("Waiting for Icinga 2 to tell us its environment")
 
-	var env *icingadb_connection.Environment = nil
 	var hasEnv bool
-
-	env, hasEnv = <-chEnv
+	h.ourEnv, hasEnv = <-chEnv
 	if !hasEnv {
 		return nil
 	}
@@ -130,7 +129,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 	log.WithFields(log.Fields{
 		"context": "HA",
 		"uuid":    h.ourUUID.String(),
-		"env":     env.Name,
+		"env":     h.ourEnv.Name,
 	}).Info("Received environment from Icinga 2")
 
 	everySecond := time.NewTicker(time.Second)
@@ -149,7 +148,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				log.WithFields(log.Fields{
 					"context": "HA",
 					"uuid":    h.ourUUID.String(),
-					"env":     env.Name,
+					"env":     h.ourEnv.Name,
 				}).Warn("Icinga 2 detected as not running, stopping.")
 
 				h.setResponsibility(resp_NotReadyForTakeover)
@@ -162,7 +161,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				log.WithFields(log.Fields{
 					"context": "HA",
 					"uuid":    h.ourUUID.String(),
-					"env":     env.Name,
+					"env":     h.ourEnv.Name,
 				}).Warn("Icinga 2 detected as not running, stopping.")
 
 				h.setResponsibility(resp_Stop)
@@ -175,7 +174,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				log.WithFields(log.Fields{
 					"context": "HA",
 					"uuid":    h.ourUUID.String(),
-					"env":     env.Name,
+					"env":     h.ourEnv.Name,
 				}).Warn("Icinga 2 detected as not running, stopping.")
 
 				h.setResponsibility(resp_Stop)
@@ -194,7 +193,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				log.WithFields(log.Fields{
 					"context": "HA",
 					"uuid":    h.ourUUID.String(),
-					"env":     env.Name,
+					"env":     h.ourEnv.Name,
 				}).Info("Icinga 2 detected as running again.")
 
 				h.setResponsibility(resp_ReadyForTakeover)
@@ -227,7 +226,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 							tx,
 							"update icingadb_instance by id",
 							`UPDATE icingadb_instance SET environment_id=?, heartbeat=? WHERE id = ?`,
-							env.ID,
+							h.ourEnv.ID,
 							time.Now().Unix(),
 							h.ourUUID[:],
 						)
@@ -240,7 +239,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 							"insert into icingadb_instance",
 							`INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, ?)`,
 							h.ourUUID[:],
-							env.ID,
+							h.ourEnv.ID,
 							time.Now().Unix(),
 							"n",
 						)
@@ -256,7 +255,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 					tx,
 					"select from icingadb_instance by environment_id, responsible",
 					`SELECT id, heartbeat FROM icingadb_instance WHERE environment_id = ? AND responsible = ?`,
-					env.ID,
+					h.ourEnv.ID,
 					"y",
 				)
 				if errFA != nil {
@@ -275,7 +274,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 								"update icingadb_instance by environment_id",
 								`UPDATE icingadb_instance SET responsible=? WHERE environment_id = ?`,
 								"n",
-								env.ID,
+								h.ourEnv.ID,
 							)
 							if errExec != nil {
 								return errExec
@@ -327,7 +326,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 						if h.setResponsibility(resp_TakeoverSync) == resp_TakeoverNoSync {
 							log.WithFields(log.Fields{
 								"context":    "HA",
-								"env":        env.Name,
+								"env":        h.ourEnv.Name,
 								"their_uuid": theirUUID.String(),
 							}).Info("Taking over")
 						}
@@ -342,7 +341,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 			if !justTakenOver {
 				log.WithFields(log.Fields{
 					"context":    "HA",
-					"env":        env.Name,
+					"env":        h.ourEnv.Name,
 					"their_uuid": theirUUID.String(),
 				}).Info("Other instance is responsible")
 			}
@@ -352,7 +351,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 					tx,
 					"select from icingadb_instance by environment_id, responsible, heartbeat",
 					`SELECT 1 FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND ? - heartbeat < 10`,
-					env.ID,
+					h.ourEnv.ID,
 					"n",
 					time.Now().Unix(),
 				)
@@ -380,7 +379,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 
 			log.WithFields(log.Fields{
 				"context": "HA",
-				"env":     env.Name,
+				"env":     h.ourEnv.Name,
 			}).Info("Other instance is responsible. Ceasing operations.")
 
 			h.responsibleSince = time.Time{}
@@ -388,7 +387,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 		}
 
 		select {
-		case env, hasEnv = <-chEnv:
+		case h.ourEnv, hasEnv = <-chEnv:
 			if !hasEnv {
 				return nil
 			}
