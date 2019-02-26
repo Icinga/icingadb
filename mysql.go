@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"git.icinga.com/icingadb/icingadb-utils-lib"
 	log "github.com/sirupsen/logrus"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,26 +27,6 @@ type DbTransaction interface {
 	DbClientOrTransaction
 	Commit() error
 	Rollback() error
-}
-
-// Database wrapper including helper functions
-type DBWrapper struct {
-	Db                    DbClient
-	ConnectedAtomic       *uint32 //uint32 to be able to use atomic operations
-	ConnectionUpCondition *sync.Cond
-	ConnectionLostCounter int
-}
-
-func (dbw *DBWrapper) IsConnected() bool {
-	return atomic.LoadUint32(dbw.ConnectedAtomic) != 0
-}
-
-func (dbw *DBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
-	if connected {
-		return atomic.CompareAndSwapUint32(dbw.ConnectedAtomic, 0, 1)
-	} else {
-		return atomic.CompareAndSwapUint32(dbw.ConnectedAtomic, 1, 0)
-	}
 }
 
 func NewDBWrapper(dbType string, dbDsn string) (*DBWrapper, error) {
@@ -75,6 +54,26 @@ func NewDBWrapper(dbType string, dbDsn string) (*DBWrapper, error) {
 	return &dbw, nil
 }
 
+// Database wrapper including helper functions
+type DBWrapper struct {
+	Db                    DbClient
+	ConnectedAtomic       *uint32 //uint32 to be able to use atomic operations
+	ConnectionUpCondition *sync.Cond
+	ConnectionLostCounter int
+}
+
+func (dbw *DBWrapper) IsConnected() bool {
+	return atomic.LoadUint32(dbw.ConnectedAtomic) != 0
+}
+
+func (dbw *DBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
+	if connected {
+		return atomic.CompareAndSwapUint32(dbw.ConnectedAtomic, 0, 1)
+	} else {
+		return atomic.CompareAndSwapUint32(dbw.ConnectedAtomic, 1, 0)
+	}
+}
+
 func (dbw *DBWrapper) getConnectionCheckInterval() time.Duration {
 	if !dbw.IsConnected() {
 		if dbw.ConnectionLostCounter < 4 {
@@ -91,25 +90,6 @@ func (dbw *DBWrapper) getConnectionCheckInterval() time.Duration {
 	}
 
 	return 15 * time.Second
-}
-
-func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, error) {
-	for {
-		if !dbw.IsConnected() {
-			dbw.WaitForConnection()
-			continue
-		}
-
-		res, err := dbw.Db.Query(query, args...)
-
-		if err != nil {
-			if !dbw.checkConnection(false) {
-				continue
-			}
-		}
-
-		return res, err
-	}
 }
 
 func (dbw *DBWrapper) checkConnection(isTicker bool) bool {
@@ -147,99 +127,38 @@ func (dbw *DBWrapper) WaitForConnection() {
 	dbw.ConnectionUpCondition.L.Unlock()
 }
 
-// SqlTransaction executes the given function inside a transaction.
-func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFailure bool, f func(*sql.Tx) error) error {
+func (dbw *DBWrapper) WithRetry(f func() (sql.Result, error)) (sql.Result, error) {
+	for {
+		res, err := f()
+
+		if err != nil {
+			if isRetryableError(err) {
+				continue
+			} else {
+				return nil, err
+			}
+		}
+
+		return res, err
+	}
+}
+
+func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
 			continue
 		}
 
-		benchmarc := icingadb_utils.NewBenchmark()
-		errTx := dbw.sqlTryTransaction(f, concurrencySafety, false)
-		benchmarc.Stop()
+		res, err := dbw.Db.Query(query, args...)
 
-		//DbIoSeconds.WithLabelValues("mysql", "transaction").Observe(benchmarc.Seconds())
-
-		log.WithFields(log.Fields{
-			"context":   "sql",
-			"benchmark": benchmarc,
-		}).Debug("Executed transaction")
-
-		if errTx != nil {
-			//TODO: Do this only for concurrencySafety = true, once we figure out the serialization errors.
-			if isSerializationFailure(errTx) {
-				log.WithFields(log.Fields{
-					"context": "sql",
-					"error":   errTx,
-				}).Debug("Repeating transaction")
+		if err != nil {
+			if !dbw.checkConnection(false) {
 				continue
 			}
-
-			if !dbw.checkConnection(false) {
-				if retryOnConnectionFailure {
-					continue
-				} else {
-					return MysqlConnectionError{"Transaction failed duo to a connection error"}
-				}
-			}
-
-			log.WithFields(log.Fields{
-				"context": "sql",
-				"error":   errTx,
-			}).Warn("SQL error occurred")
 		}
 
-		return errTx
-	}
-}
-
-// Executes the given function inside a transaction
-func (dbw *DBWrapper) sqlTryTransaction(f func(*sql.Tx) error, concurrencySafety bool, quiet bool) error {
-	tx, errBegin := dbw.SqlBegin(concurrencySafety, quiet)
-	if errBegin != nil {
-		return errBegin
-	}
-
-	errTx := f(tx)
-	if errTx != nil {
-		dbw.SqlRollback(tx, quiet)
-		return errTx
-	}
-
-	return dbw.SqlCommit(tx, quiet)
-}
-
-// SqlTransaction executes the given function inside a transaction.
-func (dbw *DBWrapper) SqlTransactionQuiet(concurrencySafety bool, retryOnConnectionFailure bool, f func(*sql.Tx) error) error {
-	for {
-		if !dbw.IsConnected() {
-			dbw.WaitForConnection()
-			continue
-		}
-
-		errTx := dbw.sqlTryTransaction(f, concurrencySafety, true)
-		if errTx != nil {
-			//TODO: Do this only for concurrencySafety = true, once we figure out the serialization errors.
-			if isSerializationFailure(errTx) {
-				continue
-			}
-
-			if !dbw.checkConnection(false) {
-				if retryOnConnectionFailure {
-					continue
-				} else {
-					return MysqlConnectionError{"Transaction failed duo to a connection error"}
-				}
-			}
-
-			// We still log errors
-			log.WithFields(log.Fields{
-				"context": "sql",
-				"error":   errTx,
-			}).Warn("SQL error occurred")
-		}
-		return errTx
+		return res, err
 	}
 }
 
@@ -353,15 +272,90 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 	}
 }
 
-// Wrapper around Db.SqlQuery() for auto-logging
-func (dbw *DBWrapper) SqlFetchAll(db DbClientOrTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+// Wrapper around sql.Exec() for auto-logging
+func (dbw *DBWrapper) SqlExec(opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+	return dbw.sqlExecInternal(dbw.Db, opDescription, sql, false, args...)
+}
+
+// No logging, no benchmarking
+func (dbw *DBWrapper) SqlExecQuiet(opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+	return dbw.sqlExecInternal(dbw.Db, opDescription, sql, true, args...)
+}
+
+// Wrapper around tx.Exec() for auto-logging
+func (dbw *DBWrapper) SqlExecTx(tx DbTransaction, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+	return dbw.sqlExecInternal(tx, opDescription, sql, false, args...)
+}
+
+// No logging, no benchmarking
+func (dbw *DBWrapper) SqlExecTxQuiet(tx DbTransaction, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
+	return dbw.sqlExecInternal(tx, opDescription, sql, true, args...)
+}
+
+func (dbw *DBWrapper) SqlFetchAll(queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+	return dbw.sqlFetchAllInternal(dbw.Db, queryDescription, query, false, args...)
+}
+
+func (dbw *DBWrapper) SqlFetchAllQuiet(queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+	return dbw.sqlFetchAllInternal(dbw.Db, queryDescription, query, true, args...)
+}
+
+func (dbw *DBWrapper) SqlFetchAllTx(tx DbTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+	return dbw.sqlFetchAllInternal(tx, queryDescription, query, false, args...)
+}
+
+func (dbw *DBWrapper) SqlFetchAllTxQuiet(tx DbTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+	return dbw.sqlFetchAllInternal(tx, queryDescription, query, true, args...)
+}
+
+// Wrapper around sql.Exec() for auto-logging
+func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opDescription string, sql string, quiet bool, args ...interface{}) (sql.Result, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
 			continue
 		}
 
-		res, err := sqlTryFetchAll(db, queryDescription, query, args...)
+		var benchmarc *icingadb_utils.Benchmark
+		if !quiet {
+			benchmarc = icingadb_utils.NewBenchmark()
+		}
+		res, err := db.Exec(sql, args...)
+		if !quiet {
+			benchmarc.Stop()
+		}
+
+		if !quiet {
+			//DbIoSeconds.WithLabelValues("mysql", opDescription).Observe(benchmarc.Seconds())
+			log.WithFields(log.Fields{
+				"context":       "sql",
+				"benchmark":     benchmarc,
+				"affected_rows": prettyPrintedRowsAffected{res},
+				"args":          prettyPrintedArgs{args},
+				"query":         prettyPrintedSql{sql},
+			}).Debug("Finished Exec")
+		}
+
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+		}
+
+		return res, err
+	}
+}
+
+// Wrapper around Db.SqlQuery() for auto-logging
+func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryDescription string, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
+
+		res, err := sqlTryFetchAll(db, queryDescription, query, quiet, args...)
 
 		if err != nil {
 			if _, isDb := db.(*sql.DB); isDb {
@@ -375,23 +369,29 @@ func (dbw *DBWrapper) SqlFetchAll(db DbClientOrTransaction, queryDescription str
 	}
 }
 
-func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
-	benchmarc := icingadb_utils.NewBenchmark()
+func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
+	var benchmarc *icingadb_utils.Benchmark
+	if !quiet {
+		benchmarc = icingadb_utils.NewBenchmark()
+	}
 	rows, errQuery := db.Query(query, args...)
-	benchmarc.Stop()
-
-	//DbIoSeconds.WithLabelValues("mysql", queryDescription).Observe(benchmarc.Seconds())
+	if !quiet {
+		benchmarc.Stop()
+	}
 
 	rowsCount := 0
 
 	defer func() {
-		log.WithFields(log.Fields{
-			"context":       "sql",
-			"benchmark":     benchmarc,
-			"query":         prettyPrintedSql{query},
-			"args":          prettyPrintedArgs{args},
-			"affected_Rows": rowsCount,
-		}).Debug("Finished FetchAll")
+		if !quiet {
+			//DbIoSeconds.WithLabelValues("mysql", queryDescription).Observe(benchmarc.Seconds())
+			log.WithFields(log.Fields{
+				"context":       "sql",
+				"benchmark":     benchmarc,
+				"query":         prettyPrintedSql{query},
+				"args":          prettyPrintedArgs{args},
+				"affected_Rows": rowsCount,
+			}).Debug("Finished FetchAll")
+		}
 	}()
 
 	if errQuery != nil {
@@ -454,214 +454,74 @@ func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query str
 	return res, nil
 }
 
-// No logging, no benchmarking
-func (dbw *DBWrapper) SqlFetchAllQuiet(db DbClientOrTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
+// sqlTransaction executes the given function inside a transaction.
+func (dbw DBWrapper) sqlTransactionInternal(concurrencySafety bool, retryOnConnectionFailure bool, quiet bool, f func(*sql.Tx) error) error {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
 			continue
 		}
 
-		res, err := sqlTryFetchAllQuiet(db, queryDescription, query, args...)
+		var benchmarc *icingadb_utils.Benchmark
+		if !quiet {
+			benchmarc = icingadb_utils.NewBenchmark()
+		}
+		errTx := dbw.sqlTryTransaction(f, concurrencySafety, false)
+		if !quiet {
+			benchmarc.Stop()
+		}
 
-		if err != nil {
-			if _, isDb := db.(*sql.DB); isDb {
-				if !dbw.checkConnection(false) {
+		//DbIoSeconds.WithLabelValues("mysql", "transaction").Observe(benchmarc.Seconds())
+
+		if !quiet {
+			log.WithFields(log.Fields{
+				"context":   "sql",
+				"benchmark": benchmarc,
+			}).Debug("Executed transaction")
+		}
+
+		if errTx != nil {
+			//TODO: Do this only for concurrencySafety = true, once we figure out the serialization errors.
+			if isSerializationFailure(errTx) {
+				if !quiet {
+					log.WithFields(log.Fields{
+						"context": "sql",
+						"error":   errTx,
+					}).Debug("Repeating transaction")
+				}
+				continue
+			}
+
+			if !dbw.checkConnection(false) {
+				if retryOnConnectionFailure {
 					continue
+				} else {
+					return MysqlConnectionError{"Transaction failed duo to a connection error"}
 				}
 			}
+
+			log.WithFields(log.Fields{
+				"context": "sql",
+				"error":   errTx,
+			}).Warn("SQL error occurred")
 		}
 
-		return res, err
+		return errTx
 	}
 }
 
-func sqlTryFetchAllQuiet(db DbClientOrTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
-	rows, errQuery := db.Query(query, args...)
-
-	if errQuery != nil {
-		return [][]interface{}{}, errQuery
+// Executes the given function inside a transaction
+func (dbw *DBWrapper) sqlTryTransaction(f func(*sql.Tx) error, concurrencySafety bool, quiet bool) error {
+	tx, errBegin := dbw.SqlBegin(concurrencySafety, quiet)
+	if errBegin != nil {
+		return errBegin
 	}
 
-	defer rows.Close()
-
-	columnTypes, errCT := rows.ColumnTypes()
-	if errCT != nil {
-		return [][]interface{}{}, errCT
+	errTx := f(tx)
+	if errTx != nil {
+		dbw.SqlRollback(tx, quiet)
+		return errTx
 	}
 
-	colsPerRow := len(columnTypes)
-	buf := list.New()
-	bridges := make([]dbTypeBridge, colsPerRow)
-	scanDest := make([]interface{}, colsPerRow)
-
-	for i, columnType := range columnTypes {
-		typ := columnType.DatabaseTypeName()
-		factory, hasFactory := dbTypeBridgeFactories[typ]
-		if hasFactory {
-			bridges[i] = factory()
-		} else {
-			bridges[i] = &dbBrokenBridge{typ: typ}
-		}
-
-		scanDest[i] = bridges[i]
-	}
-
-	for {
-		if rows.Next() {
-			if errScan := rows.Scan(scanDest...); errScan != nil {
-				return [][]interface{}{}, errScan
-			}
-
-			row := make([]interface{}, colsPerRow)
-
-			for i, bridge := range bridges {
-				row[i] = bridge.Result()
-			}
-
-			buf.PushBack(row)
-		} else if errNx := rows.Err(); errNx == nil {
-			break
-		} else {
-			return nil, errNx
-		}
-	}
-
-	res := make([][]interface{}, buf.Len())
-
-	for current, i := buf.Front(), 0; current != nil; current = current.Next() {
-		res[i] = current.Value.([]interface{})
-		i++
-	}
-
-	return res, nil
-}
-
-// Wrapper around tx.Exec() for auto-logging
-func (dbw *DBWrapper) SqlExecTx(tx DbTransaction, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	for {
-		if !dbw.IsConnected() {
-			dbw.WaitForConnection()
-			continue
-		}
-
-		benchmarc := icingadb_utils.NewBenchmark()
-		res, err := tx.Exec(sql, args...)
-		benchmarc.Stop()
-
-		//DbIoSeconds.WithLabelValues("mysql", opDescription).Observe(benchmarc.Seconds())
-
-		log.WithFields(log.Fields{
-			"context":       "sql",
-			"benchmark":     benchmarc,
-			"affected_rows": prettyPrintedRowsAffected{res},
-			"args":          prettyPrintedArgs{args},
-			"query":         prettyPrintedSql{sql},
-		}).Debug("Finished Exec")
-
-
-		if err != nil {
-			if !dbw.checkConnection(false) {
-				continue
-			}
-		}
-
-		return res, err
-	}
-}
-
-// No logging, no benchmarking
-func (dbw *DBWrapper) SqlExecTxQuiet(tx DbTransaction, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	for {
-		if !dbw.IsConnected() {
-			dbw.WaitForConnection()
-			continue
-		}
-
-		res, err := tx.Exec(sql, args...)
-
-		if err != nil {
-			if !dbw.checkConnection(false) {
-				continue
-			}
-		}
-
-		return res, err
-	}
-}
-
-// Wrapper around sql.Exec() for auto-logging
-func (dbw *DBWrapper) SqlExec(opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	for {
-		if !dbw.IsConnected() {
-			dbw.WaitForConnection()
-			continue
-		}
-
-		benchmarc := icingadb_utils.NewBenchmark()
-		res, err := dbw.Db.Exec(sql, args...)
-		benchmarc.Stop()
-
-		//DbIoSeconds.WithLabelValues("mysql", opDescription).Observe(benchmarc.Seconds())
-
-		log.WithFields(log.Fields{
-			"context":       "sql",
-			"benchmark":     benchmarc,
-			"affected_rows": prettyPrintedRowsAffected{res},
-			"args":          prettyPrintedArgs{args},
-			"query":         prettyPrintedSql{sql},
-		}).Debug("Finished Exec")
-
-
-		if err != nil {
-			if !dbw.checkConnection(false) {
-				continue
-			}
-		}
-
-		return res, err
-	}
-}
-
-// No logging, no benchmarking
-func (dbw *DBWrapper) SqlExecQuiet(opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	for {
-		if !dbw.IsConnected() {
-			dbw.WaitForConnection()
-			continue
-		}
-
-		res, err := dbw.Db.Exec(sql, args...)
-
-		if err != nil {
-			if !dbw.checkConnection(false) {
-				continue
-			}
-		}
-
-		return res, err
-	}
-}
-
-func IsRetryableError(err error) bool {
-	if strings.Contains(err.Error(), "Deadlock found when trying to get lock") {
-		return true
-	}
-	return false
-}
-
-func (dbw *DBWrapper) WithRetry(f func() (sql.Result, error)) (sql.Result, error) {
-	for {
-		res, err := f()
-
-		if err != nil {
-			if IsRetryableError(err) {
-				continue
-			} else {
-				return nil, err
-			}
-		}
-
-		return res, err
-	}
+	return dbw.SqlCommit(tx, quiet)
 }

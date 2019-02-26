@@ -364,3 +364,10 @@ func MakePlaceholderList(x int) string {
 
 	return string(runes)
 }
+
+func isRetryableError(err error) bool {
+	if strings.Contains(err.Error(), "Deadlock found when trying to get lock") {
+		return true
+	}
+	return false
+}
