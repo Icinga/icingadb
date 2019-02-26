@@ -37,7 +37,7 @@ type HA struct {
 	ourEnv *icingadb_connection.Environment
 	icinga2MTime int64
 	// responsibility tells whether we're responsible for our environment.
-	responsibility uint32
+	responsibility int32
 	// responsibleSince tells since when we're responsible for our environment.
 	responsibleSince time.Time
 	// runningCriticalOperations counts the currently running critical operations.
@@ -414,11 +414,11 @@ func (h *HA) icinga2IsAlive() bool {
 }
 
 // getResponsibility gets the responsibility.
-func (h *HA) getResponsibility() uint32 {
-	return atomic.LoadUint32(&h.responsibility)
+func (h *HA) getResponsibility() int {
+	return int(atomic.LoadInt32(&h.responsibility))
 }
 
 // setResponsibility sets the responsibility and returns the previous one.
-func (h *HA) setResponsibility(r uint32) uint32 {
-	return atomic.SwapUint32(&h.responsibility, uint32(r))
+func (h *HA) setResponsibility(r int32) int32 {
+	return atomic.SwapInt32(&h.responsibility, r)
 }
