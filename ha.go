@@ -1,7 +1,6 @@
 package icingadb_ha
 
 import (
-	"database/sql"
 	"git.icinga.com/icingadb/icingadb-connection-lib"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -99,7 +98,7 @@ func cleanUpInstances(dbw *icingadb_connection.DBWrapper) error {
 
 	log.WithFields(log.Fields{"context": "HA"}).Info("Cleaning up icingadb_instance")
 
-	errTx := dbw.SqlTransaction(true, true, func(tx *sql.Tx) error {
+	errTx := dbw.SqlTransaction(true, true, false, func(tx icingadb_connection.DbTransaction) error {
 		_, errExec := dbw.SqlExecTx(
 			tx,
 			"delete from icingadb_instance by heartbeat",
@@ -211,9 +210,9 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 		case action_TryTakeover, action_DoTakeover:
 			var justTakenOver bool
 
-			errTx := dbw.SqlTransactionQuiet(true, true, func(tx *sql.Tx) error {
+			errTx := dbw.SqlTransaction(true, true, true, func(tx icingadb_connection.DbTransaction) error {
 				{
-					rows, errFA := dbw.SqlFetchAllQuiet(
+					rows, errFA := dbw.SqlFetchAllTxQuiet(
 						tx,
 						"select from icingadb_instance by id",
 						`SELECT 1 FROM icingadb_instance WHERE id = ?`,
@@ -253,7 +252,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 
 				justTakenOver = false
 
-				rows, errFA := dbw.SqlFetchAllQuiet(
+				rows, errFA := dbw.SqlFetchAllTxQuiet(
 					tx,
 					"select from icingadb_instance by environment_id, responsible",
 					`SELECT id, heartbeat FROM icingadb_instance WHERE environment_id = ? AND responsible = ?`,
@@ -348,8 +347,8 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				}).Info("Other instance is responsible")
 			}
 		case action_CeaseOperation:
-			errTx := dbw.SqlTransactionQuiet(true, true, func(tx *sql.Tx) error {
-				rows, errFA := dbw.SqlFetchAllQuiet(
+			errTx := dbw.SqlTransaction(true, true, true, func(tx icingadb_connection.DbTransaction) error {
+				rows, errFA := dbw.SqlFetchAllTxQuiet(
 					tx,
 					"select from icingadb_instance by environment_id, responsible, heartbeat",
 					`SELECT 1 FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND ? - heartbeat < 10`,

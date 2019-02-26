@@ -56,7 +56,7 @@ func Test_cleanUpInstances(t *testing.T) {
 
 	assert.NoError(t, err, "SQL error")
 
-	rows, err := dbw.SqlFetchAll(dbw.Db, "", "SELECT 1 FROM icingadb_instance WHERE id = ?", testID[:])
+	rows, err := dbw.SqlFetchAll("", "SELECT 1 FROM icingadb_instance WHERE id = ?", testID[:])
 
 	assert.Equal(t, 1, len(rows))
 
@@ -64,7 +64,7 @@ func Test_cleanUpInstances(t *testing.T) {
 
 	assert.NoError(t, err, "Clean up failed")
 
-	rows, err = dbw.SqlFetchAll(dbw.Db, "", "SELECT 1 FROM icingadb_instance WHERE id = ?", testID[:])
+	rows, err = dbw.SqlFetchAll("", "SELECT 1 FROM icingadb_instance WHERE id = ?", testID[:])
 
 	assert.NoError(t, err, "SQL error")
 
@@ -76,7 +76,7 @@ func Test_cleanUpInstances(t *testing.T) {
 
 	assert.NoError(t, err, "Clean up failed")
 
-	rows, err = dbw.SqlFetchAll(dbw.Db, "", "SELECT 1 FROM icingadb_instance WHERE id = ?", testID[:])
+	rows, err = dbw.SqlFetchAll("", "SELECT 1 FROM icingadb_instance WHERE id = ?", testID[:])
 
 	assert.NoError(t, err, "SQL error")
 
