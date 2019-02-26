@@ -155,6 +155,23 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 	mockDb.AssertExpectations(t)
 }
 
+func TestDBWrapper_SqlTransaction(t *testing.T) {
+	dbw, err := NewDBWrapper("mysql", "icingadb:icingadb@tcp(127.0.0.1:3306)/icingadb")
+	assert.NoError(t, err, "Is the MySQL server running?")
+
+	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
+		return nil
+	})
+
+	assert.NoError(t, err)
+
+	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
+		return errors.New("whoops")
+	})
+
+	assert.Error(t, err)
+}
+
 func TestDBWrapper_WithRetry(t *testing.T) {
 	mockDb := new(DbMock)
 	dbw := NewTestDBW(mockDb)
