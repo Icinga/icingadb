@@ -20,7 +20,7 @@ func Test_decodeString(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func Test_decodePool(t *testing.T) {
+func Test_DecodePool(t *testing.T) {
 	var chInput = make(chan JsonDecodePackage)
 	var chOutput = make(chan JsonDecodePackage)
 
@@ -41,7 +41,7 @@ func Test_decodePool(t *testing.T) {
 	}
 
 	go func() {
-		assert.NoError(t, decodePool(chInput))
+		assert.NoError(t, DecodePool(chInput))
 	}()
 
 	chInput <- TestPackageA
@@ -77,7 +77,7 @@ func Test_decodePackage(t *testing.T) {
 	}
 
 	go func() {
-		err := DecodePackage(chInput)
+		err := decodePackage(chInput)
 		assert.NoError(t, err)
 	}()
 
