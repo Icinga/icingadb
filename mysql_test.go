@@ -77,7 +77,7 @@ func TestNewDBWrapper(t *testing.T) {
 	//TODO: Add more tests here
 }
 
-func TestRDBWrapper_CheckConnection(t *testing.T) {
+func TestDBWrapper_CheckConnection(t *testing.T) {
 	mockDb := new(DbMock)
 	dbw := NewTestDBW(mockDb)
 
