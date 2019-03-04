@@ -156,7 +156,7 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 }
 
 func TestDBWrapper_SqlTransaction(t *testing.T) {
-	dbw, err := NewDBWrapper("mysql", "icingadb:icingadb@tcp(127.0.0.1:3306)/icingadb")
+	dbw, err := NewDBWrapper("mysql", "module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb")
 	assert.NoError(t, err, "Is the MySQL server running?")
 
 	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
