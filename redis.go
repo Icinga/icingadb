@@ -85,7 +85,7 @@ type RDBWrapper struct {
 }
 
 func (rdbw *RDBWrapper) IsConnected() bool {
-	return *rdbw.ConnectedAtomic != 0
+	return atomic.LoadUint32(rdbw.ConnectedAtomic) != 0
 }
 
 func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
