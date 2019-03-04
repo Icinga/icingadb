@@ -62,12 +62,26 @@ var RedisWriter = Icinga2RedisWriter{
 	},
 }
 
+type RedisClient interface {
+	Ping() *redis.StatusCmd
+	Publish(channel string, message interface{}) *redis.IntCmd
+	XRead(a *redis.XReadArgs) *redis.XStreamSliceCmd
+	XDel(stream string, ids ...string) *redis.IntCmd
+	HGetAll(key string) *redis.StringStringMapCmd
+	TxPipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
+	Subscribe(channels ...string) *redis.PubSub
+}
+
+type StatusCmd interface {
+
+}
+
 // Redis wrapper including helper functions
 type RDBWrapper struct {
-	Rdb                    		*redis.Client
+	Rdb                    		RedisClient
 	ConnectedAtomic        		*uint32 //uint32 to be able to use atomic operations
 	ConnectionUpCondition 		*sync.Cond
-	ConnectionLostCounter   	int
+	ConnectionLostCounterAtomic	*uint32 //uint32 to be able to use atomic operations
 }
 
 func (rdbw *RDBWrapper) IsConnected() bool {
@@ -90,8 +104,12 @@ func NewRDBWrapper(address string) (*RDBWrapper, error) {
 		WriteTimeout: time.Minute,
 	})
 
-	rdbw := RDBWrapper{Rdb: rdb, ConnectedAtomic: new(uint32)}
-	rdbw.ConnectionUpCondition = sync.NewCond(&sync.Mutex{})
+	rdbw := RDBWrapper{
+		Rdb: rdb, ConnectedAtomic: new(uint32),
+		ConnectionLostCounterAtomic: new(uint32),
+		ConnectionUpCondition: sync.NewCond(&sync.Mutex{}),
+	}
+
 	_, err := rdbw.Rdb.Ping().Result()
 	if err != nil {
 		return nil, err
@@ -109,13 +127,14 @@ func NewRDBWrapper(address string) (*RDBWrapper, error) {
 
 func (rdbw *RDBWrapper) getConnectionCheckInterval() time.Duration {
 	if !rdbw.IsConnected() {
-		if rdbw.ConnectionLostCounter < 4 {
+		v := atomic.LoadUint32(rdbw.ConnectionLostCounterAtomic)
+		if v < 4 {
 			return 5 * time.Second
-		} else if rdbw.ConnectionLostCounter < 8 {
+		} else if v < 8 {
 			return 10 * time.Second
-		} else if rdbw.ConnectionLostCounter < 11 {
+		} else if v < 11 {
 			return 30 * time.Second
-		} else if rdbw.ConnectionLostCounter < 14 {
+		} else if v < 14 {
 			return 60 * time.Second
 		} else {
 			log.Fatal("Could not connect to Redis for over 5 minutes. Shutting down...")
@@ -134,7 +153,7 @@ func (rdbw *RDBWrapper) CheckConnection(isTicker bool) bool {
 				"error":   err,
 			}).Error("Redis connection lost. Trying to reconnect")
 		} else if isTicker {
-			rdbw.ConnectionLostCounter++
+			atomic.AddUint32(rdbw.ConnectionLostCounterAtomic, 1)
 
 			log.WithFields(log.Fields{
 				"context": "redis",
@@ -146,7 +165,7 @@ func (rdbw *RDBWrapper) CheckConnection(isTicker bool) bool {
 	} else {
 		if rdbw.CompareAndSetConnected(true) {
 			log.Info("Redis connection established")
-			rdbw.ConnectionLostCounter = 0
+			atomic.StoreUint32(rdbw.ConnectionLostCounterAtomic, 0)
 			rdbw.ConnectionUpCondition.Broadcast()
 		}
 
@@ -259,8 +278,9 @@ func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([
 	for {
 		if !rdbw.IsConnected() {
 			rdbw.WaitForConnection()
-		continue
+			continue
 		}
+
 		benchmarc := icingadb_utils.NewBenchmark()
 		c, e := rdbw.Rdb.TxPipelined(fn)
 
