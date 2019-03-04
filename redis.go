@@ -82,9 +82,14 @@ func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
 	}
 }
 
-func NewRDBWrapper(rdb *redis.Client) *RDBWrapper {
+func NewRDBWrapper(rdb *redis.Client) (*RDBWrapper, error) {
 	rdbw := RDBWrapper{Rdb: rdb, ConnectedAtomic: new(uint32)}
 	rdbw.ConnectionUpCondition = sync.NewCond(&sync.Mutex{})
+
+	res := rdbw.Rdb.Ping()
+	if res.Err() != nil {
+		return nil, res.Err()
+	}
 
 	go func() {
 		for {
@@ -93,7 +98,7 @@ func NewRDBWrapper(rdb *redis.Client) *RDBWrapper {
 		}
 	}()
 
-	return &rdbw
+	return &rdbw, nil
 }
 
 func (rdbw *RDBWrapper) getConnectionCheckInterval() time.Duration {
