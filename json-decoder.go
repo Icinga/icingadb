@@ -4,9 +4,6 @@ import (
 	"encoding/json"
 )
 
-// Number of workers DecodePool uses
-var poolSize = 16
-
 type JsonDecodePackage struct{
 	// Json strings from Redis
 	ChecksumsRaw string
@@ -29,36 +26,14 @@ func decodeString(toDecode string) (map[string]interface{}, error) {
 	return unJson.(map[string]interface{}), nil
 }
 
-// decodePool takes a channel it receives JsonDecodePackages from. These packages are decoded
-// by a pool of workers which send their result back through their own channel. Returns error
-// if any.
-func DecodePool(chInput <-chan JsonDecodePackage) error {
-	consumers := make([]chan JsonDecodePackage, poolSize)
-	for i := range consumers {
-		consumers[i] = make(chan JsonDecodePackage)
-		go decodePackage(consumers[i])
+// decodePool takes a channel it receives JsonDecodePackages from and an error channel to forward errors.
+// These packages are decoded by a pool of pollSize workers which send their result back through their own channel.
+func DecodePool(chInput <-chan JsonDecodePackage, chError chan error, poolSize int) {
+	for i := 0; i < poolSize; i++ {
+		go func(in <-chan JsonDecodePackage, chErrorInternal chan error) {
+			chErrorInternal <- decodePackage(in)
+		}(chInput, chError)
 	}
-
-	distribution := func(ch <-chan JsonDecodePackage, consumers []chan JsonDecodePackage) {
-		defer func(providers []chan JsonDecodePackage) {
-			for _, channel := range providers {
-				close(channel)
-			}
-		}(consumers)
-
-		for {
-			for _, consumer := range consumers {
-				select {
-				case packag := <- ch:
-					consumer <- packag
-				}
-			}
-		}
-	}
-
-	go distribution(chInput, consumers)
-
-	return nil
 }
 
 // decodePackage is the worker function for DecodePool. Reads from a channel and sends back decoded
@@ -66,14 +41,13 @@ func DecodePool(chInput <-chan JsonDecodePackage) error {
 func decodePackage(chInput <-chan JsonDecodePackage) error {
 	var err error
 
-
 	for input := range chInput{
-		if input.ChecksumsProcessed == nil {
+		if input.ChecksumsProcessed == nil && input.ChecksumsRaw != "" {
 			if input.ChecksumsProcessed, err = decodeString(input.ChecksumsRaw); err != nil {
 				return err
 			}
 		}
-		if input.ConfigProcessed == nil {
+		if input.ConfigProcessed == nil && input.ConfigRaw != ""{
 			if input.ConfigProcessed, err = decodeString(input.ConfigRaw); err != nil {
 				return err
 			}

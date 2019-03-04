@@ -23,6 +23,7 @@ func Test_decodeString(t *testing.T) {
 func Test_DecodePool(t *testing.T) {
 	var chInput = make(chan JsonDecodePackage)
 	var chOutput = make(chan JsonDecodePackage)
+	var chError = make(chan error)
 
 	var TestPackageA = JsonDecodePackage{
 		"{\"action_url_id\":\"761ff24e252d57581a7de5d9f417f717fb3c2d7f\",\"checkcommand_id\":\"f5e3b3b22741f40c74326fbcc79d9c331d8fa4ee\",\"customvars_checksum\":\"e9fea9581588f18cfb46969268a94166bd0474ae\",\"environment_id\":\"90a8834de76326869f3e703cd61513081ad73d3c\",\"group_ids\":[\"a63234de9f608c4a4f86053870d79610ec58b258\"],\"groups_checksum\":\"9878a753d010eb1bbde57bb78727a6e6ba26aa51\",\"host_id\":\"330c09556cbb5e01c180343bb669a2d36b48dd2c\",\"name_checksum\":\"9f75a6ea3ea6f1692538c865133a8a08e48f06d5\",\"notes_url_id\":\"31bb5f9a69c659270e2bcd257b77353669c04d1e\",\"properties_checksum\":\"caff92fafc9a17097304f6c2fb9fa029d3ec8aa8\",\"zone_id\":\"407eaa141abcae8ee554e4fe4b9e9b726bac4b77\"}",
@@ -40,9 +41,8 @@ func Test_DecodePool(t *testing.T) {
 		&chOutput,
 	}
 
-	go func() {
-		assert.NoError(t, DecodePool(chInput))
-	}()
+	DecodePool(chInput, chError, 4)
+
 
 	chInput <- TestPackageA
 	chInput <- TestPackageB
