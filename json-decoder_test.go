@@ -50,6 +50,7 @@ func Test_decodePool(t *testing.T) {
 
 	resultA := <-chOutput
 	resultB := <-chOutput
+	close(chOutput)
 
 	assert.NotNil(t, resultA.ConfigProcessed)
 	assert.NotNil(t, resultB.ConfigProcessed)
@@ -91,4 +92,5 @@ func Test_decodePackage(t *testing.T) {
 	chInput <- TestPackageA
 	chInput <- TestPackageB
 	close(chInput)
+	close(chOutput)
 }

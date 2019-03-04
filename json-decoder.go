@@ -72,6 +72,5 @@ func DecodePackage(chInput <-chan JsonDecodePackage) error {
 
 	}
 
-
 	return nil
 }
