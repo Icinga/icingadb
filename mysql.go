@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"context"
 	"database/sql"
-	"git.icinga.com/icingadb/icingadb-utils-lib"
+	"git.icinga.com/icingadb/icingadb-utils"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"sync/atomic"
