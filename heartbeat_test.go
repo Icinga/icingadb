@@ -3,7 +3,6 @@ package icingadb_ha
 import (
 	"encoding/json"
 	"git.icinga.com/icingadb/icingadb-connection-lib"
-	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -17,14 +16,10 @@ var icingastate = "{\"IcingaApplication\":" +
 	"}}}}}"
 
 func TestIcingaEventsBroker(t *testing.T) {
-	rd := redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
-
-	rdb := icingadb_connection.NewRDBWrapper(rd)
+	rdb, err := icingadb_connection.NewRDBWrapper("127.0.0.1:6379")
+	if err != nil {
+		t.Fatal("This test needs a working Redis connection")
+	}
 
 	chEnv := make(chan *icingadb_connection.Environment)
 
