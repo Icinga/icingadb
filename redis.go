@@ -1,7 +1,7 @@
 package icingadb_connection
 
 import (
-	"git.icinga.com/icingadb/icingadb-utils-lib"
+	"git.icinga.com/icingadb/icingadb-utils"
 	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
 	"sync"
