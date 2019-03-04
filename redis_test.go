@@ -3,51 +3,11 @@ package icingadb_connection
 import (
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
-
-type RdbMock struct {
-	mock.Mock
-}
-
-func (m *RdbMock) Ping() *redis.StatusCmd {
-	args := m.Called()
-	return args.Get(0).(*redis.StatusCmd)
-}
-
-func (m *RdbMock) Publish(channel string, message interface{}) *redis.IntCmd {
-	args := m.Called(channel, message)
-	return args.Get(0).(*redis.IntCmd)
-}
-
-func (m *RdbMock) XRead(a *redis.XReadArgs) *redis.XStreamSliceCmd {
-	args := m.Called(a)
-	return args.Get(0).(*redis.XStreamSliceCmd)
-}
-
-func (m *RdbMock) XDel(stream string, ids ...string) *redis.IntCmd {
-	args := m.Called(stream, ids)
-	return args.Get(0).(*redis.IntCmd)
-}
-
-func (m *RdbMock) HGetAll(key string) *redis.StringStringMapCmd {
-	args := m.Called(key)
-	return args.Get(0).(*redis.StringStringMapCmd)
-}
-
-func (m *RdbMock) TxPipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error) {
-	args := m.Called(fn)
-	return args.Get(0).([]redis.Cmder), args.Error(1)
-}
-
-func (m *RdbMock) Subscribe(channels ...string) *redis.PubSub {
-	args := m.Called(channels)
-	return args.Get(0).(*redis.PubSub)
-}
 
 func NewTestRDBW(rdb RedisClient) RDBWrapper {
 	dbw := RDBWrapper{Rdb: rdb, ConnectedAtomic: new(uint32), ConnectionLostCounterAtomic: new(uint32)}
