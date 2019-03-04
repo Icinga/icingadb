@@ -82,13 +82,19 @@ func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
 	}
 }
 
-func NewRDBWrapper(rdb *redis.Client) (*RDBWrapper, error) {
+func NewRDBWrapper(address string) (*RDBWrapper, error) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         address,
+		DialTimeout:  time.Minute / 2,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+	})
+
 	rdbw := RDBWrapper{Rdb: rdb, ConnectedAtomic: new(uint32)}
 	rdbw.ConnectionUpCondition = sync.NewCond(&sync.Mutex{})
-
-	res := rdbw.Rdb.Ping()
-	if res.Err() != nil {
-		return nil, res.Err()
+	_, err := rdbw.Rdb.Ping().Result()
+	if err != nil {
+		return nil, err
 	}
 
 	go func() {
