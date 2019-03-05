@@ -9,8 +9,9 @@ before_script:
   - cd $GOPATH/src/$REPO_NAME
   - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@git.icinga.com/".insteadOf "https://git.icinga.com/"
   - go get -t ./...
-  - apt update && apt install -y mysql-server
+  - apt update && apt install -y mysql-server redis-server
   - service mysql start
+  - service redis-server start
   - mysql < test_db.sql
 
 stages:
