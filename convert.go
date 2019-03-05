@@ -30,6 +30,32 @@ func Sha1(s string) []byte {
 	return bs
 }
 
+/**
+ * Convert the given []byte to a [20]byte
+ *
+ * @param  in  []byte  Input
+ *
+ * @returns  out  [20]byte  Output
+ */
+func Bytes2checksum(in []byte) (out [20]byte) {
+	copy(out[:], in)
+	return
+}
+
+/**
+ * Convert the given [20]byte to a []byte
+ *
+ * @param  in  [20]byte  Input
+ *
+ * @returns  out  []byte  Output
+ */
+func Checksum2bytes(in [20]byte) (out []byte) {
+	out = make([]byte, 20)
+	copy(out, in[:])
+	return
+}
+
+
 func DecodeChecksum(c []byte) string {
 	return hex.EncodeToString(c)
 }
