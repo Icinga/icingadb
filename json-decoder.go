@@ -1,8 +1,10 @@
 package icingadb_json_decoder
 
 import (
-	"encoding/json"
+	"github.com/json-iterator/go"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type JsonDecodePackage struct{
 	// Json strings from Redis
@@ -12,7 +14,7 @@ type JsonDecodePackage struct{
 	ChecksumsProcessed map[string]interface{}
 	ConfigProcessed map[string]interface{}
 	// Package will be sent back through this channel
-	ChBack *chan JsonDecodePackage
+	ChBack *chan *JsonDecodePackage
 }
 
 // decodeString unmarshals the string toDecode using the json package. Returns the object as a
@@ -28,9 +30,9 @@ func decodeString(toDecode string) (map[string]interface{}, error) {
 
 // decodePool takes a channel it receives JsonDecodePackages from and an error channel to forward errors.
 // These packages are decoded by a pool of pollSize workers which send their result back through their own channel.
-func DecodePool(chInput <-chan JsonDecodePackage, chError chan error, poolSize int) {
+func DecodePool(chInput <-chan *JsonDecodePackage, chError chan error, poolSize int) {
 	for i := 0; i < poolSize; i++ {
-		go func(in <-chan JsonDecodePackage, chErrorInternal chan error) {
+		go func(in <-chan *JsonDecodePackage, chErrorInternal chan error) {
 			chErrorInternal <- decodePackage(in)
 		}(chInput, chError)
 	}
@@ -38,7 +40,7 @@ func DecodePool(chInput <-chan JsonDecodePackage, chError chan error, poolSize i
 
 // decodePackage is the worker function for DecodePool. Reads from a channel and sends back decoded
 // packages. Returns error if any.
-func decodePackage(chInput <-chan JsonDecodePackage) error {
+func decodePackage(chInput <-chan *JsonDecodePackage) error {
 	var err error
 
 	for input := range chInput{
@@ -53,7 +55,7 @@ func decodePackage(chInput <-chan JsonDecodePackage) error {
 			}
 		}
 
-		*input.ChBack <- JsonDecodePackage(input)
+		*input.ChBack <- input
 
 	}
 
