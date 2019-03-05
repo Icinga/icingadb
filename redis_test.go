@@ -193,3 +193,83 @@ func TestRDBWrapper_XDel(t *testing.T) {
 	assert.Error(t, err)
 	assert.Len(t, streams, 0)
 }
+
+func TestRDBWrapper_Publish(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         "127.0.0.1:6379",
+		DialTimeout:  time.Minute / 2,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+	})
+	rdbw := NewTestRDBW(rdb)
+
+	if !rdbw.CheckConnection(true) {
+		t.Fatal("This test needs a working Redis connection")
+	}
+
+	var msg *redis.Message
+	var err error
+	done := make(chan bool)
+	go func() {
+		msg, err = rdb.Subscribe("testchannel").ReceiveMessage()
+		done <- true
+	}()
+
+	rdbw.CompareAndSetConnected(false)
+
+	go func () {
+		rdbw.Publish("testchannel", "Hello there")
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	rdbw.CheckConnection(true)
+
+	<- done
+
+	assert.NoError(t, err)
+	assert.Equal(t, "Hello there", msg.Payload)
+}
+
+func TestRDBWrapper_TxPipelined(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         "127.0.0.1:6379",
+		DialTimeout:  time.Minute / 2,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+	})
+	rdbw := NewTestRDBW(rdb)
+
+	if !rdbw.CheckConnection(true) {
+		t.Fatal("This test needs a working Redis connection")
+	}
+
+	rdb.Del("firstKey")
+	rdb.Del("secondKey")
+	rdb.HSet("firstKey", "foo", 5)
+	rdb.HSet("secondKey", "bar", 11)
+
+	rdbw.CompareAndSetConnected(false)
+
+	var firstMap *redis.StringStringMapCmd
+	var secondMap *redis.StringStringMapCmd
+	var err error
+	done := make(chan bool)
+	go func() {
+		_, err = rdbw.TxPipelined(func(pipe redis.Pipeliner) error {
+			firstMap = pipe.HGetAll("firstKey")
+			secondMap = pipe.HGetAll("secondKey")
+			return nil
+		})
+		done <- true
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	rdbw.CheckConnection(true)
+
+	<- done
+
+	assert.NoError(t, err)
+	assert.Contains(t, firstMap.Val(), "foo")
+	assert.Contains(t, secondMap.Val(), "bar")
+
+}
