@@ -111,7 +111,7 @@ func TestRDBWrapper_HGetAll(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
 	<- done
@@ -146,7 +146,7 @@ func TestRDBWrapper_XRead(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
 	<- done
@@ -183,7 +183,7 @@ func TestRDBWrapper_XDel(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
 	<- done
