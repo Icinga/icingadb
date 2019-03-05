@@ -1,31 +1,27 @@
 package icingadb_json_decoder
 
 import (
+	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"github.com/json-iterator/go"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 type JsonDecodePackage struct{
+	Id [20]byte
 	// Json strings from Redis
 	ChecksumsRaw string
 	ConfigRaw string
-	// When unmarshaled, results will be written here
-	ChecksumsProcessed map[string]interface{}
-	ConfigProcessed map[string]interface{}
+	Row configobject.Row
 	// Package will be sent back through this channel
-	ChBack *chan *JsonDecodePackage
+	ChBack chan *JsonDecodePackage
+	Factory configobject.RowFactory
 }
 
 // decodeString unmarshals the string toDecode using the json package. Returns the object as a
 // map[string]interface and nil if successful, error if not.
-func decodeString(toDecode string) (map[string]interface{}, error) {
-	var unJson interface{} = nil
-	if err := json.Unmarshal([]byte(toDecode), &unJson); err != nil {
-		return nil, err
-	}
-
-	return unJson.(map[string]interface{}), nil
+func decodeString(toDecode string, row configobject.Row) error {
+	return json.Unmarshal([]byte(toDecode), row)
 }
 
 // decodePool takes a channel it receives JsonDecodePackages from and an error channel to forward errors.
@@ -44,19 +40,20 @@ func decodePackage(chInput <-chan *JsonDecodePackage) error {
 	var err error
 
 	for input := range chInput{
-		if input.ChecksumsProcessed == nil && input.ChecksumsRaw != "" {
-			if input.ChecksumsProcessed, err = decodeString(input.ChecksumsRaw); err != nil {
+		row := input.Factory()
+		if input.ChecksumsRaw != "" {
+			if err := decodeString(input.ChecksumsRaw, row); err != nil {
 				return err
 			}
 		}
-		if input.ConfigProcessed == nil && input.ConfigRaw != ""{
-			if input.ConfigProcessed, err = decodeString(input.ConfigRaw); err != nil {
+		if input.ConfigRaw != ""{
+			if err = decodeString(input.ConfigRaw, row); err != nil {
 				return err
 			}
 		}
 
-		*input.ChBack <- input
-
+		input.Row = row
+		input.ChBack <- input
 	}
 
 	return nil
