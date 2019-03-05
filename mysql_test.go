@@ -115,7 +115,7 @@ func TestDBWrapper_SqlCommit(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 50)
 
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
@@ -144,7 +144,7 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 50)
 
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
@@ -215,7 +215,7 @@ func TestDBWrapper_SqlQuery(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 50)
 
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
@@ -243,7 +243,7 @@ func TestDBWrapper_SqlExec(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 50)
 
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
@@ -271,7 +271,7 @@ func TestDBWrapper_SqlExecQuiet(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 50)
 
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
@@ -300,7 +300,7 @@ func TestDBWrapper_SqlExecTx(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 50)
 
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
@@ -330,7 +330,7 @@ func TestDBWrapper_SqlExecTxQuiet(t *testing.T) {
 		done <- true
 	}()
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 50)
 
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
