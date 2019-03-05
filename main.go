@@ -4,14 +4,9 @@ import (
 	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-ha"
 	"git.icinga.com/icingadb/icingadb-json-decoder"
+	"git.icinga.com/icingadb/icingadb-main/configobject"
+	"git.icinga.com/icingadb/icingadb-main/supervisor"
 )
-
-type Supervisor struct {
-	chEnv chan *icingadb_connection.Environment
-	chDecode chan *icingadb_json_decoder.JsonDecodePackage
-	rdbw *icingadb_connection.RDBWrapper
-	dbw  *icingadb_connection.DBWrapper
-}
 
 func main() {
 	chErr := make (chan error)
@@ -25,22 +20,24 @@ func main() {
 		return
 	}
 
-	super := Supervisor{
-		make(chan *icingadb_connection.Environment),
-		make(chan *icingadb_json_decoder.JsonDecodePackage),
-		redisConn,
-		mysqlConn,
+	super := supervisor.Supervisor{
+		ChEnv: make(chan *icingadb_connection.Environment),
+		ChDecode: make(chan *icingadb_json_decoder.JsonDecodePackage),
+		Rdbw: redisConn,
+		Dbw: mysqlConn,
 	}
 
 	ha := icingadb_ha.HA{}
-	ha.Run(super.rdbw, super.dbw, super.chEnv, chErr)
+	ha.Run(super.Rdbw, super.Dbw, super.ChEnv, chErr)
 	go func() {
-		chErr <- icingadb_ha.IcingaEventsBroker(redisConn, super.chEnv)
+		chErr <- icingadb_ha.IcingaEventsBroker(redisConn, super.ChEnv)
 	}()
 
-	go icingadb_json_decoder.DecodePool(super.chDecode, chErr, 16)
+	go icingadb_json_decoder.DecodePool(super.ChDecode, chErr, 16)
 
-	go configobject.HostOperator()
+	go func() {
+		chErr <- configobject.HostOperator(&super)
+	}()
 
 	//go create object type supervisors
 

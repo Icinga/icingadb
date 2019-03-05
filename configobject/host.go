@@ -1,6 +1,11 @@
 package configobject
 
-import "git.icinga.com/icingadb/icingadb-utils"
+import (
+	"fmt"
+	"git.icinga.com/icingadb/icingadb-json-decoder"
+	"git.icinga.com/icingadb/icingadb-main/supervisor"
+	"git.icinga.com/icingadb/icingadb-utils"
+)
 
 type Host struct {
 	Id                    string  `json:"id"`
@@ -123,6 +128,38 @@ func (h *Host) SetId(id string) {
 	h.Id = id
 }
 
-func HostOperator(super main.Supervisor) error {
+func HostOperator(super *supervisor.Supervisor) error {
+	chBack := make(chan *icingadb_json_decoder.JsonDecodePackage)
+
+	//get checksums from redis
+	go func() {
+		res, err := super.Rdbw.HGetAll("icinga:config:checksum:host")
+		count := len(res)
+		if err != nil {
+			super.ChErr <- err
+			return
+		}
+
+		go func() {
+			for id, value := range res {
+				pkg := icingadb_json_decoder.JsonDecodePackage{
+					Id: icingadb_utils.Bytes2checksum(icingadb_utils.Checksum(id)),
+					ChecksumsRaw: value,
+					ChBack: chBack,
+				}
+
+				super.ChDecode <- &pkg
+			}
+		}()
+
+		for ret := range chBack {
+			fmt.Println(ret)
+			count--
+			if 0 == count {
+				close(chBack)
+			}
+		}
+	}()
+
 	return nil
 }

@@ -7,3 +7,4 @@ type Row interface {
 	SetId(id string)
 }
 
+type RowFactory func() Row
