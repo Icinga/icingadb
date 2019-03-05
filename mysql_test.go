@@ -285,3 +285,34 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 	//interval = dbw.getConnectionCheckInterval()
 	//TODO: Check for Fatal
 }
+
+func TestDBWrapper_SqlFetchAll(t *testing.T) {
+	dbw, err := NewDBWrapper("mysql", "module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb")
+	assert.NoError(t, err, "Is the MySQL server running?")
+
+	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name varchar(255) NOT NULL)")
+	assert.NoError(t, err)
+
+	_, err = dbw.Db.Exec("INSERT INTO testing0815 (name) VALUES ('horst'), ('test')")
+	assert.NoError(t, err)
+
+	var res [][]interface{}
+	done := make(chan bool)
+	dbw.CompareAndSetConnected(false)
+	go func() {
+		res, err = dbw.SqlFetchAll("test", "SELECT * FROM testing0815")
+		done <- true
+	}()
+
+	time.Sleep(time.Millisecond * 50)
+
+	dbw.checkConnection(true)
+
+	<- done
+
+	assert.NoError(t, err)
+	assert.Equal(t, [][]interface {}([][]interface {}{{int64(1), "horst"}, {int64(2), "test"}}), res)
+
+	_, err = dbw.Db.Exec("DROP TABLE testing0815")
+	assert.NoError(t, err)
+}
