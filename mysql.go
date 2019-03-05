@@ -29,8 +29,8 @@ type DbTransaction interface {
 	Rollback() error
 }
 
-func NewDBWrapper(dbType string, dbDsn string) (*DBWrapper, error) {
-	db, err := mkMysql(dbType, dbDsn)
+func NewDBWrapper(dbDsn string) (*DBWrapper, error) {
+	db, err := mkMysql("mysql", dbDsn)
 
 	if err != nil {
 		return nil, err
