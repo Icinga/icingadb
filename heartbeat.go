@@ -3,7 +3,7 @@ package icingadb_ha
 import (
 	"crypto/sha1"
 	"encoding/json"
-	"git.icinga.com/icingadb/icingadb-connection-lib"
+	"git.icinga.com/icingadb/icingadb-connection"
 	log "github.com/sirupsen/logrus"
 )
 

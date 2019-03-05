@@ -2,7 +2,7 @@ package icingadb_ha
 
 import (
 	"encoding/json"
-	"git.icinga.com/icingadb/icingadb-connection-lib"
+	"git.icinga.com/icingadb/icingadb-connection"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

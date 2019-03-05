@@ -1,7 +1,7 @@
 package icingadb_ha
 
 import (
-	"git.icinga.com/icingadb/icingadb-connection-lib"
+	"git.icinga.com/icingadb/icingadb-connection"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"sync/atomic"
