@@ -72,7 +72,7 @@ func NewTestDBW(db DbClient) DBWrapper {
 }
 
 func TestNewDBWrapper(t *testing.T) {
-	_, err := NewDBWrapper("mysql", "asdasd")
+	_, err := NewDBWrapper("asdasd")
 	assert.Error(t, err)
 	//TODO: Add more tests here
 }
@@ -156,7 +156,7 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 }
 
 func TestDBWrapper_SqlTransaction(t *testing.T) {
-	dbw, err := NewDBWrapper("mysql", "module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb")
+	dbw, err := NewDBWrapper( "module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb")
 	assert.NoError(t, err, "Is the MySQL server running?")
 
 	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
@@ -287,7 +287,7 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 }
 
 func TestDBWrapper_SqlFetchAll(t *testing.T) {
-	dbw, err := NewDBWrapper("mysql", "module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb")
+	dbw, err := NewDBWrapper("module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb")
 	assert.NoError(t, err, "Is the MySQL server running?")
 
 	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name varchar(255) NOT NULL)")
