@@ -1,91 +1,49 @@
 package main
 
 import (
-	"git.icinga.com/icingadb-configsync-lib"
-	"git.icinga.com/icingadb-connection"
-	"git.icinga.com/icingadb-ha-lib"
-	"github.com/go-redis/redis"
-	log "github.com/sirupsen/logrus"
-	"strings"
-	"time"
+	"git.icinga.com/icingadb/icingadb-connection"
+	"git.icinga.com/icingadb/icingadb-ha"
+	"git.icinga.com/icingadb/icingadb-json-decoder"
 )
 
-var chEnv = make(chan *icingadb_connection.Environment)
-var chErr = make(chan error)
+type Supervisor struct {
+	chEnv chan *icingadb_connection.Environment
+	chDecode chan *icingadb_json_decoder.JsonDecodePackage
+	rdbw *icingadb_connection.RDBWrapper
+	dbw  *icingadb_connection.DBWrapper
+}
 
 func main() {
+	chErr := make (chan error)
+	redisConn, err := icingadb_connection.NewRDBWrapper("127.0.0.1:6379")
+	if err != nil {
+		return
+	}
 
-	dbw := mkMysql()
-	rdw := mkRedis()
+	mysqlConn, err := icingadb_connection.NewDBWrapper("module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb"	)
+	if err != nil {
+		return
+	}
 
-	log.SetLevel(log.DebugLevel)
+	super := Supervisor{
+		make(chan *icingadb_connection.Environment),
+		make(chan *icingadb_json_decoder.JsonDecodePackage),
+		redisConn,
+		mysqlConn,
+	}
 
-	ha := icingadb_ha_lib.HA{}
-	go icingadb_ha_lib.IcingaEventsBroker(rdw, chEnv, chErr)
-	go ha.Run(rdw, dbw, chEnv, chErr)
-
-	ho := icingadb_configsync_lib.NewHostOperator(dbw, rdw)
-
+	ha := icingadb_ha.HA{}
+	ha.Run(super.rdbw, super.dbw, super.chEnv, chErr)
 	go func() {
-		if err := ho.FillChecksumsFromDb(); err != nil {
-			chErr <- err
-		}
+		chErr <- icingadb_ha.IcingaEventsBroker(redisConn, super.chEnv)
 	}()
 
-	var environment= icingadb_connection.Environment{}
-	select {
-	case env := <-chEnv:
-		log.Print(env)
-		environment = *env
-	case err := <-chErr:
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+	go icingadb_json_decoder.DecodePool(super.chDecode, chErr, 16)
 
-	if environment.ID == nil {
-		log.Fatal("No env!")
-	}
+	go configobject.HostOperator()
 
-	if err := ho.FillAttributesFromRedis(); err != nil {
-		log.Fatal(err)
-	}
-
-	if err := ho.Sync(); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func mkMysql() *icingadb_connection.DBWrapper {
-	dbDsn := "root:foo@tcp(127.0.0.1:3306)/icingadb"
-	sep := "?"
+	//go create object type supervisors
 
 
-	dsnParts := strings.Split(dbDsn, "/")
-	if strings.Contains(dsnParts[len(dsnParts)-1], "?") {
-		sep = "&"
-	}
 
-	dbDsn = dbDsn+ sep +
-		"innodb_strict_mode=1&sql_mode='STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION,PIPES_AS_CONCAT,ANSI_QUOTES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER'"
-
-
-	dbw, err := icingadb_connection.NewDBWrapper("mysql", dbDsn)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return dbw
-}
-
-func mkRedis() *icingadb_connection.RDBWrapper {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
-
-	rdw := icingadb_connection.NewRDBWrapper(rdb)
-	return rdw
 }
