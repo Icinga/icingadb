@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"context"
 	"database/sql"
+	"fmt"
 	"git.icinga.com/icingadb/icingadb-utils"
 	log "github.com/sirupsen/logrus"
 	"sync"
@@ -525,4 +526,42 @@ func (dbw *DBWrapper) sqlTryTransaction(f func(transaction DbTransaction) error,
 	}
 
 	return dbw.SqlCommit(tx, quiet)
+}
+
+func (dbw *DBWrapper) SqlFetchIds(table string) ([]string, error) {
+	var keys []string
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
+
+		rows, err := dbw.SqlQuery(fmt.Sprintf("SELECT id FROM %s", table))
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+		}
+
+		defer rows.Close()
+
+		for rows.Next() {
+			var id []byte
+
+			err = rows.Scan(&id)
+			if err != nil {
+				return nil, err
+			}
+
+			keys = append(keys, icingadb_utils.DecodeChecksum(id))
+		}
+
+		err = rows.Err()
+		if err != nil {
+			return nil, err
+		}
+
+		return keys, nil
+	}
 }
