@@ -473,11 +473,8 @@ func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFai
 		errTx := dbw.sqlTryTransaction(f, concurrencySafety, false)
 		if !quiet {
 			benchmarc.Stop()
-		}
+			DbIoSeconds.WithLabelValues("mysql", "transaction").Observe(benchmarc.Seconds())
 
-		DbIoSeconds.WithLabelValues("mysql", "transaction").Observe(benchmarc.Seconds())
-
-		if !quiet {
 			log.WithFields(log.Fields{
 				"context":   "sql",
 				"benchmark": benchmarc,
