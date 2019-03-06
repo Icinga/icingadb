@@ -371,3 +371,73 @@ func isRetryableError(err error) bool {
 	}
 	return false
 }
+
+var (
+	bulkSize int
+)
+
+func SetBulkSize(s int) {
+	bulkSize = s
+}
+
+type Row interface {
+	InsertValues() []interface{}
+	UpdateValues() []interface{}
+	GetId() string
+	SetId(id string)
+}
+
+type Rows []Row
+
+type RowFactory func() Row
+
+type BulkInsertStmt struct {
+	Format      string
+	Fields      []string
+	Placeholder string
+	NumField    int
+}
+
+func NewBulkInsertStmt(table string, fields []string) *BulkInsertStmt {
+	numField := len(fields)
+	placeholder := fmt.Sprintf("(%s)", strings.TrimSuffix(strings.Repeat("?, ", numField), ", "))
+	stmt := BulkInsertStmt{
+		Format:      fmt.Sprintf("INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE id = id", table, strings.Join(fields, ", "), "%s"),
+		Fields:      fields,
+		Placeholder: placeholder,
+		NumField:    numField,
+	}
+
+	return &stmt
+}
+
+type BulkDeleteStmt struct {
+	Format string
+}
+
+func NewBulkDeleteStmt(table string) *BulkDeleteStmt {
+	stmt := BulkDeleteStmt{
+		Format: fmt.Sprintf("DELETE FROM %s WHERE id IN (%s)", table, "%s"),
+	}
+
+	return &stmt
+}
+
+type UpdateStmt struct {
+	Statement string
+	NumField  int
+}
+
+func NewUpdateStmt(table string, fields []string) *UpdateStmt {
+	assignmentList := make([]string, len(fields))
+
+	for i, field := range fields {
+		assignmentList[i] = fmt.Sprintf("%s = ?", field)
+	}
+	stmt := UpdateStmt{
+		Statement: fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", table, strings.Join(assignmentList, ", ")),
+		NumField:  len(fields)+1, // +1 because of the WHERE clause
+	}
+
+	return &stmt
+}
