@@ -67,6 +67,7 @@ type RedisClient interface {
 	Publish(channel string, message interface{}) *redis.IntCmd
 	XRead(a *redis.XReadArgs) *redis.XStreamSliceCmd
 	XDel(stream string, ids ...string) *redis.IntCmd
+	HKeys(key string) *redis.StringSliceCmd
 	HGetAll(key string) *redis.StringStringMapCmd
 	TxPipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
 	Subscribe(channels ...string) *redis.PubSub
@@ -220,6 +221,7 @@ func (rdbw *RDBWrapper) XRead(args *redis.XReadArgs) *redis.XStreamSliceCmd {
 		return cmd
 	}
 }
+
 // Wrapper for connection handling
 func (rdbw *RDBWrapper) XDel(stream string, ids ...string) *redis.IntCmd {
 	for {
@@ -229,6 +231,27 @@ func (rdbw *RDBWrapper) XDel(stream string, ids ...string) *redis.IntCmd {
 		}
 
 		cmd := rdbw.Rdb.XDel(stream, ids...)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// Wrapper for connection handling
+func (rdbw *RDBWrapper) HKeys(key string) *redis.StringSliceCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.HKeys(key)
 		_, err := cmd.Result()
 
 		if err != nil {
