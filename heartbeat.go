@@ -18,7 +18,7 @@ func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *icingad
 	log.Info("Starting Events broker")
 
 	subscription := rdb.Subscribe()
-	defer subscription.Close();
+	defer subscription.Close()
 	if err := subscription.Subscribe(
 		"icinga:config:dump", "icinga:config:delete", "icinga:config:update", "icinga:stats"); err != nil {
 		return err
