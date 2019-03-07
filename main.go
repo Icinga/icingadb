@@ -41,6 +41,21 @@ func main() {
 		chErr <- configobject.HostOperator(&super)
 	}()
 
+	for {
+		select {
+		case err := <- chErr:
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+		case env := <- super.ChEnv: {
+			if env != nil {
+				log.Print("Got env: " + hex.EncodeToString(env.ID))
+			}
+		}
+		}
+	}
+
 	//go create object type supervisors
 
 

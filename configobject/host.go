@@ -1,7 +1,6 @@
 package configobject
 
 import (
-	"fmt"
 	"git.icinga.com/icingadb/icingadb-json-decoder"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"git.icinga.com/icingadb/icingadb-utils"
@@ -120,21 +119,25 @@ func (h Host) UpdateValues() []interface{} {
 	return v
 }
 
-func (h *Host) GetId() string {
+func (h Host) GetId() string {
 	return h.Id
 }
 
-func (h *Host) SetId(id string) {
+func (h Host) SetId(id string) {
 	h.Id = id
 }
 
 func HostOperator(super *supervisor.Supervisor) error {
 	chBack := make(chan *icingadb_json_decoder.JsonDecodePackage)
+	var hosts = map[[20]byte]*Host{}
 
 	//get checksums from redis
 	go func() {
 		res, err := super.Rdbw.HGetAll("icinga:config:checksum:host")
 		count := len(res)
+
+		hosts = make(map[[20]byte]*Host, count)
+
 		if err != nil {
 			super.ChErr <- err
 			return
@@ -154,7 +157,7 @@ func HostOperator(super *supervisor.Supervisor) error {
 		}()
 
 		for ret := range chBack {
-			fmt.Println(ret)
+			hosts[ret.Id] = ret.Row.(*Host)
 			count--
 			if 0 == count {
 				close(chBack)
