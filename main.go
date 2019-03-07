@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/hex"
 	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-ha"
 	"git.icinga.com/icingadb/icingadb-json-decoder"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
+	"log"
 )
 
 func main() {
@@ -21,14 +23,14 @@ func main() {
 	}
 
 	super := supervisor.Supervisor{
-		ChEnv: make(chan *icingadb_connection.Environment),
+		ChEnv: make(chan *icingadb_ha.Environment),
 		ChDecode: make(chan *icingadb_json_decoder.JsonDecodePackage),
 		Rdbw: redisConn,
 		Dbw: mysqlConn,
 	}
 
 	ha := icingadb_ha.HA{}
-	ha.Run(super.Rdbw, super.Dbw, super.ChEnv, chErr)
+	go ha.Run(super.Rdbw, super.Dbw, super.ChEnv, chErr)
 	go func() {
 		chErr <- icingadb_ha.IcingaEventsBroker(redisConn, super.ChEnv)
 	}()

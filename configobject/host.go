@@ -51,7 +51,7 @@ type Host struct {
 	CommandEndpointId     string  `json:"command_endpoint_id"`
 }
 
-func NewHost() Row {
+func NewHost() icingadb_json_decoder.Row {
 	h := Host{
 		EnvId:           icingadb_utils.DecodeChecksum(icingadb_utils.Sha1("default")),
 		CheckPeriod:     "check_period",
@@ -64,13 +64,13 @@ func NewHost() Row {
 	return &h
 }
 
-func (h *Host) InsertValues() []interface{} {
+func (h Host) InsertValues() []interface{} {
 	v := h.UpdateValues()
 
 	return append([]interface{}{icingadb_utils.Checksum(h.Id)}, v...)
 }
 
-func (h *Host) UpdateValues() []interface{} {
+func (h Host) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
 	v = append(
@@ -146,6 +146,7 @@ func HostOperator(super *supervisor.Supervisor) error {
 					Id: icingadb_utils.Bytes2checksum(icingadb_utils.Checksum(id)),
 					ChecksumsRaw: value,
 					ChBack: chBack,
+					Factory:NewHost,
 				}
 
 				super.ChDecode <- &pkg
