@@ -9,11 +9,6 @@ import (
 	"time"
 )
 
-type Environment struct {
-	ID   []byte
-	Name string
-}
-
 type Icinga2RedisWriterEventsConfig struct {
 	Update, Delete, Dump string
 }
@@ -74,15 +69,14 @@ type RedisClient interface {
 }
 
 type StatusCmd interface {
-
 }
 
 // Redis wrapper including helper functions
 type RDBWrapper struct {
-	Rdb                    		RedisClient
-	ConnectedAtomic        		*uint32 //uint32 to be able to use atomic operations
-	ConnectionUpCondition 		*sync.Cond
-	ConnectionLostCounterAtomic	*uint32 //uint32 to be able to use atomic operations
+	Rdb                         RedisClient
+	ConnectedAtomic             *uint32 //uint32 to be able to use atomic operations
+	ConnectionUpCondition       *sync.Cond
+	ConnectionLostCounterAtomic *uint32 //uint32 to be able to use atomic operations
 }
 
 func (rdbw *RDBWrapper) IsConnected() bool {
@@ -108,7 +102,7 @@ func NewRDBWrapper(address string) (*RDBWrapper, error) {
 	rdbw := RDBWrapper{
 		Rdb: rdb, ConnectedAtomic: new(uint32),
 		ConnectionLostCounterAtomic: new(uint32),
-		ConnectionUpCondition: sync.NewCond(&sync.Mutex{}),
+		ConnectionUpCondition:       sync.NewCond(&sync.Mutex{}),
 	}
 
 	_, err := rdbw.Rdb.Ping().Result()
