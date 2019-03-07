@@ -1,7 +1,7 @@
 package icingadb_ha
 
 import (
-	"git.icinga.com/icingadb/icingadb-connection-lib"
+	"git.icinga.com/icingadb/icingadb-connection"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -73,9 +73,7 @@ func TestHA_handleResponsibility(t *testing.T) {
 
 func Test_cleanUpInstances(t *testing.T) {
 	var dbw, err = icingadb_connection.NewDBWrapper(
-		"mysql",
-		"module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb?" +
-			"innodb_strict_mode=1&sql_mode='STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION,PIPES_AS_CONCAT,ANSI_QUOTES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER'")
+		"module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb?")
 	assert.NoError(t, err, "SQL error")
 
 	_, err = dbw.SqlExec(
