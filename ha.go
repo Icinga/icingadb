@@ -34,7 +34,7 @@ const (
 
 type HA struct {
 	ourUUID      uuid.UUID
-	ourEnv *icingadb_connection.Environment
+	ourEnv *Environment
 	icinga2MTime int64
 	// responsibility tells whether we're responsible for our environment.
 	responsibility int32
@@ -71,7 +71,7 @@ func (h *HA) IsResponsible() bool {
 	return h.getResponsibility() == resp_TakeoverSync
 }
 
-func (h *HA) Run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment, chErr chan error) {
+func (h *HA) Run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.DBWrapper, chEnv chan *Environment, chErr chan error) {
 	go cleanUpInstancesAsync(dbw, chErr)
 
 	if errRun := h.run(rdb, dbw, chEnv); errRun != nil {
@@ -178,7 +178,7 @@ func (h *HA) handleResponsibility() (cont bool, nextAction int) {
 	return
 }
 
-func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.DBWrapper, chEnv chan *icingadb_connection.Environment) error {
+func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.DBWrapper, chEnv chan *Environment) error {
 	log.WithFields(log.Fields{"context": "HA"}).Info("Waiting for Icinga 2 to tell us its environment")
 
 	var hasEnv bool

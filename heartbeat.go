@@ -7,6 +7,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+
+type Environment struct {
+	ID                   []byte
+	Name                 string
+	configDumpInProgress bool
+}
+
 // Compute SHA1
 func Sha1bytes(bytes []byte) []byte {
 	hash := sha1.New()
@@ -14,7 +21,7 @@ func Sha1bytes(bytes []byte) []byte {
 	return hash.Sum(nil)
 }
 
-func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *icingadb_connection.Environment) error {
+func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *Environment) error {
 	log.Info("Starting Events broker")
 
 	subscription := rdb.Subscribe()
@@ -38,7 +45,8 @@ func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *icingad
 			}
 
 			environment := unJson.(map[string]interface{})["IcingaApplication"].(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["environment"].(string)
-			env := &icingadb_connection.Environment{Name: environment, ID: Sha1bytes([]byte(environment))}
+			configDumpInProgress := unJson.(map[string]interface{})["config_dump_in_progress"].(bool)
+			env := &Environment{Name: environment, ID: Sha1bytes([]byte(environment)), configDumpInProgress: configDumpInProgress}
 			chEnv <- env
 		}
 	}
