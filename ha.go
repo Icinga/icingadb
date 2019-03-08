@@ -34,7 +34,7 @@ const (
 
 type HA struct {
 	ourUUID      uuid.UUID
-	ourEnv *Environment
+	ourEnv       *Environment
 	icinga2MTime int64
 	// responsibility tells whether we're responsible for our environment.
 	responsibility int32
@@ -195,7 +195,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 	log.WithFields(log.Fields{
 		"context": "HA",
 		"uuid":    h.ourUUID.String(),
-		"env":     h.ourEnv.Name,
+		"env":     h.ourEnv.ID,
 	}).Info("Received environment from Icinga 2")
 
 	everySecond := time.NewTicker(time.Second)
@@ -335,7 +335,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 						if h.setResponsibility(resp_TakeoverSync) == resp_TakeoverNoSync {
 							log.WithFields(log.Fields{
 								"context":    "HA",
-								"env":        h.ourEnv.Name,
+								"env":        h.ourEnv.ID,
 								"their_uuid": theirUUID.String(),
 							}).Info("Taking over")
 						}
@@ -350,7 +350,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 			if !justTakenOver {
 				log.WithFields(log.Fields{
 					"context":    "HA",
-					"env":        h.ourEnv.Name,
+					"env":        h.ourEnv.ID,
 					"their_uuid": theirUUID.String(),
 				}).Info("Other instance is responsible")
 			}
@@ -388,7 +388,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 
 			log.WithFields(log.Fields{
 				"context": "HA",
-				"env":     h.ourEnv.Name,
+				"env":     h.ourEnv.ID,
 			}).Info("Other instance is responsible. Ceasing operations.")
 
 			h.responsibleSince = time.Time{}
@@ -401,6 +401,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 				return nil
 			}
 
+			h.Icinga2HeartBeat()
 			<-everySecond.C
 		case <-everySecond.C:
 			break
