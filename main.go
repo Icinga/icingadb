@@ -37,11 +37,11 @@ func main() {
 	go icingadb_json_decoder.DecodePool(super.ChDecode, super.ChErr, 16)
 
 	go func() {
-		super.ChErr <- host.HostOperator(&super)
+		chHA := ha.RegisterNotificationListener()
+		super.ChErr <- host.HostOperator(&super, chHA)
 	}()
 
 	for {
-
 		select {
 		case err := <- super.ChErr:
 			if err != nil {

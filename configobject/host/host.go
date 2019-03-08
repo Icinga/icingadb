@@ -130,7 +130,7 @@ func (h *Host) SetId(id string) {
 	h.Id = id
 }
 
-func HostOperator(super *supervisor.Supervisor) error {
+func HostOperator(super *supervisor.Supervisor, chHA chan int) error {
 	//chBack := make(chan *icingadb_json_decoder.JsonDecodePackage)
 	var (
 		redisIds []string
@@ -166,18 +166,27 @@ func HostOperator(super *supervisor.Supervisor) error {
 	wg.Wait()
 	insert, update, delete := icingadb_utils.Delta(redisIds, mysqlIds)
 	log.Infof("Insert: %d, Update: %d, Delete: %d", len(insert), len(update), len(delete))
-			}
-		}()
 
-		for ret := range chBack {
-			hosts[ret.Id] = ret.Row.(*Host)
-			count--
-			if 0 == count {
-				log.Info("Hosts done")
-				close(chBack)
+	var (
+		chInsert chan string
+	)
+	for msg := range chHA {
+		switch msg {
+		case icingadb_ha.Notify_IsNotResponsible:
+			log.Info("Host: Lost responsibility")
+			if chInsert != nil {
+				close(chInsert)
 			}
+		case icingadb_ha.Notify_IsResponsible:
+			log.Info("Host: Got responsibility")
+			chInsert = make(chan string)
+			go func() {
+				for id := range chInsert {
+					log.Info(id)
+				}
+				log.Info("Host: Insert routine stopped")
+			}()
 		}
-	}()
-
+	}
 	return nil
 }
