@@ -259,7 +259,7 @@ func (rdbw *RDBWrapper) HKeys(key string) *redis.StringSliceCmd {
 }
 
 // Wrapper for auto-logging and connection handling
-func (rdbw *RDBWrapper) HGetAll(key string) (map[string]string, error) {
+func (rdbw *RDBWrapper) HGetAll(key string) *redis.StringStringMapCmd {
 	for {
 		if !rdbw.IsConnected() {
 			rdbw.WaitForConnection()
@@ -267,9 +267,9 @@ func (rdbw *RDBWrapper) HGetAll(key string) (map[string]string, error) {
 		}
 
 		benchmarc := icingadb_utils.NewBenchmark()
-		res, errHGA := rdbw.Rdb.HGetAll(key).Result()
+		res := rdbw.Rdb.HGetAll(key)
 
-		if errHGA != nil {
+		if _, err := res.Result(); err != nil {
 			if !rdbw.CheckConnection(false) {
 				continue
 			}
@@ -283,10 +283,10 @@ func (rdbw *RDBWrapper) HGetAll(key string) (map[string]string, error) {
 			"context":   "redis",
 			"benchmark": benchmarc,
 			"query":     "HGETALL " + key,
-			"result":    res,
+			"result":    res.Val(),
 		}).Debug("Ran Query")
 
-		return res, errHGA
+		return res
 	}
 }
 
@@ -299,9 +299,9 @@ func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([
 		}
 
 		benchmarc := icingadb_utils.NewBenchmark()
-		c, e := rdbw.Rdb.TxPipelined(fn)
+		cmd, err := rdbw.Rdb.TxPipelined(fn)
 
-		if e != nil {
+		if err != nil {
 			if !rdbw.CheckConnection(false) {
 				continue
 			}
@@ -317,7 +317,7 @@ func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([
 			"query":     "MULTI/EXEC",
 		}).Debug("Ran pipelined transaction")
 
-		return c, e
+		return cmd, err
 	}
 }
 
