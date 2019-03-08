@@ -32,6 +32,11 @@ const (
 	action_CeaseOperation
 )
 
+const (
+	Notify_IsResponsible = iota
+	Notify_IsNotResponsible
+)
+
 type HA struct {
 	ourUUID      uuid.UUID
 	ourEnv       *Environment
@@ -44,6 +49,7 @@ type HA struct {
 	runningCriticalOperations uint64
 	// lastCriticalOperationEnd tells when the last critical operation finished.
 	lastCriticalOperationEnd int64
+	notificationListeners []chan int
 }
 
 // RunCriticalOperation runs op and manages HA#runningCriticalOperations if we're responsible.
@@ -149,6 +155,7 @@ func (h *HA) handleResponsibility() (cont bool, nextAction int) {
 			}).Warn("Icinga 2 detected as not running, stopping.")
 
 			h.setResponsibility(resp_Stop)
+			h.notifyNotificationListener(Notify_IsNotResponsible)
 			cont = true
 		}
 
@@ -338,6 +345,7 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 								"env":        h.ourEnv.ID,
 								"their_uuid": theirUUID.String(),
 							}).Info("Taking over")
+							h.notifyNotificationListener(Notify_IsResponsible)
 						}
 
 						if _, errRP := rdb.Publish("icingadb:wakeup", h.ourUUID.String()).Result(); errRP != nil {
@@ -422,4 +430,18 @@ func (h *HA) getResponsibility() int {
 // setResponsibility sets the responsibility and returns the previous one.
 func (h *HA) setResponsibility(r int32) int32 {
 	return atomic.SwapInt32(&h.responsibility, r)
+}
+
+func (h *HA) RegisterNotificationListener() chan int {
+	ch := make(chan int)
+	h.notificationListeners = append(h.notificationListeners, ch)
+	return ch
+}
+
+func (h *HA) notifyNotificationListener(msg int) {
+	for _, c := range h.notificationListeners {
+		go func() {
+			c <- msg
+		}()
+	}
 }
