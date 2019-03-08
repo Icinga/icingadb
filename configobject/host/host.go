@@ -1,11 +1,12 @@
 package host
 
 import (
-	"git.icinga.com/icingadb/icingadb-json-decoder"
+	"git.icinga.com/icingadb/icingadb-ha"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"git.icinga.com/icingadb/icingadb-utils"
 	log "github.com/sirupsen/logrus"
+	"sync"
 )
 
 type Host struct {
@@ -130,31 +131,41 @@ func (h *Host) SetId(id string) {
 }
 
 func HostOperator(super *supervisor.Supervisor) error {
-	chBack := make(chan *icingadb_json_decoder.JsonDecodePackage)
-	var hosts = map[[20]byte]*Host{}
+	//chBack := make(chan *icingadb_json_decoder.JsonDecodePackage)
+	var (
+		redisIds []string
+		mysqlIds []string
+		wg = sync.WaitGroup{}
+	)
 
-	//get checksums from redis
+	//get ids from redis
+	wg.Add(1)
 	go func() {
-		res, err := super.Rdbw.HGetAll("icinga:config:checksum:host")
-		count := len(res)
-
-		hosts = make(map[[20]byte]*Host, count)
-
+		defer wg.Done()
+		var err error
+		res, err := super.Rdbw.HKeys("icinga:config:checksum:host").Result()
 		if err != nil {
 			super.ChErr <- err
 			return
 		}
+		redisIds = res
+	}()
 
-		go func() {
-			for id, value := range res {
-				pkg := icingadb_json_decoder.JsonDecodePackage{
-					Id: icingadb_utils.Bytes2checksum(icingadb_utils.Checksum(id)),
-					ChecksumsRaw: value,
-					ChBack: chBack,
-					Factory:NewHost,
-				}
+	//get ids from mysql
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		var err error
+		mysqlIds, err = super.Dbw.SqlFetchIds("host")
+		if err != nil {
+			super.ChErr <- err
+			return
+		}
+	}()
 
-				super.ChDecode <- &pkg
+	wg.Wait()
+	insert, update, delete := icingadb_utils.Delta(redisIds, mysqlIds)
+	log.Infof("Insert: %d, Update: %d, Delete: %d", len(insert), len(update), len(delete))
 			}
 		}()
 
