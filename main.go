@@ -5,7 +5,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-ha"
 	"git.icinga.com/icingadb/icingadb-json-decoder"
-	"git.icinga.com/icingadb/icingadb-main/configobject"
+	"git.icinga.com/icingadb/icingadb-main/configobject/host"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"log"
 )
@@ -38,7 +38,7 @@ func main() {
 	go icingadb_json_decoder.DecodePool(super.ChDecode, chErr, 16)
 
 	go func() {
-		chErr <- configobject.HostOperator(&super)
+		chErr <- host.HostOperator(&super)
 	}()
 
 	for {

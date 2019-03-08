@@ -1,9 +1,11 @@
-package configobject
+package host
 
 import (
 	"git.icinga.com/icingadb/icingadb-json-decoder"
+	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"git.icinga.com/icingadb/icingadb-utils"
+	log "github.com/sirupsen/logrus"
 )
 
 type Host struct {
@@ -50,7 +52,7 @@ type Host struct {
 	CommandEndpointId     string  `json:"command_endpoint_id"`
 }
 
-func NewHost() icingadb_json_decoder.Row {
+func NewHost() configobject.Row {
 	h := Host{
 		EnvId:           icingadb_utils.DecodeChecksum(icingadb_utils.Sha1("default")),
 		CheckPeriod:     "check_period",
@@ -63,13 +65,13 @@ func NewHost() icingadb_json_decoder.Row {
 	return &h
 }
 
-func (h Host) InsertValues() []interface{} {
+func (h *Host) InsertValues() []interface{} {
 	v := h.UpdateValues()
 
 	return append([]interface{}{icingadb_utils.Checksum(h.Id)}, v...)
 }
 
-func (h Host) UpdateValues() []interface{} {
+func (h *Host) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
 	v = append(
@@ -119,11 +121,11 @@ func (h Host) UpdateValues() []interface{} {
 	return v
 }
 
-func (h Host) GetId() string {
+func (h *Host) GetId() string {
 	return h.Id
 }
 
-func (h Host) SetId(id string) {
+func (h *Host) SetId(id string) {
 	h.Id = id
 }
 
@@ -160,6 +162,7 @@ func HostOperator(super *supervisor.Supervisor) error {
 			hosts[ret.Id] = ret.Row.(*Host)
 			count--
 			if 0 == count {
+				log.Info("Hosts done")
 				close(chBack)
 			}
 		}
