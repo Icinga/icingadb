@@ -7,19 +7,19 @@ import (
 	"git.icinga.com/icingadb/icingadb-json-decoder"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
-	"log"
+	log "github.com/sirupsen/logrus"
 )
 
 func main() {
 	chErr := make (chan error)
 	redisConn, err := icingadb_connection.NewRDBWrapper("127.0.0.1:6379")
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 
 	mysqlConn, err := icingadb_connection.NewDBWrapper("module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb"	)
 	if err != nil {
-		return
+		log.Fatal(err)
 	}
 
 	super := supervisor.Supervisor{
