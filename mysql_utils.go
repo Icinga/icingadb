@@ -380,17 +380,6 @@ func SetBulkSize(s int) {
 	bulkSize = s
 }
 
-type Row interface {
-	InsertValues() []interface{}
-	UpdateValues() []interface{}
-	GetId() string
-	SetId(id string)
-}
-
-type Rows []Row
-
-type RowFactory func() Row
-
 type BulkInsertStmt struct {
 	Format      string
 	Fields      []string
