@@ -1,35 +1,26 @@
 package icingadb_json_decoder
 
 import (
+	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"github.com/json-iterator/go"
 )
 
 var json = jsoniter.ConfigCompatibleWithStandardLibrary
-
-type Row interface {
-	InsertValues() []interface{}
-	UpdateValues() []interface{}
-	GetId() string
-	SetId(id string)
-}
-
-type RowFactory func() Row
-
 
 type JsonDecodePackage struct{
 	Id [20]byte
 	// Json strings from Redis
 	ChecksumsRaw string
 	ConfigRaw string
-	Row Row
+	Row configobject.Row
 	// Package will be sent back through this channel
 	ChBack chan *JsonDecodePackage
-	Factory RowFactory
+	Factory configobject.RowFactory
 }
 
 // decodeString unmarshals the string toDecode using the json package. Returns the object as a
 // map[string]interface and nil if successful, error if not.
-func decodeString(toDecode string, row Row) error {
+func decodeString(toDecode string, row configobject.Row) error {
 	return json.Unmarshal([]byte(toDecode), row)
 }
 
