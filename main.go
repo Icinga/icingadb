@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/hex"
 	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-ha"
 	"git.icinga.com/icingadb/icingadb-json-decoder"
@@ -42,14 +41,11 @@ func main() {
 	}()
 
 	for {
+
 		select {
 		case err := <- super.ChErr:
 			if err != nil {
 				log.Fatal(err)
-			}
-		case env := <- super.ChEnv:
-			if env != nil {
-				log.Print("Got env: " + hex.EncodeToString(env.ID))
 			}
 		}
 	}
