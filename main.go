@@ -38,7 +38,7 @@ func main() {
 
 	go func() {
 		chHA := ha.RegisterNotificationListener()
-		super.ChErr <- host.HostOperator(&super, chHA)
+		super.ChErr <- host.SyncOperator(&super, chHA)
 	}()
 
 	for {

@@ -130,7 +130,7 @@ func (h *Host) SetId(id string) {
 	h.Id = id
 }
 
-func HostOperator(super *supervisor.Supervisor, chHA chan int) error {
+func SyncOperator(super *supervisor.Supervisor, chHA chan int) error {
 	//chBack := make(chan *icingadb_json_decoder.JsonDecodePackage)
 	var (
 		redisIds []string
