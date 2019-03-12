@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-utils"
 	log "github.com/sirupsen/logrus"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -563,5 +565,34 @@ func (dbw *DBWrapper) SqlFetchIds(table string) ([]string, error) {
 		}
 
 		return keys, nil
+	}
+}
+
+func (dbw *DBWrapper) SqlBulkInsert(rows []configobject.Row, stmt *BulkInsertStmt) {
+	if len(rows) == 0 {
+		return
+	}
+
+	placeholders := make([]string, len(rows))
+	values := make([]interface{}, len(rows)*stmt.NumField)
+	j := 0
+
+	for i, r := range rows {
+		placeholders[i] = stmt.Placeholder
+
+		for _, v := range r.InsertValues() {
+			values[j] = v
+			j++
+		}
+	}
+
+	query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
+
+	_, err := dbw.SqlExec("Bulk insert", query, values...)
+	if err != nil {
+		_, err = dbw.SqlExec("Bulk insert", query, values...)
+		if err != nil {
+			panic(err)
+		}
 	}
 }
