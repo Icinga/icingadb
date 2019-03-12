@@ -9,7 +9,7 @@ import (
 type Supervisor struct {
 	ChErr chan error
 	ChEnv chan *icingadb_ha.Environment
-	ChDecode chan *icingadb_json_decoder.JsonDecodePackage
+	ChDecode chan *icingadb_json_decoder.JsonDecodePackages
 	Rdbw *icingadb_connection.RDBWrapper
 	Dbw  *icingadb_connection.DBWrapper
 }

@@ -1,12 +1,64 @@
 package host
 
 import (
+	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-ha"
+	"git.icinga.com/icingadb/icingadb-json-decoder"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"git.icinga.com/icingadb/icingadb-utils"
+	"git.icinga.com/icingadb/icingadb/benchmark"
 	log "github.com/sirupsen/logrus"
 	"sync"
+)
+
+var (
+	BulkInsertStmt *icingadb_connection.BulkInsertStmt
+	BulkDeleteStmt *icingadb_connection.BulkDeleteStmt
+	UpdateStmt     *icingadb_connection.UpdateStmt
+	Fields         = []string{
+		"id",
+		"env_id",
+		"name_checksum",
+		"properties_checksum",
+		"customvars_checksum",
+		"groups_checksum",
+		"name",
+		"name_ci",
+		"display_name",
+		"address",
+		"address6",
+		"address_bin",
+		"address6_bin",
+		"checkcommand",
+		"checkcommand_id",
+		"max_check_attempts",
+		"check_period",
+		"check_period_id",
+		"check_timeout",
+		"check_interval",
+		"check_retry_interval",
+		"active_checks_enabled",
+		"passive_checks_enabled",
+		"event_handler_enabled",
+		"notifications_enabled",
+		"flapping_enabled",
+		"flapping_threshold_low",
+		"flapping_threshold_high",
+		"perfdata_enabled",
+		"eventcommand",
+		"eventcommand_id",
+		"is_volatile",
+		"action_url_id",
+		"notes_url_id",
+		"notes",
+		"icon_image_id",
+		"icon_image_alt",
+		"zone",
+		"zone_id",
+		"command_endpoint",
+		"command_endpoint_id",
+	}
 )
 
 type Host struct {
@@ -130,6 +182,12 @@ func (h *Host) SetId(id string) {
 	h.Id = id
 }
 
+func init() {
+	BulkInsertStmt = icingadb_connection.NewBulkInsertStmt("host", Fields)
+	BulkDeleteStmt = icingadb_connection.NewBulkDeleteStmt("host")
+	UpdateStmt = icingadb_connection.NewUpdateStmt("host", Fields[1:]) // Omit Id from fields
+}
+
 func SyncOperator(super *supervisor.Supervisor, chHA chan int) error {
 	//chBack := make(chan *icingadb_json_decoder.JsonDecodePackage)
 	var (
@@ -168,7 +226,12 @@ func SyncOperator(super *supervisor.Supervisor, chHA chan int) error {
 	log.Infof("Insert: %d, Update: %d, Delete: %d", len(insert), len(update), len(delete))
 
 	var (
-		chInsert chan string
+		chInsert 		chan []string
+		chUpdate 		chan []string
+		chDelete 		chan []string
+		chInsertBack 	chan []configobject.Row
+		chUpdateBack 	chan []configobject.Row
+		chDeleteBack 	chan []configobject.Row
 	)
 	for msg := range chHA {
 		switch msg {
@@ -177,16 +240,99 @@ func SyncOperator(super *supervisor.Supervisor, chHA chan int) error {
 			if chInsert != nil {
 				close(chInsert)
 			}
+			if chUpdate != nil {
+				close(chInsert)
+			}
+			if chDelete != nil {
+				close(chInsert)
+			}
+			if chInsertBack != nil {
+				close(chInsertBack)
+			}
+			if chUpdateBack != nil {
+				close(chUpdateBack)
+			}
+			if chDeleteBack != nil {
+				close(chDeleteBack)
+			}
 		case icingadb_ha.Notify_IsResponsible:
 			log.Info("Host: Got responsibility")
-			chInsert = make(chan string)
+
+			wgInsert := &sync.WaitGroup{}
+			wgInsert.Add(len(insert))
+
+			chInsert = make(chan []string)
+			chUpdate = make(chan []string)
+			chDelete = make(chan []string)
+
+			chInsertBack = make(chan []configobject.Row)
+			chUpdateBack = make(chan []configobject.Row)
+			chDeleteBack = make(chan []configobject.Row)
+
+			go InsertPrepWorker(super, chInsert, chInsertBack)
+			//TODO: IMPLEMENT //go UpdatePrepWorker(super, chUpdate, chUpdateBack)
+			//TODO: IMPLEMENT //go DeletePrepWorker(super, chDelete, chDeleteBack)
+
+			go InsertExecWorker(super, chInsertBack, wgInsert)
+
 			go func() {
-				for id := range chInsert {
-					log.Info(id)
-				}
-				log.Info("Host: Insert routine stopped")
+				benchmarc := benchmark.NewBenchmark()
+				chInsert <- insert
+				wgInsert.Wait()
+				benchmarc.Stop()
+				log.Infof("Synced %v hosts in %v seconds", len(insert), benchmarc.String())
 			}()
+
+			//chUpdate <- update
+			//chDelete <- delete
 		}
 	}
 	return nil
+}
+
+func InsertPrepWorker(super *supervisor.Supervisor, chInsert <-chan []string, chInsertBack chan<- []configobject.Row) {
+	defer log.Info("Host: Insert preparation routine stopped")
+
+	worker := func(chunk *icingadb_connection.ConfigChunk) {
+		pkgs := icingadb_json_decoder.JsonDecodePackages{
+			ChBack: chInsertBack,
+		}
+		for i, key := range chunk.Keys {
+			if chunk.Configs[i] == nil || chunk.Checksums[i] == nil {
+				continue
+			}
+			pkg := icingadb_json_decoder.JsonDecodePackage{
+				Id:           	key,
+				ChecksumsRaw:	chunk.Checksums[i].(string),
+				ConfigRaw:   	chunk.Configs[i].(string),
+				Factory:		NewHost,
+				ObjectType:		"host",
+			}
+			pkgs.Packages = append(pkgs.Packages, pkg)
+		}
+
+		super.ChDecode <- &pkgs
+	}
+
+	for keys := range chInsert {
+		done := make(chan struct{})
+		ch := super.Rdbw.PipeConfigChunks(done, keys, "host")
+		for chunk := range ch {
+			worker(chunk)
+		}
+	}
+}
+
+func InsertExecWorker(super *supervisor.Supervisor, chInsertBack <-chan []configobject.Row, wg *sync.WaitGroup) {
+	defer log.Info("Host: Insert exec routine stopped")
+
+	worker := func(rows []configobject.Row) {
+		super.Dbw.SqlBulkInsert(rows, BulkInsertStmt)
+		wg.Add(-len(rows))
+	}
+
+	for rows := range chInsertBack {
+		//log.Infof("Inserting %v hosts...", len(rows))
+		go worker(rows)
+	}
 }

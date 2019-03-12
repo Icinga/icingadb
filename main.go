@@ -23,7 +23,7 @@ func main() {
 	super := supervisor.Supervisor{
 		ChErr: make (chan error),
 		ChEnv: make(chan *icingadb_ha.Environment),
-		ChDecode: make(chan *icingadb_json_decoder.JsonDecodePackage),
+		ChDecode: make(chan *icingadb_json_decoder.JsonDecodePackages),
 		Rdbw: redisConn,
 		Dbw: mysqlConn,
 	}
