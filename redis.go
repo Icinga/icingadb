@@ -1,6 +1,7 @@
 package icingadb_connection
 
 import (
+	"fmt"
 	"git.icinga.com/icingadb/icingadb-utils"
 	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
@@ -332,4 +333,65 @@ func (rdbw *RDBWrapper) Subscribe() PubSubWrapper {
 	ps := rdbw.Rdb.Subscribe()
 	psw := PubSubWrapper{ps: ps, rdbw: rdbw}
 	return psw
+}
+
+type ConfigChunk struct {
+	Keys      []string
+	Configs   []interface{}
+	Checksums []interface{}
+}
+
+func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, keys []string, objectType string) <-chan *ConfigChunk {
+	out := make(chan *ConfigChunk)
+
+	worker := func(chunk <-chan []string) {
+		for k := range chunk {
+			pipe := rdbw.Pipeline()
+			cmds := make([]*redis.SliceCmd, 2)
+
+			cmds[0] = pipe.HMGet(fmt.Sprintf("icinga:config:object:%s", objectType), k...)
+			cmds[1] = pipe.HMGet(fmt.Sprintf("icinga:config:checksum:%s", objectType), k...)
+
+			_, err := pipe.Exec() // TODO(el): What to do with the Cmder slice?
+			if err != nil {
+				panic(err)
+			}
+
+			configs, err := cmds[0].Result()
+			if err != nil {
+				panic(err)
+			}
+			checksums, err := cmds[1].Result()
+			if err != nil {
+				panic(err)
+			}
+
+			select {
+			case out <- &ConfigChunk{Keys: k, Configs: configs, Checksums: checksums}:
+			case <-done:
+				return
+			}
+		}
+	}
+
+	//TODO: Replace fixed chunkSize
+	work := icingadb_utils.ChunkKeys(done, keys, 1500)
+
+	go func() {
+		defer close(out)
+
+		wg := &sync.WaitGroup{}
+
+		for i := 0; i < 32; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				worker(work)
+			}()
+		}
+
+		wg.Wait()
+	}()
+
+	return out
 }
