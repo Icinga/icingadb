@@ -65,6 +65,7 @@ type RedisClient interface {
 	HKeys(key string) *redis.StringSliceCmd
 	HGetAll(key string) *redis.StringStringMapCmd
 	TxPipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
+	Pipeline() redis.Pipeliner
 	Subscribe(channels ...string) *redis.PubSub
 }
 
@@ -319,6 +320,12 @@ func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([
 
 		return cmd, err
 	}
+}
+
+func (rdbw *RDBWrapper) Pipeline() PipelinerWrapper {
+	pipeliner := rdbw.Rdb.Pipeline()
+	plw := PipelinerWrapper{pipeliner: pipeliner, rdbw: rdbw}
+	return plw
 }
 
 func (rdbw *RDBWrapper) Subscribe() PubSubWrapper {
