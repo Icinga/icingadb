@@ -595,8 +595,31 @@ func (dbw *DBWrapper) SqlBulkInsert(rows []configobject.Row, stmt *BulkInsertStm
 
 	return nil
 }
+
+func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
+	if len(keys) == 0 {
+		return nil
+	}
+
+	done := make(chan struct{})
+	defer close(done)
+
+	//TODO: Don't do this hardcoded - Chunksize
+	for bulk := range icingadb_utils.ChunkKeys(done, keys, 1000) {
+		placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(bulk)), ", ")
+		values := make([]interface{}, len(bulk))
+
+		for i, key := range bulk {
+			values[i] = key
+		}
+
+		query := fmt.Sprintf(stmt.Format, placeholders)
+
+		_, err := dbw.SqlExec("Bulk insert", query, values...)
 		if err != nil {
-			panic(err)
+			return err
 		}
 	}
+
+	return nil
 }
