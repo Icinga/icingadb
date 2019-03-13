@@ -568,9 +568,9 @@ func (dbw *DBWrapper) SqlFetchIds(table string) ([]string, error) {
 	}
 }
 
-func (dbw *DBWrapper) SqlBulkInsert(rows []configobject.Row, stmt *BulkInsertStmt) {
+func (dbw *DBWrapper) SqlBulkInsert(rows []configobject.Row, stmt *BulkInsertStmt) error {
 	if len(rows) == 0 {
-		return
+		return nil
 	}
 
 	placeholders := make([]string, len(rows))
@@ -590,7 +590,11 @@ func (dbw *DBWrapper) SqlBulkInsert(rows []configobject.Row, stmt *BulkInsertStm
 
 	_, err := dbw.SqlExec("Bulk insert", query, values...)
 	if err != nil {
-		_, err = dbw.SqlExec("Bulk insert", query, values...)
+		return err
+	}
+
+	return nil
+}
 		if err != nil {
 			panic(err)
 		}
