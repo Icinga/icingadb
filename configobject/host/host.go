@@ -227,11 +227,8 @@ func SyncOperator(super *supervisor.Supervisor, chHA chan int) error {
 
 	var (
 		chInsert 		chan []string
-		chUpdate 		chan []string
 		chDelete 		chan []string
 		chInsertBack 	chan []configobject.Row
-		chUpdateBack 	chan []configobject.Row
-		chDeleteBack 	chan []configobject.Row
 	)
 	for msg := range chHA {
 		switch msg {
@@ -240,20 +237,11 @@ func SyncOperator(super *supervisor.Supervisor, chHA chan int) error {
 			if chInsert != nil {
 				close(chInsert)
 			}
-			if chUpdate != nil {
-				close(chInsert)
-			}
 			if chDelete != nil {
-				close(chInsert)
+				close(chDelete)
 			}
 			if chInsertBack != nil {
 				close(chInsertBack)
-			}
-			if chUpdateBack != nil {
-				close(chUpdateBack)
-			}
-			if chDeleteBack != nil {
-				close(chDeleteBack)
 			}
 		case icingadb_ha.Notify_IsResponsible:
 			log.Info("Host: Got responsibility")
@@ -262,17 +250,10 @@ func SyncOperator(super *supervisor.Supervisor, chHA chan int) error {
 			wgInsert.Add(len(insert))
 
 			chInsert = make(chan []string)
-			chUpdate = make(chan []string)
 			chDelete = make(chan []string)
-
 			chInsertBack = make(chan []configobject.Row)
-			chUpdateBack = make(chan []configobject.Row)
-			chDeleteBack = make(chan []configobject.Row)
 
 			go InsertPrepWorker(super, chInsert, chInsertBack)
-			//TODO: IMPLEMENT //go UpdatePrepWorker(super, chUpdate, chUpdateBack)
-			//TODO: IMPLEMENT //go DeletePrepWorker(super, chDelete, chDeleteBack)
-
 			go InsertExecWorker(super, chInsertBack, wgInsert)
 
 			go func() {
