@@ -64,6 +64,7 @@ type RedisClient interface {
 	XRead(a *redis.XReadArgs) *redis.XStreamSliceCmd
 	XDel(stream string, ids ...string) *redis.IntCmd
 	HKeys(key string) *redis.StringSliceCmd
+	HMGet(key string, fields ...string) *redis.SliceCmd
 	HGetAll(key string) *redis.StringStringMapCmd
 	TxPipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
 	Pipeline() redis.Pipeliner
@@ -248,6 +249,26 @@ func (rdbw *RDBWrapper) HKeys(key string) *redis.StringSliceCmd {
 		}
 
 		cmd := rdbw.Rdb.HKeys(key)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+func (rdbw * RDBWrapper) HMGet(key string, fields ...string) *redis.SliceCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.HMGet(key, fields...)
 		_, err := cmd.Result()
 
 		if err != nil {
