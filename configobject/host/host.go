@@ -1,6 +1,7 @@
 package host
 
 import (
+	"encoding/json"
 	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-ha"
 	"git.icinga.com/icingadb/icingadb-json-decoder"
@@ -189,7 +190,6 @@ func init() {
 }
 
 func SyncOperator(super *supervisor.Supervisor, chHA chan int) error {
-	//chBack := make(chan *icingadb_json_decoder.JsonDecodePackage)
 	var (
 		redisIds []string
 		mysqlIds []string
@@ -227,56 +227,84 @@ func SyncOperator(super *supervisor.Supervisor, chHA chan int) error {
 
 	var (
 		chInsert 		chan []string
-		chDelete 		chan []string
 		chInsertBack 	chan []configobject.Row
+		chDelete 		chan []string
+		chUpdateComp	chan []string
+		chUpdate 		chan []string
+		chUpdateBack	chan []configobject.Row
+		wgInsert = &sync.WaitGroup{}
+		wgDelete = &sync.WaitGroup{}
 	)
-	for msg := range chHA {
-		switch msg {
-		case icingadb_ha.Notify_IsNotResponsible:
-			log.Info("Host: Lost responsibility")
-			if chInsert != nil {
-				close(chInsert)
+	go func() {
+		for msg := range chHA {
+			switch msg {
+			case icingadb_ha.Notify_IsNotResponsible:
+				log.Info("Host: Lost responsibility")
+				if chInsert != nil {
+					close(chInsert)
+				}
+				if chInsertBack != nil {
+					close(chInsertBack)
+				}
+				if chDelete != nil {
+					close(chDelete)
+				}
+				if chUpdateComp != nil {
+					close(chUpdateComp)
+				}
+				if chUpdate != nil {
+					close(chUpdate)
+				}
+				if chUpdateBack != nil {
+					close(chUpdateBack)
+				}
+			case icingadb_ha.Notify_IsResponsible:
+				log.Info("Host: Got responsibility")
+
+				chInsert = make(chan []string)
+				chInsertBack = make(chan []configobject.Row)
+				chDelete = make(chan []string)
+				chUpdateComp = make(chan []string)
+				chUpdate = make(chan []string)
+				chUpdateBack = make(chan []configobject.Row)
+
+				go InsertPrepWorker(super, chInsert, chInsertBack)
+				go InsertExecWorker(super, chInsertBack, wgInsert)
+
+				go DeleteExecWorker(super, chDelete, wgDelete)
+
+				go UpdateCompWorker(super, chUpdateComp, chUpdate)
+				go UpdatePrepWorker(super, chUpdate, chUpdateBack)
+				go UpdateExecWorker(super, chUpdateBack)
+
+				go func() {
+					benchmarc := benchmark.NewBenchmark()
+					wgInsert.Add(len(insert))
+					chInsert <- insert
+					//insert = nil
+					wgInsert.Wait()
+					benchmarc.Stop()
+					log.Infof("Inserted %v hosts in %v seconds", len(insert), benchmarc.String())
+				}()
+
+				go func() {
+					benchmarc := benchmark.NewBenchmark()
+					wgDelete.Add(len(delete))
+					chDelete <- delete
+					//delete = nil
+					wgDelete.Wait()
+					benchmarc.Stop()
+					log.Infof("Deleted %v hosts in %v seconds", len(delete), benchmarc.String())
+				}()
+
+				go func() {
+					chUpdateComp <- update
+					//update = nil
+				}()
 			}
-			if chDelete != nil {
-				close(chDelete)
-			}
-			if chInsertBack != nil {
-				close(chInsertBack)
-			}
-		case icingadb_ha.Notify_IsResponsible:
-			log.Info("Host: Got responsibility")
-
-			wgInsert := &sync.WaitGroup{}
-			wgInsert.Add(len(insert))
-			wgDelete := &sync.WaitGroup{}
-			wgDelete.Add(len(delete))
-
-			chInsert = make(chan []string)
-			chDelete = make(chan []string)
-			chInsertBack = make(chan []configobject.Row)
-
-			go InsertPrepWorker(super, chInsert, chInsertBack)
-			go InsertExecWorker(super, chInsertBack, wgInsert)
-
-			go DeleteExecWorker(super, chDelete, wgDelete)
-
-			go func() {
-				benchmarc := benchmark.NewBenchmark()
-				chInsert <- insert
-				wgInsert.Wait()
-				benchmarc.Stop()
-				log.Infof("Inserted %v hosts in %v seconds", len(insert), benchmarc.String())
-			}()
-
-			go func() {
-				benchmarc := benchmark.NewBenchmark()
-				chDelete <- delete
-				wgDelete.Wait()
-				benchmarc.Stop()
-				log.Infof("Deleted %v hosts in %v seconds", len(delete), benchmarc.String())
-			}()
 		}
-	}
+	}()
+
 	return nil
 }
 
@@ -334,5 +362,98 @@ func DeleteExecWorker(super *supervisor.Supervisor, chDelete <-chan []string, wg
 			super.ChErr <- super.Dbw.SqlBulkDelete(keys, BulkDeleteStmt)
 			wg.Add(-len(keys))
 		}(keys)
+	}
+}
+
+type HostChecksums struct {
+	NameChecksum          string  `json:"name_checksum"`
+	PropertiesChecksum    string  `json:"properties_checksum"`
+	CustomvarsChecksum    string  `json:"customvars_checksum"`
+	GroupsChecksum        string  `json:"groups_checksum"`
+}
+
+func UpdateCompWorker(super *supervisor.Supervisor, chUpdate <-chan []string, chUpdateBack chan<- []string) {
+	defer log.Info("Host: Update comparison routine stopped")
+
+	prep := func(chunk *icingadb_connection.ChecksumChunk, mysqlChecksums map[string]map[string]string) {
+		changed := make([]string, 0)
+		for i, key := range chunk.Keys {
+			if chunk.Checksums[i] == nil {
+				continue
+			}
+
+			//TODO: Check if this can be done better (json in this func)
+			redisChecksums := &HostChecksums{}
+			err := json.Unmarshal([]byte(chunk.Checksums[i].(string)), redisChecksums)
+			if err != nil {
+				super.ChErr <- err
+			}
+
+			if redisChecksums.PropertiesChecksum != mysqlChecksums[key]["properties_checksum"] {
+				changed = append(changed, key)
+			}
+		}
+		chUpdateBack <- changed
+	}
+
+	for keys := range chUpdate {
+		done := make(chan struct{})
+		ch := super.Rdbw.PipeChecksumChunks(done, keys, "host")
+		checksums, err := super.Dbw.SqlFetchChecksums("host", keys)
+		if err != nil {
+			super.ChErr <- err
+		}
+
+		go func() {
+			for chunk := range ch {
+				go prep(chunk, checksums)
+			}
+		}()
+	}
+}
+
+func UpdatePrepWorker(super *supervisor.Supervisor, chUpdate <-chan []string, chUpdateBack chan<- []configobject.Row) {
+	defer log.Info("Host: Update preparation routine stopped")
+
+	prep := func(chunk *icingadb_connection.ConfigChunk) {
+		pkgs := icingadb_json_decoder.JsonDecodePackages{
+			ChBack: chUpdateBack,
+		}
+		for i, key := range chunk.Keys {
+			if chunk.Configs[i] == nil || chunk.Checksums[i] == nil {
+				continue
+			}
+			pkg := icingadb_json_decoder.JsonDecodePackage{
+				Id:           	key,
+				ChecksumsRaw:	chunk.Checksums[i].(string),
+				ConfigRaw:   	chunk.Configs[i].(string),
+				Factory:		NewHost,
+				ObjectType:		"host",
+			}
+			pkgs.Packages = append(pkgs.Packages, pkg)
+		}
+
+		super.ChDecode <- &pkgs
+	}
+
+	for keys := range chUpdate {
+		done := make(chan struct{})
+		ch := super.Rdbw.PipeConfigChunks(done, keys, "host")
+		go func() {
+			for chunk := range ch {
+				go prep(chunk)
+			}
+		}()
+	}
+}
+
+func UpdateExecWorker(super *supervisor.Supervisor, chUpdateBack <-chan []configobject.Row) {
+	defer log.Info("Host: Insert exec routine stopped")
+
+	for rows := range chUpdateBack {
+		go func(rows []configobject.Row) {
+			super.ChErr <- super.Dbw.SqlBulkUpdate(rows, UpdateStmt)
+			log.Infof("Updated %v hosts", len(rows))
+		}(rows)
 	}
 }
