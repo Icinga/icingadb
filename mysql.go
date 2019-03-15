@@ -544,6 +544,8 @@ func (dbw *DBWrapper) SqlFetchIds(table string) ([]string, error) {
 			if !dbw.checkConnection(false) {
 				continue
 			}
+
+			return nil, err
 		}
 
 		defer rows.Close()
@@ -565,6 +567,50 @@ func (dbw *DBWrapper) SqlFetchIds(table string) ([]string, error) {
 		}
 
 		return keys, nil
+	}
+}
+
+func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]map[string]string, error) {
+	var checksums = map[string]map[string]string{}
+	for {
+		if !dbw.IsConnected() {
+			dbw.WaitForConnection()
+			continue
+		}
+
+		query := fmt.Sprintf("SELECT id, properties_checksum FROM %s WHERE id IN (X'%s')", table, strings.Join(ids, "', X'"))
+		rows, err := dbw.SqlQuery(query)
+
+		if err != nil {
+			if !dbw.checkConnection(false) {
+				continue
+			}
+
+			return nil, err
+		}
+
+		defer rows.Close()
+
+		for rows.Next() {
+			var id []byte
+			var propertiesChecksum []byte
+
+			err = rows.Scan(&id, &propertiesChecksum)
+			if err != nil {
+				return nil, err
+			}
+
+			checksums[icingadb_utils.DecodeChecksum(id)] = map[string]string{
+				"properties_checksum": icingadb_utils.DecodeChecksum(propertiesChecksum),
+			}
+		}
+
+		err = rows.Err()
+		if err != nil {
+			return nil, err
+		}
+
+		return checksums, nil
 	}
 }
 
@@ -610,16 +656,47 @@ func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
 		values := make([]interface{}, len(bulk))
 
 		for i, key := range bulk {
-			values[i] = key
+			values[i] = icingadb_utils.Checksum(key)
 		}
-
 		query := fmt.Sprintf(stmt.Format, placeholders)
 
-		_, err := dbw.SqlExec("Bulk insert", query, values...)
+		_, err := dbw.SqlExec("Bulk delete", query, values...)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (dbw *DBWrapper) SqlBulkUpdate(rows []configobject.Row, statement *UpdateStmt) error {
+	if len(rows) == 0 {
+		return nil
+	}
+
+	values := make([]interface{}, statement.NumField)
+	err := dbw.SqlTransaction(true, false, false, func(tx DbTransaction) error {
+		for _, r := range rows {
+			var (
+				i = 0
+				v interface{}
+			)
+
+			for i, v = range r.UpdateValues() {
+				values[i] = v
+			}
+
+			i++
+			values[i] = icingadb_utils.Checksum(r.GetId())
+
+			_, err := tx.Exec(statement.Statement, values...)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+
+	return err
 }
