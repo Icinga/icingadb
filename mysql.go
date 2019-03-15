@@ -572,13 +572,12 @@ func (dbw *DBWrapper) SqlFetchIds(table string) ([]string, error) {
 
 func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]map[string]string, error) {
 	var checksums = map[string]map[string]string{}
-	for {
-		if !dbw.IsConnected() {
-			dbw.WaitForConnection()
-			continue
-		}
 
-		query := fmt.Sprintf("SELECT id, properties_checksum FROM %s WHERE id IN (X'%s')", table, strings.Join(ids, "', X'"))
+	done := make(chan struct{})
+	//TODO: Don't do this hardcoded - Chunksize
+	for bulk := range icingadb_utils.ChunkKeys(done, ids, 1000) {
+		//TODO: This should be done in parallel
+		query := fmt.Sprintf("SELECT id, properties_checksum FROM %s WHERE id IN (X'%s')", table, strings.Join(bulk, "', X'"))
 		rows, err := dbw.SqlQuery(query)
 
 		if err != nil {
@@ -609,9 +608,9 @@ func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]
 		if err != nil {
 			return nil, err
 		}
-
-		return checksums, nil
 	}
+
+	return checksums, nil
 }
 
 func (dbw *DBWrapper) SqlBulkInsert(rows []configobject.Row, stmt *BulkInsertStmt) error {
