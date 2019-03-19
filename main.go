@@ -5,6 +5,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-ha"
 	"git.icinga.com/icingadb/icingadb-json-decoder"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
+	"git.icinga.com/icingadb/icingadb-main/configobject/sync"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	log "github.com/sirupsen/logrus"
 )
@@ -38,7 +39,14 @@ func main() {
 
 	go func() {
 		chHA := ha.RegisterNotificationListener()
-		super.ChErr <- host.SyncOperator(&super, chHA)
+
+		super.ChErr <- sync.Operator(&super, chHA, &sync.Context{
+			ObjectType: "host",
+			Factory: host.NewHost,
+			InsertStmt: host.BulkInsertStmt,
+			DeleteStmt: host.BulkDeleteStmt,
+			UpdateStmt: host.BulkUpdateStmt,
+		})
 	}()
 
 	for {
