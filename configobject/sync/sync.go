@@ -145,6 +145,7 @@ func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 				if !ok {
 					return
 				}
+			default:
 			}
 
 			if chunk.Configs[i] == nil || chunk.Checksums[i] == nil {
@@ -169,6 +170,7 @@ func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 			if !ok {
 				return
 			}
+		default:
 		}
 
 		ch := super.Rdbw.PipeConfigChunks(done, keys, ctx.ObjectType)
@@ -187,6 +189,7 @@ func InsertExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 			if !ok {
 				return
 			}
+		default:
 		}
 
 		go func(rows []configobject.Row) {
@@ -203,6 +206,7 @@ func DeleteExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 			if !ok {
 				return
 			}
+		default:
 		}
 
 		go func(keys []string) {
@@ -221,6 +225,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 				if !ok {
 					return
 				}
+			default:
 			}
 
 			if chunk.Checksums[i] == nil {
@@ -249,6 +254,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 			if !ok {
 				return
 			}
+		default:
 		}
 
 		ch := super.Rdbw.PipeChecksumChunks(done, keys, ctx.ObjectType)
@@ -264,6 +270,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 					if !ok {
 						return
 					}
+				default:
 				}
 
 				go prep(chunk, checksums)
@@ -283,6 +290,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 				if !ok {
 					return
 				}
+			default:
 			}
 
 			if chunk.Configs[i] == nil || chunk.Checksums[i] == nil {
@@ -307,6 +315,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 			if !ok {
 				return
 			}
+		default:
 		}
 
 		ch := super.Rdbw.PipeConfigChunks(done, keys, ctx.ObjectType)
@@ -317,6 +326,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 					if !ok {
 						return
 					}
+				default:
 				}
 
 				go prep(chunk)
@@ -332,6 +342,7 @@ func UpdateExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 			if !ok {
 				return
 			}
+		default:
 		}
 
 		go func(rows []configobject.Row) {
