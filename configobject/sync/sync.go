@@ -12,6 +12,7 @@ import (
 	"git.icinga.com/icingadb/icingadb/benchmark"
 	log "github.com/sirupsen/logrus"
 	"sync"
+	"sync/atomic"
 )
 
 type Context struct {
@@ -89,6 +90,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 				log.Infof("%s: Got responsibility", ctx.ObjectType)
 
 				done = make(chan struct{})
+				updateCounter := new(uint32)
 
 				go InsertPrepWorker(super, ctx, done, chInsert, chInsertBack)
 				go InsertExecWorker(super, ctx, done, chInsertBack, wgInsert)
@@ -97,7 +99,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 
 				go UpdateCompWorker(super, ctx, done, chUpdateComp, chUpdate, wgUpdate)
 				go UpdatePrepWorker(super, ctx, done, chUpdate, chUpdateBack)
-				go UpdateExecWorker(super, ctx, done, chUpdateBack, wgUpdate)
+				go UpdateExecWorker(super, ctx, done, chUpdateBack, wgUpdate, updateCounter)
 
 				go func() {
 					benchmarc := benchmark.NewBenchmark()
@@ -123,7 +125,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 					chUpdateComp <- update
 					wgUpdate.Wait()
 					benchmarc.Stop()
-					log.Infof("Updated %v %ss in %v", len(update), ctx.ObjectType, benchmarc.String())
+					log.Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), ctx.ObjectType, benchmarc.String())
 				}()
 			}
 		}
@@ -335,7 +337,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 	}
 }
 
-func UpdateExecWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdateBack <-chan []configobject.Row, wg *sync.WaitGroup) {
+func UpdateExecWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdateBack <-chan []configobject.Row, wg *sync.WaitGroup, updateCounter *uint32) {
 	for rows := range chUpdateBack {
 		select {
 		case _, ok := <-done:
@@ -348,6 +350,7 @@ func UpdateExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 		go func(rows []configobject.Row) {
 			super.ChErr <- super.Dbw.SqlBulkUpdate(rows, ctx.UpdateStmt)
 			wg.Add(-len(rows))
+			atomic.AddUint32(updateCounter, uint32(len(rows)))
 		}(rows)
 	}
 }
