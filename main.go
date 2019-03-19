@@ -4,29 +4,44 @@ import (
 	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-ha"
 	"git.icinga.com/icingadb/icingadb-json-decoder"
+	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/sync"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	log "github.com/sirupsen/logrus"
 )
 
+type RedisInfo struct {
+	host     string
+	port     int
+	user     string
+	password string
+}
+
 func main() {
-	redisConn, err := icingadb_connection.NewRDBWrapper("127.0.0.1:6379")
+	if err := config.ParseConfig("icingadb.ini"); err != nil {
+		log.Fatal(err)
+	}
+
+	redisInfo := config.GetRedisInfo()
+	mysqlInfo := config.GetMysqlInfo()
+
+	redisConn, err := icingadb_connection.NewRDBWrapper(redisInfo.Host + ":" + redisInfo.Port)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	mysqlConn, err := icingadb_connection.NewDBWrapper("module-dev:icinga0815!@tcp(127.0.0.1:3306)/icingadb"	)
+	mysqlConn, err := icingadb_connection.NewDBWrapper(mysqlInfo.User + ":" + mysqlInfo.Password + "@tcp(" + mysqlInfo.Host + ":" + mysqlInfo.Port + ")/" + mysqlInfo.Database)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	super := supervisor.Supervisor{
-		ChErr: make (chan error),
-		ChEnv: make(chan *icingadb_ha.Environment),
+		ChErr:    make(chan error),
+		ChEnv:    make(chan *icingadb_ha.Environment),
 		ChDecode: make(chan *icingadb_json_decoder.JsonDecodePackages),
-		Rdbw: redisConn,
-		Dbw: mysqlConn,
+		Rdbw:     redisConn,
+		Dbw:      mysqlConn,
 	}
 
 	ha := icingadb_ha.HA{}
@@ -42,7 +57,7 @@ func main() {
 
 		super.ChErr <- sync.Operator(&super, chHA, &sync.Context{
 			ObjectType: "host",
-			Factory: host.NewHost,
+			Factory:    host.NewHost,
 			InsertStmt: host.BulkInsertStmt,
 			DeleteStmt: host.BulkDeleteStmt,
 			UpdateStmt: host.BulkUpdateStmt,
@@ -51,7 +66,7 @@ func main() {
 
 	for {
 		select {
-		case err := <- super.ChErr:
+		case err := <-super.ChErr:
 			if err != nil {
 				log.Fatal(err)
 			}
