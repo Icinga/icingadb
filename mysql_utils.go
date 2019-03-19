@@ -372,14 +372,6 @@ func isRetryableError(err error) bool {
 	return false
 }
 
-var (
-	bulkSize int
-)
-
-func SetBulkSize(s int) {
-	bulkSize = s
-}
-
 type BulkInsertStmt struct {
 	Format      string
 	Fields      []string
@@ -412,20 +404,21 @@ func NewBulkDeleteStmt(table string) *BulkDeleteStmt {
 	return &stmt
 }
 
-type UpdateStmt struct {
-	Statement string
-	NumField  int
+type BulkUpdateStmt struct {
+	Format      string
+	Fields      []string
+	Placeholder string
+	NumField    int
 }
 
-func NewUpdateStmt(table string, fields []string) *UpdateStmt {
-	assignmentList := make([]string, len(fields))
-
-	for i, field := range fields {
-		assignmentList[i] = fmt.Sprintf("%s = ?", field)
-	}
-	stmt := UpdateStmt{
-		Statement: fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", table, strings.Join(assignmentList, ", ")),
-		NumField:  len(fields)+1, // +1 because of the WHERE clause
+func NewBulkUpdateStmt(table string, fields []string) *BulkUpdateStmt {
+	numField := len(fields)
+	placeholder := fmt.Sprintf("(%s)", strings.TrimSuffix(strings.Repeat("?, ", numField), ", "))
+	stmt := BulkUpdateStmt{
+		Format:      fmt.Sprintf("REPLACE INTO %s (%s) VALUES %s", table, strings.Join(fields, ", "), "%s"),
+		Fields:      fields,
+		Placeholder: placeholder,
+		NumField:    numField,
 	}
 
 	return &stmt

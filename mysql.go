@@ -668,34 +668,30 @@ func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
 	return nil
 }
 
-func (dbw *DBWrapper) SqlBulkUpdate(rows []configobject.Row, statement *UpdateStmt) error {
+func (dbw *DBWrapper) SqlBulkUpdate(rows []configobject.Row, stmt *BulkUpdateStmt) error {
 	if len(rows) == 0 {
 		return nil
 	}
 
-	values := make([]interface{}, statement.NumField)
-	err := dbw.SqlTransaction(true, false, false, func(tx DbTransaction) error {
-		for _, r := range rows {
-			var (
-				i = 0
-				v interface{}
-			)
+	placeholders := make([]string, len(rows))
+	values := make([]interface{}, len(rows)*stmt.NumField)
+	j := 0
 
-			for i, v = range r.UpdateValues() {
-				values[i] = v
-			}
+	for i, r := range rows {
+		placeholders[i] = stmt.Placeholder
 
-			i++
-			values[i] = icingadb_utils.Checksum(r.GetId())
-
-			_, err := tx.Exec(statement.Statement, values...)
-			if err != nil {
-				return err
-			}
+		for _, v := range r.InsertValues() {
+			values[j] = v
+			j++
 		}
+	}
 
-		return nil
-	})
+	query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
 
-	return err
+	_, err := dbw.SqlExec("Bulk insert", query, values...)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
