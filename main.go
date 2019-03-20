@@ -7,6 +7,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-json-decoder"
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
+	"git.icinga.com/icingadb/icingadb-main/configobject/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/sync"
 	"git.icinga.com/icingadb/icingadb-main/prometheus"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
@@ -58,6 +59,18 @@ func main() {
 			InsertStmt: host.BulkInsertStmt,
 			DeleteStmt: host.BulkDeleteStmt,
 			UpdateStmt: host.BulkUpdateStmt,
+		})
+	}()
+
+	go func() {
+		chHA := ha.RegisterNotificationListener()
+
+		super.ChErr <- sync.Operator(&super, chHA, &sync.Context{
+			ObjectType: "service",
+			Factory:    service.NewService,
+			InsertStmt: service.BulkInsertStmt,
+			DeleteStmt: service.BulkDeleteStmt,
+			UpdateStmt: service.BulkUpdateStmt,
 		})
 	}()
 
