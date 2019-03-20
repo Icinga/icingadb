@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-ha"
 	"git.icinga.com/icingadb/icingadb-json-decoder"
@@ -11,16 +12,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type RedisInfo struct {
-	host     string
-	port     int
-	user     string
-	password string
-}
-
 func main() {
-	if err := config.ParseConfig("icingadb.ini"); err != nil {
-		log.Fatal(err)
+	configPath := flag.String("config", "icingadb.ini", "path to config")
+	flag.Parse()
+
+	if err := config.ParseConfig(*configPath); err != nil {
+		log.Fatalf("Error reading config: %v", err)
 	}
 
 	redisInfo := config.GetRedisInfo()
