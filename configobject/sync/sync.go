@@ -174,14 +174,6 @@ func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 			ChBack: chInsertBack,
 		}
 		for i, key := range chunk.Keys {
-			select {
-			case _, ok := <-done:
-				if !ok {
-					return
-				}
-			default:
-			}
-
 			if chunk.Configs[i] == nil || chunk.Checksums[i] == nil {
 				continue
 			}
@@ -254,14 +246,6 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 	prep := func(chunk *icingadb_connection.ChecksumChunk, mysqlChecksums map[string]map[string]string) {
 		changed := make([]string, 0)
 		for i, key := range chunk.Keys {
-			select {
-			case _, ok := <-done:
-				if !ok {
-					return
-				}
-			default:
-			}
-
 			if chunk.Checksums[i] == nil {
 				continue
 			}
@@ -299,14 +283,6 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 
 		go func() {
 			for chunk := range ch {
-				select {
-				case _, ok := <-done:
-					if !ok {
-						return
-					}
-				default:
-				}
-
 				go prep(chunk, checksums)
 			}
 		}()
@@ -319,14 +295,6 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 			ChBack: chUpdateBack,
 		}
 		for i, key := range chunk.Keys {
-			select {
-			case _, ok := <-done:
-				if !ok {
-					return
-				}
-			default:
-			}
-
 			if chunk.Configs[i] == nil || chunk.Checksums[i] == nil {
 				continue
 			}
@@ -355,14 +323,6 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 		ch := super.Rdbw.PipeConfigChunks(done, keys, ctx.ObjectType)
 		go func() {
 			for chunk := range ch {
-				select {
-				case _, ok := <-done:
-					if !ok {
-						return
-					}
-				default:
-				}
-
 				go prep(chunk)
 			}
 		}()
