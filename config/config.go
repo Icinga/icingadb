@@ -31,13 +31,16 @@ var mysqlInfo = &MysqlInfo{
 
 func ParseConfig(path string) error {
 	cfg, err := ini.Load(path)
+	if err != nil {
+		return err
+	}
 
 	if err := cfg.Section("redis").MapTo(redisInfo); err != nil {
 		return err
 	}
 
 	if redisInfo.Host == "" {
-		return errors.New("config: missing redis host")
+		return errors.New("missing redis host")
 	}
 
 	if err = cfg.Section("mysql").MapTo(mysqlInfo); err != nil {
@@ -45,10 +48,10 @@ func ParseConfig(path string) error {
 	}
 
 	if mysqlInfo.Host == "" {
-		return errors.New("config: missing mysql host")
+		return errors.New("missing mysql host")
 	}
 	if mysqlInfo.User == "" || mysqlInfo.Password == "" {
-		return errors.New("config: missing mysql credentials")
+		return errors.New("missing mysql credentials")
 	}
 
 	return nil
