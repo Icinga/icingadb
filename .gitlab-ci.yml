@@ -4,6 +4,7 @@ variables:
 stages:
     - build
     - build-image
+    - deploy-image
 
 build:
   stage: build
@@ -38,4 +39,33 @@ build-image:
     - docker pull $CONTAINER || true
     - docker build -f gitlab-ci/Dockerfile --pull --cache-from $CONTAINER -t $CONTAINER .
     - docker push $CONTAINER
+
+deploy-image-1: &deploy-image-base
+  variables:
+    SSH_ADDR: 10.77.27.18
+  stage: deploy-image
+  dependencies:
+    - build-image
+  only:
+    - master
+  image: $CI_REGISTRY/icingadb/docker/master-deploy:latest
+  script:
+    - cat <<<"$SSH_PRIVKEY" >./deploy.sshkey
+    - chmod 0600 ./deploy.sshkey
+    - >
+      ssh -i ./deploy.sshkey -o StrictHostKeyChecking=no $SSH_ADDR
+      "docker login -u $GITLABCI_USER -p $GITLABCI_TOKEN $CI_REGISTRY
+      && cd /root/icingadb
+      && docker-compose pull icingadb
+      && DOCKER_SERVICE=icingadb
+      CI_COMMIT_SHA=$CI_COMMIT_SHA
+      CI_COMMIT_AUTHOR='$(git log -1 --format=%an $CI_COMMIT_SHA)'
+      CI_COMMIT_TITLE=\"\$(base64 -d <<<'$(base64 <<<"$CI_COMMIT_TITLE")')\"
+      /root/icingadb/docker-compose-up.py >>messages"
+    - rm ./deploy.sshkey
+
+deploy-image-2:
+  <<: *deploy-image-base
+  variables:
+    SSH_ADDR: 10.77.27.16
 
