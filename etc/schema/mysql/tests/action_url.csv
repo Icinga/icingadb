@@ -1,0 +1,11 @@
+id;action_url
+7ae3bfebcb1d644e9ad9;http://google.com
+4bdd2ffe5134c4283afd;https://netways.de
+f2040cbe68069d252c8d;https://icinga.com
+4a4e5b48bf31ae07ca84;https://example.com
+271661f114b4a123bdc8;https://test.net
+67af359061dd5e8417d4;http://localhost:8080/action
+fe465a8ed9e9ca13ab92;https://github.com/icinga
+9978ba84b178edb04c5f;http://heise.de
+db1b8dde62083321f6fc;http://www.myaction.com/action?host=$host.name$
+000ab0a3143b170aa9be;https://foobar.com/action
