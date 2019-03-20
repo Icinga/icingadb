@@ -36,15 +36,15 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 
 	var (
 		done			chan struct{}
-		chInsert      	= make(chan []string)
-		chInsertBack  	= make(chan []configobject.Row)
-		chDelete      	= make(chan []string)
-		chUpdateComp  	= make(chan []string)
-		chUpdate      	= make(chan []string)
-		chUpdateBack  	= make(chan []configobject.Row)
-		wgInsert      	= &sync.WaitGroup{}
-		wgDelete      	= &sync.WaitGroup{}
-		wgUpdate      	= &sync.WaitGroup{}
+		chInsert      	chan []string
+		chInsertBack  	chan []configobject.Row
+		chDelete      	chan []string
+		chUpdateComp  	chan []string
+		chUpdate      	chan []string
+		chUpdateBack  	chan []configobject.Row
+		wgInsert      	*sync.WaitGroup
+		wgDelete      	*sync.WaitGroup
+		wgUpdate      	*sync.WaitGroup
 	)
 	for msg := range chHA {
 		switch msg {
@@ -58,8 +58,19 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 
 			//TODO: This should only be done, if HA was taken over from another instance
 			insert, update, delete = GetDelta(super, ctx)
+			log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", ctx.ObjectType, len(insert), len(update), len(delete))
 
-			done = make(chan struct{})
+			done 			= make(chan struct{})
+			chInsert      	= make(chan []string)
+			chInsertBack  	= make(chan []configobject.Row)
+			chDelete      	= make(chan []string)
+			chUpdateComp  	= make(chan []string)
+			chUpdate      	= make(chan []string)
+			chUpdateBack  	= make(chan []configobject.Row)
+			wgInsert      	= &sync.WaitGroup{}
+			wgDelete      	= &sync.WaitGroup{}
+			wgUpdate      	= &sync.WaitGroup{}
+
 			updateCounter := new(uint32)
 
 			go InsertPrepWorker(super, ctx, done, chInsert, chInsertBack)
