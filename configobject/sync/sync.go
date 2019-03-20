@@ -46,61 +46,59 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 		wgDelete      	= &sync.WaitGroup{}
 		wgUpdate      	= &sync.WaitGroup{}
 	)
-	go func() {
-		for msg := range chHA {
-			switch msg {
-			case icingadb_ha.Notify_IsNotResponsible:
-				log.Info(fmt.Sprintf("%s: Lost responsibility", ctx.ObjectType))
-				if done != nil {
-					close(done)
-				}
-			case icingadb_ha.Notify_IsResponsible:
-				log.Infof("%s: Got responsibility", ctx.ObjectType)
-
-				//TODO: This should only be done, if HA was taken over from another instance
-				insert, update, delete = GetDelta(super, ctx)
-
-				done = make(chan struct{})
-				updateCounter := new(uint32)
-
-				go InsertPrepWorker(super, ctx, done, chInsert, chInsertBack)
-				go InsertExecWorker(super, ctx, done, chInsertBack, wgInsert)
-
-				go DeleteExecWorker(super, ctx, done, chDelete, wgDelete)
-
-				go UpdateCompWorker(super, ctx, done, chUpdateComp, chUpdate, wgUpdate)
-				go UpdatePrepWorker(super, ctx, done, chUpdate, chUpdateBack)
-				go UpdateExecWorker(super, ctx, done, chUpdateBack, wgUpdate, updateCounter)
-
-				go func() {
-					benchmarc := benchmark.NewBenchmark()
-					wgInsert.Add(len(insert))
-					chInsert <- insert
-					wgInsert.Wait()
-					benchmarc.Stop()
-					log.Infof("Inserted %v %ss in %v", len(insert), ctx.ObjectType, benchmarc.String())
-				}()
-
-				go func() {
-					benchmarc := benchmark.NewBenchmark()
-					wgDelete.Add(len(delete))
-					chDelete <- delete
-					wgDelete.Wait()
-					benchmarc.Stop()
-					log.Infof("Deleted %v %ss in %v", len(delete), ctx.ObjectType, benchmarc.String())
-				}()
-
-				go func() {
-					benchmarc := benchmark.NewBenchmark()
-					wgUpdate.Add(len(update))
-					chUpdateComp <- update
-					wgUpdate.Wait()
-					benchmarc.Stop()
-					log.Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), ctx.ObjectType, benchmarc.String())
-				}()
+	for msg := range chHA {
+		switch msg {
+		case icingadb_ha.Notify_IsNotResponsible:
+			log.Info(fmt.Sprintf("%s: Lost responsibility", ctx.ObjectType))
+			if done != nil {
+				close(done)
 			}
+		case icingadb_ha.Notify_IsResponsible:
+			log.Infof("%s: Got responsibility", ctx.ObjectType)
+
+			//TODO: This should only be done, if HA was taken over from another instance
+			insert, update, delete = GetDelta(super, ctx)
+
+			done = make(chan struct{})
+			updateCounter := new(uint32)
+
+			go InsertPrepWorker(super, ctx, done, chInsert, chInsertBack)
+			go InsertExecWorker(super, ctx, done, chInsertBack, wgInsert)
+
+			go DeleteExecWorker(super, ctx, done, chDelete, wgDelete)
+
+			go UpdateCompWorker(super, ctx, done, chUpdateComp, chUpdate, wgUpdate)
+			go UpdatePrepWorker(super, ctx, done, chUpdate, chUpdateBack)
+			go UpdateExecWorker(super, ctx, done, chUpdateBack, wgUpdate, updateCounter)
+
+			go func() {
+				benchmarc := benchmark.NewBenchmark()
+				wgInsert.Add(len(insert))
+				chInsert <- insert
+				wgInsert.Wait()
+				benchmarc.Stop()
+				log.Infof("Inserted %v %ss in %v", len(insert), ctx.ObjectType, benchmarc.String())
+			}()
+
+			go func() {
+				benchmarc := benchmark.NewBenchmark()
+				wgDelete.Add(len(delete))
+				chDelete <- delete
+				wgDelete.Wait()
+				benchmarc.Stop()
+				log.Infof("Deleted %v %ss in %v", len(delete), ctx.ObjectType, benchmarc.String())
+			}()
+
+			go func() {
+				benchmarc := benchmark.NewBenchmark()
+				wgUpdate.Add(len(update))
+				chUpdateComp <- update
+				wgUpdate.Wait()
+				benchmarc.Stop()
+				log.Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), ctx.ObjectType, benchmarc.String())
+			}()
 		}
-	}()
+	}
 
 	return nil
 }
