@@ -51,9 +51,9 @@ func main() {
 
 	go icingadb_json_decoder.DecodePool(super.ChDecode, super.ChErr, 16)
 
-	chHA := ha.RegisterNotificationListener()
+	chHAHost := ha.RegisterNotificationListener()
 	go func() {
-		super.ChErr <- sync.Operator(&super, chHA, &sync.Context{
+		super.ChErr <- sync.Operator(&super, chHAHost, &sync.Context{
 			ObjectType: "host",
 			Factory:    host.NewHost,
 			InsertStmt: host.BulkInsertStmt,
@@ -62,10 +62,10 @@ func main() {
 		})
 	}()
 
+	chHAService := ha.RegisterNotificationListener()
 	go func() {
-		chHA := ha.RegisterNotificationListener()
 
-		super.ChErr <- sync.Operator(&super, chHA, &sync.Context{
+		super.ChErr <- sync.Operator(&super, chHAService, &sync.Context{
 			ObjectType: "service",
 			Factory:    service.NewService,
 			InsertStmt: service.BulkInsertStmt,
