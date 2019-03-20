@@ -33,8 +33,8 @@ const (
 )
 
 const (
-	Notify_IsResponsible = iota
-	Notify_IsNotResponsible
+	Notify_StartSync = iota
+	Notify_StopSync
 )
 
 type HA struct {
@@ -155,7 +155,7 @@ func (h *HA) handleResponsibility() (cont bool, nextAction int) {
 			}).Warn("Icinga 2 detected as not running, stopping.")
 
 			h.setResponsibility(resp_Stop)
-			h.notifyNotificationListener(Notify_IsNotResponsible)
+			h.notifyNotificationListener(Notify_StopSync)
 			cont = true
 		}
 
@@ -345,7 +345,12 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 								"env":        h.ourEnv.ID,
 								"their_uuid": theirUUID.String(),
 							}).Info("Taking over")
-							h.notifyNotificationListener(Notify_IsResponsible)
+
+							// TODO: This should not be done here, but on configDumpInProgress changes.
+							// It's only possible to do it here, because we always lose responsibility during config dump once
+							if !h.ourEnv.configDumpInProgress {
+								h.notifyNotificationListener(Notify_StartSync)
+							}
 						}
 
 						if _, errRP := rdb.Publish("icingadb:wakeup", h.ourUUID.String()).Result(); errRP != nil {
