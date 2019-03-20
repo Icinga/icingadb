@@ -100,13 +100,7 @@ type Host struct {
 }
 
 func NewHost() configobject.Row {
-	h := Host{
-		EnvId:           icingadb_utils.DecodeChecksum(icingadb_utils.Sha1("default")),
-		CheckPeriod:     "check_period",
-		CheckPeriodId:   icingadb_utils.DecodeChecksum(icingadb_utils.Sha1("check_period")),
-		Eventcommand:    "event_command",
-		CommandEndpoint: "command_endpoint",
-	}
+	h := Host{}
 	h.NameCi = &h.Name
 
 	return &h

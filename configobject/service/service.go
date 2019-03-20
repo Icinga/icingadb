@@ -94,13 +94,7 @@ type Service struct {
 }
 
 func NewService() configobject.Row {
-	s := Service{
-		EnvId:           icingadb_utils.DecodeChecksum(icingadb_utils.Sha1("default")),
-		CheckPeriod:     "check_period",
-		CheckPeriodId:   icingadb_utils.DecodeChecksum(icingadb_utils.Sha1("check_period")),
-		Eventcommand:    "event_command",
-		CommandEndpoint: "command_endpoint",
-	}
+	s := Service{}
 	s.NameCi = &s.Name
 
 	return &s
