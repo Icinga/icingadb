@@ -48,12 +48,13 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 	)
 	for msg := range chHA {
 		switch msg {
-		case icingadb_ha.Notify_IsNotResponsible:
+		case icingadb_ha.Notify_StopSync:
 			log.Info(fmt.Sprintf("%s: Lost responsibility", ctx.ObjectType))
 			if done != nil {
 				close(done)
+				done = nil
 			}
-		case icingadb_ha.Notify_IsResponsible:
+		case icingadb_ha.Notify_StartSync:
 			log.Infof("%s: Got responsibility", ctx.ObjectType)
 
 			//TODO: This should only be done, if HA was taken over from another instance
