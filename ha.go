@@ -440,8 +440,8 @@ func (h *HA) RegisterNotificationListener() chan int {
 
 func (h *HA) notifyNotificationListener(msg int) {
 	for _, c := range h.notificationListeners {
-		go func() {
-			c <- msg
-		}()
+		go func(ch chan int) {
+			ch <- msg
+		}(c)
 	}
 }
