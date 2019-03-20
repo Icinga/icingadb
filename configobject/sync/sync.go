@@ -88,7 +88,12 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 				chInsert <- insert
 				wgInsert.Wait()
 				benchmarc.Stop()
-				log.Infof("Inserted %v %ss in %v", len(insert), ctx.ObjectType, benchmarc.String())
+				log.WithFields(log.Fields{
+					"type": 		ctx.ObjectType,
+					"count": 		len(insert),
+					"benchmark":	benchmarc.String(),
+					"action": 		"insert",
+				}).Infof("Inserted %v %ss in %v", len(insert), ctx.ObjectType, benchmarc.String())
 			}()
 
 			go func() {
@@ -97,7 +102,12 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 				chDelete <- delete
 				wgDelete.Wait()
 				benchmarc.Stop()
-				log.Infof("Deleted %v %ss in %v", len(delete), ctx.ObjectType, benchmarc.String())
+				log.WithFields(log.Fields{
+					"type": 		ctx.ObjectType,
+					"count": 		len(insert),
+					"benchmark":	benchmarc.String(),
+					"action": 		"delete",
+				}).Infof("Deleted %v %ss in %v", len(delete), ctx.ObjectType, benchmarc.String())
 			}()
 
 			go func() {
@@ -106,7 +116,12 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 				chUpdateComp <- update
 				wgUpdate.Wait()
 				benchmarc.Stop()
-				log.Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), ctx.ObjectType, benchmarc.String())
+				log.WithFields(log.Fields{
+					"type": 		ctx.ObjectType,
+					"count": 		len(insert),
+					"benchmark":	benchmarc.String(),
+					"action": 		"update",
+				}).Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), ctx.ObjectType, benchmarc.String())
 			}()
 		}
 	}
