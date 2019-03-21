@@ -8,7 +8,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/service"
-	"git.icinga.com/icingadb/icingadb-main/configobject/sync"
+	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
 	"git.icinga.com/icingadb/icingadb-main/prometheus"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	log "github.com/sirupsen/logrus"
@@ -53,7 +53,7 @@ func main() {
 
 	chHAHost := ha.RegisterNotificationListener()
 	go func() {
-		super.ChErr <- sync.Operator(&super, chHAHost, &sync.Context{
+		super.ChErr <- configsync.Operator(&super, chHAHost, &configsync.Context{
 			ObjectType: "host",
 			Factory:    host.NewHost,
 			InsertStmt: host.BulkInsertStmt,
@@ -64,8 +64,7 @@ func main() {
 
 	chHAService := ha.RegisterNotificationListener()
 	go func() {
-
-		super.ChErr <- sync.Operator(&super, chHAService, &sync.Context{
+		super.ChErr <- configsync.Operator(&super, chHAService, &configsync.Context{
 			ObjectType: "service",
 			Factory:    service.NewService,
 			InsertStmt: service.BulkInsertStmt,

@@ -1,4 +1,4 @@
-package sync
+package configsync
 
 import (
 	"encoding/json"
