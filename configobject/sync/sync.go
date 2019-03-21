@@ -105,7 +105,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 				benchmarc.Stop()
 				log.WithFields(log.Fields{
 					"type": 		ctx.ObjectType,
-					"count": 		len(insert),
+					"count": 		len(delete),
 					"benchmark":	benchmarc.String(),
 					"action": 		"delete",
 				}).Infof("Deleted %v %ss in %v", len(delete), ctx.ObjectType, benchmarc.String())
@@ -119,7 +119,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 				benchmarc.Stop()
 				log.WithFields(log.Fields{
 					"type": 		ctx.ObjectType,
-					"count": 		len(insert),
+					"count": 		atomic.LoadUint32(updateCounter),
 					"benchmark":	benchmarc.String(),
 					"action": 		"update",
 				}).Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), ctx.ObjectType, benchmarc.String())
