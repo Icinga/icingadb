@@ -7,6 +7,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-json-decoder"
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
+	"git.icinga.com/icingadb/icingadb-main/configobject/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/sync"
 	"git.icinga.com/icingadb/icingadb-main/prometheus"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
@@ -50,14 +51,26 @@ func main() {
 
 	go icingadb_json_decoder.DecodePool(super.ChDecode, super.ChErr, 16)
 
-	chHA := ha.RegisterNotificationListener()
+	chHAHost := ha.RegisterNotificationListener()
 	go func() {
-		super.ChErr <- sync.Operator(&super, chHA, &sync.Context{
+		super.ChErr <- sync.Operator(&super, chHAHost, &sync.Context{
 			ObjectType: "host",
 			Factory:    host.NewHost,
 			InsertStmt: host.BulkInsertStmt,
 			DeleteStmt: host.BulkDeleteStmt,
 			UpdateStmt: host.BulkUpdateStmt,
+		})
+	}()
+
+	chHAService := ha.RegisterNotificationListener()
+	go func() {
+
+		super.ChErr <- sync.Operator(&super, chHAService, &sync.Context{
+			ObjectType: "service",
+			Factory:    service.NewService,
+			InsertStmt: service.BulkInsertStmt,
+			DeleteStmt: service.BulkDeleteStmt,
+			UpdateStmt: service.BulkUpdateStmt,
 		})
 	}()
 

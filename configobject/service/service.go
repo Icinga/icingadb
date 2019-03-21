@@ -1,4 +1,4 @@
-package host
+package service
 
 import (
 	"git.icinga.com/icingadb/icingadb-connection"
@@ -17,13 +17,10 @@ var (
 		"properties_checksum",
 		"customvars_checksum",
 		"groups_checksum",
+		"host_id",
 		"name",
 		"name_ci",
 		"display_name",
-		"address",
-		"address6",
-		"address_bin",
-		"address6_bin",
 		"checkcommand",
 		"checkcommand_id",
 		"max_check_attempts",
@@ -55,20 +52,17 @@ var (
 	}
 )
 
-type Host struct {
+type Service struct {
 	Id                    string  `json:"id"`
 	EnvId                 string  `json:"env_id"`
 	NameChecksum          string  `json:"name_checksum"`
 	PropertiesChecksum    string  `json:"properties_checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
 	GroupsChecksum        string  `json:"groups_checksum"`
+	HostId                string  `json:"host_id"`
 	Name                  string  `json:"name"`
 	NameCi                *string `json:"name_ci"`
 	DisplayName           string  `json:"display_name"`
-	Address               string  `json:"address"`
-	Address6              string  `json:"address6"`
-	AddressBin            string  `json:"address_bin"`
-	Address6Bin           string  `json:"address6_bin"`
 	Checkcommand          string  `json:"checkcommand"`
 	CheckcommandId        string  `json:"checkcommand_id"`
 	MaxCheckAttempts      float32 `json:"max_check_attempts"`
@@ -99,79 +93,76 @@ type Host struct {
 	CommandEndpointId     string  `json:"command_endpoint_id"`
 }
 
-func NewHost() configobject.Row {
-	h := Host{}
-	h.NameCi = &h.Name
+func NewService() configobject.Row {
+	s := Service{}
+	s.NameCi = &s.Name
 
-	return &h
+	return &s
 }
 
-func (h *Host) InsertValues() []interface{} {
-	v := h.UpdateValues()
+func (s *Service) InsertValues() []interface{} {
+	v := s.UpdateValues()
 
-	return append([]interface{}{icingadb_utils.Checksum(h.Id)}, v...)
+	return append([]interface{}{icingadb_utils.Checksum(s.Id)}, v...)
 }
 
-func (h *Host) UpdateValues() []interface{} {
+func (s *Service) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
 	v = append(
 		v,
-		icingadb_utils.Checksum(h.EnvId),
-		icingadb_utils.Checksum(h.NameChecksum),
-		icingadb_utils.Checksum(h.PropertiesChecksum),
-		icingadb_utils.Checksum(h.CustomvarsChecksum),
-		icingadb_utils.Checksum(h.GroupsChecksum),
-		h.Name,
-		h.NameCi,
-		h.DisplayName,
-		h.Address,
-		h.Address6,
-		h.AddressBin,
-		h.Address6Bin,
-		h.Checkcommand,
-		icingadb_utils.Checksum(h.CheckcommandId),
-		h.MaxCheckAttempts,
-		h.CheckPeriod,
-		icingadb_utils.Checksum(h.CheckPeriodId),
-		h.CheckTimeout,
-		h.CheckInterval,
-		h.CheckRetryInterval,
-		icingadb_utils.Bool[h.ActiveChecksEnabled],
-		icingadb_utils.Bool[h.PassiveChecksEnabled],
-		icingadb_utils.Bool[h.EventHandlerEnabled],
-		icingadb_utils.Bool[h.NotificationsEnabled],
-		icingadb_utils.Bool[h.FlappingEnabled],
-		h.FlappingThresholdLow,
-		h.FlappingThresholdHigh,
-		icingadb_utils.Bool[h.PerfdataEnabled],
-		h.Eventcommand,
-		icingadb_utils.Checksum(h.EventcommandId),
-		icingadb_utils.Bool[h.IsVolatile],
-		icingadb_utils.Checksum(h.ActionUrlId),
-		icingadb_utils.Checksum(h.NotesUrlId),
-		h.Notes,
-		icingadb_utils.Checksum(h.IconImageId),
-		h.IconImageAlt,
-		h.Zone,
-		icingadb_utils.Checksum(h.ZoneId),
-		h.CommandEndpoint,
-		icingadb_utils.Checksum(h.CommandEndpointId),
+		icingadb_utils.Checksum(s.EnvId),
+		icingadb_utils.Checksum(s.NameChecksum),
+		icingadb_utils.Checksum(s.PropertiesChecksum),
+		icingadb_utils.Checksum(s.CustomvarsChecksum),
+		icingadb_utils.Checksum(s.GroupsChecksum),
+		icingadb_utils.Checksum(s.HostId),
+		s.Name,
+		s.NameCi,
+		s.DisplayName,
+		s.Checkcommand,
+		icingadb_utils.Checksum(s.CheckcommandId),
+		s.MaxCheckAttempts,
+		s.CheckPeriod,
+		icingadb_utils.Checksum(s.CheckPeriodId),
+		s.CheckTimeout,
+		s.CheckInterval,
+		s.CheckRetryInterval,
+		icingadb_utils.Bool[s.ActiveChecksEnabled],
+		icingadb_utils.Bool[s.PassiveChecksEnabled],
+		icingadb_utils.Bool[s.EventHandlerEnabled],
+		icingadb_utils.Bool[s.NotificationsEnabled],
+		icingadb_utils.Bool[s.FlappingEnabled],
+		s.FlappingThresholdLow,
+		s.FlappingThresholdHigh,
+		icingadb_utils.Bool[s.PerfdataEnabled],
+		s.Eventcommand,
+		icingadb_utils.Checksum(s.EventcommandId),
+		icingadb_utils.Bool[s.IsVolatile],
+		icingadb_utils.Checksum(s.ActionUrlId),
+		icingadb_utils.Checksum(s.NotesUrlId),
+		s.Notes,
+		icingadb_utils.Checksum(s.IconImageId),
+		s.IconImageAlt,
+		s.Zone,
+		icingadb_utils.Checksum(s.ZoneId),
+		s.CommandEndpoint,
+		icingadb_utils.Checksum(s.CommandEndpointId),
 	)
 
 	return v
 }
 
-func (h *Host) GetId() string {
-	return h.Id
+func (s *Service) GetId() string {
+	return s.Id
 }
 
-func (h *Host) SetId(id string) {
-	h.Id = id
+func (s *Service) SetId(id string) {
+	s.Id = id
 }
 
 func init() {
-	BulkInsertStmt = icingadb_connection.NewBulkInsertStmt("host", Fields)
-	BulkDeleteStmt = icingadb_connection.NewBulkDeleteStmt("host")
-	BulkUpdateStmt = icingadb_connection.NewBulkUpdateStmt("host", Fields)
+	BulkInsertStmt = icingadb_connection.NewBulkInsertStmt("service", Fields)
+	BulkDeleteStmt = icingadb_connection.NewBulkDeleteStmt("service")
+	BulkUpdateStmt = icingadb_connection.NewBulkUpdateStmt("service", Fields)
 }
