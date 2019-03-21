@@ -61,7 +61,7 @@ func main() {
 		})
 	}()
 
-	go prometheus.HandleHttp("localhost:8080", super.ChErr)
+	go prometheus.HandleHttp("0.0.0.0:8080", super.ChErr)
 
 	for {
 		select {
