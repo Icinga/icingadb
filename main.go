@@ -8,6 +8,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/sync"
+	"git.icinga.com/icingadb/icingadb-main/prometheus"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	log "github.com/sirupsen/logrus"
 )
@@ -59,6 +60,8 @@ func main() {
 			UpdateStmt: host.BulkUpdateStmt,
 		})
 	}()
+
+	go prometheus.HandleHttp("localhost:8080", super.ChErr)
 
 	for {
 		select {
