@@ -176,6 +176,7 @@ func GetDelta(super *supervisor.Supervisor, ctx *Context) ([]string, []string, [
 	return icingadb_utils.Delta(redisIds, mysqlIds)
 }
 
+// InsertPrepWorker fetches config for IDs(chInsert) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
 func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chInsert <-chan []string, chInsertBack chan<- []configobject.Row) {
 	defer log.Infof("%s: Insert preparation routine stopped", ctx.ObjectType)
 
@@ -218,6 +219,7 @@ func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 	}
 }
 
+// InsertExecWorker gets decoded configobject.Row objects from the JsonDecodePool and inserts them into MySQL
 func InsertExecWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chInsertBack <-chan []configobject.Row, wg *sync.WaitGroup) {
 	for rows := range chInsertBack {
 		select {
@@ -235,6 +237,7 @@ func InsertExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 	}
 }
 
+// DeleteExecWorker deletes IDs(chDelete) from MySQL
 func DeleteExecWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chDelete <-chan []string, wg *sync.WaitGroup) {
 	for keys := range chDelete {
 		select {
@@ -252,7 +255,9 @@ func DeleteExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 	}
 }
 
-func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdate <-chan []string, chUpdateBack chan<- []string, wg *sync.WaitGroup) {
+// UpdateCompWorker gets IDs(chUpdateComp) that might need an update, fetches the corresponding checksums for Redis and MySQL,
+// compares them and inserts changed IDs into chUpdate.
+func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdateComp <-chan []string, chUpdate chan<- []string, wg *sync.WaitGroup) {
 	prep := func(chunk *icingadb_connection.ChecksumChunk, mysqlChecksums map[string]map[string]string) {
 		changed := make([]string, 0)
 		for i, key := range chunk.Keys {
@@ -273,10 +278,10 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 				wg.Done()
 			}
 		}
-		chUpdateBack <- changed
+		chUpdate <- changed
 	}
 
-	for keys := range chUpdate {
+	for keys := range chUpdateComp {
 		select {
 		case _, ok := <-done:
 			if !ok {
@@ -299,6 +304,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 	}
 }
 
+// UpdatePrepWorker fetches config for IDs(chUpdate) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
 func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdate <-chan []string, chUpdateBack chan<- []configobject.Row) {
 	prep := func(chunk *icingadb_connection.ConfigChunk) {
 		pkgs := icingadb_json_decoder.JsonDecodePackages{
@@ -339,6 +345,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 	}
 }
 
+// UpdateExecWorker gets decoded configobject.Row objects from the JsonDecodePool and updates them in MySQL
 func UpdateExecWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdateBack <-chan []configobject.Row, wg *sync.WaitGroup, updateCounter *uint32) {
 	for rows := range chUpdateBack {
 		select {
