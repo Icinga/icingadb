@@ -30,6 +30,9 @@ type Checksums struct {
 	GroupsChecksum        string  `json:"groups_checksum"`
 }
 
+// Operator is the main worker for each config type. It takes a reference to a supervisor super, holding all required
+// connection information and other control mechanisms, a channel chHA, which informs the Operator of the current HA
+// state, and a Context reference ctx defining the type and providing the necessary factories.
 func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 	insert, update, delete := GetDelta(super, ctx)
 	log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", ctx.ObjectType, len(insert), len(update), len(delete))
@@ -48,12 +51,14 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 	)
 	for msg := range chHA {
 		switch msg {
+		// Icinga 2 probably died, stop operations and tell all workers to shut down.
 		case icingadb_ha.Notify_StopSync:
 			log.Info(fmt.Sprintf("%s: Lost responsibility", ctx.ObjectType))
 			if done != nil {
 				close(done)
 				done = nil
 			}
+		// Starts up the whole sync process.
 		case icingadb_ha.Notify_StartSync:
 			log.Infof("%s: Got responsibility", ctx.ObjectType)
 
@@ -130,6 +135,11 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 	return nil
 }
 
+// GetDelta takes a config Context (host, service, checkcommand, etc.) and fetches the ids from MySQL and Redis. It
+// returns three string slices:
+// 1. IDs which are in the Redis but not in the MySQL (to insert)
+// 2. IDs which are in both (to possibly update)
+// 3. IDs which are in the MySQL but not the Redis (to delete)
 func GetDelta(super *supervisor.Supervisor, ctx *Context) ([]string, []string, []string) {
 	var (
 		redisIds []string
