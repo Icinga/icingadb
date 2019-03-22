@@ -22,7 +22,7 @@ type HA struct {
 	notificationListeners []chan int
 }
 
-func newHA(super *supervisor.Supervisor) (*HA, error) {
+func NewHA(super *supervisor.Supervisor) (*HA, error) {
 	var err error
 	ho := HA{
 		super: super,
@@ -51,8 +51,8 @@ func (h *HA) updateInstance() error {
 
 func (h *HA) insertInstance() error {
 	_, err := h.super.Dbw.SqlExec("insert into icingadb_instance",
-		fmt.Sprintf("INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (%s, %s, %d, 'y')",
-			h.uid, h.super.EnvId, h.icinga2MTime))
+		fmt.Sprintf("INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES ('%s', '%s', %d, 'y')",
+			h.uid[:], h.super.EnvId, h.icinga2MTime))
 	return err
 }
 
