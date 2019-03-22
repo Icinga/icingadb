@@ -538,7 +538,7 @@ func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string) ([]string, error) 
 			continue
 		}
 
-		rows, err := dbw.SqlQuery(fmt.Sprintf("SELECT id FROM %s WHERE env_id='X%s'", table, icingadb_utils.DecodeChecksum(envId)))
+		rows, err := dbw.SqlQuery(fmt.Sprintf("SELECT id FROM %s WHERE env_id=(X'%s')", table, icingadb_utils.DecodeChecksum(envId)))
 
 		if err != nil {
 			if !dbw.checkConnection(false) {
