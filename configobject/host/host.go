@@ -57,7 +57,7 @@ var (
 
 type Host struct {
 	Id                    string  `json:"id"`
-	EnvId                 string  `json:"env_id"`
+	EnvId                 string  `json:"environment_id"`
 	NameChecksum          string  `json:"name_checksum"`
 	PropertiesChecksum    string  `json:"properties_checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
