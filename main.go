@@ -12,6 +12,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/prometheus"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	log "github.com/sirupsen/logrus"
+	"sync"
 )
 
 func main() {
@@ -37,16 +38,17 @@ func main() {
 
 	super := supervisor.Supervisor{
 		ChErr:    make(chan error),
-		ChEnv:    make(chan *icingadb_ha.Environment),
 		ChDecode: make(chan *icingadb_json_decoder.JsonDecodePackages),
 		Rdbw:     redisConn,
 		Dbw:      mysqlConn,
+		EnvLock:  &sync.Mutex{},
 	}
 
-	ha := icingadb_ha.HA{}
-	go ha.Run(super.Rdbw, super.Dbw, super.ChEnv, super.ChErr)
+	chEnv := make(chan *icingadb_ha.Environment)
+	ha := icingadb_ha.NewHA(super)
+	go ha.Run(super.Rdbw, super.Dbw, chEnv, super.ChErr)
 	go func() {
-		super.ChErr <- icingadb_ha.IcingaEventsBroker(redisConn, super.ChEnv)
+		super.ChErr <- icingadb_ha.IcingaEventsBroker(redisConn, chEnv)
 	}()
 
 	go icingadb_json_decoder.DecodePool(super.ChDecode, super.ChErr, 16)
