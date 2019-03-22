@@ -633,7 +633,10 @@ func (dbw *DBWrapper) SqlBulkInsert(rows []configobject.Row, stmt *BulkInsertStm
 
 	query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
 
-	_, err := dbw.SqlExec("Bulk insert", query, values...)
+	_, err := dbw.WithRetry(func() (result sql.Result, e error) {
+		return dbw.SqlExec("Bulk insert", query, values...)
+	})
+
 	if err != nil {
 		return err
 	}
@@ -659,7 +662,9 @@ func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
 		}
 		query := fmt.Sprintf(stmt.Format, placeholders)
 
-		_, err := dbw.SqlExec("Bulk delete", query, values...)
+		_, err := dbw.WithRetry(func() (result sql.Result, e error) {
+			return dbw.SqlExec("Bulk delete", query, values...)
+		})
 		if err != nil {
 			return err
 		}
@@ -688,7 +693,9 @@ func (dbw *DBWrapper) SqlBulkUpdate(rows []configobject.Row, stmt *BulkUpdateStm
 
 	query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
 
-	_, err := dbw.SqlExec("Bulk insert", query, values...)
+	_, err := dbw.WithRetry(func() (result sql.Result, e error) {
+		return dbw.SqlExec("Bulk update", query, values...)
+	})
 	if err != nil {
 		return err
 	}
