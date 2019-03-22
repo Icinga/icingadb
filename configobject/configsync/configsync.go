@@ -214,7 +214,9 @@ func GetDelta(super *supervisor.Supervisor, ctx *Context) ([]string, []string, [
 	go func() {
 		defer wg.Done()
 		var err error
-		mysqlIds, err = super.Dbw.SqlFetchIds(ctx.ObjectType)
+		super.EnvLock.Lock()
+		mysqlIds, err = super.Dbw.SqlFetchIds(super.EnvId, ctx.ObjectType)
+		super.EnvLock.Unlock()
 		if err != nil {
 			super.ChErr <- err
 			return
