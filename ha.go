@@ -39,7 +39,7 @@ const (
 )
 
 type HA struct {
-	super						supervisor.Supervisor
+	super						*supervisor.Supervisor
 	ourUUID      				uuid.UUID
 	ourEnv       				*Environment
 	icinga2MTime 				int64
@@ -54,7 +54,7 @@ type HA struct {
 	notificationListeners 		[]chan int
 }
 
-func NewHA(super supervisor.Supervisor) HA {
+func NewHA(super *supervisor.Supervisor) HA {
 	ha := HA{
 		super: super,
 	}
