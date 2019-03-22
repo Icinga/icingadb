@@ -215,6 +215,10 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 		"env":     h.ourEnv.ID,
 	}).Info("Received environment from Icinga 2")
 
+	h.super.EnvLock.Lock()
+	h.super.EnvId = h.ourEnv.ID
+	h.super.EnvLock.Unlock()
+
 	everySecond := time.NewTicker(time.Second)
 	defer everySecond.Stop()
 
