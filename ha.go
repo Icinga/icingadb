@@ -2,6 +2,7 @@ package icingadb_ha
 
 import (
 	"git.icinga.com/icingadb/icingadb-connection"
+	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"sync/atomic"
@@ -38,18 +39,27 @@ const (
 )
 
 type HA struct {
-	ourUUID      uuid.UUID
-	ourEnv       *Environment
-	icinga2MTime int64
+	super						supervisor.Supervisor
+	ourUUID      				uuid.UUID
+	ourEnv       				*Environment
+	icinga2MTime 				int64
 	// responsibility tells whether we're responsible for our environment.
-	responsibility int32
+	responsibility 				int32
 	// responsibleSince tells since when we're responsible for our environment.
-	responsibleSince time.Time
+	responsibleSince 			time.Time
 	// runningCriticalOperations counts the currently running critical operations.
-	runningCriticalOperations uint64
+	runningCriticalOperations 	uint64
 	// lastCriticalOperationEnd tells when the last critical operation finished.
-	lastCriticalOperationEnd int64
-	notificationListeners []chan int
+	lastCriticalOperationEnd 	int64
+	notificationListeners 		[]chan int
+}
+
+func NewHA(super supervisor.Supervisor) HA {
+	ha := HA{
+		super: super,
+	}
+
+	return ha
 }
 
 // RunCriticalOperation runs op and manages HA#runningCriticalOperations if we're responsible.
@@ -413,6 +423,10 @@ func (h *HA) run(rdb *icingadb_connection.RDBWrapper, dbw *icingadb_connection.D
 			if !hasEnv {
 				return nil
 			}
+
+			h.super.EnvLock.Lock()
+			h.super.EnvId = h.ourEnv.ID
+			h.super.EnvLock.Unlock()
 
 			h.Icinga2HeartBeat()
 			<-everySecond.C
