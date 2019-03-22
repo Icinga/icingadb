@@ -35,8 +35,8 @@ type Checksums struct {
 // connection information and other control mechanisms, a channel chHA, which informs the Operator of the current HA
 // state, and a Context reference ctx defining the type and providing the necessary factories.
 func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
-	insert, update, delete := GetDelta(super, ctx)
-	log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", ctx.ObjectType, len(insert), len(update), len(delete))
+	//insert, update, delete := GetDelta(super, ctx)
+	//log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", ctx.ObjectType, len(insert), len(update), len(delete))
 
 	var (
 		// If this IcingaDB-Instance looses responsibility, this channel will be
@@ -78,7 +78,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 			log.Infof("%s: Got responsibility", ctx.ObjectType)
 
 			//TODO: This should only be done, if HA was taken over from another instance
-			insert, update, delete = GetDelta(super, ctx)
+			insert, update, delete := GetDelta(super, ctx)
 			log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", ctx.ObjectType, len(insert), len(update), len(delete))
 
 			// Clean up all channels and wait groups for a fresh config dump
