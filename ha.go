@@ -2,6 +2,7 @@ package icingadb_ha
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/google/uuid"
@@ -78,29 +79,43 @@ func (h *HA) Run(chEnv chan *Environment) {
 	// Wait for first heartbeat
 	env := <-chEnv
 	if env == nil {
-		log.Fatal("Environment empty?!")
+		log.WithFields(log.Fields{
+			"context": "HA",
+			}).Fatal("Received empty environment.")
 	}
 	h.super.EnvId = env.ID
 
+	haLogger := log.WithFields(log.Fields{
+		"context": "HA",
+		"environment": hex.EncodeToString(h.super.EnvId),
+		"UUID":   h.uid,
+	})
+	haLogger.Info("Got initial environment.")
+
+	// We have a new UUID with every restart, no use comparing them.
 	_, beat, err := h.getInstance()
 	if err != nil {
-		log.Fatal(err)
+		haLogger.Fatalf("Failed to fetch instance: %v", err)
 	}
 
 	if time.Now().Unix()-beat > 15 {
+		haLogger.Info("Taking over.")
+
 		// This means there was no instance row match, insert
 		if beat == 0 {
 			err = h.insertInstance()
 		} else {
 			err = h.updateInstance()
 		}
+
 		if err != nil {
-			log.Fatal(err)
+			haLogger.Fatalf("Failed to insert/update instance: %v", err)
 		}
 
 		h.isActive = true
 		h.notifyNotificationListener(Notify_StartSync)
 	} else {
+		haLogger.Info("Other instance is active.")
 		h.isActive = false
 	}
 
@@ -122,18 +137,23 @@ func (h *HA) Run(chEnv chan *Environment) {
 			} else {
 				they, beat, err := h.getInstance()
 				if err != nil {
-					log.Fatal(err)
+					haLogger.Fatal("Failed to fetch instance: %v", err)
 				}
 				if they == h.uid {
+					haLogger.Debug("We are active.")
 					if err := h.updateInstance(); err != nil {
-						log.Fatal(err)
+						haLogger.Fatalf("Failed to update instance: %v", err)
 					}
 				} else if h.icinga2MTime-beat > 15 {
+					haLogger.Info("Taking over.")
 					h.isActive = true
 					h.notifyNotificationListener(Notify_StartSync)
+				} else {
+					haLogger.Debug("Other instance is active.")
 				}
 			}
 		case <-timerHA.C:
+			haLogger.Info("Icinga 2 sent no heartbeat for 15 seconds, pronouncing dead.")
 			h.isActive = false
 			h.notifyNotificationListener(Notify_StopSync)
 		}
