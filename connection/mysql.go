@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
-	"git.icinga.com/icingadb/icingadb-utils"
+	"git.icinga.com/icingadb/icingadb-main/utils"
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
@@ -187,7 +187,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransactio
 		if quiet {
 			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
 		} else {
-			benchmarc := icingadb_utils.NewBenchmark()
+			benchmarc := utils.NewBenchmark()
 			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
 			benchmarc.Stop()
 
@@ -221,7 +221,7 @@ func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 		if quiet {
 			err = tx.Commit()
 		} else {
-			benchmarc := icingadb_utils.NewBenchmark()
+			benchmarc := utils.NewBenchmark()
 			err = tx.Commit()
 			benchmarc.Stop()
 
@@ -253,7 +253,7 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 
 		var err error
 		if !quiet {
-			benchmarc := icingadb_utils.NewBenchmark()
+			benchmarc := utils.NewBenchmark()
 			err = tx.Rollback()
 			benchmarc.Stop()
 
@@ -321,9 +321,9 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opDescription st
 			continue
 		}
 
-		var benchmarc *icingadb_utils.Benchmark
+		var benchmarc *utils.Benchmark
 		if !quiet {
-			benchmarc = icingadb_utils.NewBenchmark()
+			benchmarc = utils.NewBenchmark()
 		}
 		res, err := db.Exec(sql, args...)
 		DbOperationsExec.Inc()
@@ -376,9 +376,9 @@ func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryDescrip
 }
 
 func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
-	var benchmarc *icingadb_utils.Benchmark
+	var benchmarc *utils.Benchmark
 	if !quiet {
-		benchmarc = icingadb_utils.NewBenchmark()
+		benchmarc = utils.NewBenchmark()
 	}
 	rows, errQuery := db.Query(query, args...)
 	DbOperationsQuery.Inc()
@@ -469,9 +469,9 @@ func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFai
 			continue
 		}
 
-		var benchmarc *icingadb_utils.Benchmark
+		var benchmarc *utils.Benchmark
 		if !quiet {
-			benchmarc = icingadb_utils.NewBenchmark()
+			benchmarc = utils.NewBenchmark()
 		}
 		errTx := dbw.sqlTryTransaction(f, concurrencySafety, false)
 		if !quiet {
@@ -538,7 +538,7 @@ func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string) ([]string, error) 
 			continue
 		}
 
-		rows, err := dbw.SqlQuery(fmt.Sprintf("SELECT id FROM %s WHERE env_id=(X'%s')", table, icingadb_utils.DecodeChecksum(envId)))
+		rows, err := dbw.SqlQuery(fmt.Sprintf("SELECT id FROM %s WHERE env_id=(X'%s')", table, utils.DecodeChecksum(envId)))
 
 		if err != nil {
 			if !dbw.checkConnection(false) {
@@ -558,7 +558,7 @@ func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string) ([]string, error) 
 				return nil, err
 			}
 
-			keys = append(keys, icingadb_utils.DecodeChecksum(id))
+			keys = append(keys, utils.DecodeChecksum(id))
 		}
 
 		err = rows.Err()
@@ -575,7 +575,7 @@ func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]
 
 	done := make(chan struct{})
 	//TODO: Don't do this hardcoded - Chunksize
-	for bulk := range icingadb_utils.ChunkKeys(done, ids, 1000) {
+	for bulk := range utils.ChunkKeys(done, ids, 1000) {
 		//TODO: This should be done in parallel
 		query := fmt.Sprintf("SELECT id, properties_checksum FROM %s WHERE id IN (X'%s')", table, strings.Join(bulk, "', X'"))
 		rows, err := dbw.SqlQuery(query)
@@ -599,8 +599,8 @@ func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]
 				return nil, err
 			}
 
-			checksums[icingadb_utils.DecodeChecksum(id)] = map[string]string{
-				"properties_checksum": icingadb_utils.DecodeChecksum(propertiesChecksum),
+			checksums[utils.DecodeChecksum(id)] = map[string]string{
+				"properties_checksum": utils.DecodeChecksum(propertiesChecksum),
 			}
 		}
 
@@ -653,12 +653,12 @@ func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
 	defer close(done)
 
 	//TODO: Don't do this hardcoded - Chunksize
-	for bulk := range icingadb_utils.ChunkKeys(done, keys, 1000) {
+	for bulk := range utils.ChunkKeys(done, keys, 1000) {
 		placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(bulk)), ", ")
 		values := make([]interface{}, len(bulk))
 
 		for i, key := range bulk {
-			values[i] = icingadb_utils.Checksum(key)
+			values[i] = utils.Checksum(key)
 		}
 		query := fmt.Sprintf(stmt.Format, placeholders)
 

@@ -1,4 +1,4 @@
-package icingadb_utils
+package utils
 
 import (
 	"fmt"

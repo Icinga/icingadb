@@ -1,9 +1,9 @@
-package icingadb_ha
+package ha
 
 import (
 	"crypto/sha1"
 	"encoding/json"
-	"git.icinga.com/icingadb/icingadb-connection"
+	"git.icinga.com/icingadb/icingadb-main/connection"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,7 +21,7 @@ func Sha1bytes(bytes []byte) []byte {
 	return hash.Sum(nil)
 }
 
-func IcingaEventsBroker(rdb *icingadb_connection.RDBWrapper, chEnv chan *Environment) error {
+func IcingaEventsBroker(rdb *connection.RDBWrapper, chEnv chan *Environment) error {
 	log.Info("Starting Events broker")
 
 	subscription := rdb.Subscribe()

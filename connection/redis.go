@@ -2,7 +2,7 @@ package connection
 
 import (
 	"fmt"
-	"git.icinga.com/icingadb/icingadb-utils"
+	"git.icinga.com/icingadb/icingadb-main/utils"
 	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
 	"sync"
@@ -289,7 +289,7 @@ func (rdbw *RDBWrapper) HGetAll(key string) *redis.StringStringMapCmd {
 			continue
 		}
 
-		benchmarc := icingadb_utils.NewBenchmark()
+		benchmarc := utils.NewBenchmark()
 		res := rdbw.Rdb.HGetAll(key)
 
 		if _, err := res.Result(); err != nil {
@@ -321,7 +321,7 @@ func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([
 			continue
 		}
 
-		benchmarc := icingadb_utils.NewBenchmark()
+		benchmarc := utils.NewBenchmark()
 		cmd, err := rdbw.Rdb.TxPipelined(fn)
 
 		if err != nil {
@@ -401,7 +401,7 @@ func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, keys []string, ob
 	}
 
 	//TODO: Replace fixed chunkSize
-	work := icingadb_utils.ChunkKeys(done, keys, 500)
+	work := utils.ChunkKeys(done, keys, 500)
 
 	go func() {
 		defer close(out)
@@ -443,7 +443,7 @@ func (rdbw *RDBWrapper) PipeChecksumChunks(done <-chan struct{}, keys []string, 
 	}
 
 	//TODO: Replace fixed chunkSize
-	work := icingadb_utils.ChunkKeys(done, keys, 500)
+	work := utils.ChunkKeys(done, keys, 500)
 
 	go func() {
 		defer close(out)

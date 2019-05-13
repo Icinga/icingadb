@@ -2,14 +2,14 @@ package main
 
 import (
 	"flag"
-	"git.icinga.com/icingadb/icingadb-connection"
-	"git.icinga.com/icingadb/icingadb-ha"
-	"git.icinga.com/icingadb/icingadb-json-decoder"
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
+	"git.icinga.com/icingadb/icingadb-main/connection"
+	"git.icinga.com/icingadb/icingadb-main/ha"
+	"git.icinga.com/icingadb/icingadb-main/jsondecoder"
 	"git.icinga.com/icingadb/icingadb-main/prometheus"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	log "github.com/sirupsen/logrus"
@@ -27,38 +27,38 @@ func main() {
 	redisInfo := config.GetRedisInfo()
 	mysqlInfo := config.GetMysqlInfo()
 
-	redisConn, err := icingadb_connection.NewRDBWrapper(redisInfo.Host + ":" + redisInfo.Port)
+	redisConn, err := connection.NewRDBWrapper(redisInfo.Host + ":" + redisInfo.Port)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	mysqlConn, err := icingadb_connection.NewDBWrapper(mysqlInfo.User + ":" + mysqlInfo.Password + "@tcp(" + mysqlInfo.Host + ":" + mysqlInfo.Port + ")/" + mysqlInfo.Database)
+	mysqlConn, err := connection.NewDBWrapper(mysqlInfo.User + ":" + mysqlInfo.Password + "@tcp(" + mysqlInfo.Host + ":" + mysqlInfo.Port + ")/" + mysqlInfo.Database)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	super := supervisor.Supervisor{
 		ChErr:    make(chan error),
-		ChDecode: make(chan *icingadb_json_decoder.JsonDecodePackages),
+		ChDecode: make(chan *jsondecoder.JsonDecodePackages),
 		Rdbw:     redisConn,
 		Dbw:      mysqlConn,
 		EnvLock:  &sync.Mutex{},
 	}
 
-	chEnv := make(chan *icingadb_ha.Environment)
-	ha, err := icingadb_ha.NewHA(&super)
+	chEnv := make(chan *ha.Environment)
+	haInstance, err := ha.NewHA(&super)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	go ha.Run(chEnv)
+	go haInstance.Run(chEnv)
 	go func() {
-		super.ChErr <- icingadb_ha.IcingaEventsBroker(redisConn, chEnv)
+		super.ChErr <- ha.IcingaEventsBroker(redisConn, chEnv)
 	}()
 
-	go icingadb_json_decoder.DecodePool(super.ChDecode, super.ChErr, 16)
+	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)
 
-	chHAHost := ha.RegisterNotificationListener()
+	chHAHost := haInstance.RegisterNotificationListener()
 	go func() {
 		super.ChErr <- configsync.Operator(&super, chHAHost, &configsync.Context{
 			ObjectType: "host",
@@ -69,7 +69,7 @@ func main() {
 		})
 	}()
 
-	chHAService := ha.RegisterNotificationListener()
+	chHAService := haInstance.RegisterNotificationListener()
 	go func() {
 		super.ChErr <- configsync.Operator(&super, chHAService, &configsync.Context{
 			ObjectType: "service",

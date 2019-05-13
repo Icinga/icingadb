@@ -3,13 +3,12 @@ package configsync
 import (
 	"encoding/json"
 	"fmt"
-	"git.icinga.com/icingadb/icingadb-connection"
-	"git.icinga.com/icingadb/icingadb-ha"
-	"git.icinga.com/icingadb/icingadb-json-decoder"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
+	"git.icinga.com/icingadb/icingadb-main/connection"
+	"git.icinga.com/icingadb/icingadb-main/ha"
+	"git.icinga.com/icingadb/icingadb-main/jsondecoder"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
-	"git.icinga.com/icingadb/icingadb-utils"
-	"git.icinga.com/icingadb/icingadb/benchmark"
+	"git.icinga.com/icingadb/icingadb-main/utils"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"sync/atomic"
@@ -19,9 +18,9 @@ import (
 type Context struct {
 	ObjectType string
 	Factory configobject.RowFactory
-	InsertStmt *icingadb_connection.BulkInsertStmt
-	DeleteStmt *icingadb_connection.BulkDeleteStmt
-	UpdateStmt *icingadb_connection.BulkUpdateStmt
+	InsertStmt *connection.BulkInsertStmt
+	DeleteStmt *connection.BulkDeleteStmt
+	UpdateStmt *connection.BulkUpdateStmt
 }
 
 type Checksums struct {
@@ -67,14 +66,14 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 	for msg := range chHA {
 		switch msg {
 		// Icinga 2 probably died, stop operations and tell all workers to shut down.
-		case icingadb_ha.Notify_StopSync:
+		case ha.Notify_StopSync:
 			log.Info(fmt.Sprintf("%s: Lost responsibility", ctx.ObjectType))
 			if done != nil {
 				close(done)
 				done = nil
 			}
 		// Starts up the whole sync process.
-		case icingadb_ha.Notify_StartSync:
+		case ha.Notify_StartSync:
 			log.Infof("%s: Got responsibility", ctx.ObjectType)
 
 			//TODO: This should only be done, if HA was taken over from another instance
@@ -120,7 +119,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 			}
 
 			go func() {
-				benchmarc := benchmark.NewBenchmark()
+				benchmarc := utils.NewBenchmark()
 				wgInsert.Add(len(insert))
 
 				// Provide the InsertPrepWorker with IDs to insert
@@ -140,7 +139,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 			}()
 
 			go func() {
-				benchmarc := benchmark.NewBenchmark()
+				benchmarc := utils.NewBenchmark()
 				wgDelete.Add(len(delete))
 
 				// Provide the DeleteExecWorker with IDs to delete
@@ -160,7 +159,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 			}()
 
 			go func() {
-				benchmarc := benchmark.NewBenchmark()
+				benchmarc := utils.NewBenchmark()
 				wgUpdate.Add(len(update))
 
 				// Provide the UpdateCompWorker with IDs to compare
@@ -224,22 +223,22 @@ func GetDelta(super *supervisor.Supervisor, ctx *Context) ([]string, []string, [
 	}()
 
 	wg.Wait()
-	return icingadb_utils.Delta(redisIds, mysqlIds)
+	return utils.Delta(redisIds, mysqlIds)
 }
 
 // InsertPrepWorker fetches config for IDs(chInsert) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
 func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chInsert <-chan []string, chInsertBack chan<- []configobject.Row) {
 	defer log.Infof("%s: Insert preparation routine stopped", ctx.ObjectType)
 
-	prep := func(chunk *icingadb_connection.ConfigChunk) {
-		pkgs := icingadb_json_decoder.JsonDecodePackages{
+	prep := func(chunk *connection.ConfigChunk) {
+		pkgs := jsondecoder.JsonDecodePackages{
 			ChBack: chInsertBack,
 		}
 		for i, key := range chunk.Keys {
 			if chunk.Configs[i] == nil || chunk.Checksums[i] == nil {
 				continue
 			}
-			pkg := icingadb_json_decoder.JsonDecodePackage{
+			pkg := jsondecoder.JsonDecodePackage{
 				Id:           	key,
 				ChecksumsRaw:	chunk.Checksums[i].(string),
 				ConfigRaw:   	chunk.Configs[i].(string),
@@ -309,7 +308,7 @@ func DeleteExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 // UpdateCompWorker gets IDs(chUpdateComp) that might need an update, fetches the corresponding checksums for Redis and MySQL,
 // compares them and inserts changed IDs into chUpdate.
 func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdateComp <-chan []string, chUpdate chan<- []string, wg *sync.WaitGroup) {
-	prep := func(chunk *icingadb_connection.ChecksumChunk, mysqlChecksums map[string]map[string]string) {
+	prep := func(chunk *connection.ChecksumChunk, mysqlChecksums map[string]map[string]string) {
 		changed := make([]string, 0)
 		for i, key := range chunk.Keys {
 			if chunk.Checksums[i] == nil {
@@ -357,15 +356,15 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 
 // UpdatePrepWorker fetches config for IDs(chUpdate) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
 func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdate <-chan []string, chUpdateBack chan<- []configobject.Row) {
-	prep := func(chunk *icingadb_connection.ConfigChunk) {
-		pkgs := icingadb_json_decoder.JsonDecodePackages{
+	prep := func(chunk *connection.ConfigChunk) {
+		pkgs := jsondecoder.JsonDecodePackages{
 			ChBack: chUpdateBack,
 		}
 		for i, key := range chunk.Keys {
 			if chunk.Configs[i] == nil || chunk.Checksums[i] == nil {
 				continue
 			}
-			pkg := icingadb_json_decoder.JsonDecodePackage{
+			pkg := jsondecoder.JsonDecodePackage{
 				Id:           	key,
 				ChecksumsRaw:	chunk.Checksums[i].(string),
 				ConfigRaw:   	chunk.Configs[i].(string),

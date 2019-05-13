@@ -2,7 +2,7 @@ package statesync
 
 import (
 	"encoding/hex"
-	"git.icinga.com/icingadb/icingadb-connection"
+	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
@@ -61,7 +61,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 		return
 	}
 
-	errTx := super.Dbw.SqlTransaction(true, true, false, func(tx icingadb_connection.DbTransaction) error {
+	errTx := super.Dbw.SqlTransaction(true, true, false, func(tx connection.DbTransaction) error {
 		for _, state := range states {
 			values := state.Values
 
