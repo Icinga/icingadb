@@ -45,8 +45,12 @@ func main() {
 	}
 
 	chEnv := make(chan *icingadb_ha.Environment)
-	ha := icingadb_ha.NewHA(&super)
-	go ha.Run(super.Rdbw, super.Dbw, chEnv, super.ChErr)
+	ha, err := icingadb_ha.NewHA(&super)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go ha.Run(chEnv)
 	go func() {
 		super.ChErr <- icingadb_ha.IcingaEventsBroker(redisConn, chEnv)
 	}()
