@@ -1,4 +1,4 @@
-package icingadb_connection
+package connection
 
 import (
 	"database/sql"
@@ -40,7 +40,7 @@ func mkMysql(dbType string, dbDsn string) (*sql.DB, error) {
 
 	mysql.SetLogger(oldlog.New(ioutil.Discard, "", 0))
 
-	db.SetMaxOpenConns(100)
+	db.SetMaxOpenConns(50)
 	db.SetMaxIdleConns(0)
 
 	return db, nil

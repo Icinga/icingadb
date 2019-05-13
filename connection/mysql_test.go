@@ -1,4 +1,4 @@
-package icingadb_connection
+package connection
 
 import (
 	"context"
