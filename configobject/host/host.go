@@ -1,15 +1,15 @@
 package host
 
 import (
-	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
-	"git.icinga.com/icingadb/icingadb-utils"
+	"git.icinga.com/icingadb/icingadb-main/connection"
+	"git.icinga.com/icingadb/icingadb-main/utils"
 )
 
 var (
-	BulkInsertStmt *icingadb_connection.BulkInsertStmt
-	BulkDeleteStmt *icingadb_connection.BulkDeleteStmt
-	BulkUpdateStmt *icingadb_connection.BulkUpdateStmt
+	BulkInsertStmt *connection.BulkInsertStmt
+	BulkDeleteStmt *connection.BulkDeleteStmt
+	BulkUpdateStmt *connection.BulkUpdateStmt
 	Fields         = []string{
 		"id",
 		"env_id",
@@ -109,7 +109,7 @@ func NewHost() configobject.Row {
 func (h *Host) InsertValues() []interface{} {
 	v := h.UpdateValues()
 
-	return append([]interface{}{icingadb_utils.Checksum(h.Id)}, v...)
+	return append([]interface{}{utils.Checksum(h.Id)}, v...)
 }
 
 func (h *Host) UpdateValues() []interface{} {
@@ -117,11 +117,11 @@ func (h *Host) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		icingadb_utils.Checksum(h.EnvId),
-		icingadb_utils.Checksum(h.NameChecksum),
-		icingadb_utils.Checksum(h.PropertiesChecksum),
-		icingadb_utils.Checksum(h.CustomvarsChecksum),
-		icingadb_utils.Checksum(h.GroupsChecksum),
+		utils.Checksum(h.EnvId),
+		utils.Checksum(h.NameChecksum),
+		utils.Checksum(h.PropertiesChecksum),
+		utils.Checksum(h.CustomvarsChecksum),
+		utils.Checksum(h.GroupsChecksum),
 		h.Name,
 		h.NameCi,
 		h.DisplayName,
@@ -130,33 +130,33 @@ func (h *Host) UpdateValues() []interface{} {
 		h.AddressBin,
 		h.Address6Bin,
 		h.Checkcommand,
-		icingadb_utils.Checksum(h.CheckcommandId),
+		utils.Checksum(h.CheckcommandId),
 		h.MaxCheckAttempts,
 		h.CheckPeriod,
-		icingadb_utils.Checksum(h.CheckPeriodId),
+		utils.Checksum(h.CheckPeriodId),
 		h.CheckTimeout,
 		h.CheckInterval,
 		h.CheckRetryInterval,
-		icingadb_utils.Bool[h.ActiveChecksEnabled],
-		icingadb_utils.Bool[h.PassiveChecksEnabled],
-		icingadb_utils.Bool[h.EventHandlerEnabled],
-		icingadb_utils.Bool[h.NotificationsEnabled],
-		icingadb_utils.Bool[h.FlappingEnabled],
+		utils.Bool[h.ActiveChecksEnabled],
+		utils.Bool[h.PassiveChecksEnabled],
+		utils.Bool[h.EventHandlerEnabled],
+		utils.Bool[h.NotificationsEnabled],
+		utils.Bool[h.FlappingEnabled],
 		h.FlappingThresholdLow,
 		h.FlappingThresholdHigh,
-		icingadb_utils.Bool[h.PerfdataEnabled],
+		utils.Bool[h.PerfdataEnabled],
 		h.Eventcommand,
-		icingadb_utils.Checksum(h.EventcommandId),
-		icingadb_utils.Bool[h.IsVolatile],
-		icingadb_utils.Checksum(h.ActionUrlId),
-		icingadb_utils.Checksum(h.NotesUrlId),
+		utils.Checksum(h.EventcommandId),
+		utils.Bool[h.IsVolatile],
+		utils.Checksum(h.ActionUrlId),
+		utils.Checksum(h.NotesUrlId),
 		h.Notes,
-		icingadb_utils.Checksum(h.IconImageId),
+		utils.Checksum(h.IconImageId),
 		h.IconImageAlt,
 		h.Zone,
-		icingadb_utils.Checksum(h.ZoneId),
+		utils.Checksum(h.ZoneId),
 		h.CommandEndpoint,
-		icingadb_utils.Checksum(h.CommandEndpointId),
+		utils.Checksum(h.CommandEndpointId),
 	)
 
 	return v
@@ -171,7 +171,7 @@ func (h *Host) SetId(id string) {
 }
 
 func init() {
-	BulkInsertStmt = icingadb_connection.NewBulkInsertStmt("host", Fields)
-	BulkDeleteStmt = icingadb_connection.NewBulkDeleteStmt("host")
-	BulkUpdateStmt = icingadb_connection.NewBulkUpdateStmt("host", Fields)
+	BulkInsertStmt = connection.NewBulkInsertStmt("host", Fields)
+	BulkDeleteStmt = connection.NewBulkDeleteStmt("host")
+	BulkUpdateStmt = connection.NewBulkUpdateStmt("host", Fields)
 }

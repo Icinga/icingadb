@@ -1,4 +1,4 @@
-package icingadb_utils
+package utils
 
 func ChunkKeys(done <-chan struct{}, keys []string, size int) <-chan []string {
 	ch := make(chan []string)

@@ -1,4 +1,4 @@
-package icingadb_utils
+package utils
 
 func Delta(a []string, b []string) ([]string, []string, []string) {
 	maintained := make([]string, 0)

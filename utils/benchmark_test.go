@@ -1,4 +1,4 @@
-package icingadb_utils
+package utils
 
 import (
 	"github.com/stretchr/testify/assert"

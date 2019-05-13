@@ -1,4 +1,4 @@
-package icingadb_json_decoder
+package jsondecoder
 
 import (
 	"git.icinga.com/icingadb/icingadb-main/configobject"

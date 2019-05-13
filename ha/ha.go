@@ -1,4 +1,4 @@
-package icingadb_ha
+package ha
 
 import (
 	"bytes"

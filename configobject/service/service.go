@@ -1,15 +1,15 @@
 package service
 
 import (
-	"git.icinga.com/icingadb/icingadb-connection"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
-	"git.icinga.com/icingadb/icingadb-utils"
+	"git.icinga.com/icingadb/icingadb-main/connection"
+	"git.icinga.com/icingadb/icingadb-main/utils"
 )
 
 var (
-	BulkInsertStmt *icingadb_connection.BulkInsertStmt
-	BulkDeleteStmt *icingadb_connection.BulkDeleteStmt
-	BulkUpdateStmt *icingadb_connection.BulkUpdateStmt
+	BulkInsertStmt *connection.BulkInsertStmt
+	BulkDeleteStmt *connection.BulkDeleteStmt
+	BulkUpdateStmt *connection.BulkUpdateStmt
 	Fields         = []string{
 		"id",
 		"env_id",
@@ -103,7 +103,7 @@ func NewService() configobject.Row {
 func (s *Service) InsertValues() []interface{} {
 	v := s.UpdateValues()
 
-	return append([]interface{}{icingadb_utils.Checksum(s.Id)}, v...)
+	return append([]interface{}{utils.Checksum(s.Id)}, v...)
 }
 
 func (s *Service) UpdateValues() []interface{} {
@@ -111,43 +111,43 @@ func (s *Service) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		icingadb_utils.Checksum(s.EnvId),
-		icingadb_utils.Checksum(s.NameChecksum),
-		icingadb_utils.Checksum(s.PropertiesChecksum),
-		icingadb_utils.Checksum(s.CustomvarsChecksum),
-		icingadb_utils.Checksum(s.GroupsChecksum),
-		icingadb_utils.Checksum(s.HostId),
+		utils.Checksum(s.EnvId),
+		utils.Checksum(s.NameChecksum),
+		utils.Checksum(s.PropertiesChecksum),
+		utils.Checksum(s.CustomvarsChecksum),
+		utils.Checksum(s.GroupsChecksum),
+		utils.Checksum(s.HostId),
 		s.Name,
 		s.NameCi,
 		s.DisplayName,
 		s.Checkcommand,
-		icingadb_utils.Checksum(s.CheckcommandId),
+		utils.Checksum(s.CheckcommandId),
 		s.MaxCheckAttempts,
 		s.CheckPeriod,
-		icingadb_utils.Checksum(s.CheckPeriodId),
+		utils.Checksum(s.CheckPeriodId),
 		s.CheckTimeout,
 		s.CheckInterval,
 		s.CheckRetryInterval,
-		icingadb_utils.Bool[s.ActiveChecksEnabled],
-		icingadb_utils.Bool[s.PassiveChecksEnabled],
-		icingadb_utils.Bool[s.EventHandlerEnabled],
-		icingadb_utils.Bool[s.NotificationsEnabled],
-		icingadb_utils.Bool[s.FlappingEnabled],
+		utils.Bool[s.ActiveChecksEnabled],
+		utils.Bool[s.PassiveChecksEnabled],
+		utils.Bool[s.EventHandlerEnabled],
+		utils.Bool[s.NotificationsEnabled],
+		utils.Bool[s.FlappingEnabled],
 		s.FlappingThresholdLow,
 		s.FlappingThresholdHigh,
-		icingadb_utils.Bool[s.PerfdataEnabled],
+		utils.Bool[s.PerfdataEnabled],
 		s.Eventcommand,
-		icingadb_utils.Checksum(s.EventcommandId),
-		icingadb_utils.Bool[s.IsVolatile],
-		icingadb_utils.Checksum(s.ActionUrlId),
-		icingadb_utils.Checksum(s.NotesUrlId),
+		utils.Checksum(s.EventcommandId),
+		utils.Bool[s.IsVolatile],
+		utils.Checksum(s.ActionUrlId),
+		utils.Checksum(s.NotesUrlId),
 		s.Notes,
-		icingadb_utils.Checksum(s.IconImageId),
+		utils.Checksum(s.IconImageId),
 		s.IconImageAlt,
 		s.Zone,
-		icingadb_utils.Checksum(s.ZoneId),
+		utils.Checksum(s.ZoneId),
 		s.CommandEndpoint,
-		icingadb_utils.Checksum(s.CommandEndpointId),
+		utils.Checksum(s.CommandEndpointId),
 	)
 
 	return v
@@ -162,7 +162,7 @@ func (s *Service) SetId(id string) {
 }
 
 func init() {
-	BulkInsertStmt = icingadb_connection.NewBulkInsertStmt("service", Fields)
-	BulkDeleteStmt = icingadb_connection.NewBulkDeleteStmt("service")
-	BulkUpdateStmt = icingadb_connection.NewBulkUpdateStmt("service", Fields)
+	BulkInsertStmt = connection.NewBulkInsertStmt("service", Fields)
+	BulkDeleteStmt = connection.NewBulkDeleteStmt("service")
+	BulkUpdateStmt = connection.NewBulkUpdateStmt("service", Fields)
 }

@@ -1,11 +1,9 @@
-package icingadb_json_decoder
+package jsondecoder
 
 import (
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
-
-
 
 func Test_decodeString(t *testing.T) {
 	var testCorrect = "{\"Integer\": 2.0, \"String\": \"Test One Two Three\"}"

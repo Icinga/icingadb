@@ -1,16 +1,16 @@
 package supervisor
 
 import (
-	"git.icinga.com/icingadb/icingadb-connection"
-	"git.icinga.com/icingadb/icingadb-json-decoder"
+	"git.icinga.com/icingadb/icingadb-main/connection"
+	"git.icinga.com/icingadb/icingadb-main/jsondecoder"
 	"sync"
 )
 
 type Supervisor struct {
 	ChErr 		chan error
-	ChDecode 	chan *icingadb_json_decoder.JsonDecodePackages
-	Rdbw		*icingadb_connection.RDBWrapper
-	Dbw  		*icingadb_connection.DBWrapper
+	ChDecode 	chan *jsondecoder.JsonDecodePackages
+	Rdbw		*connection.RDBWrapper
+	Dbw  		*connection.DBWrapper
 	EnvId 		[]byte
 	EnvLock		*sync.Mutex
 }

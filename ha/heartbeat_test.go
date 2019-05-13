@@ -1,8 +1,8 @@
-package icingadb_ha
+package ha
 
 import (
 	"encoding/json"
-	"git.icinga.com/icingadb/icingadb-connection"
+	"git.icinga.com/icingadb/icingadb-main/connection"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
@@ -16,7 +16,7 @@ var icingastate = "{\"IcingaApplication\":" +
 	"}}}}}"
 
 func TestIcingaEventsBroker(t *testing.T) {
-	rdb, err := icingadb_connection.NewRDBWrapper("127.0.0.1:6379")
+	rdb, err := connection.NewRDBWrapper("127.0.0.1:6379")
 	if err != nil {
 		t.Fatal("This test needs a working Redis connection")
 	}
