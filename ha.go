@@ -146,10 +146,8 @@ func (h *HA) Run(chEnv chan *Environment) {
 			previous := h.icinga2MTime
 			h.icinga2HeartBeat()
 
-			if h.icinga2MTime-previous < 10 {
-				if h.isActive {
-					err = h.updateOwnInstance()
-				}
+			if h.icinga2MTime-previous < 10 && h.isActive {
+				err = h.updateOwnInstance()
 			} else {
 				they, beat, err := h.getInstance()
 				if err != nil {
