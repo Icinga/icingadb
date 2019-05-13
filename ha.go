@@ -3,6 +3,7 @@ package icingadb_ha
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/google/uuid"
@@ -44,9 +45,16 @@ func (h *HA) AreWeActive() bool {
 	return h.isActive
 }
 
-func (h *HA) updateInstance() error {
-	_, err := h.super.Dbw.SqlExec("update icingadb_instance by environment",
-		fmt.Sprintf("UPDATE icingadb_instance SET heartbeat = %d", h.icinga2MTime))
+func (h *HA) updateOwnInstance() error {
+	_, err := h.super.Dbw.SqlExec("update icingadb_instance by id",
+		fmt.Sprintf("UPDATE icingadb_instance SET heartbeat = %d WHERE id = '%s'", h.icinga2MTime, h.uid[:]))
+	return err
+}
+
+func (h *HA) takeOverInstance() error {
+	_, err := h.super.Dbw.SqlExec("update icingadb_instance by environment_id",
+		fmt.Sprintf("UPDATE icingadb_instance SET id = '%s', heartbeat = %d WHERE environment_id = '%s'",
+			h.uid[:], h.icinga2MTime, h.super.EnvId))
 	return err
 }
 
@@ -81,21 +89,25 @@ func (h *HA) Run(chEnv chan *Environment) {
 	if env == nil {
 		log.WithFields(log.Fields{
 			"context": "HA",
-			}).Fatal("Received empty environment.")
+		}).Error("Received empty environment.")
+		h.super.ChErr <- errors.New("received empty environment")
+		return
 	}
 	h.super.EnvId = env.ID
 
 	haLogger := log.WithFields(log.Fields{
-		"context": "HA",
+		"context":     "HA",
 		"environment": hex.EncodeToString(h.super.EnvId),
-		"UUID":   h.uid,
+		"UUID":        h.uid,
 	})
 	haLogger.Info("Got initial environment.")
 
 	// We have a new UUID with every restart, no use comparing them.
 	_, beat, err := h.getInstance()
 	if err != nil {
-		haLogger.Fatalf("Failed to fetch instance: %v", err)
+		haLogger.Errorf("Failed to fetch instance: %v", err)
+		h.super.ChErr <- errors.New("failed to fetch instance")
+		return
 	}
 
 	if time.Now().Unix()-beat > 15 {
@@ -105,11 +117,13 @@ func (h *HA) Run(chEnv chan *Environment) {
 		if beat == 0 {
 			err = h.insertInstance()
 		} else {
-			err = h.updateInstance()
+			err = h.takeOverInstance()
 		}
 
 		if err != nil {
-			haLogger.Fatalf("Failed to insert/update instance: %v", err)
+			haLogger.Errorf("Failed to insert/update instance: %v", err)
+			h.super.ChErr <- errors.New("failed to insert/update instance")
+			return
 		}
 
 		h.isActive = true
@@ -124,28 +138,38 @@ func (h *HA) Run(chEnv chan *Environment) {
 		select {
 		case env := <-chEnv:
 			if bytes.Compare(env.ID, h.super.EnvId) != 0 {
-				log.Fatal("Received environment is not the one we expected. Panic.")
+				haLogger.Error("Received environment is not the one we expected. Panic.")
+				h.super.ChErr <- errors.New("received unexpected environment")
 			}
 
 			timerHA.Reset(time.Second * 15)
 			previous := h.icinga2MTime
 			h.icinga2HeartBeat()
+
 			if h.icinga2MTime-previous < 10 {
 				if h.isActive {
-					err = h.updateInstance()
+					err = h.updateOwnInstance()
 				}
 			} else {
 				they, beat, err := h.getInstance()
 				if err != nil {
-					haLogger.Fatal("Failed to fetch instance: %v", err)
+					haLogger.Errorf("Failed to fetch instance: %v", err)
+					h.super.ChErr <- errors.New("failed to fetch instance")
+					return
 				}
 				if they == h.uid {
 					haLogger.Debug("We are active.")
-					if err := h.updateInstance(); err != nil {
-						haLogger.Fatalf("Failed to update instance: %v", err)
+					if err := h.updateOwnInstance(); err != nil {
+						haLogger.Errorf("Failed to update instance: %v", err)
+						h.super.ChErr <- errors.New("failed to update instance")
+						return
 					}
 				} else if h.icinga2MTime-beat > 15 {
 					haLogger.Info("Taking over.")
+					if err := h.takeOverInstance(); err != nil {
+						haLogger.Errorf("Failed to update instance: %v", err)
+						h.super.ChErr <- errors.New("failed to update instance")
+					}
 					h.isActive = true
 					h.notifyNotificationListener(Notify_StartSync)
 				} else {
