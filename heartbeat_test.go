@@ -21,7 +21,7 @@ func TestIcingaEventsBroker(t *testing.T) {
 		t.Fatal("This test needs a working Redis connection")
 	}
 
-	chEnv := make(chan *icingadb_connection.Environment)
+	chEnv := make(chan *Environment)
 
 	go func() {
 		err := IcingaEventsBroker(rdb, chEnv)
