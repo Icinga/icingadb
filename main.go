@@ -9,6 +9,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/service"
+	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
 	"git.icinga.com/icingadb/icingadb-main/prometheus"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	log "github.com/sirupsen/logrus"
@@ -78,6 +79,8 @@ func main() {
 			UpdateStmt: service.BulkUpdateStmt,
 		})
 	}()
+
+	statesync.StartStateSync(&super)
 
 	go prometheus.HandleHttp("0.0.0.0:8080", super.ChErr)
 
