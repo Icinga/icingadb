@@ -107,7 +107,8 @@ func TestRDBWrapper_HGetAll(t *testing.T) {
 	var err error
 	done := make(chan bool)
 	go func() {
-		data, err = rdbw.HGetAll("herpdaderp")
+		var res = rdbw.HGetAll("herpdaderp")
+		data, err = res.Result()
 		done <- true
 	}()
 
