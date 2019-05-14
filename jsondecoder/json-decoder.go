@@ -27,8 +27,8 @@ type JsonDecodePackages struct {
 	ChBack chan<- []configobject.Row
 }
 
-// decodeString unmarshals the string toDecode using the json package. Returns the object as a
-// map[string]interface and nil if successful, error if not.
+// decodeString unmarshals the string toDecode using the json package. The decoded json will be written to row.
+// Returns error, if not successful.
 func decodeString(toDecode string, row configobject.Row) error {
 	return json.Unmarshal([]byte(toDecode), row)
 }
@@ -48,9 +48,9 @@ func DecodePool(chInput <-chan *JsonDecodePackages, chError chan error, poolSize
 func decodePackage(chInput <-chan *JsonDecodePackages) error {
 	var err error
 
-	for pkgs := range chInput{
+	for pkgs := range chInput {
 		var rows []configobject.Row
-		for _, pkg := range pkgs.Packages{
+		for _, pkg := range pkgs.Packages {
 			row := pkg.Factory()
 			row.SetId(pkg.Id)
 			if pkg.ChecksumsRaw != "" {
