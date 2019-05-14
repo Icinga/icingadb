@@ -16,7 +16,7 @@ var icingastate = "{\"IcingaApplication\":" +
 	"}}}}}"
 
 func TestIcingaEventsBroker(t *testing.T) {
-	rdb, err := connection.NewRDBWrapper("127.0.0.1:6379")
+	rdb, err := connection.NewRDBWrapper("10.77.27.18:6379")
 	if err != nil {
 		t.Fatal("This test needs a working Redis connection")
 	}
