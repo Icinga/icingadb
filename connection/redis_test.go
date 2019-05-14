@@ -16,7 +16,7 @@ func NewTestRDBW(rdb RedisClient) RDBWrapper {
 }
 
 func TestNewRDBWrapper(t *testing.T) {
-	_, err := NewRDBWrapper("127.0.0.1:6379")
+	_, err := NewRDBWrapper("10.77.27.18:6379")
 	assert.NoError(t, err, "Redis should be connected")
 
 	_, err = NewRDBWrapper("asdasdasdasdasd:5123")
@@ -60,7 +60,7 @@ func TestRDBWrapper_CheckConnection(t *testing.T) {
 	rdbw := NewTestRDBW(nil)
 
 	rdbw.Rdb = redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
+		Addr:         "10.77.27.18:6379",
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -86,7 +86,7 @@ func TestRDBWrapper_CheckConnection(t *testing.T) {
 
 func TestRDBWrapper_HGetAll(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
+		Addr:         "10.77.27.18:6379",
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -124,7 +124,7 @@ func TestRDBWrapper_HGetAll(t *testing.T) {
 
 func TestRDBWrapper_XRead(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
+		Addr:         "10.77.27.18:6379",
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -162,7 +162,7 @@ func TestRDBWrapper_XRead(t *testing.T) {
 
 func TestRDBWrapper_XDel(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
+		Addr:         "10.77.27.18:6379",
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -197,7 +197,7 @@ func TestRDBWrapper_XDel(t *testing.T) {
 
 func TestRDBWrapper_Publish(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
+		Addr:         "10.77.27.18:6379",
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -233,7 +233,7 @@ func TestRDBWrapper_Publish(t *testing.T) {
 
 func TestRDBWrapper_TxPipelined(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "127.0.0.1:6379",
+		Addr:         "10.77.27.18:6379",
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
