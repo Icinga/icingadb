@@ -1,22 +1,35 @@
 variables:
-  REPO_THING: git.icinga.com/icingadb
+  REPO_BASE_PATH: git.icinga.com/icingadb
 
 stages:
-    - build
-    - build-image
-    - deploy-image
+  - test
+  - build-bin
+  - build-image
+  - deploy
 
-build:
-  stage: build
+test:
+  stage: test
   image: golang:latest
   before_script:
-    - mkdir -p $GOPATH/src/$REPO_THING
-    - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_THING
-    - cd $GOPATH/src/$REPO_THING/$CI_PROJECT_NAME
-    - git config --global url."https://gitlab-ci-token:${CI_JOB_TOKEN}@git.icinga.com/".insteadOf "https://git.icinga.com/"
+    - mkdir -p $GOPATH/src/$REPO_BASE_PATH
+    - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_BASE_PATH
+    - cd $GOPATH/src/$REPO_BASE_PATH/$CI_PROJECT_NAME
+    - go get -t ./...
+  script:
+    - go fmt $(go list ./... | grep -v /vendor/)
+    - go vet $(go list ./... | grep -v /vendor/)
+    - go test -race $(go list ./... | grep -v /vendor/) -cover
+
+build-bin:
+  stage: build-bin
+  image: golang:latest
+  before_script:
+    - mkdir -p $GOPATH/src/$REPO_BASE_PATH
+    - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_BASE_PATH
+    - cd $GOPATH/src/$REPO_BASE_PATH/$CI_PROJECT_NAME
+    - go get -t ./...
   script:
     - gitlab-ci/assert-go-fmt.sh
-    - go get .
     - go build -x -v .
   artifacts:
     paths:
@@ -26,8 +39,6 @@ build-image:
   variables:
     CONTAINER: $CI_REGISTRY/$CI_PROJECT_PATH/$CI_COMMIT_REF_SLUG
   stage: build-image
-  dependencies:
-    - build
   tags:
     - docker-build
   image: docker:latest
@@ -43,11 +54,12 @@ build-image:
 deploy-image-1: &deploy-image-base
   variables:
     SSH_ADDR: 10.77.27.18
-  stage: deploy-image
+  stage: deploy
   dependencies:
     - build-image
   only:
     - master
+  allow_failure: true
   image: $CI_REGISTRY/icingadb/docker/master-deploy:latest
   script:
     - cat <<<"$SSH_PRIVKEY" >./deploy.sshkey
