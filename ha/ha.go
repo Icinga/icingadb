@@ -157,6 +157,12 @@ func (h *HA) Run(chEnv chan *Environment) {
 				}
 				if they == h.uid {
 					haLogger.Debug("We are active.")
+					if !h.isActive {
+						haLogger.Info("Icinga 2 sent heartbeat after restart. Taking over.")
+						h.isActive = true
+						h.notifyNotificationListener(Notify_StartSync)
+					}
+
 					if err := h.updateOwnInstance(); err != nil {
 						haLogger.Errorf("Failed to update instance: %v", err)
 						h.super.ChErr <- errors.New("failed to update instance")
