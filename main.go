@@ -5,6 +5,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
 	"git.icinga.com/icingadb/icingadb-main/configobject/host"
+	"git.icinga.com/icingadb/icingadb-main/configobject/hostgroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
 	"git.icinga.com/icingadb/icingadb-main/connection"
@@ -77,6 +78,17 @@ func main() {
 			InsertStmt: service.BulkInsertStmt,
 			DeleteStmt: service.BulkDeleteStmt,
 			UpdateStmt: service.BulkUpdateStmt,
+		})
+	}()
+
+	chHAHostgroup := haInstance.RegisterNotificationListener()
+	go func() {
+		super.ChErr <- configsync.Operator(&super, chHAHostgroup, &configsync.Context{
+			ObjectType: "hostgroup",
+			Factory:    hostgroup.NewHostgroup,
+			InsertStmt: hostgroup.BulkInsertStmt,
+			DeleteStmt: hostgroup.BulkDeleteStmt,
+			UpdateStmt: hostgroup.BulkUpdateStmt,
 		})
 	}()
 
