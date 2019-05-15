@@ -88,6 +88,7 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&servicegroup.ObjectInformation,
 		&user.ObjectInformation,
 		&zone.ObjectInformation,
+		&endpoint.ObjectInformation,
 	}
 
 	for _, objectInformation := range objectTypes {
