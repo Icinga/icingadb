@@ -9,6 +9,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/zone"
 	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/ha"
@@ -101,5 +102,10 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 	chHAUser := haInstance.RegisterNotificationListener()
 	go func() {
 		super.ChErr <- configsync.Operator(super, chHAUser, &user.ObjectInformation)
+	}()
+
+	chHAZone := haInstance.RegisterNotificationListener()
+	go func() {
+		super.ChErr <- configsync.Operator(super, chHAZone, &zone.ObjectInformation)
 	}()
 }
