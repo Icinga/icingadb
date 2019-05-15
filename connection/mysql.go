@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/utils"
 	log "github.com/sirupsen/logrus"
 	"strings"
@@ -613,7 +612,7 @@ func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]
 	return checksums, nil
 }
 
-func (dbw *DBWrapper) SqlBulkInsert(rows []configobject.Row, stmt *BulkInsertStmt) error {
+func (dbw *DBWrapper) SqlBulkInsert(rows []Row, stmt *BulkInsertStmt) error {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -673,7 +672,7 @@ func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
 	return nil
 }
 
-func (dbw *DBWrapper) SqlBulkUpdate(rows []configobject.Row, stmt *BulkUpdateStmt) error {
+func (dbw *DBWrapper) SqlBulkUpdate(rows []Row, stmt *BulkUpdateStmt) error {
 	if len(rows) == 0 {
 		return nil
 	}

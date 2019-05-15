@@ -1,4 +1,4 @@
-package service
+package host
 
 import (
 	"git.icinga.com/icingadb/icingadb-main/configobject"
@@ -7,9 +7,7 @@ import (
 )
 
 var (
-	BulkInsertStmt *connection.BulkInsertStmt
-	BulkDeleteStmt *connection.BulkDeleteStmt
-	BulkUpdateStmt *connection.BulkUpdateStmt
+	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"id",
 		"env_id",
@@ -17,10 +15,13 @@ var (
 		"properties_checksum",
 		"customvars_checksum",
 		"groups_checksum",
-		"host_id",
 		"name",
 		"name_ci",
 		"display_name",
+		"address",
+		"address6",
+		"address_bin",
+		"address6_bin",
 		"checkcommand",
 		"checkcommand_id",
 		"max_check_attempts",
@@ -52,17 +53,20 @@ var (
 	}
 )
 
-type Service struct {
+type Host struct {
 	Id                    string  `json:"id"`
 	EnvId                 string  `json:"environment_id"`
 	NameChecksum          string  `json:"name_checksum"`
 	PropertiesChecksum    string  `json:"properties_checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
 	GroupsChecksum        string  `json:"groups_checksum"`
-	HostId                string  `json:"host_id"`
 	Name                  string  `json:"name"`
 	NameCi                *string `json:"name_ci"`
 	DisplayName           string  `json:"display_name"`
+	Address               string  `json:"address"`
+	Address6              string  `json:"address6"`
+	AddressBin            string  `json:"address_bin"`
+	Address6Bin           string  `json:"address6_bin"`
 	Checkcommand          string  `json:"checkcommand"`
 	CheckcommandId        string  `json:"checkcommand_id"`
 	MaxCheckAttempts      float32 `json:"max_check_attempts"`
@@ -93,76 +97,83 @@ type Service struct {
 	CommandEndpointId     string  `json:"command_endpoint_id"`
 }
 
-func NewService() configobject.Row {
-	s := Service{}
-	s.NameCi = &s.Name
+func NewHost() connection.Row {
+	h := Host{}
+	h.NameCi = &h.Name
 
-	return &s
+	return &h
 }
 
-func (s *Service) InsertValues() []interface{} {
-	v := s.UpdateValues()
+func (h *Host) InsertValues() []interface{} {
+	v := h.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(s.Id)}, v...)
+	return append([]interface{}{utils.Checksum(h.Id)}, v...)
 }
 
-func (s *Service) UpdateValues() []interface{} {
+func (h *Host) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
 	v = append(
 		v,
-		utils.Checksum(s.EnvId),
-		utils.Checksum(s.NameChecksum),
-		utils.Checksum(s.PropertiesChecksum),
-		utils.Checksum(s.CustomvarsChecksum),
-		utils.Checksum(s.GroupsChecksum),
-		utils.Checksum(s.HostId),
-		s.Name,
-		s.NameCi,
-		s.DisplayName,
-		s.Checkcommand,
-		utils.Checksum(s.CheckcommandId),
-		s.MaxCheckAttempts,
-		s.CheckPeriod,
-		utils.Checksum(s.CheckPeriodId),
-		s.CheckTimeout,
-		s.CheckInterval,
-		s.CheckRetryInterval,
-		utils.Bool[s.ActiveChecksEnabled],
-		utils.Bool[s.PassiveChecksEnabled],
-		utils.Bool[s.EventHandlerEnabled],
-		utils.Bool[s.NotificationsEnabled],
-		utils.Bool[s.FlappingEnabled],
-		s.FlappingThresholdLow,
-		s.FlappingThresholdHigh,
-		utils.Bool[s.PerfdataEnabled],
-		s.Eventcommand,
-		utils.Checksum(s.EventcommandId),
-		utils.Bool[s.IsVolatile],
-		utils.Checksum(s.ActionUrlId),
-		utils.Checksum(s.NotesUrlId),
-		s.Notes,
-		utils.Checksum(s.IconImageId),
-		s.IconImageAlt,
-		s.Zone,
-		utils.Checksum(s.ZoneId),
-		s.CommandEndpoint,
-		utils.Checksum(s.CommandEndpointId),
+		utils.Checksum(h.EnvId),
+		utils.Checksum(h.NameChecksum),
+		utils.Checksum(h.PropertiesChecksum),
+		utils.Checksum(h.CustomvarsChecksum),
+		utils.Checksum(h.GroupsChecksum),
+		h.Name,
+		h.NameCi,
+		h.DisplayName,
+		h.Address,
+		h.Address6,
+		h.AddressBin,
+		h.Address6Bin,
+		h.Checkcommand,
+		utils.Checksum(h.CheckcommandId),
+		h.MaxCheckAttempts,
+		h.CheckPeriod,
+		utils.Checksum(h.CheckPeriodId),
+		h.CheckTimeout,
+		h.CheckInterval,
+		h.CheckRetryInterval,
+		utils.Bool[h.ActiveChecksEnabled],
+		utils.Bool[h.PassiveChecksEnabled],
+		utils.Bool[h.EventHandlerEnabled],
+		utils.Bool[h.NotificationsEnabled],
+		utils.Bool[h.FlappingEnabled],
+		h.FlappingThresholdLow,
+		h.FlappingThresholdHigh,
+		utils.Bool[h.PerfdataEnabled],
+		h.Eventcommand,
+		utils.Checksum(h.EventcommandId),
+		utils.Bool[h.IsVolatile],
+		utils.Checksum(h.ActionUrlId),
+		utils.Checksum(h.NotesUrlId),
+		h.Notes,
+		utils.Checksum(h.IconImageId),
+		h.IconImageAlt,
+		h.Zone,
+		utils.Checksum(h.ZoneId),
+		h.CommandEndpoint,
+		utils.Checksum(h.CommandEndpointId),
 	)
 
 	return v
 }
 
-func (s *Service) GetId() string {
-	return s.Id
+func (h *Host) GetId() string {
+	return h.Id
 }
 
-func (s *Service) SetId(id string) {
-	s.Id = id
+func (h *Host) SetId(id string) {
+	h.Id = id
 }
 
 func init() {
-	BulkInsertStmt = connection.NewBulkInsertStmt("service", Fields)
-	BulkDeleteStmt = connection.NewBulkDeleteStmt("service")
-	BulkUpdateStmt = connection.NewBulkUpdateStmt("service", Fields)
+	ObjectInformation = configobject.ObjectInformation{
+		ObjectType: "host",
+		Factory: NewHost,
+		BulkInsertStmt: connection.NewBulkInsertStmt("host", Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt("host"),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt("host", Fields),
+	}
 }

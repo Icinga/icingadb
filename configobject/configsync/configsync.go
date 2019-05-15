@@ -14,15 +14,6 @@ import (
 	"sync/atomic"
 )
 
-// Context provides an Operator with all necessary information to sync a config type
-type Context struct {
-	ObjectType string
-	Factory configobject.RowFactory
-	InsertStmt *connection.BulkInsertStmt
-	DeleteStmt *connection.BulkDeleteStmt
-	UpdateStmt *connection.BulkUpdateStmt
-}
-
 type Checksums struct {
 	NameChecksum          string  `json:"name_checksum"`
 	PropertiesChecksum    string  `json:"properties_checksum"`
@@ -32,10 +23,10 @@ type Checksums struct {
 
 // Operator is the main worker for each config type. It takes a reference to a supervisor super, holding all required
 // connection information and other control mechanisms, a channel chHA, which informs the Operator of the current HA
-// state, and a Context reference ctx defining the type and providing the necessary factories.
-func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
-	//insert, update, delete := GetDelta(super, ctx)
-	//log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", ctx.ObjectType, len(insert), len(update), len(delete))
+// state, and a ObjectInformation reference defining the type and providing the necessary factories.
+func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *configobject.ObjectInformation) error {
+	//insert, update, delete := GetDelta(super, objectInformation)
+	//log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", objectInformation.ObjectType, len(insert), len(update), len(delete))
 
 	var (
 		// If this IcingaDB-Instance looses responsibility, this channel will be
@@ -46,7 +37,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 		chInsert      	chan []string
 		// Used by the JsonDecodePool to provide the InsertExecWorker with decoded rows, ready to be inserted
 		// JsonDecodePool -> InsertExecWorker
-		chInsertBack  	chan []configobject.Row
+		chInsertBack  	chan []connection.Row
 		// Used by this Operator to provide the DeleteExecWorker with IDs to delete
 		// Operator -> DeleteExecWorker
 		chDelete      	chan []string
@@ -58,7 +49,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 		chUpdate      	chan []string
 		// Used by the JsonDecodePool to provide the UpdateExecWorker with decoded rows, ready to be updated
 		// JsonDecodePool -> UpdateExecWorker
-		chUpdateBack  	chan []configobject.Row
+		chUpdateBack  	chan []connection.Row
 		wgInsert      	*sync.WaitGroup
 		wgDelete      	*sync.WaitGroup
 		wgUpdate      	*sync.WaitGroup
@@ -67,41 +58,41 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 		switch msg {
 		// Icinga 2 probably died, stop operations and tell all workers to shut down.
 		case ha.Notify_StopSync:
-			log.Info(fmt.Sprintf("%s: Lost responsibility", ctx.ObjectType))
+			log.Info(fmt.Sprintf("%s: Lost responsibility", objectInformation.ObjectType))
 			if done != nil {
 				close(done)
 				done = nil
 			}
 		// Starts up the whole sync process.
 		case ha.Notify_StartSync:
-			log.Infof("%s: Got responsibility", ctx.ObjectType)
+			log.Infof("%s: Got responsibility", objectInformation.ObjectType)
 
 			//TODO: This should only be done, if HA was taken over from another instance
-			insert, update, delete := GetDelta(super, ctx)
-			log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", ctx.ObjectType, len(insert), len(update), len(delete))
+			insert, update, delete := GetDelta(super, objectInformation)
+			log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", objectInformation.ObjectType, len(insert), len(update), len(delete))
 
 			// Clean up all channels and wait groups for a fresh config dump
 			done 			= make(chan struct{})
 			chInsert      	= make(chan []string)
-			chInsertBack  	= make(chan []configobject.Row)
+			chInsertBack  	= make(chan []connection.Row)
 			chDelete      	= make(chan []string)
 			chUpdateComp  	= make(chan []string)
 			chUpdate      	= make(chan []string)
-			chUpdateBack  	= make(chan []configobject.Row)
+			chUpdateBack  	= make(chan []connection.Row)
 			wgInsert      	= &sync.WaitGroup{}
 			wgDelete      	= &sync.WaitGroup{}
 			wgUpdate      	= &sync.WaitGroup{}
 
 			updateCounter := new(uint32)
 
-			go InsertPrepWorker(super, ctx, done, chInsert, chInsertBack)
-			go InsertExecWorker(super, ctx, done, chInsertBack, wgInsert)
+			go InsertPrepWorker(super, objectInformation, done, chInsert, chInsertBack)
+			go InsertExecWorker(super, objectInformation, done, chInsertBack, wgInsert)
 
-			go DeleteExecWorker(super, ctx, done, chDelete, wgDelete)
+			go DeleteExecWorker(super, objectInformation, done, chDelete, wgDelete)
 
-			go UpdateCompWorker(super, ctx, done, chUpdateComp, chUpdate, wgUpdate)
-			go UpdatePrepWorker(super, ctx, done, chUpdate, chUpdateBack)
-			go UpdateExecWorker(super, ctx, done, chUpdateBack, wgUpdate, updateCounter)
+			go UpdateCompWorker(super, objectInformation, done, chUpdateComp, chUpdate, wgUpdate)
+			go UpdatePrepWorker(super, objectInformation, done, chUpdate, chUpdateBack)
+			go UpdateExecWorker(super, objectInformation, done, chUpdateBack, wgUpdate, updateCounter)
 
 			waitOrKill := func(wg *sync.WaitGroup, done chan struct{}) (kill bool) {
 				waitDone := make(chan bool)
@@ -130,11 +121,11 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 				benchmarc.Stop()
 				if !kill {
 					log.WithFields(log.Fields{
-						"type": 		ctx.ObjectType,
+						"type": 		objectInformation.ObjectType,
 						"count": 		len(insert),
 						"benchmark":	benchmarc.String(),
 						"action": 		"insert",
-					}).Infof("Inserted %v %ss in %v", len(insert), ctx.ObjectType, benchmarc.String())
+					}).Infof("Inserted %v %ss in %v", len(insert), objectInformation.ObjectType, benchmarc.String())
 				}
 			}()
 
@@ -150,11 +141,11 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 				benchmarc.Stop()
 				if !kill {
 					log.WithFields(log.Fields{
-						"type":      ctx.ObjectType,
+						"type":      objectInformation.ObjectType,
 						"count":     len(delete),
 						"benchmark": benchmarc.String(),
 						"action":    "delete",
-					}).Infof("Deleted %v %ss in %v", len(delete), ctx.ObjectType, benchmarc.String())
+					}).Infof("Deleted %v %ss in %v", len(delete), objectInformation.ObjectType, benchmarc.String())
 				}
 			}()
 
@@ -170,11 +161,11 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 				benchmarc.Stop()
 				if !kill {
 					log.WithFields(log.Fields{
-						"type":      ctx.ObjectType,
+						"type":      objectInformation.ObjectType,
 						"count":     atomic.LoadUint32(updateCounter),
 						"benchmark": benchmarc.String(),
 						"action":    "update",
-					}).Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), ctx.ObjectType, benchmarc.String())
+					}).Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), objectInformation.ObjectType, benchmarc.String())
 				}
 			}()
 		}
@@ -183,12 +174,12 @@ func Operator(super *supervisor.Supervisor, chHA chan int, ctx *Context) error {
 	return nil
 }
 
-// GetDelta takes a config Context (host, service, checkcommand, etc.) and fetches the ids from MySQL and Redis. It
+// GetDelta takes the ObjectInformation (host, service, checkcommand, etc.) and fetches the ids from MySQL and Redis. It
 // returns three string slices:
 // 1. IDs which are in the Redis but not in the MySQL (to insert)
 // 2. IDs which are in both (to possibly update)
 // 3. IDs which are in the MySQL but not the Redis (to delete)
-func GetDelta(super *supervisor.Supervisor, ctx *Context) ([]string, []string, []string) {
+func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation) ([]string, []string, []string) {
 	var (
 		redisIds []string
 		mysqlIds []string
@@ -200,7 +191,7 @@ func GetDelta(super *supervisor.Supervisor, ctx *Context) ([]string, []string, [
 	go func() {
 		defer wg.Done()
 		var err error
-		res, err := super.Rdbw.HKeys(fmt.Sprintf("icinga:config:checksum:%s", ctx.ObjectType)).Result()
+		res, err := super.Rdbw.HKeys(fmt.Sprintf("icinga:config:checksum:%s", objectInformation.ObjectType)).Result()
 		if err != nil {
 			super.ChErr <- err
 			return
@@ -214,7 +205,7 @@ func GetDelta(super *supervisor.Supervisor, ctx *Context) ([]string, []string, [
 		defer wg.Done()
 		var err error
 		super.EnvLock.Lock()
-		mysqlIds, err = super.Dbw.SqlFetchIds(super.EnvId, ctx.ObjectType)
+		mysqlIds, err = super.Dbw.SqlFetchIds(super.EnvId, objectInformation.ObjectType)
 		super.EnvLock.Unlock()
 		if err != nil {
 			super.ChErr <- err
@@ -227,8 +218,8 @@ func GetDelta(super *supervisor.Supervisor, ctx *Context) ([]string, []string, [
 }
 
 // InsertPrepWorker fetches config for IDs(chInsert) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
-func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chInsert <-chan []string, chInsertBack chan<- []configobject.Row) {
-	defer log.Infof("%s: Insert preparation routine stopped", ctx.ObjectType)
+func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsert <-chan []string, chInsertBack chan<- []connection.Row) {
+	defer log.Infof("%s: Insert preparation routine stopped", objectInformation.ObjectType)
 
 	prep := func(chunk *connection.ConfigChunk) {
 		pkgs := jsondecoder.JsonDecodePackages{
@@ -242,8 +233,8 @@ func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 				Id:           	key,
 				ChecksumsRaw:	chunk.Checksums[i].(string),
 				ConfigRaw:   	chunk.Configs[i].(string),
-				Factory:		ctx.Factory,
-				ObjectType:		ctx.ObjectType,
+				Factory:		objectInformation.Factory,
+				ObjectType:		objectInformation.ObjectType,
 			}
 			pkgs.Packages = append(pkgs.Packages, pkg)
 		}
@@ -260,7 +251,7 @@ func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 		default:
 		}
 
-		ch := super.Rdbw.PipeConfigChunks(done, keys, ctx.ObjectType)
+		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.ObjectType)
 		go func() {
 			for chunk := range ch {
 				go prep(chunk)
@@ -269,8 +260,8 @@ func InsertPrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 	}
 }
 
-// InsertExecWorker gets decoded configobject.Row objects from the JsonDecodePool and inserts them into MySQL
-func InsertExecWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chInsertBack <-chan []configobject.Row, wg *sync.WaitGroup) {
+// InsertExecWorker gets decoded connection.Row objects from the JsonDecodePool and inserts them into MySQL
+func InsertExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsertBack <-chan []connection.Row, wg *sync.WaitGroup) {
 	for rows := range chInsertBack {
 		select {
 		case _, ok := <-done:
@@ -280,15 +271,15 @@ func InsertExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 		default:
 		}
 
-		go func(rows []configobject.Row) {
-			super.ChErr <- super.Dbw.SqlBulkInsert(rows, ctx.InsertStmt)
+		go func(rows []connection.Row) {
+			super.ChErr <- super.Dbw.SqlBulkInsert(rows, objectInformation.BulkInsertStmt)
 			wg.Add(-len(rows))
 		}(rows)
 	}
 }
 
 // DeleteExecWorker deletes IDs(chDelete) from MySQL
-func DeleteExecWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chDelete <-chan []string, wg *sync.WaitGroup) {
+func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chDelete <-chan []string, wg *sync.WaitGroup) {
 	for keys := range chDelete {
 		select {
 		case _, ok := <-done:
@@ -299,7 +290,7 @@ func DeleteExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 		}
 
 		go func(keys []string) {
-			super.ChErr <- super.Dbw.SqlBulkDelete(keys, ctx.DeleteStmt)
+			super.ChErr <- super.Dbw.SqlBulkDelete(keys, objectInformation.BulkDeleteStmt)
 			wg.Add(-len(keys))
 		}(keys)
 	}
@@ -307,7 +298,7 @@ func DeleteExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 
 // UpdateCompWorker gets IDs(chUpdateComp) that might need an update, fetches the corresponding checksums for Redis and MySQL,
 // compares them and inserts changed IDs into chUpdate.
-func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdateComp <-chan []string, chUpdate chan<- []string, wg *sync.WaitGroup) {
+func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdateComp <-chan []string, chUpdate chan<- []string, wg *sync.WaitGroup) {
 	prep := func(chunk *connection.ChecksumChunk, mysqlChecksums map[string]map[string]string) {
 		changed := make([]string, 0)
 		for i, key := range chunk.Keys {
@@ -340,8 +331,8 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 		default:
 		}
 
-		ch := super.Rdbw.PipeChecksumChunks(done, keys, ctx.ObjectType)
-		checksums, err := super.Dbw.SqlFetchChecksums(ctx.ObjectType, keys)
+		ch := super.Rdbw.PipeChecksumChunks(done, keys, objectInformation.ObjectType)
+		checksums, err := super.Dbw.SqlFetchChecksums(objectInformation.ObjectType, keys)
 		if err != nil {
 			super.ChErr <- err
 		}
@@ -355,7 +346,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 }
 
 // UpdatePrepWorker fetches config for IDs(chUpdate) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
-func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdate <-chan []string, chUpdateBack chan<- []configobject.Row) {
+func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdate <-chan []string, chUpdateBack chan<- []connection.Row) {
 	prep := func(chunk *connection.ConfigChunk) {
 		pkgs := jsondecoder.JsonDecodePackages{
 			ChBack: chUpdateBack,
@@ -368,8 +359,8 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 				Id:           	key,
 				ChecksumsRaw:	chunk.Checksums[i].(string),
 				ConfigRaw:   	chunk.Configs[i].(string),
-				Factory:		ctx.Factory,
-				ObjectType:		ctx.ObjectType,
+				Factory:		objectInformation.Factory,
+				ObjectType:		objectInformation.ObjectType,
 			}
 			pkgs.Packages = append(pkgs.Packages, pkg)
 		}
@@ -386,7 +377,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 		default:
 		}
 
-		ch := super.Rdbw.PipeConfigChunks(done, keys, ctx.ObjectType)
+		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.ObjectType)
 		go func() {
 			for chunk := range ch {
 				go prep(chunk)
@@ -395,8 +386,8 @@ func UpdatePrepWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 	}
 }
 
-// UpdateExecWorker gets decoded configobject.Row objects from the JsonDecodePool and updates them in MySQL
-func UpdateExecWorker(super *supervisor.Supervisor, ctx *Context, done chan struct{}, chUpdateBack <-chan []configobject.Row, wg *sync.WaitGroup, updateCounter *uint32) {
+// UpdateExecWorker gets decoded connection.Row objects from the JsonDecodePool and updates them in MySQL
+func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdateBack <-chan []connection.Row, wg *sync.WaitGroup, updateCounter *uint32) {
 	for rows := range chUpdateBack {
 		select {
 		case _, ok := <-done:
@@ -406,8 +397,8 @@ func UpdateExecWorker(super *supervisor.Supervisor, ctx *Context, done chan stru
 		default:
 		}
 
-		go func(rows []configobject.Row) {
-			super.ChErr <- super.Dbw.SqlBulkUpdate(rows, ctx.UpdateStmt)
+		go func(rows []connection.Row) {
+			super.ChErr <- super.Dbw.SqlBulkUpdate(rows, objectInformation.BulkUpdateStmt)
 			wg.Add(-len(rows))
 			atomic.AddUint32(updateCounter, uint32(len(rows)))
 		}(rows)

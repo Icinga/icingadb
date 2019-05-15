@@ -7,9 +7,7 @@ import (
 )
 
 var (
-	BulkInsertStmt *connection.BulkInsertStmt
-	BulkDeleteStmt *connection.BulkDeleteStmt
-	BulkUpdateStmt *connection.BulkUpdateStmt
+	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"id",
 		"env_id",
@@ -35,7 +33,7 @@ type Servicegroup struct {
 	ZoneId                string  `json:"zone_id"`
 }
 
-func NewServicegroup() configobject.Row {
+func NewServicegroup() connection.Row {
 	s := Servicegroup{}
 	s.NameCi = &s.Name
 
@@ -75,7 +73,11 @@ func (s *Servicegroup) SetId(id string) {
 }
 
 func init() {
-	BulkInsertStmt = connection.NewBulkInsertStmt("servicegroup", Fields)
-	BulkDeleteStmt = connection.NewBulkDeleteStmt("servicegroup")
-	BulkUpdateStmt = connection.NewBulkUpdateStmt("servicegroup", Fields)
+	ObjectInformation = configobject.ObjectInformation{
+		ObjectType: "servicegroup",
+		Factory: NewServicegroup,
+		BulkInsertStmt: connection.NewBulkInsertStmt("servicegroup", Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt("servicegroup"),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt("servicegroup", Fields),
+	}
 }

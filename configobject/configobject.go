@@ -1,10 +1,13 @@
 package configobject
 
-type Row interface {
-	InsertValues() []interface{}
-	UpdateValues() []interface{}
-	GetId() string
-	SetId(id string)
-}
+import (
+	"git.icinga.com/icingadb/icingadb-main/connection"
+)
 
-type RowFactory func() Row
+type ObjectInformation struct {
+	ObjectType 		string
+	Factory    		connection.RowFactory
+	BulkInsertStmt 	*connection.BulkInsertStmt
+	BulkDeleteStmt 	*connection.BulkDeleteStmt
+	BulkUpdateStmt 	*connection.BulkUpdateStmt
+}
