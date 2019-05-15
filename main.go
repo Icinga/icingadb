@@ -9,6 +9,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/servicegroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
+	"git.icinga.com/icingadb/icingadb-main/configobject/user"
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/ha"
 	"git.icinga.com/icingadb/icingadb-main/jsondecoder"
@@ -101,6 +102,17 @@ func main() {
 			InsertStmt: servicegroup.BulkInsertStmt,
 			DeleteStmt: servicegroup.BulkDeleteStmt,
 			UpdateStmt: servicegroup.BulkUpdateStmt,
+		})
+	}()
+
+	chHAUser := haInstance.RegisterNotificationListener()
+	go func() {
+		super.ChErr <- configsync.Operator(&super, chHAUser, &configsync.Context{
+			ObjectType: "user",
+			Factory:    user.NewUser,
+			InsertStmt: user.BulkInsertStmt,
+			DeleteStmt: user.BulkDeleteStmt,
+			UpdateStmt: user.BulkUpdateStmt,
 		})
 	}()
 
