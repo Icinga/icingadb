@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"git.icinga.com/icingadb/icingadb-main/config"
+	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/endpoint"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
@@ -79,33 +81,18 @@ func main() {
 }
 
 func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
-	chHAHost := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(super, chHAHost, &host.ObjectInformation)
-	}()
+	objectTypes := []*configobject.ObjectInformation{
+		&host.ObjectInformation,
+		&service.ObjectInformation,
+		&hostgroup.ObjectInformation,
+		&servicegroup.ObjectInformation,
+		&user.ObjectInformation,
+		&zone.ObjectInformation,
+	}
 
-	chHAService := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(super, chHAService, &service.ObjectInformation)
-	}()
-
-	chHAHostgroup := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(super, chHAHostgroup, &hostgroup.ObjectInformation)
-	}()
-
-	chHAServicegroup := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(super, chHAServicegroup, &servicegroup.ObjectInformation)
-	}()
-
-	chHAUser := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(super, chHAUser, &user.ObjectInformation)
-	}()
-
-	chHAZone := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(super, chHAZone, &zone.ObjectInformation)
-	}()
+	for _, objectInformation := range objectTypes {
+		go func(information *configobject.ObjectInformation) {
+			super.ChErr <- configsync.Operator(super, haInstance.RegisterNotificationListener(), information)
+		}(objectInformation)
+	}
 }
