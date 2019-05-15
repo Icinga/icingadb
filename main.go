@@ -11,6 +11,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/zone"
 	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
 	"git.icinga.com/icingadb/icingadb-main/connection"
@@ -87,6 +88,7 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&hostgroup.ObjectInformation,
 		&servicegroup.ObjectInformation,
 		&user.ObjectInformation,
+		&usergroup.ObjectInformation,
 		&zone.ObjectInformation,
 		&endpoint.ObjectInformation,
 	}
