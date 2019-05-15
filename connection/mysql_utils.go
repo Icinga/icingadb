@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
+	oldlog "log"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
-	log "github.com/sirupsen/logrus"
-	oldlog "log"
 )
 
 // mkMysql creates a new MySQL client.
@@ -423,3 +423,12 @@ func NewBulkUpdateStmt(table string, fields []string) *BulkUpdateStmt {
 
 	return &stmt
 }
+
+type Row interface {
+	InsertValues() []interface{}
+	UpdateValues() []interface{}
+	GetId() string
+	SetId(id string)
+}
+
+type RowFactory func() Row

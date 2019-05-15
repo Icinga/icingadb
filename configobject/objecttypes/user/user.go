@@ -7,9 +7,7 @@ import (
 )
 
 var (
-	BulkInsertStmt *connection.BulkInsertStmt
-	BulkDeleteStmt *connection.BulkDeleteStmt
-	BulkUpdateStmt *connection.BulkUpdateStmt
+	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"id",
 		"env_id",
@@ -49,7 +47,7 @@ type User struct {
 	ZoneId              	string  `json:"zone_id"`
 }
 
-func NewUser() configobject.Row {
+func NewUser() connection.Row {
 	u := User{}
 	u.NameCi = &u.Name
 
@@ -96,7 +94,11 @@ func (u *User) SetId(id string) {
 }
 
 func init() {
-	BulkInsertStmt = connection.NewBulkInsertStmt("user", Fields)
-	BulkDeleteStmt = connection.NewBulkDeleteStmt("user")
-	BulkUpdateStmt = connection.NewBulkUpdateStmt("user", Fields)
+	ObjectInformation = configobject.ObjectInformation{
+		ObjectType: "user",
+		Factory: NewUser,
+		BulkInsertStmt: connection.NewBulkInsertStmt("user", Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt("user"),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt("user", Fields),
+	}
 }

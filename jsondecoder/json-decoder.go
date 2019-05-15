@@ -1,7 +1,7 @@
 package jsondecoder
 
 import (
-	"git.icinga.com/icingadb/icingadb-main/configobject"
+	"git.icinga.com/icingadb/icingadb-main/connection"
 	"github.com/json-iterator/go"
 )
 
@@ -15,21 +15,21 @@ type JsonDecodePackage struct {
 	// Json strings from Redis
 	ConfigRaw string
 	// Unmarshaled config object ready to be used in SQL
-	Row configobject.Row
+	Row connection.Row
 	// Package will be sent back through this channel
-	Factory configobject.RowFactory
+	Factory connection.RowFactory
 	// Object type (host, service, endpoint, command...)
 	ObjectType string
 }
 
 type JsonDecodePackages struct {
 	Packages []JsonDecodePackage
-	ChBack chan<- []configobject.Row
+	ChBack chan<- []connection.Row
 }
 
 // decodeString unmarshals the string toDecode using the json package. The decoded json will be written to row.
 // Returns error, if not successful.
-func decodeString(toDecode string, row configobject.Row) error {
+func decodeString(toDecode string, row connection.Row) error {
 	return json.Unmarshal([]byte(toDecode), row)
 }
 
@@ -49,7 +49,7 @@ func decodePackage(chInput <-chan *JsonDecodePackages) error {
 	var err error
 
 	for pkgs := range chInput {
-		var rows []configobject.Row
+		var rows []connection.Row
 		for _, pkg := range pkgs.Packages {
 			row := pkg.Factory()
 			row.SetId(pkg.Id)

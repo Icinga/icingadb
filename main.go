@@ -4,12 +4,12 @@ import (
 	"flag"
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
-	"git.icinga.com/icingadb/icingadb-main/configobject/host"
-	"git.icinga.com/icingadb/icingadb-main/configobject/hostgroup"
-	"git.icinga.com/icingadb/icingadb-main/configobject/service"
-	"git.icinga.com/icingadb/icingadb-main/configobject/servicegroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user"
 	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
-	"git.icinga.com/icingadb/icingadb-main/configobject/user"
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/ha"
 	"git.icinga.com/icingadb/icingadb-main/jsondecoder"
@@ -61,60 +61,7 @@ func main() {
 
 	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)
 
-	chHAHost := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(&super, chHAHost, &configsync.Context{
-			ObjectType: "host",
-			Factory:    host.NewHost,
-			InsertStmt: host.BulkInsertStmt,
-			DeleteStmt: host.BulkDeleteStmt,
-			UpdateStmt: host.BulkUpdateStmt,
-		})
-	}()
-
-	chHAService := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(&super, chHAService, &configsync.Context{
-			ObjectType: "service",
-			Factory:    service.NewService,
-			InsertStmt: service.BulkInsertStmt,
-			DeleteStmt: service.BulkDeleteStmt,
-			UpdateStmt: service.BulkUpdateStmt,
-		})
-	}()
-
-	chHAHostgroup := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(&super, chHAHostgroup, &configsync.Context{
-			ObjectType: "hostgroup",
-			Factory:    hostgroup.NewHostgroup,
-			InsertStmt: hostgroup.BulkInsertStmt,
-			DeleteStmt: hostgroup.BulkDeleteStmt,
-			UpdateStmt: hostgroup.BulkUpdateStmt,
-		})
-	}()
-
-	chHAServicegroup := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(&super, chHAServicegroup, &configsync.Context{
-			ObjectType: "servicegroup",
-			Factory:    servicegroup.NewServicegroup,
-			InsertStmt: servicegroup.BulkInsertStmt,
-			DeleteStmt: servicegroup.BulkDeleteStmt,
-			UpdateStmt: servicegroup.BulkUpdateStmt,
-		})
-	}()
-
-	chHAUser := haInstance.RegisterNotificationListener()
-	go func() {
-		super.ChErr <- configsync.Operator(&super, chHAUser, &configsync.Context{
-			ObjectType: "user",
-			Factory:    user.NewUser,
-			InsertStmt: user.BulkInsertStmt,
-			DeleteStmt: user.BulkDeleteStmt,
-			UpdateStmt: user.BulkUpdateStmt,
-		})
-	}()
+	startConfigSyncOperators(&super, haInstance)
 
 	statesync.StartStateSync(&super)
 
@@ -128,4 +75,31 @@ func main() {
 			}
 		}
 	}
+}
+
+func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
+	chHAHost := haInstance.RegisterNotificationListener()
+	go func() {
+		super.ChErr <- configsync.Operator(super, chHAHost, &host.ObjectInformation)
+	}()
+
+	chHAService := haInstance.RegisterNotificationListener()
+	go func() {
+		super.ChErr <- configsync.Operator(super, chHAService, &service.ObjectInformation)
+	}()
+
+	chHAHostgroup := haInstance.RegisterNotificationListener()
+	go func() {
+		super.ChErr <- configsync.Operator(super, chHAHostgroup, &hostgroup.ObjectInformation)
+	}()
+
+	chHAServicegroup := haInstance.RegisterNotificationListener()
+	go func() {
+		super.ChErr <- configsync.Operator(super, chHAServicegroup, &servicegroup.ObjectInformation)
+	}()
+
+	chHAUser := haInstance.RegisterNotificationListener()
+	go func() {
+		super.ChErr <- configsync.Operator(super, chHAUser, &user.ObjectInformation)
+	}()
 }
