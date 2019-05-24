@@ -147,6 +147,7 @@ func (dbw *DBWrapper) WithRetry(f func() (sql.Result, error)) (sql.Result, error
 }
 
 func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, error) {
+	DbOperationsQuery.Inc()
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -154,7 +155,6 @@ func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, er
 		}
 
 		res, err := dbw.Db.Query(query, args...)
-		DbOperationsQuery.Inc()
 
 		if err != nil {
 			if !dbw.checkConnection(false) {
@@ -168,6 +168,7 @@ func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, er
 
 // Wrapper around Db.BeginTx() for auto-logging
 func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransaction, error) {
+	DbOperationsBegin.Inc()
 	var isoLvl sql.IsolationLevel
 	if concurrencySafety {
 		isoLvl = sql.LevelSerializable
@@ -210,6 +211,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransactio
 
 // Wrapper around tx.Commit() for auto-logging
 func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
+	DbOperationsCommit.Inc()
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -244,6 +246,7 @@ func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 
 // Wrapper around tx.Rollback() for auto-logging
 func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
+	DbOperationsRollback.Inc()
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -324,8 +327,10 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opDescription st
 		if !quiet {
 			benchmarc = utils.NewBenchmark()
 		}
+
 		res, err := db.Exec(sql, args...)
 		DbOperationsExec.Inc()
+
 		if !quiet {
 			benchmarc.Stop()
 		}
@@ -380,7 +385,6 @@ func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query str
 		benchmarc = utils.NewBenchmark()
 	}
 	rows, errQuery := db.Query(query, args...)
-	DbOperationsQuery.Inc()
 	if !quiet {
 		benchmarc.Stop()
 	}
@@ -462,6 +466,7 @@ func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query str
 
 // sqlTransaction executes the given function inside a transaction.
 func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFailure bool, quiet bool, f func(DbTransaction) error) error {
+	DbTransactions.Inc()
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -530,6 +535,7 @@ func (dbw *DBWrapper) sqlTryTransaction(f func(transaction DbTransaction) error,
 }
 
 func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string) ([]string, error) {
+	DbFetchIds.Inc()
 	var keys []string
 	for {
 		if !dbw.IsConnected() {
@@ -570,8 +576,8 @@ func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string) ([]string, error) 
 }
 
 func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]map[string]string, error) {
+	DbFetchChecksums.Inc()
 	var checksums = map[string]map[string]string{}
-
 	done := make(chan struct{})
 	//TODO: Don't do this hardcoded - Chunksize
 	for bulk := range utils.ChunkKeys(done, ids, 1000) {
@@ -617,6 +623,8 @@ func (dbw *DBWrapper) SqlBulkInsert(rows []Row, stmt *BulkInsertStmt) error {
 		return nil
 	}
 
+	DbBulkInserts.Inc()
+
 	placeholders := make([]string, len(rows))
 	values := make([]interface{}, len(rows)*stmt.NumField)
 	j := 0
@@ -648,6 +656,8 @@ func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
 		return nil
 	}
 
+	DbBulkDeletes.Inc()
+
 	done := make(chan struct{})
 	defer close(done)
 
@@ -676,6 +686,8 @@ func (dbw *DBWrapper) SqlBulkUpdate(rows []Row, stmt *BulkUpdateStmt) error {
 	if len(rows) == 0 {
 		return nil
 	}
+
+	DbBulkUpdates.Inc()
 
 	placeholders := make([]string, len(rows))
 	values := make([]interface{}, len(rows)*stmt.NumField)
