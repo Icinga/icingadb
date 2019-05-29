@@ -273,7 +273,9 @@ func InsertExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 
 		go func(rows []connection.Row) {
 			super.ChErr <- super.Dbw.SqlBulkInsert(rows, objectInformation.BulkInsertStmt)
-			wg.Add(-len(rows))
+			rowLen := len(rows)
+			wg.Add(-rowLen)
+			ConfigSyncInsertsTotal.WithLabelValues(objectInformation.ObjectType).Add(float64(rowLen))
 		}(rows)
 	}
 }
@@ -291,7 +293,9 @@ func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 
 		go func(keys []string) {
 			super.ChErr <- super.Dbw.SqlBulkDelete(keys, objectInformation.BulkDeleteStmt)
-			wg.Add(-len(keys))
+			rowLen := len(keys)
+			wg.Add(-rowLen)
+			ConfigSyncInsertsTotal.WithLabelValues(objectInformation.ObjectType).Add(float64(rowLen))
 		}(keys)
 	}
 }
@@ -399,8 +403,10 @@ func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 
 		go func(rows []connection.Row) {
 			super.ChErr <- super.Dbw.SqlBulkUpdate(rows, objectInformation.BulkUpdateStmt)
-			wg.Add(-len(rows))
-			atomic.AddUint32(updateCounter, uint32(len(rows)))
+			rowLen := len(rows)
+			wg.Add(-rowLen)
+			atomic.AddUint32(updateCounter, uint32(rowLen))
+			ConfigSyncUpdatesTotal.WithLabelValues(objectInformation.ObjectType).Add(float64(rowLen))
 		}(rows)
 	}
 }
