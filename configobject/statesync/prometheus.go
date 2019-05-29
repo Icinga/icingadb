@@ -5,10 +5,10 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-var StateSyncsPerSecond = promauto.NewGaugeVec(
-	prometheus.GaugeOpts{
-		Name: "statesyncs_per_second",
-		Help: "Statesyncs per second per object type",
+var StateSyncsTotal = promauto.NewCounterVec(
+	prometheus.CounterOpts{
+		Name: "statesyncs_total",
+		Help: "Statesyncs total per object type",
 	},
 	[]string{"objecttype"},
 )

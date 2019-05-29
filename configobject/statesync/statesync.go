@@ -58,7 +58,6 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 
 	states := streams[0].Messages
 	if len(states) == 0 {
-		StateSyncsPerSecond.WithLabelValues(objectType).Set(0)
 		return
 	}
 
@@ -131,7 +130,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 
 	log.Debugf("%d %s state synced", len(storedStateIds), objectType)
 	syncCounter[objectType] += len(storedStateIds)
-	StateSyncsPerSecond.WithLabelValues(objectType).Set(float64(len(storedStateIds)))
+	StateSyncsTotal.WithLabelValues(objectType).Add(float64(len(storedStateIds)))
 }
 
 //Converts a Icinga state type(0 for soft, 1 for hard) we got from Redis into a DB state type(soft, hard)

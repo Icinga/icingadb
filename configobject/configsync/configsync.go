@@ -295,7 +295,7 @@ func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 			super.ChErr <- super.Dbw.SqlBulkDelete(keys, objectInformation.BulkDeleteStmt)
 			rowLen := len(keys)
 			wg.Add(-rowLen)
-			ConfigSyncInsertsTotal.WithLabelValues(objectInformation.ObjectType).Add(float64(rowLen))
+			ConfigSyncDeletesTotal.WithLabelValues(objectInformation.ObjectType).Add(float64(rowLen))
 		}(keys)
 	}
 }
