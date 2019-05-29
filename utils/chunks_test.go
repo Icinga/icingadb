@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -30,7 +30,7 @@ func TestChunkKeys(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, chunks, want)
+	assert.Equal(t, want, chunks)
 
 	ch = ChunkKeys(make(chan struct{}), keys, 5)
 	chunks = nil
@@ -47,5 +47,5 @@ func TestChunkKeys(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, chunks, want)
+	assert.Equal(t, want, chunks)
 }
