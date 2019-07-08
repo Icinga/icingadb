@@ -69,6 +69,7 @@ func (e *Endpoint) SetId(id string) {
 func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: "endpoint",
+		RedisKey: "endpoint",
 		Factory: NewEndpoint,
 		BulkInsertStmt: connection.NewBulkInsertStmt("endpoint", Fields),
 		BulkDeleteStmt: connection.NewBulkDeleteStmt("endpoint"),
