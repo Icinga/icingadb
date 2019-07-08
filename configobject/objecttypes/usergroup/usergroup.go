@@ -23,9 +23,9 @@ var (
 
 type Usergroup struct {
 	Id                    string  `json:"id"`
-	EnvId                 string  `json:"environment_id"`
+	EnvId                 string  `json:"env_id"`
 	NameChecksum          string  `json:"name_checksum"`
-	PropertiesChecksum    string  `json:"properties_checksum"`
+	PropertiesChecksum    string  `json:"checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
 	Name                  string  `json:"name"`
 	NameCi                *string `json:"name_ci"`
