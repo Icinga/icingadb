@@ -191,7 +191,7 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 	go func() {
 		defer wg.Done()
 		var err error
-		res, err := super.Rdbw.HKeys(fmt.Sprintf("icinga:config:checksum:%s", objectInformation.ObjectType)).Result()
+		res, err := super.Rdbw.HKeys(fmt.Sprintf("icinga:checksum:%s", objectInformation.RedisKey)).Result()
 		if err != nil {
 			super.ChErr <- err
 			return
@@ -251,7 +251,7 @@ func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 		default:
 		}
 
-		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.ObjectType)
+		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.RedisKey)
 		go func() {
 			for chunk := range ch {
 				go prep(chunk)
@@ -335,7 +335,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 		default:
 		}
 
-		ch := super.Rdbw.PipeChecksumChunks(done, keys, objectInformation.ObjectType)
+		ch := super.Rdbw.PipeChecksumChunks(done, keys, objectInformation.RedisKey)
 		checksums, err := super.Dbw.SqlFetchChecksums(objectInformation.ObjectType, keys)
 		if err != nil {
 			super.ChErr <- err
@@ -381,7 +381,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 		default:
 		}
 
-		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.ObjectType)
+		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.RedisKey)
 		go func() {
 			for chunk := range ch {
 				go prep(chunk)

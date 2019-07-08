@@ -6,6 +6,7 @@ import (
 
 type ObjectInformation struct {
 	ObjectType 		string
+	RedisKey		string
 	Factory    		connection.RowFactory
 	BulkInsertStmt 	*connection.BulkInsertStmt
 	BulkDeleteStmt 	*connection.BulkDeleteStmt

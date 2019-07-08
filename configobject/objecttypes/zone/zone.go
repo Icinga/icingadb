@@ -75,6 +75,7 @@ func (z *Zone) SetId(id string) {
 func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: "zone",
+		RedisKey: "zone",
 		Factory: NewZone,
 		BulkInsertStmt: connection.NewBulkInsertStmt("zone", Fields),
 		BulkDeleteStmt: connection.NewBulkDeleteStmt("zone"),
