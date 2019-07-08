@@ -52,9 +52,9 @@ var (
 
 type Service struct {
 	Id                    string  `json:"id"`
-	EnvId                 string  `json:"environment_id"`
+	EnvId                 string  `json:"env_id"`
 	NameChecksum          string  `json:"name_checksum"`
-	PropertiesChecksum    string  `json:"properties_checksum"`
+	PropertiesChecksum    string  `json:"checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
 	GroupsChecksum        string  `json:"groups_checksum"`
 	HostId                string  `json:"host_id"`

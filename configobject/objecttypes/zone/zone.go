@@ -23,9 +23,9 @@ var (
 
 type Zone struct {
 	Id                  string  `json:"id"`
-	EnvId               string  `json:"environment_id"`
+	EnvId               string  `json:"env_id"`
 	NameChecksum        string  `json:"name_checksum"`
-	PropertiesChecksum  string  `json:"properties_checksum"`
+	PropertiesChecksum  string  `json:"checksum"`
 	ParentsChecksum     string  `json:"parents_checksum"`
 	Name                string  `json:"name"`
 	NameCi              *string `json:"name_ci"`
