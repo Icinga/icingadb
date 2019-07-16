@@ -173,6 +173,7 @@ func init() {
 		ObjectType: "host",
 		RedisKey: "host",
 		Factory: NewHost,
+		HasChecksum: true,
 		BulkInsertStmt: connection.NewBulkInsertStmt("host", Fields),
 		BulkDeleteStmt: connection.NewBulkDeleteStmt("host"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt("host", Fields),
