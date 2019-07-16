@@ -7,6 +7,7 @@ import (
 type ObjectInformation struct {
 	ObjectType 		string
 	RedisKey		string
+	HasChecksum		bool
 	Factory    		connection.RowFactory
 	BulkInsertStmt 	*connection.BulkInsertStmt
 	BulkDeleteStmt 	*connection.BulkDeleteStmt
