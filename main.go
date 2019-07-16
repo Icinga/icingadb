@@ -7,6 +7,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/endpoint"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
@@ -84,8 +85,9 @@ func main() {
 func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 	objectTypes := []*configobject.ObjectInformation{
 		&host.ObjectInformation,
-		&service.ObjectInformation,
+		&hostcustomvar.ObjectInformation,
 		&hostgroup.ObjectInformation,
+		&service.ObjectInformation,
 		&servicegroup.ObjectInformation,
 		&user.ObjectInformation,
 		&usergroup.ObjectInformation,
