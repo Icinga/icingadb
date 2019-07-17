@@ -9,10 +9,15 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user/usercustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup/usergroupcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/zone"
 	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
 	"git.icinga.com/icingadb/icingadb-main/connection"
@@ -86,12 +91,24 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 	objectTypes := []*configobject.ObjectInformation{
 		&host.ObjectInformation,
 		&hostcustomvar.ObjectInformation,
-		&hostgroup.ObjectInformation,
+
 		&service.ObjectInformation,
+		&servicecustomvar.ObjectInformation,
+
+		&hostgroup.ObjectInformation,
+		&hostgroupcustomvar.ObjectInformation,
+
 		&servicegroup.ObjectInformation,
+		&servicegroupcustomvar.ObjectInformation,
+
 		&user.ObjectInformation,
+		&usercustomvar.ObjectInformation,
+
 		&usergroup.ObjectInformation,
+		&usergroupcustomvar.ObjectInformation,
+
 		&zone.ObjectInformation,
+
 		&endpoint.ObjectInformation,
 	}
 
