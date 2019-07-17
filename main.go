@@ -7,7 +7,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/endpoint"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
-	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
