@@ -53,10 +53,11 @@ CREATE TABLE command_envvar (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE command_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + customvar_id)',
   command_id binary(20) NOT NULL COMMENT 'command.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
-  PRIMARY KEY (customvar_id, command_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 /* TODO(el): Default custom variables are missing */
