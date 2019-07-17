@@ -81,11 +81,12 @@ CREATE TABLE hostgroup (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_member (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + host_id + hostgroup_id)',
   host_id binary(20) NOT NULL COMMENT 'host.id',
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (hostgroup_id,host_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE host_customvar (
@@ -98,11 +99,12 @@ CREATE TABLE host_customvar (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + hostgroup_id + customvar_id)',
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (customvar_id, hostgroup_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE host_state (

@@ -74,27 +74,30 @@ CREATE TABLE servicegroup (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup_member (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + service_id)',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (servicegroup_id,service_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + service_id + customvar_id)',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (customvar_id, service_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + customvar_id)',
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (customvar_id, servicegroup_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE service_state (
