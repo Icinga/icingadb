@@ -169,13 +169,14 @@ func (h *Host) SetId(id string) {
 }
 
 func init() {
+	name := "host"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "host",
-		RedisKey: "host",
+		ObjectType: name,
+		RedisKey: name,
 		Factory: NewHost,
 		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt("host", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("host"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("host", Fields),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

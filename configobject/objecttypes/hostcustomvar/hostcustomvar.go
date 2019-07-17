@@ -31,7 +31,7 @@ func NewHostCustomvar() connection.Row {
 func (c *HostCustomvar) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.ChecksumString{c.Id}}, v...)
+	return append([]interface{}{utils.Checksum(c.Id)}, v...)
 }
 
 func (c *HostCustomvar) UpdateValues() []interface{} {
@@ -39,9 +39,9 @@ func (c *HostCustomvar) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.ChecksumString{c.HostId},
-		utils.ChecksumString{c.CustomvarId},
-		utils.ChecksumString{c.EnvId},
+		utils.Checksum(c.HostId),
+		utils.Checksum(c.CustomvarId),
+		utils.Checksum(c.EnvId),
 	)
 
 	return v
@@ -56,13 +56,14 @@ func (c *HostCustomvar) SetId(id string) {
 }
 
 func init() {
+	name := "host_customvar"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "host_customvar",
+		ObjectType: name,
 		RedisKey: "host:customvar",
 		Factory: NewHostCustomvar,
 		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt("host_customvar", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("host_customvar"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("host_customvar", Fields),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

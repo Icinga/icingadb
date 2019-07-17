@@ -73,12 +73,14 @@ func (z *Zone) SetId(id string) {
 }
 
 func init() {
+	name := "zone"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "zone",
-		RedisKey: "zone",
+		ObjectType: name,
+		RedisKey: name,
 		Factory: NewZone,
-		BulkInsertStmt: connection.NewBulkInsertStmt("zone", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("zone"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("zone", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 	}
 }
