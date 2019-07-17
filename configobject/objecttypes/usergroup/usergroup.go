@@ -73,12 +73,14 @@ func (u *Usergroup) SetId(id string) {
 }
 
 func init() {
+	name := "usergroup"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "usergroup",
-		RedisKey: "usergroup",
+		ObjectType: name,
+		RedisKey: name,
 		Factory: NewUsergroup,
-		BulkInsertStmt: connection.NewBulkInsertStmt("usergroup", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("usergroup"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("usergroup", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

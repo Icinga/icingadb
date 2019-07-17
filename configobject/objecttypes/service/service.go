@@ -160,12 +160,14 @@ func (s *Service) SetId(id string) {
 }
 
 func init() {
+	name := "service"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "service",
-		RedisKey: "service",
+		ObjectType: name,
+		RedisKey: name,
 		Factory: NewService,
-		BulkInsertStmt: connection.NewBulkInsertStmt("service", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("service"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("service", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

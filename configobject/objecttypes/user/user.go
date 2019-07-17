@@ -94,12 +94,14 @@ func (u *User) SetId(id string) {
 }
 
 func init() {
+	name := "user"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "user",
-		RedisKey: "user",
+		ObjectType: name,
+		RedisKey: name,
 		Factory: NewUser,
-		BulkInsertStmt: connection.NewBulkInsertStmt("user", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("user"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("user", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 	}
 }
