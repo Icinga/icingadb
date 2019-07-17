@@ -32,14 +32,20 @@ CREATE TABLE timeperiod_range (
   PRIMARY KEY (timeperiod_id,range_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
-CREATE TABLE timeperiod_override (
+CREATE TABLE timeperiod_override_include (
   timeperiod_id binary(20) NOT NULL COMMENT 'timeperiod.id',
   override_id binary(20) NOT NULL COMMENT 'timeperiod.id',
   env_id binary(20) NOT NULL COMMENT 'env.id',
 
-  override_type enum('include','exclude') NOT NULL,
+  PRIMARY KEY (timeperiod_id,override_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
-  PRIMARY KEY (timeperiod_id,override_id,override_type)
+CREATE TABLE timeperiod_override_exclude (
+  timeperiod_id binary(20) NOT NULL COMMENT 'timeperiod.id',
+  override_id binary(20) NOT NULL COMMENT 'timeperiod.id',
+  env_id binary(20) NOT NULL COMMENT 'env.id',
+
+  PRIMARY KEY (timeperiod_id,override_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE timeperiod_customvar (
