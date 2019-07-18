@@ -5,7 +5,6 @@ CREATE TABLE customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name + value)',
   env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
-  reference_counter int(6) unsigned NOT NULL COMMENT 'if 0, the custom var needs to be deleted',
 
   name varchar(255) NOT NULL COLLATE utf8_bin,
   value text NOT NULL,

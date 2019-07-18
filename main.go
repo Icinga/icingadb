@@ -5,6 +5,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/customvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/endpoint"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcustomvar"
@@ -106,6 +107,8 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 
 		&usergroup.ObjectInformation,
 		&usergroupcustomvar.ObjectInformation,
+
+		&customvar.ObjectInformation,
 
 		&zone.ObjectInformation,
 
