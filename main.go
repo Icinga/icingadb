@@ -5,12 +5,15 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/actionurl"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/customvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/endpoint"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/iconimage"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notesurl"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
@@ -113,6 +116,10 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&zone.ObjectInformation,
 
 		&endpoint.ObjectInformation,
+
+		&actionurl.ObjectInformation,
+		&notesurl.ObjectInformation,
+		&iconimage.ObjectInformation,
 	}
 
 	for _, objectInformation := range objectTypes {
