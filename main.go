@@ -15,6 +15,10 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupmember"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/iconimage"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notesurl"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification/notificationcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification/notificationuser"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification/notificationusergroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
@@ -116,6 +120,11 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&usergroup.ObjectInformation,
 		&usergroupcustomvar.ObjectInformation,
 		&usergroupmember.ObjectInformation,
+
+		&notification.ObjectInformation,
+		&notificationcustomvar.ObjectInformation,
+		&notificationuser.ObjectInformation,
+		&notificationusergroup.ObjectInformation,
 
 		&customvar.ObjectInformation,
 
