@@ -24,6 +24,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user/usercustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup/usergroupcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup/usergroupmember"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/zone"
 	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
 	"git.icinga.com/icingadb/icingadb-main/connection"
@@ -114,6 +115,7 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 
 		&usergroup.ObjectInformation,
 		&usergroupcustomvar.ObjectInformation,
+		&usergroupmember.ObjectInformation,
 
 		&customvar.ObjectInformation,
 
