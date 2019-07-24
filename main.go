@@ -24,6 +24,11 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupmember"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod/timeperiodcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod/timeperiodoverrideexclude"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod/timeperiodoverrideinclude"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod/timeperiodrange"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user/usercustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup"
@@ -135,6 +140,12 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&actionurl.ObjectInformation,
 		&notesurl.ObjectInformation,
 		&iconimage.ObjectInformation,
+
+		&timeperiod.ObjectInformation,
+		&timeperiodcustomvar.ObjectInformation,
+		&timeperiodoverrideinclude.ObjectInformation,
+		&timeperiodoverrideexclude.ObjectInformation,
+		&timeperiodrange.ObjectInformation,
 	}
 
 	for _, objectInformation := range objectTypes {

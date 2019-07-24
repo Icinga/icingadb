@@ -6,11 +6,7 @@ CREATE TABLE timeperiod (
   env_id binary(20) NOT NULL COMMENT 'env.id',
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
-  ranges_checksum binary(20) NOT NULL COMMENT 'sha1(ranges from timeperiod_ranges where timeperiod_range.timeperiod_id = id)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
-  customvars_checksum binary(20) NOT NULL COMMENT 'sha1(timeperiod.vars)',
-  includes_checksum binary(20) NOT NULL COMMENT 'sha1(includes)',
-  excludes_checksum binary(20) NOT NULL COMMENT 'sha1(excludes)',
 
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
