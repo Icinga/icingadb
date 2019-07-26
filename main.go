@@ -6,8 +6,16 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/actionurl"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandargument"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/customvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/endpoint"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandargument"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
@@ -19,6 +27,10 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification/notificationcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification/notificationuser"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification/notificationusergroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandargument"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
@@ -146,6 +158,21 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&timeperiodoverrideinclude.ObjectInformation,
 		&timeperiodoverrideexclude.ObjectInformation,
 		&timeperiodrange.ObjectInformation,
+
+		&checkcommand.ObjectInformation,
+		&checkcommandcustomvar.ObjectInformation,
+		&checkcommandargument.ObjectInformation,
+		&checkcommandenvvar.ObjectInformation,
+
+		&eventcommand.ObjectInformation,
+		&eventcommandcustomvar.ObjectInformation,
+		&eventcommandargument.ObjectInformation,
+		&eventcommandenvvar.ObjectInformation,
+
+		&notificationcommand.ObjectInformation,
+		&notificationcommandcustomvar.ObjectInformation,
+		&notificationcommandargument.ObjectInformation,
+		&notificationcommandenvvar.ObjectInformation,
 	}
 
 	for _, objectInformation := range objectTypes {
