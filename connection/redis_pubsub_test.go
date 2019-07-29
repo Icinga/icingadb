@@ -9,7 +9,7 @@ import (
 
 func TestPubSubWrapper(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "10.77.27.18:6379",
+		Addr:         "10.77.27.16:6379",
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
