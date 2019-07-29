@@ -18,6 +18,7 @@ var (
 		"name_ci",
 		"is_global",
 		"parent_id",
+		"depth",
 	}
 )
 
@@ -31,6 +32,7 @@ type Zone struct {
 	NameCi              *string `json:"name_ci"`
 	IsGlobal			bool	`json:"is_global"`
 	ParentId            string  `json:"parent_id"`
+	Depth				float64	`json:"depth"`
 }
 
 func NewZone() connection.Row {
@@ -59,6 +61,7 @@ func (z *Zone) UpdateValues() []interface{} {
 		z.NameCi,
 		utils.Bool[z.IsGlobal],
 		utils.Checksum(z.ParentId),
+		z.Depth,
 	)
 
 	return v

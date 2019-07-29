@@ -14,18 +14,9 @@ CREATE TABLE zone (
   is_global enum('y','n') NOT NULL,
   parent_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
+  depth tinyint(3) unsigned NOT NULL,
 
   PRIMARY KEY (id),
   INDEX idx_parent_id (parent_id),
   UNIQUE INDEX idx_env_id_id (env_id,id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
-
-CREATE TABLE zone_tree (
-  parent_id binary(20) NOT NULL COMMENT 'zone.id',
-  child_id binary(20) NOT NULL COMMENT 'zone.id',
-  env_id binary(20) NOT NULL COMMENT 'env.id',
-  depth tinyint(3) unsigned NOT NULL,
-
-  PRIMARY KEY (child_id,depth),
-  UNIQUE INDEX zone_relation (child_id,parent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
