@@ -53,7 +53,7 @@ build-image:
 
 deploy-image-1: &deploy-image-base
   variables:
-    SSH_ADDR: 10.77.27.18
+    SSH_ADDR: 10.77.27.16
   stage: deploy
   dependencies:
     - build-image
@@ -75,9 +75,4 @@ deploy-image-1: &deploy-image-base
       CI_COMMIT_TITLE=\"\$(base64 -d <<<'$(base64 <<<"$CI_COMMIT_TITLE")')\"
       /root/icingadb/docker-compose-up.py >>messages"
     - rm ./deploy.sshkey
-
-deploy-image-2:
-  <<: *deploy-image-base
-  variables:
-    SSH_ADDR: 10.77.27.16
 
