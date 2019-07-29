@@ -34,7 +34,7 @@ type NotificationCommandArgument struct {
 	ArgumentValue			string		`json:"value"`
 	ArgumentOrder			float32		`json:"order"`
 	Description				string		`json:"description"`
-	ArgumentKeyOverride		string		`json:"argument_key_override"`
+	ArgumentKeyOverride		string		`json:"key"`
 	RepeatKey				bool		`json:"repeat_key"`
 	Required				bool		`json:"required"`
 	SetIf					string		`json:"set_if"`
