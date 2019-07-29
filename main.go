@@ -17,7 +17,9 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcomment"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostdowntime"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupmember"
@@ -32,7 +34,9 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecomment"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicedowntime"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupmember"
@@ -119,9 +123,13 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 	objectTypes := []*configobject.ObjectInformation{
 		&host.ObjectInformation,
 		&hostcustomvar.ObjectInformation,
+		&hostdowntime.ObjectInformation,
+		&hostcomment.ObjectInformation,
 
 		&service.ObjectInformation,
 		&servicecustomvar.ObjectInformation,
+		&servicedowntime.ObjectInformation,
+		&servicecomment.ObjectInformation,
 
 		&hostgroup.ObjectInformation,
 		&hostgroupcustomvar.ObjectInformation,
