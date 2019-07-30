@@ -13,7 +13,7 @@ var icingastate = "{\"IcingaApplication\":" +
 	"{\"icingaapplication\":" +
 	"{\"app\":{" +
 	"\"environment\": \"\"" +
-	"}}}}}"
+	"}}}}, \"config_dump_in_progress\": false}"
 
 func TestIcingaEventsBroker(t *testing.T) {
 	rdb, err := connection.NewRDBWrapper("10.77.27.16:6379")
