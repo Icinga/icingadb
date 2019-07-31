@@ -120,7 +120,7 @@ CREATE TABLE host_state (
   output text DEFAULT NULL,
   long_output text DEFAULT NULL,
   performance_data text DEFAULT NULL,
-  check_commandline varchar(255) DEFAULT NULL,
+  check_commandline text DEFAULT NULL,
 
   is_problem enum('y', 'n') NOT NULL,
   is_handled enum('y', 'n') NOT NULL,
