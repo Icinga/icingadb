@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 )
 
 var (
@@ -29,6 +31,13 @@ var (
 		"FlappingEnd":		256,
 	}
 )
+
+// StringToSha1String converts the given string into a SHA1 string
+func StringToSha1String(s string) string {
+	hash := sha1.New()
+	hash.Write([]byte(s))
+	return fmt.Sprintf("%x", hash.Sum(nil))
+}
 
 // Checksum converts a hex string to a byte array
 func Checksum(s string) []byte {
