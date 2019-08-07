@@ -93,6 +93,10 @@ func (u *User) SetId(id string) {
 	u.Id = id
 }
 
+func (u *User) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{u}, nil
+}
+
 func init() {
 	name := "user"
 	ObjectInformation = configobject.ObjectInformation{

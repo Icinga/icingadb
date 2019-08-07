@@ -55,6 +55,10 @@ func (h *HostgroupMember) SetId(id string) {
 	h.Id = id
 }
 
+func (h *HostgroupMember) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{h}, nil
+}
+
 func init() {
 	name := "hostgroup_member"
 	ObjectInformation = configobject.ObjectInformation{

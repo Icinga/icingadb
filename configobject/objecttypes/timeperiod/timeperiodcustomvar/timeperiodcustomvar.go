@@ -55,6 +55,10 @@ func (c *TimeperiodCustomvar) SetId(id string) {
 	c.Id = id
 }
 
+func (c *TimeperiodCustomvar) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "timeperiod_customvar"
 	ObjectInformation = configobject.ObjectInformation{

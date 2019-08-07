@@ -55,6 +55,10 @@ func (u *UsergroupMember) SetId(id string) {
 	u.Id = id
 }
 
+func (u *UsergroupMember) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{u}, nil
+}
+
 func init() {
 	name := "usergroup_member"
 	ObjectInformation = configobject.ObjectInformation{

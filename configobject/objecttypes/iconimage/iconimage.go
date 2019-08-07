@@ -53,6 +53,10 @@ func (a *IconImage) SetId(id string) {
 	a.Id = id
 }
 
+func (a *IconImage) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{a}, nil
+}
+
 func init() {
 	name := "icon_image"
 	ObjectInformation = configobject.ObjectInformation{

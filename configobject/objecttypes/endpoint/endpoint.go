@@ -66,6 +66,10 @@ func (e *Endpoint) SetId(id string) {
 	e.Id = id
 }
 
+func (e *Endpoint) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{e}, nil
+}
+
 func init() {
 	name := "endpoint"
 	ObjectInformation = configobject.ObjectInformation{

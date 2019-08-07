@@ -102,6 +102,10 @@ func (n *Notification) SetId(id string) {
 	n.Id = id
 }
 
+func (n *Notification) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{n}, nil
+}
+
 func init() {
 	name := "notification"
 	ObjectInformation = configobject.ObjectInformation{

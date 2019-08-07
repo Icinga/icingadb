@@ -95,6 +95,10 @@ func (h *HostDowntime) SetId(id string) {
 	h.Id = id
 }
 
+func (h *HostDowntime) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{h}, nil
+}
+
 func init() {
 	name := "host_downtime"
 	ObjectInformation = configobject.ObjectInformation{

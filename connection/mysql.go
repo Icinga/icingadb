@@ -623,6 +623,14 @@ func (dbw *DBWrapper) SqlBulkInsert(rows []Row, stmt *BulkInsertStmt) error {
 		return nil
 	}
 
+	finalRows := make([]Row, 0)
+	for _, r := range rows {
+		fr, _ := r.GetFinalRows()
+		finalRows = append(finalRows, fr...)
+	}
+
+	rows = finalRows
+
 	DbBulkInserts.Inc()
 
 	placeholders := make([]string, len(rows))

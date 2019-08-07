@@ -72,6 +72,10 @@ func (t *Timeperiod) SetId(id string) {
 	t.Id = id
 }
 
+func (t *Timeperiod) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{t}, nil
+}
+
 func init() {
 	name := "timeperiod"
 	ObjectInformation = configobject.ObjectInformation{

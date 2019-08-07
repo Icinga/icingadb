@@ -168,6 +168,10 @@ func (h *Host) SetId(id string) {
 	h.Id = id
 }
 
+func (h *Host) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{h}, nil
+}
+
 func init() {
 	name := "host"
 	ObjectInformation = configobject.ObjectInformation{

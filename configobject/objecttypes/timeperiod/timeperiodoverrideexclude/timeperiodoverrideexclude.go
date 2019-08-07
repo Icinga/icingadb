@@ -55,6 +55,10 @@ func (t *TimeperiodOverrideExclude) SetId(id string) {
 	t.Id = id
 }
 
+func (t *TimeperiodOverrideExclude) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{t}, nil
+}
+
 func init() {
 	name := "timeperiod_override_exclude"
 	ObjectInformation = configobject.ObjectInformation{

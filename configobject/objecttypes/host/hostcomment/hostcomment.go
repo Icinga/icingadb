@@ -83,6 +83,10 @@ func (h *HostComment) SetId(id string) {
 	h.Id = id
 }
 
+func (h *HostComment) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{h}, nil
+}
+
 func init() {
 	name := "host_comment"
 	ObjectInformation = configobject.ObjectInformation{
