@@ -87,6 +87,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
 		RedisKey: "checkcommand:argument",
+		DeltaMySqlField: "id",
 		Factory: NewCheckCommandArgument,
 		HasChecksum: true,
 		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
