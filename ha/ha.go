@@ -8,6 +8,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"sync"
 	"time"
 )
 
@@ -22,12 +23,14 @@ type HA struct {
 	uid                   uuid.UUID
 	super                 *supervisor.Supervisor
 	notificationListeners []chan int
+	notificationListenersMutex sync.Mutex
 }
 
 func NewHA(super *supervisor.Supervisor) (*HA, error) {
 	var err error
 	ho := HA{
 		super: super,
+		notificationListenersMutex: sync.Mutex{},
 	}
 
 	if ho.uid, err = uuid.NewRandom(); err != nil {
@@ -190,7 +193,9 @@ func (h *HA) Run(chEnv chan *Environment) {
 
 func (h *HA) RegisterNotificationListener() chan int {
 	ch := make(chan int)
+	h.notificationListenersMutex.Lock()
 	h.notificationListeners = append(h.notificationListeners, ch)
+	h.notificationListenersMutex.Unlock()
 	return ch
 }
 
