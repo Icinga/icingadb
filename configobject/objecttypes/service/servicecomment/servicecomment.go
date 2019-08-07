@@ -83,6 +83,10 @@ func (s *ServiceComment) SetId(id string) {
 	s.Id = id
 }
 
+func (s *ServiceComment) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{s}, nil
+}
+
 func init() {
 	name := "service_comment"
 	ObjectInformation = configobject.ObjectInformation{

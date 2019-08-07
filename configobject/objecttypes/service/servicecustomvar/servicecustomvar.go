@@ -55,6 +55,10 @@ func (c *ServiceCustomvar) SetId(id string) {
 	c.Id = id
 }
 
+func (c *ServiceCustomvar) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "service_customvar"
 	ObjectInformation = configobject.ObjectInformation{

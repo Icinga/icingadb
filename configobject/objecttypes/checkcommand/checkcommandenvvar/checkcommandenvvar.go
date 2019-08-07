@@ -61,6 +61,10 @@ func (c *CheckCommandEnvvar) SetId(id string) {
 	c.Id = id
 }
 
+func (c *CheckCommandEnvvar) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "checkcommand_envvar"
 	ObjectInformation = configobject.ObjectInformation{

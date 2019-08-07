@@ -55,6 +55,10 @@ func (c *NotificationCustomvar) SetId(id string) {
 	c.Id = id
 }
 
+func (c *NotificationCustomvar) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "notification_customvar"
 	ObjectInformation = configobject.ObjectInformation{

@@ -82,6 +82,10 @@ func (c *NotificationCommandArgument) SetId(id string) {
 	c.Id = id
 }
 
+func (c *NotificationCommandArgument) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "notificationcommand_argument"
 	ObjectInformation = configobject.ObjectInformation{

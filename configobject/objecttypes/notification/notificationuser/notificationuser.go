@@ -55,6 +55,10 @@ func (n *NotificationUser) SetId(id string) {
 	n.Id = id
 }
 
+func (n *NotificationUser) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{n}, nil
+}
+
 func init() {
 	name := "notification_user"
 	ObjectInformation = configobject.ObjectInformation{

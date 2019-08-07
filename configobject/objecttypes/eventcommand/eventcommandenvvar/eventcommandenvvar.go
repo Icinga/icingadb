@@ -61,6 +61,10 @@ func (c *EventCommandEnvvar) SetId(id string) {
 	c.Id = id
 }
 
+func (c *EventCommandEnvvar) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "eventcommand_envvar"
 	ObjectInformation = configobject.ObjectInformation{

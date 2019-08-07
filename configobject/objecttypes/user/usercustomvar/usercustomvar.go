@@ -55,6 +55,10 @@ func (c *UserCustomvar) SetId(id string) {
 	c.Id = id
 }
 
+func (c *UserCustomvar) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "user_customvar"
 	ObjectInformation = configobject.ObjectInformation{

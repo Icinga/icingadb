@@ -82,6 +82,10 @@ func (c *CheckCommandArgument) SetId(id string) {
 	c.Id = id
 }
 
+func (c *CheckCommandArgument) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "checkcommand_argument"
 	ObjectInformation = configobject.ObjectInformation{

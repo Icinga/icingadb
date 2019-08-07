@@ -72,6 +72,10 @@ func (c *CheckCommand) SetId(id string) {
 	c.Id = id
 }
 
+func (c *CheckCommand) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "checkcommand"
 	ObjectInformation = configobject.ObjectInformation{

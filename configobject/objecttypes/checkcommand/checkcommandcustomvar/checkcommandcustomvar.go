@@ -55,6 +55,10 @@ func (c *CheckCommandCustomvar) SetId(id string) {
 	c.Id = id
 }
 
+func (c *CheckCommandCustomvar) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
+}
+
 func init() {
 	name := "checkcommand_customvar"
 	ObjectInformation = configobject.ObjectInformation{

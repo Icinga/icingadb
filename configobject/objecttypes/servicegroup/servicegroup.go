@@ -72,6 +72,10 @@ func (s *Servicegroup) SetId(id string) {
 	s.Id = id
 }
 
+func (s *Servicegroup) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{s}, nil
+}
+
 func init() {
 	name := "servicegroup"
 	ObjectInformation = configobject.ObjectInformation{

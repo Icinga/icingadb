@@ -53,6 +53,10 @@ func (a *ActionUrl) SetId(id string) {
 	a.Id = id
 }
 
+func (a *ActionUrl) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{a}, nil
+}
+
 func init() {
 	name := "action_url"
 	ObjectInformation = configobject.ObjectInformation{

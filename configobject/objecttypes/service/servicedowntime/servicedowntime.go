@@ -95,6 +95,10 @@ func (s *ServiceDowntime) SetId(id string) {
 	s.Id = id
 }
 
+func (s *ServiceDowntime) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{s}, nil
+}
+
 func init() {
 	name := "service_downtime"
 	ObjectInformation = configobject.ObjectInformation{

@@ -429,6 +429,7 @@ type Row interface {
 	UpdateValues() []interface{}
 	GetId() string
 	SetId(id string)
+	GetFinalRows() ([]Row, error)
 }
 
 type RowFactory func() Row

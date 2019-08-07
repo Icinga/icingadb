@@ -53,6 +53,10 @@ func (a *NotesUrl) SetId(id string) {
 	a.Id = id
 }
 
+func (a *NotesUrl) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{a}, nil
+}
+
 func init() {
 	name := "notes_url"
 	ObjectInformation = configobject.ObjectInformation{

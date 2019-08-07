@@ -159,6 +159,10 @@ func (s *Service) SetId(id string) {
 	s.Id = id
 }
 
+func (s *Service) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{s}, nil
+}
+
 func init() {
 	name := "service"
 	ObjectInformation = configobject.ObjectInformation{

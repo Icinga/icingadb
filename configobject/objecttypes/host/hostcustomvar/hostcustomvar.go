@@ -55,6 +55,10 @@ func (c *HostCustomvar) SetId(id string) {
 	c.Id = id
 }
 
+func (h *HostCustomvar) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{h}, nil
+}
+
 func init() {
 	name := "host_customvar"
 	ObjectInformation = configobject.ObjectInformation{

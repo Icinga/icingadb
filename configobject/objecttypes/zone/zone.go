@@ -75,6 +75,10 @@ func (z *Zone) SetId(id string) {
 	z.Id = id
 }
 
+func (z *Zone) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{z}, nil
+}
+
 func init() {
 	name := "zone"
 	ObjectInformation = configobject.ObjectInformation{
