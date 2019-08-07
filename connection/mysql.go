@@ -534,7 +534,7 @@ func (dbw *DBWrapper) sqlTryTransaction(f func(transaction DbTransaction) error,
 	return dbw.SqlCommit(tx, quiet)
 }
 
-func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string) ([]string, error) {
+func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string, field string) ([]string, error) {
 	DbFetchIds.Inc()
 	var keys []string
 	for {
@@ -543,7 +543,7 @@ func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string) ([]string, error) 
 			continue
 		}
 
-		rows, err := dbw.SqlQuery(fmt.Sprintf("SELECT id FROM %s WHERE env_id=(X'%s')", table, utils.DecodeChecksum(envId)))
+		rows, err := dbw.SqlQuery(fmt.Sprintf("SELECT %s FROM %s WHERE env_id=(X'%s')", field, table, utils.DecodeChecksum(envId)))
 
 		if err != nil {
 			if !dbw.checkConnection(false) {

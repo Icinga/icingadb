@@ -100,6 +100,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
 		RedisKey: "hostdowntime",
+		DeltaMySqlField: "id",
 		Factory: NewHostDowntime,
 		HasChecksum: true,
 		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),

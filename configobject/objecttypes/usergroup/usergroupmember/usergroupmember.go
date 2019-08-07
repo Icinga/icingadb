@@ -60,6 +60,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
 		RedisKey: "user:groupmember",
+		DeltaMySqlField: "id",
 		Factory: NewUsergroupMember,
 		HasChecksum: false,
 		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),

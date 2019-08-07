@@ -66,6 +66,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
 		RedisKey: "notificationcommand:envvar",
+		DeltaMySqlField: "id",
 		Factory: NewNotificationCommandEnvvar,
 		HasChecksum: true,
 		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),

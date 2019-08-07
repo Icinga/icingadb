@@ -7,6 +7,7 @@ import (
 type ObjectInformation struct {
 	ObjectType 		string
 	RedisKey		string
+	DeltaMySqlField string
 	HasChecksum		bool
 	Factory    		connection.RowFactory
 	BulkInsertStmt 	*connection.BulkInsertStmt
