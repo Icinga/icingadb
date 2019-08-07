@@ -11,6 +11,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/customvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/customvar/customvarflat"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/endpoint"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandargument"
@@ -152,6 +153,7 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&notificationusergroup.ObjectInformation,
 
 		&customvar.ObjectInformation,
+		&customvarflat.ObjectInformation,
 
 		&zone.ObjectInformation,
 
