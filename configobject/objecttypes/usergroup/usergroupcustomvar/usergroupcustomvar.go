@@ -18,7 +18,7 @@ var (
 
 type UsergroupCustomvar struct {
 	Id						string 		`json:"id"`
-	UsergroupId			string		`json:"object_id"`
+	UsergroupId				string		`json:"object_id"`
 	CustomvarId 			string 		`json:"customvar_id"`
 	EnvId           		string		`json:"env_id"`
 }

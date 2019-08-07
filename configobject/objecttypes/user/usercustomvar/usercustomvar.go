@@ -18,7 +18,7 @@ var (
 
 type UserCustomvar struct {
 	Id						string 		`json:"id"`
-	UserId			string		`json:"object_id"`
+	UserId					string		`json:"object_id"`
 	CustomvarId 			string 		`json:"customvar_id"`
 	EnvId           		string		`json:"env_id"`
 }
