@@ -119,7 +119,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				// Wait for all IDs to be inserted into MySQL
 				kill := waitOrKill(wgInsert, done)
 				benchmarc.Stop()
-				if !kill {
+				if !kill && len(insert) > 0 {
 					log.WithFields(log.Fields{
 						"type": 		objectInformation.ObjectType,
 						"count": 		len(insert),
@@ -139,7 +139,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				// Wait for all IDs to be deleted from MySQL
 				kill := waitOrKill(wgDelete, done)
 				benchmarc.Stop()
-				if !kill {
+				if !kill && len(delete) > 0 {
 					log.WithFields(log.Fields{
 						"type":      objectInformation.ObjectType,
 						"count":     len(delete),
@@ -160,7 +160,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 					// Wait for all IDs to be update in MySQL
 					kill := waitOrKill(wgUpdate, done)
 					benchmarc.Stop()
-					if !kill {
+					if !kill && atomic.LoadUint32(updateCounter) > 0 {
 						log.WithFields(log.Fields{
 							"type":      objectInformation.ObjectType,
 							"count":     atomic.LoadUint32(updateCounter),
