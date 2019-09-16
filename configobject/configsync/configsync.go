@@ -54,22 +54,27 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 		wgDelete      	*sync.WaitGroup
 		wgUpdate      	*sync.WaitGroup
 	)
+	log.Infof("%s: Ready", objectInformation.ObjectType)
 	for msg := range chHA {
 		switch msg {
 		// Icinga 2 probably died, stop operations and tell all workers to shut down.
 		case ha.Notify_StopSync:
-			log.Info(fmt.Sprintf("%s: Lost responsibility", objectInformation.ObjectType))
 			if done != nil {
+				log.Info(fmt.Sprintf("%s: Lost responsibility", objectInformation.ObjectType))
 				close(done)
 				done = nil
 			}
 		// Starts up the whole sync process.
 		case ha.Notify_StartSync:
+			if done != nil {
+				continue
+			}
+
 			log.Infof("%s: Got responsibility", objectInformation.ObjectType)
 
 			//TODO: This should only be done, if HA was taken over from another instance
 			insert, update, delete := GetDelta(super, objectInformation)
-			log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", objectInformation.ObjectType, len(insert), len(update), len(delete))
+			//log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", objectInformation.ObjectType, len(insert), len(update), len(delete))
 
 			// Clean up all channels and wait groups for a fresh config dump
 			done 			= make(chan struct{})
