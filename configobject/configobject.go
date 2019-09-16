@@ -5,12 +5,13 @@ import (
 )
 
 type ObjectInformation struct {
-	ObjectType 		string
-	RedisKey		string
-	DeltaMySqlField string
-	HasChecksum		bool
-	Factory    		connection.RowFactory
-	BulkInsertStmt 	*connection.BulkInsertStmt
-	BulkDeleteStmt 	*connection.BulkDeleteStmt
-	BulkUpdateStmt 	*connection.BulkUpdateStmt
+	ObjectType 					string
+	RedisKey					string
+	DeltaMySqlField 			string
+	HasChecksum					bool
+	NotificationListenerType	string
+	Factory    					connection.RowFactory
+	BulkInsertStmt 				*connection.BulkInsertStmt
+	BulkDeleteStmt 				*connection.BulkDeleteStmt
+	BulkUpdateStmt 				*connection.BulkUpdateStmt
 }

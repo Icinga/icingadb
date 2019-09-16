@@ -108,6 +108,8 @@ func main() {
 
 	statesync.StartStateSync(&super)
 
+	haInstance.StartEventListener()
+
 	go prometheus.HandleHttp("0.0.0.0:8080", super.ChErr)
 
 	for {
@@ -187,7 +189,7 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 
 	for _, objectInformation := range objectTypes {
 		go func(information *configobject.ObjectInformation) {
-			super.ChErr <- configsync.Operator(super, haInstance.RegisterNotificationListener(), information)
+			super.ChErr <- configsync.Operator(super, haInstance.RegisterNotificationListener(information.NotificationListenerType), information)
 		}(objectInformation)
 	}
 }
