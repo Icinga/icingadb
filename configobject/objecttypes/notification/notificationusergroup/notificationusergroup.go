@@ -19,7 +19,7 @@ var (
 type NotificationUsergroup struct {
 	Id						string 		`json:"id"`
 	NotificationId			string		`json:"notification_id"`
-	UsergroupId	 				string 		`json:"usergroup_id"`
+	UsergroupId	 			string 		`json:"usergroup_id"`
 	EnvId           		string		`json:"env_id"`
 }
 
@@ -70,5 +70,6 @@ func init() {
 		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
 		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		NotificationListenerType: "notification",
 	}
 }
