@@ -32,6 +32,7 @@ type DbTransaction interface {
 }
 
 func NewDBWrapper(dbDsn string) (*DBWrapper, error) {
+	log.Info("Connecting to MySQL")
 	db, err := mkMysql("mysql", dbDsn)
 
 	if err != nil {
@@ -43,7 +44,10 @@ func NewDBWrapper(dbDsn string) (*DBWrapper, error) {
 
 	err = dbw.Db.Ping()
 	if err != nil {
-		return nil, err
+		log.WithFields(log.Fields{
+			"context": "sql",
+			"error":   err,
+		}).Error("Could not connect to SQL. Trying again")
 	}
 
 	go func() {

@@ -95,6 +95,7 @@ func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
 }
 
 func NewRDBWrapper(address string) (*RDBWrapper, error) {
+	log.Info("Connecting to Redis")
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         address,
 		DialTimeout:  time.Minute / 2,
@@ -110,7 +111,10 @@ func NewRDBWrapper(address string) (*RDBWrapper, error) {
 
 	_, err := rdbw.Rdb.Ping().Result()
 	if err != nil {
-		return nil, err
+		log.WithFields(log.Fields{
+			"context": "redis",
+			"error":   err,
+		}).Error("Could not connect to Redis. Trying again")
 	}
 
 	go func() {
