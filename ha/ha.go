@@ -72,22 +72,23 @@ func (h *HA) insertInstance() error {
 	return err
 }
 
-func (h *HA) getInstance() (uuid.UUID, int64, error) {
+func (h *HA) getInstance() (bool, uuid.UUID, int64, error) {
 	rows, err := h.super.Dbw.SqlFetchAll("select id, heartbeat from icingadb_instance where environment_id = ourEnvID",
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		h.super.EnvId,
 	)
+
 	if err != nil {
-		return uuid.UUID{}, 0, err
+		return false, uuid.UUID{}, 0, err
 	}
 	if len(rows) == 0 {
-		return uuid.UUID{}, 0, nil
+		return false, uuid.UUID{}, 0, nil
 	}
 
 	var theirUUID uuid.UUID
 	copy(theirUUID[:], rows[0][0].([]byte))
 
-	return theirUUID, rows[0][1].(int64), nil
+	return true, theirUUID, rows[0][1].(int64), nil
 }
 
 func (h *HA) Run(chEnv chan *Environment) {
@@ -109,8 +110,7 @@ func (h *HA) Run(chEnv chan *Environment) {
 	})
 	haLogger.Info("Got initial environment.")
 
-	// We have a new UUID with every restart, no use comparing them.
-	_, beat, err := h.getInstance()
+	found, _, beat, err := h.getInstance()
 	if err != nil {
 		haLogger.Errorf("Failed to fetch instance: %v", err)
 		h.super.ChErr <- errors.New("failed to fetch instance")
@@ -121,7 +121,7 @@ func (h *HA) Run(chEnv chan *Environment) {
 		haLogger.Info("Taking over.")
 
 		// This means there was no instance row match, insert
-		if beat == 0 {
+		if !found {
 			err = h.insertInstance()
 		} else {
 			err = h.takeOverInstance()
@@ -155,7 +155,7 @@ func (h *HA) Run(chEnv chan *Environment) {
 			if h.icinga2MTime-previous < 10 && h.isActive {
 				err = h.updateOwnInstance()
 			} else {
-				they, beat, err := h.getInstance()
+				_, they, beat, err := h.getInstance()
 				if err != nil {
 					haLogger.Errorf("Failed to fetch instance: %v", err)
 					h.super.ChErr <- errors.New("failed to fetch instance")
