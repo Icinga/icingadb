@@ -21,6 +21,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcomment"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostdowntime"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hoststate"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupmember"
@@ -38,6 +39,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecomment"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicedowntime"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicestate"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupmember"
@@ -128,11 +130,13 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&hostcustomvar.ObjectInformation,
 		&hostdowntime.ObjectInformation,
 		&hostcomment.ObjectInformation,
+		&hoststate.ObjectInformation,
 
 		&service.ObjectInformation,
 		&servicecustomvar.ObjectInformation,
 		&servicedowntime.ObjectInformation,
 		&servicecomment.ObjectInformation,
+		&servicestate.ObjectInformation,
 
 		&hostgroup.ObjectInformation,
 		&hostgroupcustomvar.ObjectInformation,

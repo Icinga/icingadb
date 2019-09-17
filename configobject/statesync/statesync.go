@@ -75,7 +75,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 			_, errExec := super.Dbw.SqlExecTx(
 				tx,
 				"replace into "+objectType+"_state",
-				`REPLACE INTO `+objectType+`_state (`+objectType+`_id, env_id, state_type, soft_state, hard_state, attempt, severity, output, long_output, performance_data,`+
+				`REPLACE INTO `+objectType+`_state (id, env_id, state_type, soft_state, hard_state, attempt, severity, output, long_output, performance_data,`+
 					`check_commandline, is_problem, is_handled, is_reachable, is_flapping, is_acknowledged, acknowledgement_comment_id,`+
 					`in_downtime, execution_time, latency, timeout, last_update, last_state_change, last_soft_state,`+
 					`last_hard_state, next_check) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -100,10 +100,10 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 				values["execution_time"],
 				redisIntToDBInt(values["latency"]),
 				redisIntToDBInt(values["check_timeout"]),
-				values["last_state_change"], //TODO: ??? (also see MR) should be last_update
+				values["last_update"],
 				values["last_state_change"],
-				values["state"],           //TODO: Should be last_soft_state but is not implemented in core
-				values["last_hard_state"], //TODO: Should be last_hard_state but is not implemented in core
+				values["last_soft_state"],
+				values["last_hard_state"],
 				values["next_check"],
 			)
 
