@@ -15,7 +15,7 @@ var icingastate = "{\"IcingaApplication\":" +
 	"\"environment\": \"\"" +
 	"}}}}, \"config_dump_in_progress\": false}"
 
-func TestIcingaEventsBroker(t *testing.T) {
+func TestIcingaHeartbeatListener(t *testing.T) {
 	rdb, err := connection.NewRDBWrapper("10.77.27.16:6379")
 	if err != nil {
 		t.Fatal("This test needs a working Redis connection")
@@ -24,7 +24,7 @@ func TestIcingaEventsBroker(t *testing.T) {
 	chEnv := make(chan *Environment)
 
 	go func() {
-		err := IcingaEventsBroker(rdb, chEnv)
+		err := IcingaHeartbeatListener(rdb, chEnv)
 		assert.NoError(t, err, "redis connection error")
 	}()
 

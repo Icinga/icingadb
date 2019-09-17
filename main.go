@@ -101,7 +101,7 @@ func main() {
 
 	go haInstance.Run(chEnv)
 	go func() {
-		super.ChErr <- ha.IcingaEventsBroker(redisConn, chEnv)
+		super.ChErr <- ha.IcingaHeartbeatListener(redisConn, chEnv)
 	}()
 
 	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)

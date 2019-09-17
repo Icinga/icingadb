@@ -21,8 +21,8 @@ func Sha1bytes(bytes []byte) []byte {
 	return hash.Sum(nil)
 }
 
-func IcingaEventsBroker(rdb *connection.RDBWrapper, chEnv chan *Environment) error {
-	log.Info("Starting Events broker")
+func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment) error {
+	log.Info("Starting heartbeat listener")
 
 	subscription := rdb.Subscribe()
 	defer subscription.Close()
