@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
-	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	oldlog "log"
 	"reflect"
@@ -17,8 +16,6 @@ import (
 
 // mkMysql creates a new MySQL client.
 func mkMysql(dbType string, dbDsn string) (*sql.DB, error) {
-	log.Info("Connecting to MySQL")
-
 	sep := "?"
 
 	if dbDsn == "" {
