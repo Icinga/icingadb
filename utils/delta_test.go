@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"github.com/magiconair/properties/assert"
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
@@ -22,17 +22,17 @@ func TestDelta(t *testing.T) {
 
 	introduced, maintained, dismissed := Delta(new, old)
 
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"cherp",
 		"lerp",
 	}, introduced)
 
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"herp",
 		"merp",
 	}, maintained)
 
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"derp",
 		"berp",
 	}, dismissed)
