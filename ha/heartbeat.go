@@ -27,7 +27,7 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 	subscription := rdb.Subscribe()
 	defer subscription.Close()
 	if err := subscription.Subscribe(
-		"icinga:config:dump", "icinga:config:delete", "icinga:config:update", "icinga:stats"); err != nil {
+		"icinga:stats"); err != nil {
 		return err
 	}
 
@@ -37,17 +37,14 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 			return err
 		}
 
-		switch msg.Channel {
-		case "icinga:stats":
-			var unJson interface{} = nil
-			if err = json.Unmarshal([]byte(msg.Payload), &unJson); err != nil {
-				return err
-			}
-
-			environment := unJson.(map[string]interface{})["IcingaApplication"].(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["environment"].(string)
-			configDumpInProgress := unJson.(map[string]interface{})["config_dump_in_progress"].(bool)
-			env := &Environment{Name: environment, ID: Sha1bytes([]byte(environment)), configDumpInProgress: configDumpInProgress}
-			chEnv <- env
+		var unJson interface{} = nil
+		if err = json.Unmarshal([]byte(msg.Payload), &unJson); err != nil {
+			return err
 		}
+
+		environment := unJson.(map[string]interface{})["IcingaApplication"].(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["environment"].(string)
+		configDumpInProgress := unJson.(map[string]interface{})["config_dump_in_progress"].(bool)
+		env := &Environment{Name: environment, ID: Sha1bytes([]byte(environment)), configDumpInProgress: configDumpInProgress}
+		chEnv <- env
 	}
 }
