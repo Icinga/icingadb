@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/go-redis/redis"
 	"github.com/google/uuid"
@@ -54,21 +53,21 @@ func (h *HA) AreWeActive() bool {
 
 func (h *HA) updateOwnInstance() error {
 	_, err := h.super.Dbw.SqlExec("update icingadb_instance by id",
-		fmt.Sprintf("UPDATE icingadb_instance SET heartbeat = %d WHERE id = '%s'", h.icinga2MTime, h.uid[:]))
+		"UPDATE icingadb_instance SET heartbeat = ? WHERE id = ?", h.icinga2MTime, h.uid[:])
 	return err
 }
 
 func (h *HA) takeOverInstance() error {
 	_, err := h.super.Dbw.SqlExec("update icingadb_instance by environment_id",
-		fmt.Sprintf("UPDATE icingadb_instance SET id = '%s', heartbeat = %d WHERE environment_id = '%s'",
-			h.uid[:], h.icinga2MTime, h.super.EnvId))
+		"UPDATE icingadb_instance SET id = ?, heartbeat = ? WHERE environment_id = ?",
+			h.uid[:], h.icinga2MTime, h.super.EnvId)
 	return err
 }
 
 func (h *HA) insertInstance() error {
 	_, err := h.super.Dbw.SqlExec("insert into icingadb_instance",
-		fmt.Sprintf("INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES ('%s', '%s', %d, 'y')",
-			h.uid[:], h.super.EnvId, h.icinga2MTime))
+		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, 'y')",
+			h.uid[:], h.super.EnvId, h.icinga2MTime)
 	return err
 }
 
