@@ -137,6 +137,7 @@ func (h *HA) Run(chEnv chan *Environment) {
 	} else {
 		haLogger.Info("Other instance is active.")
 		h.isActive = false
+		h.lastEventId = "0-0"
 	}
 
 	timerHA := time.NewTimer(time.Second * 15)
@@ -187,6 +188,7 @@ func (h *HA) Run(chEnv chan *Environment) {
 		case <-timerHA.C:
 			haLogger.Info("Icinga 2 sent no heartbeat for 15 seconds, pronouncing dead.")
 			h.isActive = false
+			h.lastEventId = "0-0"
 			h.notifyNotificationListener("*", Notify_StopSync)
 		}
 	}
@@ -208,10 +210,12 @@ func (h *HA) runEventListener() {
 		return
 	}
 
-	result := h.super.Rdbw.XRead(&redis.XReadArgs{Streams: []string{"icinga:dump", h.lastEventId}})
+	result := h.super.Rdbw.XRead(&redis.XReadArgs{Block: -1, Streams: []string{"icinga:dump", h.lastEventId}})
 	streams, err := result.Result()
 	if err != nil {
-		h.super.ChErr <- err
+		if err.Error() != "redis: nil" {
+			h.super.ChErr <- err
+		}
 		return
 	}
 
