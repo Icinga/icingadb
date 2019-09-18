@@ -10,6 +10,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"git.icinga.com/icingadb/icingadb-main/utils"
 	log "github.com/sirupsen/logrus"
+	"regexp"
 	"sync"
 	"sync/atomic"
 )
@@ -54,7 +55,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 		wgDelete      	*sync.WaitGroup
 		wgUpdate      	*sync.WaitGroup
 	)
-	log.Infof("%s: Ready", objectInformation.ObjectType)
+	log.Debugf("%s: Ready", objectInformation.ObjectType)
 	for msg := range chHA {
 		switch msg {
 		// Icinga 2 probably died, stop operations and tell all workers to shut down.
@@ -98,6 +99,8 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 			go UpdateCompWorker(super, objectInformation, done, chUpdateComp, chUpdate, wgUpdate)
 			go UpdatePrepWorker(super, objectInformation, done, chUpdate, chUpdateBack)
 			go UpdateExecWorker(super, objectInformation, done, chUpdateBack, wgUpdate, updateCounter)
+
+			go RuntimeUpdateWorker(super, objectInformation, done, chInsert, chDelete, wgInsert, wgDelete)
 
 			waitOrKill := func(wg *sync.WaitGroup, done chan struct{}) (kill bool) {
 				waitDone := make(chan bool)
@@ -420,5 +423,56 @@ func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 			atomic.AddUint32(updateCounter, uint32(rowLen))
 			ConfigSyncUpdatesTotal.WithLabelValues(objectInformation.ObjectType).Add(float64(rowLen))
 		}(rows)
+	}
+}
+
+func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsert chan []string, chDelete chan []string, wgInsert *sync.WaitGroup, wgDelete *sync.WaitGroup) {
+	subscription := super.Rdbw.Subscribe()
+	defer subscription.Close()
+	if err := subscription.Subscribe("icinga:config:delete", "icinga:config:update"); err != nil {
+		super.ChErr <- err
+	}
+
+	for {
+		msg, err := subscription.ReceiveMessage()
+
+		select {
+		case _, ok := <-done:
+			if !ok {
+				return
+			}
+		default:
+		}
+
+		if err != nil {
+			super.ChErr <- err
+		}
+
+		// Split string on last ':'
+		// host:customvar:050ecceaf1ce87e7d503184135d99f47eda5ee85
+		// => [host:customvar:050ecceaf1ce87e7d503184135d99f47eda5ee85 host:customvar 050ecceaf1ce87e7d503184135d99f47eda5ee85]
+		re := regexp.MustCompile(`\A(.*):(.*?)\z`)
+		data := re.FindStringSubmatch(msg.Payload)
+
+		objectType := data[1]
+		if objectType == objectInformation.RedisKey {
+			objectId := data[2]
+			switch msg.Channel {
+			case "icinga:config:update":
+				wgInsert.Add(1)
+				chInsert <- []string{objectId}
+				log.WithFields(log.Fields{
+					"type": 		objectInformation.ObjectType,
+					"action":		"runtime insert/update",
+				}).Infof("Inserting 1 %v on runtime update", objectInformation.ObjectType)
+			case "icinga:config:delete":
+				wgDelete.Add(1)
+				chDelete <- []string{objectId}
+				log.WithFields(log.Fields{
+					"type": 		objectInformation.ObjectType,
+					"action":		"runtime delete",
+				}).Infof("Deleting 1 %v on runtime update", objectInformation.ObjectType)
+			}
+		}
 	}
 }
