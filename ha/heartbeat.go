@@ -37,6 +37,8 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 			return err
 		}
 
+		log.Debug("Got heartbeat")
+
 		var unJson interface{} = nil
 		if err = json.Unmarshal([]byte(msg.Payload), &unJson); err != nil {
 			return err
