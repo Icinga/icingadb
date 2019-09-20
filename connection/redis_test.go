@@ -16,11 +16,12 @@ func NewTestRDBW(rdb RedisClient) RDBWrapper {
 }
 
 func TestNewRDBWrapper(t *testing.T) {
-	_, err := NewRDBWrapper("10.77.27.16:6379")
+	rdbw, err := NewRDBWrapper("10.77.27.16:6379")
 	assert.NoError(t, err, "Redis should be connected")
+	assert.True(t, rdbw.CheckConnection(false), "Redis should be connected")
 
-	_, err = NewRDBWrapper("asdasdasdasdasd:5123")
-	assert.Error(t, err, "Redis should not be connected")
+	rdbw, _ = NewRDBWrapper("asdasdasdasdasd:5123")
+	assert.False(t, rdbw.CheckConnection(false), "Redis should not be connected")
 	//TODO: Add more tests here
 }
 
