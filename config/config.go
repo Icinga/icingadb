@@ -3,7 +3,16 @@ package config
 import (
 	"errors"
 	"github.com/go-ini/ini"
+	"github.com/sirupsen/logrus"
 )
+
+type Logging struct {
+	Level    string `ini:"level"`
+}
+
+var logging = &Logging{
+	Level: "info",
+}
 
 type RedisInfo struct {
 	Host     string `ini:"host"`
@@ -35,6 +44,15 @@ func ParseConfig(path string) error {
 		return err
 	}
 
+	if err := cfg.Section("logging").MapTo(logging); err != nil {
+		return err
+	}
+
+	_, err = logrus.ParseLevel(logging.Level)
+	if err != nil {
+		return err
+	}
+
 	if err := cfg.Section("redis").MapTo(redisInfo); err != nil {
 		return err
 	}
@@ -55,6 +73,10 @@ func ParseConfig(path string) error {
 	}
 
 	return nil
+}
+
+func GetLogging() *Logging {
+	return logging
 }
 
 func GetMysqlInfo() *MysqlInfo {

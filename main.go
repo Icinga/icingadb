@@ -72,6 +72,9 @@ func main() {
 		log.Fatalf("Error reading config: %v", err)
 	}
 
+	level, _ := log.ParseLevel(config.GetLogging().Level)
+	log.SetLevel(level)
+
 	redisInfo := config.GetRedisInfo()
 	mysqlInfo := config.GetMysqlInfo()
 
