@@ -52,9 +52,9 @@ var (
 
 type Service struct {
 	Id                    string  `json:"id"`
-	EnvId                 string  `json:"environment_id"`
+	EnvId                 string  `json:"env_id"`
 	NameChecksum          string  `json:"name_checksum"`
-	PropertiesChecksum    string  `json:"properties_checksum"`
+	PropertiesChecksum    string  `json:"checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
 	GroupsChecksum        string  `json:"groups_checksum"`
 	HostId                string  `json:"host_id"`
@@ -159,12 +159,21 @@ func (s *Service) SetId(id string) {
 	s.Id = id
 }
 
+func (s *Service) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{s}, nil
+}
+
 func init() {
+	name := "service"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "service",
+		ObjectType: name,
+		RedisKey: name,
+		DeltaMySqlField: "id",
 		Factory: NewService,
-		BulkInsertStmt: connection.NewBulkInsertStmt("service", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("service"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("service", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		NotificationListenerType: "service",
 	}
 }

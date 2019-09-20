@@ -5,7 +5,6 @@ CREATE TABLE icon_image (
   id binary(20) NOT NULL COMMENT 'sha1(icon_image)',
   icon_image text COLLATE utf8mb4_unicode_ci NOT NULL,
   env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
-  reference_counter int(6) unsigned NOT NULL COMMENT 'if 0, the custom var needs to be deleted',
 
   PRIMARY KEY (env_id, id),
   KEY idx_icon_image (icon_image(255))
@@ -15,7 +14,6 @@ CREATE TABLE action_url (
   id binary(20) NOT NULL COMMENT 'sha1(action_url)',
   action_url text COLLATE utf8mb4_unicode_ci NOT NULL,
   env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
-  reference_counter int(6) unsigned NOT NULL COMMENT 'if 0, the custom var needs to be deleted',
 
   PRIMARY KEY (env_id, id),
   KEY idx_action_url (action_url(255))
@@ -25,7 +23,6 @@ CREATE TABLE notes_url (
   id binary(20) NOT NULL COMMENT 'sha1(notes_url)',
   notes_url text COLLATE utf8mb4_unicode_ci NOT NULL,
   env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
-  reference_counter int(6) unsigned NOT NULL COMMENT 'if 0, the custom var needs to be deleted',
 
   PRIMARY KEY (env_id, id),
   KEY idx_notes_url (notes_url(255))

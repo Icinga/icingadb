@@ -74,31 +74,34 @@ CREATE TABLE servicegroup (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup_member (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + service_id)',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (servicegroup_id,service_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + service_id + customvar_id)',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (customvar_id, service_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + customvar_id)',
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (customvar_id, servicegroup_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE service_state (
-  service_id binary(20) NOT NULL COMMENT 'service.id',
+  id binary(20) NOT NULL COMMENT 'service.id',
   env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   state_type enum('hard', 'soft') NOT NULL,
@@ -110,7 +113,7 @@ CREATE TABLE service_state (
   output text DEFAULT NULL,
   long_output text DEFAULT NULL,
   performance_data text DEFAULT NULL,
-  check_commandline varchar(255) DEFAULT NULL,
+  check_commandline text DEFAULT NULL,
 
   is_problem enum('y', 'n') NOT NULL,
   is_handled enum('y', 'n') NOT NULL,
@@ -132,5 +135,5 @@ CREATE TABLE service_state (
   last_hard_state tinyint(1) unsigned NOT NULL,
   next_check bigint(20) unsigned NOT NULL,
 
-  PRIMARY KEY (service_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;

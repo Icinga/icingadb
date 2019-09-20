@@ -23,9 +23,9 @@ var (
 
 type Usergroup struct {
 	Id                    string  `json:"id"`
-	EnvId                 string  `json:"environment_id"`
+	EnvId                 string  `json:"env_id"`
 	NameChecksum          string  `json:"name_checksum"`
-	PropertiesChecksum    string  `json:"properties_checksum"`
+	PropertiesChecksum    string  `json:"checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
 	Name                  string  `json:"name"`
 	NameCi                *string `json:"name_ci"`
@@ -72,12 +72,21 @@ func (u *Usergroup) SetId(id string) {
 	u.Id = id
 }
 
+func (u *Usergroup) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{u}, nil
+}
+
 func init() {
+	name := "usergroup"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "usergroup",
+		ObjectType: name,
+		RedisKey: name,
+		DeltaMySqlField: "id",
 		Factory: NewUsergroup,
-		BulkInsertStmt: connection.NewBulkInsertStmt("usergroup", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("usergroup"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("usergroup", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		NotificationListenerType: "usergroup",
 	}
 }

@@ -5,13 +5,54 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/actionurl"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandargument"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandenvvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/customvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/customvar/customvarflat"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/endpoint"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandargument"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcomment"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostdowntime"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hoststate"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupmember"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/iconimage"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notesurl"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification/notificationcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification/notificationuser"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notification/notificationusergroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandargument"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecomment"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicedowntime"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicestate"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupmember"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod/timeperiodcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod/timeperiodoverrideexclude"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod/timeperiodoverrideinclude"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/timeperiod/timeperiodrange"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/user/usercustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup/usergroupcustomvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/usergroup/usergroupmember"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/zone"
 	"git.icinga.com/icingadb/icingadb-main/configobject/statesync"
 	"git.icinga.com/icingadb/icingadb-main/connection"
@@ -60,7 +101,7 @@ func main() {
 
 	go haInstance.Run(chEnv)
 	go func() {
-		super.ChErr <- ha.IcingaEventsBroker(redisConn, chEnv)
+		super.ChErr <- ha.IcingaHeartbeatListener(redisConn, chEnv)
 	}()
 
 	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)
@@ -68,6 +109,8 @@ func main() {
 	startConfigSyncOperators(&super, haInstance)
 
 	statesync.StartStateSync(&super)
+
+	haInstance.StartEventListener()
 
 	go prometheus.HandleHttp("0.0.0.0:8080", super.ChErr)
 
@@ -84,18 +127,73 @@ func main() {
 func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 	objectTypes := []*configobject.ObjectInformation{
 		&host.ObjectInformation,
+		&hostcustomvar.ObjectInformation,
+		&hostdowntime.ObjectInformation,
+		&hostcomment.ObjectInformation,
+		&hoststate.ObjectInformation,
+
 		&service.ObjectInformation,
+		&servicecustomvar.ObjectInformation,
+		&servicedowntime.ObjectInformation,
+		&servicecomment.ObjectInformation,
+		&servicestate.ObjectInformation,
+
 		&hostgroup.ObjectInformation,
+		&hostgroupcustomvar.ObjectInformation,
+		&hostgroupmember.ObjectInformation,
+
 		&servicegroup.ObjectInformation,
+		&servicegroupcustomvar.ObjectInformation,
+		&servicegroupmember.ObjectInformation,
+
 		&user.ObjectInformation,
+		&usercustomvar.ObjectInformation,
+
 		&usergroup.ObjectInformation,
+		&usergroupcustomvar.ObjectInformation,
+		&usergroupmember.ObjectInformation,
+
+		&notification.ObjectInformation,
+		&notificationcustomvar.ObjectInformation,
+		&notificationuser.ObjectInformation,
+		&notificationusergroup.ObjectInformation,
+
+		&customvar.ObjectInformation,
+		&customvarflat.ObjectInformation,
+
 		&zone.ObjectInformation,
+
 		&endpoint.ObjectInformation,
+
+		&actionurl.ObjectInformation,
+		&notesurl.ObjectInformation,
+		&iconimage.ObjectInformation,
+
+		&timeperiod.ObjectInformation,
+		&timeperiodcustomvar.ObjectInformation,
+		&timeperiodoverrideinclude.ObjectInformation,
+		&timeperiodoverrideexclude.ObjectInformation,
+		&timeperiodrange.ObjectInformation,
+
+		&checkcommand.ObjectInformation,
+		&checkcommandcustomvar.ObjectInformation,
+		&checkcommandargument.ObjectInformation,
+		&checkcommandenvvar.ObjectInformation,
+
+		&eventcommand.ObjectInformation,
+		&eventcommandcustomvar.ObjectInformation,
+		&eventcommandargument.ObjectInformation,
+		&eventcommandenvvar.ObjectInformation,
+
+		&notificationcommand.ObjectInformation,
+		&notificationcommandcustomvar.ObjectInformation,
+		&notificationcommandargument.ObjectInformation,
+		&notificationcommandenvvar.ObjectInformation,
 	}
 
 	for _, objectInformation := range objectTypes {
 		go func(information *configobject.ObjectInformation) {
-			super.ChErr <- configsync.Operator(super, haInstance.RegisterNotificationListener(), information)
+			super.ChErr <- configsync.Operator(super, haInstance.RegisterNotificationListener(information.NotificationListenerType), information)
 		}(objectInformation)
 	}
 }

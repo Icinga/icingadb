@@ -21,9 +21,9 @@ var (
 
 type Endpoint struct {
 	Id                  string  `json:"id"`
-	EnvId               string  `json:"environment_id"`
+	EnvId               string  `json:"env_id"`
 	NameChecksum        string  `json:"name_checksum"`
-	PropertiesChecksum  string  `json:"properties_checksum"`
+	PropertiesChecksum  string  `json:"checksum"`
 	Name                string  `json:"name"`
 	NameCi              *string `json:"name_ci"`
 	ZoneId            	string  `json:"zone_id"`
@@ -66,12 +66,21 @@ func (e *Endpoint) SetId(id string) {
 	e.Id = id
 }
 
+func (e *Endpoint) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{e}, nil
+}
+
 func init() {
+	name := "endpoint"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "endpoint",
+		ObjectType: name,
+		RedisKey: name,
+		DeltaMySqlField: "id",
 		Factory: NewEndpoint,
-		BulkInsertStmt: connection.NewBulkInsertStmt("endpoint", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("endpoint"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("endpoint", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		NotificationListenerType: "endpoint",
 	}
 }

@@ -367,7 +367,7 @@ type ChecksumChunk struct {
 	Checksums []interface{}
 }
 
-func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, keys []string, objectType string) <-chan *ConfigChunk {
+func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, keys []string, redisKey string) <-chan *ConfigChunk {
 	out := make(chan *ConfigChunk)
 
 	worker := func(chunk <-chan []string) {
@@ -375,8 +375,8 @@ func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, keys []string, ob
 			pipe := rdbw.Pipeline()
 			cmds := make([]*redis.SliceCmd, 2)
 
-			cmds[0] = pipe.HMGet(fmt.Sprintf("icinga:config:object:%s", objectType), k...)
-			cmds[1] = pipe.HMGet(fmt.Sprintf("icinga:config:checksum:%s", objectType), k...)
+			cmds[0] = pipe.HMGet(fmt.Sprintf("icinga:config:%s", redisKey), k...)
+			cmds[1] = pipe.HMGet(fmt.Sprintf("icinga:checksum:%s", redisKey), k...)
 
 			_, err := pipe.Exec() // TODO(el): What to do with the Cmder slice?
 			if err != nil {
@@ -422,12 +422,12 @@ func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, keys []string, ob
 	return out
 }
 
-func (rdbw *RDBWrapper) PipeChecksumChunks(done <-chan struct{}, keys []string, objectType string) <-chan *ChecksumChunk {
+func (rdbw *RDBWrapper) PipeChecksumChunks(done <-chan struct{}, keys []string, redisKey string) <-chan *ChecksumChunk {
 	out := make(chan *ChecksumChunk)
 
 	worker := func(chunk <-chan []string) {
 		for k := range chunk {
-			cmd := rdbw.HMGet(fmt.Sprintf("icinga:config:checksum:%s", objectType), k...)
+			cmd := rdbw.HMGet(fmt.Sprintf("icinga:checksum:%s", redisKey), k...)
 
 			checksums, err := cmd.Result()
 			if err != nil {

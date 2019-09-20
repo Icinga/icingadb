@@ -45,23 +45,26 @@ CREATE TABLE usergroup (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE usergroup_member (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + usergroup_id + user_id)',
   user_id binary(20) NOT NULL COMMENT 'user.id',
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
   env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (user_id,usergroup_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + user_id + customvar_id)',
   user_id binary(20) NOT NULL COMMENT 'user.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
-  PRIMARY KEY (customvar_id, user_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE usergroup_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + usergroup_id + customvar_id)',
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
-  PRIMARY KEY (customvar_id, usergroup_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
