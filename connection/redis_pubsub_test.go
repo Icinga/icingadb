@@ -3,13 +3,14 @@ package connection
 import (
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
 	"time"
 )
 
 func TestPubSubWrapper(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "10.77.27.16:6379",
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
