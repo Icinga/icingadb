@@ -72,8 +72,11 @@ func NewTestDBW(db DbClient) DBWrapper {
 }
 
 func TestNewDBWrapper(t *testing.T) {
-	_, err := NewDBWrapper("asdasd")
-	assert.Error(t, err)
+	dbw, err := NewDBWrapper("asdasd")
+	if err == nil {
+		assert.False(t, dbw.checkConnection(false), "DBWrapper should not be connected")
+	}
+
 	//TODO: Add more tests here
 }
 
