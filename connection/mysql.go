@@ -6,12 +6,25 @@ import (
 	"database/sql"
 	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/utils"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
+
+var mysqlObservers = struct {
+	begin       prometheus.Observer
+	commit      prometheus.Observer
+	rollback    prometheus.Observer
+	transaction prometheus.Observer
+}{
+	DbIoSeconds.WithLabelValues("mysql", "begin"),
+	DbIoSeconds.WithLabelValues("mysql", "commit"),
+	DbIoSeconds.WithLabelValues("mysql", "rollback"),
+	DbIoSeconds.WithLabelValues("mysql", "transaction"),
+}
 
 // This is used in SqlFetchAll and SqlFetchAllQuiet
 type DbClientOrTransaction interface {
@@ -195,7 +208,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransactio
 			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
 			benchmarc.Stop()
 
-			DbIoSeconds.WithLabelValues("mysql", "begin").Observe(benchmarc.Seconds())
+			mysqlObservers.begin.Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -230,7 +243,7 @@ func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 			err = tx.Commit()
 			benchmarc.Stop()
 
-			DbIoSeconds.WithLabelValues("mysql", "commit").Observe(benchmarc.Seconds())
+			mysqlObservers.commit.Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -263,7 +276,7 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 			err = tx.Rollback()
 			benchmarc.Stop()
 
-			DbIoSeconds.WithLabelValues("mysql", "rollback").Observe(benchmarc.Seconds())
+			mysqlObservers.rollback.Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -484,7 +497,7 @@ func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFai
 		errTx := dbw.sqlTryTransaction(f, concurrencySafety, false)
 		if !quiet {
 			benchmarc.Stop()
-			DbIoSeconds.WithLabelValues("mysql", "transaction").Observe(benchmarc.Seconds())
+			mysqlObservers.transaction.Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
