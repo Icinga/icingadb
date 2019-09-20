@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/go-redis/redis"
 	"github.com/google/uuid"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"time"
@@ -43,6 +45,18 @@ func NewHA(super *supervisor.Supervisor) (*HA, error) {
 	return &ho, nil
 }
 
+var mysqlObservers = struct {
+	updateIcingadbInstanceById                           prometheus.Observer
+	updateIcingadbInstanceByEnvironmentId                prometheus.Observer
+	insertIntoIcingadbInstance                           prometheus.Observer
+	selectIdHeartbeatFromIcingadbInstanceByEnvironmentId prometheus.Observer
+}{
+	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by id"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by environment_id"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "insert into icingadb_instance"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "select id, heartbeat from icingadb_instance where environment_id = ourEnvID"),
+}
+
 func (h *HA) icinga2HeartBeat() {
 	h.icinga2MTime = time.Now().Unix()
 }
@@ -52,27 +66,27 @@ func (h *HA) AreWeActive() bool {
 }
 
 func (h *HA) updateOwnInstance() error {
-	_, err := h.super.Dbw.SqlExec("update icingadb_instance by id",
+	_, err := h.super.Dbw.SqlExec(mysqlObservers.updateIcingadbInstanceById,
 		"UPDATE icingadb_instance SET heartbeat = ? WHERE id = ?", h.icinga2MTime, h.uid[:])
 	return err
 }
 
 func (h *HA) takeOverInstance() error {
-	_, err := h.super.Dbw.SqlExec("update icingadb_instance by environment_id",
+	_, err := h.super.Dbw.SqlExec(mysqlObservers.updateIcingadbInstanceByEnvironmentId,
 		"UPDATE icingadb_instance SET id = ?, heartbeat = ? WHERE environment_id = ?",
 			h.uid[:], h.icinga2MTime, h.super.EnvId)
 	return err
 }
 
 func (h *HA) insertInstance() error {
-	_, err := h.super.Dbw.SqlExec("insert into icingadb_instance",
+	_, err := h.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, 'y')",
 			h.uid[:], h.super.EnvId, h.icinga2MTime)
 	return err
 }
 
 func (h *HA) getInstance() (bool, uuid.UUID, int64, error) {
-	rows, err := h.super.Dbw.SqlFetchAll("select id, heartbeat from icingadb_instance where environment_id = ourEnvID",
+	rows, err := h.super.Dbw.SqlFetchAll(mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		h.super.EnvId,
 	)

@@ -5,12 +5,23 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/go-redis/redis"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
 
 //Counter on how many host/service states have synced since the last logSyncCounters()
 var syncCounter = make(map[string]int)
+
+var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
+	mysqlObservers = map[string]prometheus.Observer{}
+
+	for _, objectType := range [2]string{"host", "service"} {
+		mysqlObservers[objectType] = connection.DbIoSeconds.WithLabelValues("mysql", "replace into "+objectType+"_state")
+	}
+
+	return
+}()
 
 //Start the sync goroutines for hosts and services
 func StartStateSync(super *supervisor.Supervisor) {
@@ -79,7 +90,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 
 			_, errExec := super.Dbw.SqlExecTx(
 				tx,
-				"replace into "+objectType+"_state",
+				mysqlObservers[objectType],
 				`REPLACE INTO `+objectType+`_state (`+objectType+`_id, env_id, state_type, soft_state, hard_state, attempt, severity, output, long_output, performance_data,`+
 					`check_commandline, is_problem, is_handled, is_reachable, is_flapping, is_acknowledged, acknowledgement_comment_id,`+
 					`in_downtime, execution_time, latency, timeout, last_update, last_state_change, last_soft_state,`+

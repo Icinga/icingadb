@@ -19,11 +19,17 @@ var mysqlObservers = struct {
 	commit      prometheus.Observer
 	rollback    prometheus.Observer
 	transaction prometheus.Observer
+	bulkInsert  prometheus.Observer
+	bulkDelete  prometheus.Observer
+	bulkUpdate  prometheus.Observer
 }{
 	DbIoSeconds.WithLabelValues("mysql", "begin"),
 	DbIoSeconds.WithLabelValues("mysql", "commit"),
 	DbIoSeconds.WithLabelValues("mysql", "rollback"),
 	DbIoSeconds.WithLabelValues("mysql", "transaction"),
+	DbIoSeconds.WithLabelValues("mysql", "Bulk insert"),
+	DbIoSeconds.WithLabelValues("mysql", "Bulk delete"),
+	DbIoSeconds.WithLabelValues("mysql", "Bulk update"),
 }
 
 // This is used in SqlFetchAll and SqlFetchAllQuiet
@@ -297,43 +303,43 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 }
 
 // Wrapper around sql.Exec() for auto-logging
-func (dbw *DBWrapper) SqlExec(opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	return dbw.sqlExecInternal(dbw.Db, opDescription, sql, false, args...)
+func (dbw *DBWrapper) SqlExec(opObserver prometheus.Observer, sql string, args ...interface{}) (sql.Result, error) {
+	return dbw.sqlExecInternal(dbw.Db, opObserver, sql, false, args...)
 }
 
 // No logging, no benchmarking
-func (dbw *DBWrapper) SqlExecQuiet(opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	return dbw.sqlExecInternal(dbw.Db, opDescription, sql, true, args...)
+func (dbw *DBWrapper) SqlExecQuiet(opObserver prometheus.Observer, sql string, args ...interface{}) (sql.Result, error) {
+	return dbw.sqlExecInternal(dbw.Db, opObserver, sql, true, args...)
 }
 
 // Wrapper around tx.Exec() for auto-logging
-func (dbw *DBWrapper) SqlExecTx(tx DbTransaction, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	return dbw.sqlExecInternal(tx, opDescription, sql, false, args...)
+func (dbw *DBWrapper) SqlExecTx(tx DbTransaction, opObserver prometheus.Observer, sql string, args ...interface{}) (sql.Result, error) {
+	return dbw.sqlExecInternal(tx, opObserver, sql, false, args...)
 }
 
 // No logging, no benchmarking
-func (dbw *DBWrapper) SqlExecTxQuiet(tx DbTransaction, opDescription string, sql string, args ...interface{}) (sql.Result, error) {
-	return dbw.sqlExecInternal(tx, opDescription, sql, true, args...)
+func (dbw *DBWrapper) SqlExecTxQuiet(tx DbTransaction, opObserver prometheus.Observer, sql string, args ...interface{}) (sql.Result, error) {
+	return dbw.sqlExecInternal(tx, opObserver, sql, true, args...)
 }
 
-func (dbw *DBWrapper) SqlFetchAll(queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(dbw.Db, queryDescription, query, false, args...)
+func (dbw *DBWrapper) SqlFetchAll(queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
+	return dbw.sqlFetchAllInternal(dbw.Db, queryObserver, query, false, args...)
 }
 
-func (dbw *DBWrapper) SqlFetchAllQuiet(queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(dbw.Db, queryDescription, query, true, args...)
+func (dbw *DBWrapper) SqlFetchAllQuiet(queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
+	return dbw.sqlFetchAllInternal(dbw.Db, queryObserver, query, true, args...)
 }
 
-func (dbw *DBWrapper) SqlFetchAllTx(tx DbTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(tx, queryDescription, query, false, args...)
+func (dbw *DBWrapper) SqlFetchAllTx(tx DbTransaction, queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
+	return dbw.sqlFetchAllInternal(tx, queryObserver, query, false, args...)
 }
 
-func (dbw *DBWrapper) SqlFetchAllTxQuiet(tx DbTransaction, queryDescription string, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(tx, queryDescription, query, true, args...)
+func (dbw *DBWrapper) SqlFetchAllTxQuiet(tx DbTransaction, queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
+	return dbw.sqlFetchAllInternal(tx, queryObserver, query, true, args...)
 }
 
 // Wrapper around sql.Exec() for auto-logging
-func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opDescription string, sql string, quiet bool, args ...interface{}) (sql.Result, error) {
+func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prometheus.Observer, sql string, quiet bool, args ...interface{}) (sql.Result, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -353,7 +359,7 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opDescription st
 		}
 
 		if !quiet {
-			DbIoSeconds.WithLabelValues("mysql", opDescription).Observe(benchmarc.Seconds())
+			opObserver.Observe(benchmarc.Seconds())
 			log.WithFields(log.Fields{
 				"context":       "sql",
 				"benchmark":     benchmarc,
@@ -375,14 +381,14 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opDescription st
 }
 
 // Wrapper around Db.SqlQuery() for auto-logging
-func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryDescription string, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
+func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryObserver prometheus.Observer, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
 			continue
 		}
 
-		res, err := sqlTryFetchAll(db, queryDescription, query, quiet, args...)
+		res, err := sqlTryFetchAll(db, queryObserver, query, quiet, args...)
 
 		if err != nil {
 			if _, isDb := db.(*sql.DB); isDb {
@@ -396,7 +402,7 @@ func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryDescrip
 	}
 }
 
-func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
+func sqlTryFetchAll(db DbClientOrTransaction, queryObserver prometheus.Observer, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
 	var benchmarc *utils.Benchmark
 	if !quiet {
 		benchmarc = utils.NewBenchmark()
@@ -410,7 +416,7 @@ func sqlTryFetchAll(db DbClientOrTransaction, queryDescription string, query str
 
 	defer func() {
 		if !quiet {
-			DbIoSeconds.WithLabelValues("mysql", queryDescription).Observe(benchmarc.Seconds())
+			queryObserver.Observe(benchmarc.Seconds())
 			log.WithFields(log.Fields{
 				"context":       "sql",
 				"benchmark":     benchmarc,
@@ -666,7 +672,7 @@ func (dbw *DBWrapper) SqlBulkInsert(rows []Row, stmt *BulkInsertStmt) error {
 	query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
 
 	_, err := dbw.WithRetry(func() (result sql.Result, e error) {
-		return dbw.SqlExec("Bulk insert", query, values...)
+		return dbw.SqlExec(mysqlObservers.bulkInsert, query, values...)
 	})
 
 	if err != nil {
@@ -697,7 +703,7 @@ func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
 		query := fmt.Sprintf(stmt.Format, placeholders)
 
 		_, err := dbw.WithRetry(func() (result sql.Result, e error) {
-			return dbw.SqlExec("Bulk delete", query, values...)
+			return dbw.SqlExec(mysqlObservers.bulkDelete, query, values...)
 		})
 		if err != nil {
 			return err
@@ -730,7 +736,7 @@ func (dbw *DBWrapper) SqlBulkUpdate(rows []Row, stmt *BulkUpdateStmt) error {
 	query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
 
 	_, err := dbw.WithRetry(func() (result sql.Result, e error) {
-		return dbw.SqlExec("Bulk update", query, values...)
+		return dbw.SqlExec(mysqlObservers.bulkUpdate, query, values...)
 	})
 	if err != nil {
 		return err
