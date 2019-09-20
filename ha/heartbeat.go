@@ -11,7 +11,7 @@ import (
 type Environment struct {
 	ID                   []byte
 	Name                 string
-	configDumpInProgress bool
+	NodeName             string
 }
 
 // Compute SHA1
@@ -26,8 +26,7 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 
 	subscription := rdb.Subscribe()
 	defer subscription.Close()
-	if err := subscription.Subscribe(
-		"icinga:stats"); err != nil {
+	if err := subscription.Subscribe("icinga:stats"); err != nil {
 		return err
 	}
 
@@ -45,8 +44,8 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 		}
 
 		environment := unJson.(map[string]interface{})["IcingaApplication"].(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["environment"].(string)
-		configDumpInProgress := unJson.(map[string]interface{})["config_dump_in_progress"].(bool)
-		env := &Environment{Name: environment, ID: Sha1bytes([]byte(environment)), configDumpInProgress: configDumpInProgress}
+		nodeName := unJson.(map[string]interface{})["IcingaApplication"].(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["node_name"].(string)
+		env := &Environment{Name: environment, ID: Sha1bytes([]byte(environment)), NodeName: nodeName}
 		chEnv <- env
 	}
 }

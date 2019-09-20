@@ -12,7 +12,8 @@ var icingastate = "{\"IcingaApplication\":" +
 	"{\"status\": " +
 	"{\"icingaapplication\":" +
 	"{\"app\":{" +
-	"\"environment\": \"\"" +
+	"\"environment\": \"\"," +
+	"\"node_name\": \"master1.icinga.test.com\"" +
 	"}}}}, \"config_dump_in_progress\": false}"
 
 func TestIcingaHeartbeatListener(t *testing.T) {
