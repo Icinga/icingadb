@@ -18,19 +18,21 @@ var (
 		"name_ci",
 		"is_global",
 		"parent_id",
+		"depth",
 	}
 )
 
 type Zone struct {
 	Id                  string  `json:"id"`
-	EnvId               string  `json:"environment_id"`
+	EnvId               string  `json:"env_id"`
 	NameChecksum        string  `json:"name_checksum"`
-	PropertiesChecksum  string  `json:"properties_checksum"`
+	PropertiesChecksum  string  `json:"checksum"`
 	ParentsChecksum     string  `json:"parents_checksum"`
 	Name                string  `json:"name"`
 	NameCi              *string `json:"name_ci"`
 	IsGlobal			bool	`json:"is_global"`
 	ParentId            string  `json:"parent_id"`
+	Depth				float64	`json:"depth"`
 }
 
 func NewZone() connection.Row {
@@ -59,6 +61,7 @@ func (z *Zone) UpdateValues() []interface{} {
 		z.NameCi,
 		utils.Bool[z.IsGlobal],
 		utils.Checksum(z.ParentId),
+		z.Depth,
 	)
 
 	return v
@@ -72,12 +75,21 @@ func (z *Zone) SetId(id string) {
 	z.Id = id
 }
 
+func (z *Zone) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{z}, nil
+}
+
 func init() {
+	name := "zone"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "zone",
+		ObjectType: name,
+		RedisKey: name,
+		DeltaMySqlField: "id",
 		Factory: NewZone,
-		BulkInsertStmt: connection.NewBulkInsertStmt("zone", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("zone"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("zone", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		NotificationListenerType: "zone",
 	}
 }

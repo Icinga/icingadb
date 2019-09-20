@@ -55,9 +55,9 @@ var (
 
 type Host struct {
 	Id                    string  `json:"id"`
-	EnvId                 string  `json:"environment_id"`
+	EnvId                 string  `json:"env_id"`
 	NameChecksum          string  `json:"name_checksum"`
-	PropertiesChecksum    string  `json:"properties_checksum"`
+	PropertiesChecksum    string  `json:"checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
 	GroupsChecksum        string  `json:"groups_checksum"`
 	Name                  string  `json:"name"`
@@ -168,12 +168,21 @@ func (h *Host) SetId(id string) {
 	h.Id = id
 }
 
+func (h *Host) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{h}, nil
+}
+
 func init() {
+	name := "host"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "host",
+		ObjectType: name,
+		RedisKey: name,
+		DeltaMySqlField: "id",
 		Factory: NewHost,
-		BulkInsertStmt: connection.NewBulkInsertStmt("host", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("host"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("host", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		NotificationListenerType: "host",
 	}
 }

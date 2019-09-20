@@ -81,31 +81,34 @@ CREATE TABLE hostgroup (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_member (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + host_id + hostgroup_id)',
   host_id binary(20) NOT NULL COMMENT 'host.id',
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (hostgroup_id,host_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE host_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + host_id + customvar_id)',
   host_id binary(20) NOT NULL COMMENT 'host.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (customvar_id, host_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + hostgroup_id + customvar_id)',
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
-  PRIMARY KEY (customvar_id, hostgroup_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE host_state (
-  host_id binary(20) NOT NULL COMMENT 'host.id',
+  id binary(20) NOT NULL COMMENT 'host.id',
   env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   state_type enum('hard', 'soft') NOT NULL,
@@ -117,7 +120,7 @@ CREATE TABLE host_state (
   output text DEFAULT NULL,
   long_output text DEFAULT NULL,
   performance_data text DEFAULT NULL,
-  check_commandline varchar(255) DEFAULT NULL,
+  check_commandline text DEFAULT NULL,
 
   is_problem enum('y', 'n') NOT NULL,
   is_handled enum('y', 'n') NOT NULL,
@@ -139,5 +142,5 @@ CREATE TABLE host_state (
   last_hard_state tinyint(1) unsigned NOT NULL,
   next_check bigint(20) unsigned NOT NULL,
 
-  PRIMARY KEY (host_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;

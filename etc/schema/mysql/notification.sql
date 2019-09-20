@@ -31,24 +31,27 @@ CREATE TABLE notification (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_user (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + user_id)',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   user_id binary(20) NOT NULL COMMENT 'user.id',
   env_id binary(20) NOT NULL COMMENT 'environment.id',
 
-  PRIMARY KEY (notification_id,user_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_usergroup (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + usergroup_id)',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
   env_id binary(20) NOT NULL COMMENT 'environment.id',
 
-  PRIMARY KEY (notification_id, usergroup_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_customvar (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + customvar_id)',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
-  PRIMARY KEY (customvar_id, notification_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;

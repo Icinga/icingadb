@@ -29,22 +29,22 @@ var (
 )
 
 type User struct {
-	Id						string  `json:"id"`
-	EnvId					string  `json:"environment_id"`
-	NameChecksum			string  `json:"name_checksum"`
-	PropertiesChecksum  	string  `json:"properties_checksum"`
-	CustomvarsChecksum  	string  `json:"customvars_checksum"`
-	GroupsChecksum      	string  `json:"groups_checksum"`
-	Name                	string  `json:"name"`
-	NameCi              	*string `json:"name_ci"`
-	DisplayName         	string  `json:"display_name"`
-	EMail           		string  `json:"email"`
-	Pager           		string  `json:"pager"`
-	NotificationsEnabled	bool 	`json:"notifications_enabled"`
-	PeriodId				string 	`json:"period_id"`
-	States           		int  	`json:"states"`
-	Types           		int		`json:"types"`
-	ZoneId              	string  `json:"zone_id"`
+	Id						string  	`json:"id"`
+	EnvId					string  	`json:"env_id"`
+	NameChecksum			string  	`json:"name_checksum"`
+	PropertiesChecksum  	string  	`json:"checksum"`
+	CustomvarsChecksum  	string  	`json:"customvars_checksum"`
+	GroupsChecksum      	string  	`json:"groups_checksum"`
+	Name                	string  	`json:"name"`
+	NameCi              	*string 	`json:"name_ci"`
+	DisplayName         	string  	`json:"display_name"`
+	EMail           		string  	`json:"email"`
+	Pager           		string  	`json:"pager"`
+	NotificationsEnabled	bool 		`json:"notifications_enabled"`
+	PeriodId				string 		`json:"period_id"`
+	States           		[]string  	`json:"states"`
+	Types           		[]string	`json:"types"`
+	ZoneId              	string  	`json:"zone_id"`
 }
 
 func NewUser() connection.Row {
@@ -77,8 +77,8 @@ func (u *User) UpdateValues() []interface{} {
 		u.Pager,
 		u.NotificationsEnabled,
 		utils.Checksum(u.PeriodId),
-		u.States,
-		u.Types,
+		utils.NotificationStatesToBitMask(u.States),
+		utils.NotificationTypesToBitMask(u.Types),
 		utils.Checksum(u.ZoneId),
 	)
 
@@ -93,12 +93,21 @@ func (u *User) SetId(id string) {
 	u.Id = id
 }
 
+func (u *User) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{u}, nil
+}
+
 func init() {
+	name := "user"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: "user",
+		ObjectType: name,
+		RedisKey: name,
+		DeltaMySqlField: "id",
 		Factory: NewUser,
-		BulkInsertStmt: connection.NewBulkInsertStmt("user", Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt("user"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt("user", Fields),
+		HasChecksum: true,
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		NotificationListenerType: "user",
 	}
 }

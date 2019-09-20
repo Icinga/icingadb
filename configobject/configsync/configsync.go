@@ -10,13 +10,14 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"git.icinga.com/icingadb/icingadb-main/utils"
 	log "github.com/sirupsen/logrus"
+	"regexp"
 	"sync"
 	"sync/atomic"
 )
 
 type Checksums struct {
 	NameChecksum          string  `json:"name_checksum"`
-	PropertiesChecksum    string  `json:"properties_checksum"`
+	PropertiesChecksum    string  `json:"checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
 	GroupsChecksum        string  `json:"groups_checksum"`
 }
@@ -54,22 +55,27 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 		wgDelete      	*sync.WaitGroup
 		wgUpdate      	*sync.WaitGroup
 	)
+	log.Debugf("%s: Ready", objectInformation.ObjectType)
 	for msg := range chHA {
 		switch msg {
 		// Icinga 2 probably died, stop operations and tell all workers to shut down.
 		case ha.Notify_StopSync:
-			log.Info(fmt.Sprintf("%s: Lost responsibility", objectInformation.ObjectType))
 			if done != nil {
+				log.Info(fmt.Sprintf("%s: Lost responsibility", objectInformation.ObjectType))
 				close(done)
 				done = nil
 			}
 		// Starts up the whole sync process.
 		case ha.Notify_StartSync:
+			if done != nil {
+				continue
+			}
+
 			log.Infof("%s: Got responsibility", objectInformation.ObjectType)
 
 			//TODO: This should only be done, if HA was taken over from another instance
 			insert, update, delete := GetDelta(super, objectInformation)
-			log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", objectInformation.ObjectType, len(insert), len(update), len(delete))
+			//log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", objectInformation.ObjectType, len(insert), len(update), len(delete))
 
 			// Clean up all channels and wait groups for a fresh config dump
 			done 			= make(chan struct{})
@@ -93,6 +99,8 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 			go UpdateCompWorker(super, objectInformation, done, chUpdateComp, chUpdate, wgUpdate)
 			go UpdatePrepWorker(super, objectInformation, done, chUpdate, chUpdateBack)
 			go UpdateExecWorker(super, objectInformation, done, chUpdateBack, wgUpdate, updateCounter)
+
+			go RuntimeUpdateWorker(super, objectInformation, done, chInsert, chDelete, wgInsert, wgDelete)
 
 			waitOrKill := func(wg *sync.WaitGroup, done chan struct{}) (kill bool) {
 				waitDone := make(chan bool)
@@ -119,7 +127,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				// Wait for all IDs to be inserted into MySQL
 				kill := waitOrKill(wgInsert, done)
 				benchmarc.Stop()
-				if !kill {
+				if !kill && len(insert) > 0 {
 					log.WithFields(log.Fields{
 						"type": 		objectInformation.ObjectType,
 						"count": 		len(insert),
@@ -139,7 +147,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				// Wait for all IDs to be deleted from MySQL
 				kill := waitOrKill(wgDelete, done)
 				benchmarc.Stop()
-				if !kill {
+				if !kill && len(delete) > 0 {
 					log.WithFields(log.Fields{
 						"type":      objectInformation.ObjectType,
 						"count":     len(delete),
@@ -149,25 +157,27 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				}
 			}()
 
-			go func() {
-				benchmarc := utils.NewBenchmark()
-				wgUpdate.Add(len(update))
+			if (objectInformation.HasChecksum) {
+				go func() {
+					benchmarc := utils.NewBenchmark()
+					wgUpdate.Add(len(update))
 
-				// Provide the UpdateCompWorker with IDs to compare
-				chUpdateComp <- update
+					// Provide the UpdateCompWorker with IDs to compare
+					chUpdateComp <- update
 
-				// Wait for all IDs to be update in MySQL
-				kill := waitOrKill(wgUpdate, done)
-				benchmarc.Stop()
-				if !kill {
-					log.WithFields(log.Fields{
-						"type":      objectInformation.ObjectType,
-						"count":     atomic.LoadUint32(updateCounter),
-						"benchmark": benchmarc.String(),
-						"action":    "update",
-					}).Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), objectInformation.ObjectType, benchmarc.String())
-				}
-			}()
+					// Wait for all IDs to be update in MySQL
+					kill := waitOrKill(wgUpdate, done)
+					benchmarc.Stop()
+					if !kill && atomic.LoadUint32(updateCounter) > 0 {
+						log.WithFields(log.Fields{
+							"type":      objectInformation.ObjectType,
+							"count":     atomic.LoadUint32(updateCounter),
+							"benchmark": benchmarc.String(),
+							"action":    "update",
+						}).Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), objectInformation.ObjectType, benchmarc.String())
+					}
+				}()
+			}
 		}
 	}
 
@@ -191,7 +201,7 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 	go func() {
 		defer wg.Done()
 		var err error
-		res, err := super.Rdbw.HKeys(fmt.Sprintf("icinga:config:checksum:%s", objectInformation.ObjectType)).Result()
+		res, err := super.Rdbw.HKeys(fmt.Sprintf("icinga:config:%s", objectInformation.RedisKey)).Result()
 		if err != nil {
 			super.ChErr <- err
 			return
@@ -205,7 +215,7 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 		defer wg.Done()
 		var err error
 		super.EnvLock.Lock()
-		mysqlIds, err = super.Dbw.SqlFetchIds(super.EnvId, objectInformation.ObjectType)
+		mysqlIds, err = super.Dbw.SqlFetchIds(super.EnvId, objectInformation.ObjectType, objectInformation.DeltaMySqlField)
 		super.EnvLock.Unlock()
 		if err != nil {
 			super.ChErr <- err
@@ -226,16 +236,21 @@ func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 			ChBack: chInsertBack,
 		}
 		for i, key := range chunk.Keys {
-			if chunk.Configs[i] == nil || chunk.Checksums[i] == nil {
+			if chunk.Configs[i] == nil {
 				continue
 			}
+
 			pkg := jsondecoder.JsonDecodePackage{
 				Id:           	key,
-				ChecksumsRaw:	chunk.Checksums[i].(string),
-				ConfigRaw:   	chunk.Configs[i].(string),
+				ConfigRaw:		chunk.Configs[i].(string),
 				Factory:		objectInformation.Factory,
 				ObjectType:		objectInformation.ObjectType,
 			}
+
+			if chunk.Checksums[i] != nil {
+				pkg.ChecksumsRaw = chunk.Checksums[i].(string)
+			}
+
 			pkgs.Packages = append(pkgs.Packages, pkg)
 		}
 
@@ -251,7 +266,7 @@ func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 		default:
 		}
 
-		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.ObjectType)
+		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.RedisKey)
 		go func() {
 			for chunk := range ch {
 				go prep(chunk)
@@ -335,7 +350,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 		default:
 		}
 
-		ch := super.Rdbw.PipeChecksumChunks(done, keys, objectInformation.ObjectType)
+		ch := super.Rdbw.PipeChecksumChunks(done, keys, objectInformation.RedisKey)
 		checksums, err := super.Dbw.SqlFetchChecksums(objectInformation.ObjectType, keys)
 		if err != nil {
 			super.ChErr <- err
@@ -381,7 +396,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 		default:
 		}
 
-		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.ObjectType)
+		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.RedisKey)
 		go func() {
 			for chunk := range ch {
 				go prep(chunk)
@@ -408,5 +423,56 @@ func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 			atomic.AddUint32(updateCounter, uint32(rowLen))
 			ConfigSyncUpdatesTotal.WithLabelValues(objectInformation.ObjectType).Add(float64(rowLen))
 		}(rows)
+	}
+}
+
+func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsert chan []string, chDelete chan []string, wgInsert *sync.WaitGroup, wgDelete *sync.WaitGroup) {
+	subscription := super.Rdbw.Subscribe()
+	defer subscription.Close()
+	if err := subscription.Subscribe("icinga:config:delete", "icinga:config:update"); err != nil {
+		super.ChErr <- err
+	}
+
+	for {
+		msg, err := subscription.ReceiveMessage()
+
+		select {
+		case _, ok := <-done:
+			if !ok {
+				return
+			}
+		default:
+		}
+
+		if err != nil {
+			super.ChErr <- err
+		}
+
+		// Split string on last ':'
+		// host:customvar:050ecceaf1ce87e7d503184135d99f47eda5ee85
+		// => [host:customvar:050ecceaf1ce87e7d503184135d99f47eda5ee85 host:customvar 050ecceaf1ce87e7d503184135d99f47eda5ee85]
+		re := regexp.MustCompile(`\A(.*):(.*?)\z`)
+		data := re.FindStringSubmatch(msg.Payload)
+
+		objectType := data[1]
+		if objectType == objectInformation.RedisKey {
+			objectId := data[2]
+			switch msg.Channel {
+			case "icinga:config:update":
+				wgInsert.Add(1)
+				chInsert <- []string{objectId}
+				log.WithFields(log.Fields{
+					"type": 		objectInformation.ObjectType,
+					"action":		"runtime insert/update",
+				}).Infof("Inserting 1 %v on runtime update", objectInformation.ObjectType)
+			case "icinga:config:delete":
+				wgDelete.Add(1)
+				chDelete <- []string{objectId}
+				log.WithFields(log.Fields{
+					"type": 		objectInformation.ObjectType,
+					"action":		"runtime delete",
+				}).Infof("Deleting 1 %v on runtime update", objectInformation.ObjectType)
+			}
+		}
 	}
 }
