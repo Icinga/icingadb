@@ -49,6 +49,11 @@ func logSyncCounters() {
 
 //Tries to sync the states of given object type every second
 func syncStates(super *supervisor.Supervisor, objectType string) {
+	if super.EnvId == nil {
+		log.Debug("StateSync: Waiting for EnvId to be set")
+		return
+	}
+
 	result := super.Rdbw.XRead(&redis.XReadArgs{Streams: []string{"icinga:state:stream:" + objectType, "0"}})
 	streams, err := result.Result()
 	if err != nil {
