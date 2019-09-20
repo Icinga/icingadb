@@ -94,7 +94,7 @@ func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
 	}
 }
 
-func NewRDBWrapper(address string) (*RDBWrapper, error) {
+func NewRDBWrapper(address string) *RDBWrapper {
 	log.Info("Connecting to Redis")
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         address,
@@ -124,7 +124,7 @@ func NewRDBWrapper(address string) (*RDBWrapper, error) {
 		}
 	}()
 
-	return &rdbw, nil
+	return &rdbw
 }
 
 func (rdbw *RDBWrapper) getConnectionCheckInterval() time.Duration {

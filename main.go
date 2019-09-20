@@ -78,10 +78,7 @@ func main() {
 	redisInfo := config.GetRedisInfo()
 	mysqlInfo := config.GetMysqlInfo()
 
-	redisConn, err := connection.NewRDBWrapper(redisInfo.Host + ":" + redisInfo.Port)
-	if err != nil {
-		log.Fatal(err)
-	}
+	redisConn := connection.NewRDBWrapper(redisInfo.Host + ":" + redisInfo.Port)
 
 	mysqlConn, err := connection.NewDBWrapper(mysqlInfo.User + ":" + mysqlInfo.Password + "@tcp(" + mysqlInfo.Host + ":" + mysqlInfo.Port + ")/" + mysqlInfo.Database)
 	if err != nil {
