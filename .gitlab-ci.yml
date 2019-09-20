@@ -10,6 +10,8 @@ stages:
 test:
   stage: test
   image: golang:latest
+  variables:
+    ICINGADB_TEST_REDIS: 10.77.27.16:6379
   before_script:
     - mkdir -p $GOPATH/src/$REPO_BASE_PATH
     - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_BASE_PATH
