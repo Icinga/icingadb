@@ -139,13 +139,11 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
 		RedisKey: "customvar",
-		DeltaMySqlField: "customvar_id",
+		PrimaryMySqlField: "customvar_id",
 		Factory: NewCustomvarFlat,
 		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: &connection.BulkDeleteStmt{
-			Format: fmt.Sprintf("DELETE FROM %s WHERE customvar_id IN (%s)", name, "%s"),
-		},
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields, "id"),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "customvar_id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

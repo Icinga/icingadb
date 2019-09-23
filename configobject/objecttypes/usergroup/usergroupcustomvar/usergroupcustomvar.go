@@ -64,11 +64,11 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
 		RedisKey: "usergroup:customvar",
-		DeltaMySqlField: "id",
+		PrimaryMySqlField: "id",
 		Factory: NewUsergroupCustomvar,
 		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields, "id"),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "usergroup",
 	}

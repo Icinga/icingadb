@@ -81,11 +81,11 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
 		RedisKey: name,
-		DeltaMySqlField: "id",
+		PrimaryMySqlField: "id",
 		Factory: NewHostgroup,
 		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields, "id"),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "hostgroup",
 	}
