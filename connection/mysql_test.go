@@ -230,6 +230,8 @@ func TestDBWrapper_SqlQuery(t *testing.T) {
 	mockDb.AssertExpectations(t)
 }
 
+var mysqlTestObserver = DbIoSeconds.WithLabelValues("mysql", "test")
+
 func TestDBWrapper_SqlExec(t *testing.T) {
 	mockDb := new(DbMock)
 	dbw := NewTestDBW(mockDb)
@@ -243,7 +245,7 @@ func TestDBWrapper_SqlExec(t *testing.T) {
 
 	dbw.CompareAndSetConnected(true)
 	go func() {
-		_, err = dbw.SqlExec("test", "test")
+		_, err = dbw.SqlExec(mysqlTestObserver, "test")
 		done <- true
 	}()
 
@@ -304,7 +306,7 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 	done := make(chan bool)
 	dbw.CompareAndSetConnected(false)
 	go func() {
-		res, err = dbw.SqlFetchAll("test", "SELECT * FROM testing0815")
+		res, err = dbw.SqlFetchAll(mysqlTestObserver, "SELECT * FROM testing0815")
 		done <- true
 	}()
 
