@@ -1,2 +1,6 @@
+# Exclude all hidden files
+.*
 
-\.idea/
+# Except those related to git(lab)
+!.git*
+!.gitlab-ci.yml
