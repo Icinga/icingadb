@@ -1,9 +1,9 @@
 package connection
 
 import (
+	"git.icinga.com/icingadb/icingadb-main/connection/redisd"
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/assert"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,7 +17,18 @@ func NewTestRDBW(rdb RedisClient) RDBWrapper {
 }
 
 func TestNewRDBWrapper(t *testing.T) {
-	rdbw := NewRDBWrapper(os.Getenv("ICINGADB_TEST_REDIS"))
+	var server redisd.Server
+
+	client, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+	defer client.Close()
+
+	rdbw := NewRDBWrapper(client.Options().Addr)
 	assert.True(t, rdbw.CheckConnection(false), "Redis should be connected")
 
 	rdbw = NewRDBWrapper("asdasdasdasdasd:5123")
@@ -59,14 +70,19 @@ func TestRDBWrapper_GetConnectionCheckInterval(t *testing.T) {
 }
 
 func TestRDBWrapper_CheckConnection(t *testing.T) {
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(nil)
 
-	rdbw.Rdb = redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	rdbw.Rdb = rdb
 	atomic.StoreUint32(rdbw.ConnectionLostCounterAtomic, 512312312)
 	assert.True(t, rdbw.CheckConnection(false), "DBWrapper should be connected")
 	assert.Equal(t, uint32(0), atomic.LoadUint32(rdbw.ConnectionLostCounterAtomic))
@@ -87,12 +103,16 @@ func TestRDBWrapper_CheckConnection(t *testing.T) {
 }
 
 func TestRDBWrapper_HGetAll(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {
@@ -169,12 +189,16 @@ func TestRDBWrapper_HMGet(t *testing.T) {
 }
 
 func TestRDBWrapper_XRead(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {
@@ -207,12 +231,16 @@ func TestRDBWrapper_XRead(t *testing.T) {
 }
 
 func TestRDBWrapper_XDel(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {
@@ -242,12 +270,16 @@ func TestRDBWrapper_XDel(t *testing.T) {
 }
 
 func TestRDBWrapper_Publish(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {
@@ -278,12 +310,16 @@ func TestRDBWrapper_Publish(t *testing.T) {
 }
 
 func TestRDBWrapper_TxPipelined(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {
