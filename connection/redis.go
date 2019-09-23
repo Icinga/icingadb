@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/utils"
 	"github.com/go-redis/redis"
+	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"sync/atomic"
@@ -56,6 +57,14 @@ var RedisWriter = Icinga2RedisWriter{
 			Object: "icinga:state:object:",
 		},
 	},
+}
+
+var redisObservers = struct {
+	hgetall prometheus.Observer
+	multi   prometheus.Observer
+}{
+	DbIoSeconds.WithLabelValues("redis", "hgetall"),
+	DbIoSeconds.WithLabelValues("redis", "multi"),
 }
 
 type RedisClient interface {
@@ -304,7 +313,7 @@ func (rdbw *RDBWrapper) HGetAll(key string) *redis.StringStringMapCmd {
 
 		benchmarc.Stop()
 
-		DbIoSeconds.WithLabelValues("redis", "hgetall").Observe(benchmarc.Seconds())
+		redisObservers.hgetall.Observe(benchmarc.Seconds())
 
 		log.WithFields(log.Fields{
 			"context":   "redis",
@@ -336,7 +345,7 @@ func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([
 
 		benchmarc.Stop()
 
-		DbIoSeconds.WithLabelValues("redis", "multi").Observe(benchmarc.Seconds())
+		redisObservers.multi.Observe(benchmarc.Seconds())
 
 		log.WithFields(log.Fields{
 			"context":   "redis",
