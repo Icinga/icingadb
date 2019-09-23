@@ -7,6 +7,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -159,7 +160,7 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 }
 
 func TestDBWrapper_SqlTransaction(t *testing.T) {
-	dbw, err := NewDBWrapper( "module-dev:icinga0815!@tcp(10.77.27.16:3306)/icingadb")
+	dbw, err := NewDBWrapper(os.Getenv("ICINGADB_TEST_MYSQL"))
 	assert.NoError(t, err, "Is the MySQL server running?")
 
 	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
@@ -290,7 +291,7 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 }
 
 func TestDBWrapper_SqlFetchAll(t *testing.T) {
-	dbw, err := NewDBWrapper("module-dev:icinga0815!@tcp(10.77.27.16:3306)/icingadb")
+	dbw, err := NewDBWrapper(os.Getenv("ICINGADB_TEST_MYSQL"))
 	assert.NoError(t, err, "Is the MySQL server running?")
 
 	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name varchar(255) NOT NULL)")

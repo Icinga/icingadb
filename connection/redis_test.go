@@ -3,6 +3,7 @@ package connection
 import (
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -16,7 +17,7 @@ func NewTestRDBW(rdb RedisClient) RDBWrapper {
 }
 
 func TestNewRDBWrapper(t *testing.T) {
-	rdbw := NewRDBWrapper("10.77.27.16:6379")
+	rdbw := NewRDBWrapper(os.Getenv("ICINGADB_TEST_REDIS"))
 	assert.True(t, rdbw.CheckConnection(false), "Redis should be connected")
 
 	rdbw = NewRDBWrapper("asdasdasdasdasd:5123")
@@ -60,7 +61,7 @@ func TestRDBWrapper_CheckConnection(t *testing.T) {
 	rdbw := NewTestRDBW(nil)
 
 	rdbw.Rdb = redis.NewClient(&redis.Options{
-		Addr:         "10.77.27.16:6379",
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -86,7 +87,7 @@ func TestRDBWrapper_CheckConnection(t *testing.T) {
 
 func TestRDBWrapper_HGetAll(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "10.77.27.16:6379",
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -124,7 +125,7 @@ func TestRDBWrapper_HGetAll(t *testing.T) {
 
 func TestRDBWrapper_XRead(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "10.77.27.16:6379",
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -162,7 +163,7 @@ func TestRDBWrapper_XRead(t *testing.T) {
 
 func TestRDBWrapper_XDel(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "10.77.27.16:6379",
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -197,7 +198,7 @@ func TestRDBWrapper_XDel(t *testing.T) {
 
 func TestRDBWrapper_Publish(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "10.77.27.16:6379",
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -233,7 +234,7 @@ func TestRDBWrapper_Publish(t *testing.T) {
 
 func TestRDBWrapper_TxPipelined(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
-		Addr:         "10.77.27.16:6379",
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,

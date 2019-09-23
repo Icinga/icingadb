@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
 	"time"
 )
@@ -17,7 +18,7 @@ var icingastate = "{\"IcingaApplication\":" +
 	"}}}}, \"config_dump_in_progress\": false}"
 
 func TestIcingaHeartbeatListener(t *testing.T) {
-	rdb := connection.NewRDBWrapper("10.77.27.16:6379")
+	rdb := connection.NewRDBWrapper(os.Getenv("ICINGADB_TEST_REDIS"))
 	assert.True(t, rdb.CheckConnection(false), "This test needs a working Redis connection")
 
 	chEnv := make(chan *Environment)
