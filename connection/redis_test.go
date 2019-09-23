@@ -52,9 +52,10 @@ func TestRDBWrapper_GetConnectionCheckInterval(t *testing.T) {
 	atomic.StoreUint32(rdbw.ConnectionLostCounterAtomic, 11)
 	assert.Equal(t, 60*time.Second, rdbw.getConnectionCheckInterval())
 
-	//dbw.ConnectionLostCounter = 14
-	//interval = dbw.getConnectionCheckInterval()
-	//TODO: Check for Fatal
+	//Should panic, if not connected and counter > 13
+	rdbw.CompareAndSetConnected(false)
+	atomic.StoreUint32(rdbw.ConnectionLostCounterAtomic, 14)
+	assert.Panics(t, func() { rdbw.getConnectionCheckInterval() }, "Should panic")
 }
 
 func TestRDBWrapper_CheckConnection(t *testing.T) {

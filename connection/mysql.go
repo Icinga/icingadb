@@ -111,7 +111,7 @@ func (dbw *DBWrapper) getConnectionCheckInterval() time.Duration {
 		} else if v < 14 {
 			return 60 * time.Second
 		} else {
-			log.Fatal("Could not connect to SQL for over 5 minutes. Shutting down...")
+			log.Panic("Could not connect to SQL for over 5 minutes. Shutting down...")
 		}
 	}
 

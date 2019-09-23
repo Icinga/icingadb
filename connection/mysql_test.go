@@ -287,9 +287,10 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 11)
 	assert.Equal(t, 60*time.Second, dbw.getConnectionCheckInterval())
 
-	//dbw.ConnectionLostCounter = 14
-	//interval = dbw.getConnectionCheckInterval()
-	//TODO: Check for Fatal
+	//Should panic, if not connected and counter > 13
+	dbw.CompareAndSetConnected(false)
+	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 14)
+	assert.Panics(t, func() { dbw.getConnectionCheckInterval() }, "Should panic")
 }
 
 func TestDBWrapper_SqlFetchAll(t *testing.T) {
