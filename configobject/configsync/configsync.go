@@ -215,7 +215,7 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 		defer wg.Done()
 		var err error
 		super.EnvLock.Lock()
-		mysqlIds, err = super.Dbw.SqlFetchIds(super.EnvId, objectInformation.ObjectType, objectInformation.DeltaMySqlField)
+		mysqlIds, err = super.Dbw.SqlFetchIds(super.EnvId, objectInformation.ObjectType, objectInformation.PrimaryMySqlField)
 		super.EnvLock.Unlock()
 		if err != nil {
 			super.ChErr <- err

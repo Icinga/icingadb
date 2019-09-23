@@ -64,11 +64,11 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
 		RedisKey: "eventcommand:customvar",
-		DeltaMySqlField: "id",
+		PrimaryMySqlField: "id",
 		Factory: NewEventCommandCustomvar,
 		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields, "id"),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "eventcommand",
 	}

@@ -376,11 +376,11 @@ type BulkInsertStmt struct {
 	NumField    int
 }
 
-func NewBulkInsertStmt(table string, fields []string) *BulkInsertStmt {
+func NewBulkInsertStmt(table string, fields []string, primaryKey string) *BulkInsertStmt {
 	numField := len(fields)
 	placeholder := fmt.Sprintf("(%s)", strings.TrimSuffix(strings.Repeat("?, ", numField), ", "))
 	stmt := BulkInsertStmt{
-		Format:      fmt.Sprintf("INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE id = id", table, strings.Join(fields, ", "), "%s"),
+		Format:      fmt.Sprintf("INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE %s = %s", table, strings.Join(fields, ", "), "%s", primaryKey, primaryKey),
 		Fields:      fields,
 		Placeholder: placeholder,
 		NumField:    numField,
@@ -393,9 +393,9 @@ type BulkDeleteStmt struct {
 	Format string
 }
 
-func NewBulkDeleteStmt(table string) *BulkDeleteStmt {
+func NewBulkDeleteStmt(table string, primaryKey string) *BulkDeleteStmt {
 	stmt := BulkDeleteStmt{
-		Format: fmt.Sprintf("DELETE FROM %s WHERE id IN (%s)", table, "%s"),
+		Format: fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)", table, primaryKey, "%s"),
 	}
 
 	return &stmt

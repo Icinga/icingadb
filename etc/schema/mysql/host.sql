@@ -108,7 +108,7 @@ CREATE TABLE hostgroup_customvar (
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE host_state (
-  id binary(20) NOT NULL COMMENT 'host.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   state_type enum('hard', 'soft') NOT NULL,
@@ -142,5 +142,5 @@ CREATE TABLE host_state (
   last_hard_state tinyint(1) unsigned NOT NULL,
   next_check bigint(20) unsigned NOT NULL,
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (host_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;

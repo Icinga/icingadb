@@ -9,7 +9,7 @@ import (
 var (
 	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
-		"id",
+		"host_id",
 		"env_id",
 		"state_type",
 		"soft_state",
@@ -39,7 +39,7 @@ var (
 )
 
 type HostState struct {
-	Id                  		string  `json:"id"`
+	HostId                  	string  `json:"id"`
 	EnvId               		string  `json:"env_id"`
 	StateType					float32	`json:"state_type"`
 	SoftState					float32	`json:"state"`
@@ -76,7 +76,7 @@ func NewHostState() connection.Row {
 func (h *HostState) InsertValues() []interface{} {
 	v := h.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(h.Id)}, v...)
+	return append([]interface{}{utils.Checksum(h.HostId)}, v...)
 }
 
 func (h *HostState) UpdateValues() []interface{} {
@@ -115,11 +115,11 @@ func (h *HostState) UpdateValues() []interface{} {
 }
 
 func (h *HostState) GetId() string {
-	return h.Id
+	return h.HostId
 }
 
 func (h *HostState) SetId(id string) {
-	h.Id = id
+	h.HostId = id
 }
 
 func (h *HostState) GetFinalRows() ([]connection.Row, error) {
@@ -131,11 +131,11 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
 		RedisKey: "state:host",
-		DeltaMySqlField: "id",
+		PrimaryMySqlField: "host_id",
 		Factory: NewHostState,
 		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields, "host_id"),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "host_id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "host",
 	}

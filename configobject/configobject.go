@@ -7,7 +7,7 @@ import (
 type ObjectInformation struct {
 	ObjectType 					string
 	RedisKey					string
-	DeltaMySqlField 			string
+	PrimaryMySqlField 			string
 	HasChecksum					bool
 	NotificationListenerType	string
 	Factory    					connection.RowFactory
