@@ -9,7 +9,9 @@ stages:
 
 test:
   stage: test
-  image: golang:latest
+  image: $CI_REGISTRY/icingadb/docker/master-test-icingadb:latest
+  variables:
+    GOPATH: /home/icingadb/go
   before_script:
     - mkdir -p $GOPATH/src/$REPO_BASE_PATH
     - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_BASE_PATH
