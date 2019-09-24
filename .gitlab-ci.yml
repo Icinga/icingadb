@@ -10,8 +10,6 @@ stages:
 test:
   stage: test
   image: golang:latest
-  variables:
-    ICINGADB_TEST_MYSQL: 'module-dev:icinga0815!@tcp(10.77.27.16:3306)/icingadb'
   before_script:
     - mkdir -p $GOPATH/src/$REPO_BASE_PATH
     - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_BASE_PATH
