@@ -1,3 +1,5 @@
+/vendor
+
 # Exclude all hidden files
 .*
 
