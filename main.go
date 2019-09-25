@@ -99,7 +99,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go haInstance.Run(chEnv)
+	go haInstance.StartHA(chEnv)
 	go func() {
 		super.ChErr <- ha.IcingaHeartbeatListener(redisConn, chEnv)
 	}()
