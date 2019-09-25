@@ -10,7 +10,7 @@ var (
 	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"id",
-		"env_id",
+		"environment_id",
 		"host_id",
 		"name_checksum",
 		"properties_checksum",
@@ -27,7 +27,7 @@ var (
 
 type HostComment struct {
 	Id					string	`json:"id"`
-	EnvId               string	`json:"env_id"`
+	EnvId               string	`json:"environment_id"`
 	HostId           	string	`json:"host_id"`
 	NameChecksum        string	`json:"name_checksum"`
 	PropertiesChecksum  string	`json:"checksum"`

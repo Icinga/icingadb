@@ -12,7 +12,7 @@ var (
 	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"id",
-		"env_id",
+		"environment_id",
 		"customvar_id",
 		"flatname_checksum",
 		"flatname",
@@ -22,7 +22,7 @@ var (
 
 type CustomvarFlat struct {
 	Id                   string `json:"id"`
-	EnvId                string `json:"env_id"`
+	EnvId                string `json:"environment_id"`
 	NameChecksum         string `json:"name_checksum"`
 	Name                 string `json:"name"`
 	Value                string `json:"value"`

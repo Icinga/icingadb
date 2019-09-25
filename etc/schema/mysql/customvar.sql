@@ -3,7 +3,7 @@ SET innodb_strict_mode = 1;
 
 CREATE TABLE customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name + value)',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
 
   name varchar(255) NOT NULL COLLATE utf8_bin,
@@ -14,7 +14,7 @@ CREATE TABLE customvar (
 
 CREATE TABLE customvar_flat (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + flatname + flatvalue)',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   customvar_id binary(20) NOT NULL COMMENT 'sha1(customvar.id)',
   flatname_checksum binary(20) NOT NULL COMMENT 'sha1(flatname after conversion)',
 

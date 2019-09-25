@@ -12,7 +12,7 @@ var (
 		"id",
 		"timeperiod_id",
 		"override_id",
-		"env_id",
+		"environment_id",
 	}
 )
 
@@ -20,7 +20,7 @@ type TimeperiodOverrideInclude struct {
 	Id						string 		`json:"id"`
 	TimeperiodId			string		`json:"timeperiod_id"`
 	OverrideId	 			string 		`json:"include_id"`
-	EnvId           		string		`json:"env_id"`
+	EnvId           		string		`json:"environment_id"`
 }
 
 func NewTimeperiodOverrideInclude() connection.Row {

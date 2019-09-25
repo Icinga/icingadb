@@ -12,7 +12,7 @@ var (
 		"id",
 		"servicegroup_id",
 		"service_id",
-		"env_id",
+		"environment_id",
 	}
 )
 
@@ -20,7 +20,7 @@ type ServicegroupMember struct {
 	Id						string 		`json:"id"`
 	ServicegroupId			string		`json:"group_id"`
 	ServiceId	 			string 		`json:"object_id"`
-	EnvId           		string		`json:"env_id"`
+	EnvId           		string		`json:"environment_id"`
 }
 
 func NewServicegroupMember() connection.Row {

@@ -3,7 +3,7 @@ SET innodb_strict_mode = 1;
 
 CREATE TABLE notification (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL,
   customvars_checksum binary(20) NOT NULL COMMENT 'sha1(notification.vars)',
@@ -20,7 +20,7 @@ CREATE TABLE notification (
   times_begin int(10) unsigned DEFAULT NULL,
   times_end int(10) unsigned DEFAULT NULL,
   notification_interval int(10) unsigned NOT NULL,
-  period_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
+  timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
   states tinyint(2) unsigned NOT NULL,
   types smallint(3) unsigned NOT NULL,
@@ -34,7 +34,7 @@ CREATE TABLE notification_user (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + user_id)',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   user_id binary(20) NOT NULL COMMENT 'user.id',
-  env_id binary(20) NOT NULL COMMENT 'environment.id',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -43,7 +43,7 @@ CREATE TABLE notification_usergroup (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + usergroup_id)',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
-  env_id binary(20) NOT NULL COMMENT 'environment.id',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -52,6 +52,6 @@ CREATE TABLE notification_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + customvar_id)',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;

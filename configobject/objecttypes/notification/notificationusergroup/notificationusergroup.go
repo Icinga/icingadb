@@ -12,7 +12,7 @@ var (
 		"id",
 		"notification_id",
 		"usergroup_id",
-		"env_id",
+		"environment_id",
 	}
 )
 
@@ -20,7 +20,7 @@ type NotificationUsergroup struct {
 	Id						string 		`json:"id"`
 	NotificationId			string		`json:"notification_id"`
 	UsergroupId	 			string 		`json:"usergroup_id"`
-	EnvId           		string		`json:"env_id"`
+	EnvId           		string		`json:"environment_id"`
 }
 
 func NewNotificationUsergroup() connection.Row {

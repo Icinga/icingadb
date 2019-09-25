@@ -10,7 +10,7 @@ var (
 	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"id",
-		"env_id",
+		"environment_id",
 		"name_checksum",
 		"properties_checksum",
 		"customvars_checksum",
@@ -23,7 +23,7 @@ var (
 		"checkcommand_id",
 		"max_check_attempts",
 		"check_period",
-		"check_period_id",
+		"check_timeperiod_id",
 		"check_timeout",
 		"check_interval",
 		"check_retry_interval",
@@ -52,7 +52,7 @@ var (
 
 type Service struct {
 	Id                    string  `json:"id"`
-	EnvId                 string  `json:"env_id"`
+	EnvId                 string  `json:"environment_id"`
 	NameChecksum          string  `json:"name_checksum"`
 	PropertiesChecksum    string  `json:"checksum"`
 	CustomvarsChecksum    string  `json:"customvars_checksum"`
@@ -65,7 +65,7 @@ type Service struct {
 	CheckcommandId        string  `json:"checkcommand_id"`
 	MaxCheckAttempts      float32 `json:"max_check_attempts"`
 	CheckPeriod           string  `json:"check_period"`
-	CheckPeriodId         string  `json:"check_period_id"`
+	CheckPeriodId         string  `json:"check_timeperiod_id"`
 	CheckTimeout          float32 `json:"check_timeout"`
 	CheckInterval         float32 `json:"check_interval"`
 	CheckRetryInterval    float32 `json:"check_retry_interval"`

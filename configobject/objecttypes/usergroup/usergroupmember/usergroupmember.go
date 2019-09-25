@@ -12,7 +12,7 @@ var (
 		"id",
 		"usergroup_id",
 		"user_id",
-		"env_id",
+		"environment_id",
 	}
 )
 
@@ -20,7 +20,7 @@ type UsergroupMember struct {
 	Id					string 		`json:"id"`
 	UsergroupId			string		`json:"group_id"`
 	UserId	 			string 		`json:"user_id"`
-	EnvId           	string		`json:"env_id"`
+	EnvId           	string		`json:"environment_id"`
 }
 
 func NewUsergroupMember() connection.Row {

@@ -3,7 +3,7 @@ SET innodb_strict_mode = 1;
 
 CREATE TABLE service (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
   customvars_checksum binary(20) NOT NULL COMMENT 'sha1(service.vars)',
@@ -20,7 +20,7 @@ CREATE TABLE service (
   max_check_attempts int(10) unsigned NOT NULL,
 
   check_period varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
-  check_period_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
+  check_timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
   check_timeout int(10) unsigned DEFAULT NULL,
   check_interval int(10) unsigned NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE service (
 
 CREATE TABLE servicegroup (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
   customvars_checksum binary(20) NOT NULL COMMENT 'sha1(servicegroup.vars)',
@@ -77,7 +77,7 @@ CREATE TABLE servicegroup_member (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + service_id)',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
-  env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -86,7 +86,7 @@ CREATE TABLE service_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + service_id + customvar_id)',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -95,14 +95,14 @@ CREATE TABLE servicegroup_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + customvar_id)',
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE service_state (
   service_id binary(20) NOT NULL COMMENT 'service.id',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   state_type enum('hard', 'soft') NOT NULL,
   soft_state tinyint(1) unsigned NOT NULL,

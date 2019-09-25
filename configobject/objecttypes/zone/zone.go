@@ -10,7 +10,7 @@ var (
 	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"id",
-		"env_id",
+		"environment_id",
 		"name_checksum",
 		"properties_checksum",
 		"parents_checksum",
@@ -24,7 +24,7 @@ var (
 
 type Zone struct {
 	Id                  string  `json:"id"`
-	EnvId               string  `json:"env_id"`
+	EnvId               string  `json:"environment_id"`
 	NameChecksum        string  `json:"name_checksum"`
 	PropertiesChecksum  string  `json:"checksum"`
 	ParentsChecksum     string  `json:"parents_checksum"`

@@ -1,2 +1,2 @@
-id;env_id;name_checksum;properties_checksum;name;name_ci;host_id;service_id;command_id;times_begin;times_end;notification_interval;period_id;states;types;zone_id
+id;environment_id;name_checksum;properties_checksum;name;name_ci;host_id;service_id;command_id;times_begin;times_end;notification_interval;timeperiod_id;states;types;zone_id
 0a30d6199584432ea369;b65da3345b7d4cff9a24;fe53687c39514a5794b7;2992037dd9dd4577ae79;notify-1;notify-1;4bf94dba13178df0a0a4;NULL;e55cfd3301c0454a8481;NULL;NULL;300;f98a83dfd1fd4aaa9af9;15;96;5bf526ee976b4ccade5a

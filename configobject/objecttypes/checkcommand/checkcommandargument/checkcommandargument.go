@@ -12,7 +12,7 @@ var (
 		"id",
 		"command_id",
 		"argument_key",
-		"env_id",
+		"environment_id",
 		"properties_checksum",
 		"argument_value",
 		"argument_order",
@@ -29,7 +29,7 @@ type CheckCommandArgument struct {
 	Id						string 		`json:"id"`
 	CommandId				string		`json:"command_id"`
 	ArgumentKey				string		`json:"argument_key"`
-	EnvId           		string		`json:"env_id"`
+	EnvId           		string		`json:"environment_id"`
 	PropertiesChecksum		string		`json:"checksum"`
 	ArgumentValue			string		`json:"value"`
 	ArgumentOrder			float32		`json:"order"`

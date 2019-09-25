@@ -3,7 +3,7 @@ SET innodb_strict_mode = 1;
 
 CREATE TABLE host_downtime (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
-  env_id binary(20) NOT NULL COMMENT 'environment.id',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
   host_id binary(20) NOT NULL COMMENT 'host.id',
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
@@ -29,7 +29,7 @@ CREATE TABLE host_downtime (
 
 CREATE TABLE service_downtime (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
-  env_id binary(20) NOT NULL COMMENT 'environment.id',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',

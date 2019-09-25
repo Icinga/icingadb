@@ -12,7 +12,7 @@ var (
 		"id",
 		"command_id",
 		"customvar_id",
-		"env_id",
+		"environment_id",
 	}
 )
 
@@ -20,7 +20,7 @@ type EventCommandCustomvar struct {
 	Id						string 		`json:"id"`
 	EventCommandId			string		`json:"object_id"`
 	CustomvarId 			string 		`json:"customvar_id"`
-	EnvId           		string		`json:"env_id"`
+	EnvId           		string		`json:"environment_id"`
 }
 
 func NewEventCommandCustomvar() connection.Row {

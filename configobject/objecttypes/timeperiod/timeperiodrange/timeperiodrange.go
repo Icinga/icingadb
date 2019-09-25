@@ -13,7 +13,7 @@ var (
 		"timeperiod_id",
 		"range_key",
 		"range_value",
-		"env_id",
+		"environment_id",
 	}
 )
 
@@ -22,7 +22,7 @@ type TimeperiodRange struct {
 	TimeperiodId			string		`json:"timeperiod_id"`
 	RangeKey	 			string 		`json:"range_key"`
 	RangeValue	 			string 		`json:"range_value"`
-	EnvId           		string		`json:"env_id"`
+	EnvId           		string		`json:"environment_id"`
 }
 
 func NewTimeperiodRange() connection.Row {

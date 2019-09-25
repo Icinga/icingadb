@@ -12,7 +12,7 @@ var (
 		"id",
 		"hostgroup_id",
 		"host_id",
-		"env_id",
+		"environment_id",
 	}
 )
 
@@ -20,7 +20,7 @@ type HostgroupMember struct {
 	Id						string 		`json:"id"`
 	HostgroupId				string		`json:"group_id"`
 	HostId		 			string 		`json:"object_id"`
-	EnvId           		string		`json:"env_id"`
+	EnvId           		string		`json:"environment_id"`
 }
 
 func NewHostgroupMember() connection.Row {

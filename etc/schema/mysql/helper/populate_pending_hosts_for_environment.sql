@@ -1,13 +1,13 @@
 
 DELIMITER //
 CREATE PROCEDURE populate_pending_hosts_for_environment(
-  IN env_id BINARY(20)
+  IN environment_id BINARY(20)
 )
   BEGIN
     SET @bigNow = unix_timestamp_ms();
     INSERT INTO host_state (
       host_id,
-      env_id,
+      environment_id,
       state_type,
       soft_state,
       hard_state,
@@ -26,7 +26,7 @@ CREATE PROCEDURE populate_pending_hosts_for_environment(
       next_check
     ) SELECT
         h.id,
-        env_id,
+        environment_id,
         'hard',
         99,
         99,
@@ -48,7 +48,7 @@ CREATE PROCEDURE populate_pending_hosts_for_environment(
           SELECT host_id
           FROM host_state hs
           WHERE hs.host_id = h.id)
-            AND h.env_id = env_id;
+            AND h.environment_id = environment_id;
 
   END
 

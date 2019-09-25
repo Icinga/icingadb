@@ -3,7 +3,7 @@ SET innodb_strict_mode = 1;
 
 CREATE TABLE zone (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
   parents_checksum binary(20) NOT NULL COMMENT 'sha1(all parents checksums)',
@@ -18,5 +18,5 @@ CREATE TABLE zone (
 
   PRIMARY KEY (id),
   INDEX idx_parent_id (parent_id),
-  UNIQUE INDEX idx_env_id_id (env_id,id)
+  UNIQUE INDEX idx_environment_id_id (environment_id,id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;

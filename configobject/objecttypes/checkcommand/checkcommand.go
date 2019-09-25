@@ -10,7 +10,7 @@ var (
 	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"id",
-		"env_id",
+		"environment_id",
 		"name_checksum",
 		"properties_checksum",
 		"name",
@@ -23,7 +23,7 @@ var (
 
 type CheckCommand struct {
 	Id                    string  	`json:"id"`
-	EnvId                 string  	`json:"env_id"`
+	EnvId                 string  	`json:"environment_id"`
 	NameChecksum          string  	`json:"name_checksum"`
 	PropertiesChecksum    string  	`json:"checksum"`
 	Name                  string  	`json:"name"`
