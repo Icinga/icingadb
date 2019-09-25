@@ -10,7 +10,7 @@ var (
 	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"host_id",
-		"env_id",
+		"environment_id",
 		"state_type",
 		"soft_state",
 		"hard_state",
@@ -40,7 +40,7 @@ var (
 
 type HostState struct {
 	HostId                  	string  `json:"id"`
-	EnvId               		string  `json:"env_id"`
+	EnvId               		string  `json:"environment_id"`
 	StateType					float32	`json:"state_type"`
 	SoftState					float32	`json:"state"`
 	HardState					float32	`json:"NONE"` //TODO (NoH): I'm not sure where to get this from

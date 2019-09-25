@@ -3,7 +3,7 @@ SET innodb_strict_mode = 1;
 
 CREATE TABLE endpoint (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL,
 

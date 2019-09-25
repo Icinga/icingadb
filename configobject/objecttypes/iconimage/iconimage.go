@@ -10,14 +10,14 @@ var (
 	ObjectInformation configobject.ObjectInformation
 	Fields = []string{
 		"id",
-		"env_id",
+		"environment_id",
 		"icon_image",
 	}
 )
 
 type IconImage struct {
 	Id               string  `json:"id"`
-	EnvId            string  `json:"env_id"`
+	EnvId            string  `json:"environment_id"`
 	IconImage        string  `json:"icon_image"`
 }
 

@@ -1,2 +1,2 @@
-id;env_id;name_checksum;name
+id;environment_id;name_checksum;name
 6625851376b230891032;b65da3345b7d4cff9a24;33f3e3be317c6e79daae;run_my_event.sh

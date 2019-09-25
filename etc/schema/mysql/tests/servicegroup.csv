@@ -1,2 +1,2 @@
-id;env_id;name_checksum;properties_checksum;name;name_ci;display_name;zone_id
+id;environment_id;name_checksum;properties_checksum;name;name_ci;display_name;zone_id
 6eaf35fcc99d490cb110;b65da3345b7d4cff9a24;7078e8355bb444d78616;60a2a3583ce443c498a5;myGroup;mygroup;My Group;5bf526ee976b4ccade5a

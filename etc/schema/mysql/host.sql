@@ -3,7 +3,7 @@ SET innodb_strict_mode = 1;
 
 CREATE TABLE host (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
   customvars_checksum binary(20) NOT NULL COMMENT 'sha1(host.vars)',
@@ -24,7 +24,7 @@ CREATE TABLE host (
   max_check_attempts int(10) unsigned NOT NULL,
 
   check_period varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
-  check_period_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
+  check_timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
   check_timeout int(10) unsigned DEFAULT NULL,
   check_interval int(10) unsigned NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE host (
 
 CREATE TABLE hostgroup (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
   customvars_checksum binary(20) NOT NULL COMMENT 'sha1(hostgroup.vars)',
@@ -84,7 +84,7 @@ CREATE TABLE hostgroup_member (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + host_id + hostgroup_id)',
   host_id binary(20) NOT NULL COMMENT 'host.id',
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
-  env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -93,7 +93,7 @@ CREATE TABLE host_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + host_id + customvar_id)',
   host_id binary(20) NOT NULL COMMENT 'host.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -102,14 +102,14 @@ CREATE TABLE hostgroup_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + hostgroup_id + customvar_id)',
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  env_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) DEFAULT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE host_state (
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  env_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   state_type enum('hard', 'soft') NOT NULL,
   soft_state tinyint(1) unsigned NOT NULL,

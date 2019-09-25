@@ -12,7 +12,7 @@ var (
 		"id",
 		"hostgroup_id",
 		"customvar_id",
-		"env_id",
+		"environment_id",
 	}
 )
 
@@ -20,7 +20,7 @@ type HostgroupCustomvar struct {
 	Id						string 		`json:"id"`
 	HostgroupId				string		`json:"object_id"`
 	CustomvarId 			string 		`json:"customvar_id"`
-	EnvId           		string		`json:"env_id"`
+	EnvId           		string		`json:"environment_id"`
 }
 
 func NewHostgroupCustomvar() connection.Row {

@@ -66,7 +66,7 @@ checksum:user
 	properies_checksum
 	group_ids
 	groups_checksum
-	period_id
+	timeperiod_id
 
 object:zone
 	is_global
@@ -111,7 +111,7 @@ checksum:host/service
 	notes_url_id
 	icon_image_id
 	command_endpoint_id
-	check_period_id
+	check_timeperiod_id
 	eventcommand_id
 	groups_checksum
 	group_ids

@@ -10,7 +10,7 @@ var (
 	ObjectInformation configobject.ObjectInformation
 	Fields         = []string{
 		"id",
-		"env_id",
+		"environment_id",
 		"name_checksum",
 		"properties_checksum",
 		"customvars_checksum",
@@ -24,7 +24,7 @@ var (
 		"times_begin",
 		"times_end",
 		"notification_interval",
-		"period_id",
+		"timeperiod_id",
 		"states",
 		"types",
 		"zone_id",
@@ -33,7 +33,7 @@ var (
 
 type Notification struct {
 	Id                    	string  	`json:"id"`
-	EnvId                 	string  	`json:"env_id"`
+	EnvId                 	string  	`json:"environment_id"`
 	NameChecksum          	string  	`json:"name_checksum"`
 	PropertiesChecksum    	string  	`json:"checksum"`
 	CustomvarsChecksum    	string  	`json:"customvars_checksum"`
@@ -47,7 +47,7 @@ type Notification struct {
 	TimesBegin				float32		`json:"times_begin"`
 	TimesEnd				float32		`json:"times_end"`
 	NotificationInterval	float32		`json:"notification_interval"`
-	PeriodId				string		`json:"period_id"`
+	PeriodId				string		`json:"timeperiod_id"`
 	States					[]string	`json:"states"`
 	Types					[]string	`json:"types"`
 	ZoneId                	string  	`json:"zone_id"`

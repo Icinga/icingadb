@@ -10,14 +10,14 @@ var (
 	ObjectInformation configobject.ObjectInformation
 	Fields = []string{
 		"id",
-		"env_id",
+		"environment_id",
 		"action_url",
 	}
 )
 
 type ActionUrl struct {
 	Id               string  `json:"id"`
-	EnvId            string  `json:"env_id"`
+	EnvId            string  `json:"environment_id"`
 	ActionUrl        string  `json:"action_url"`
 }
 

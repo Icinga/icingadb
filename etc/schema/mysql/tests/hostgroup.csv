@@ -1,4 +1,4 @@
-id;env_id;name_checksum;properties_checksum;name;name_ci;display_name
+id;environment_id;name_checksum;properties_checksum;name;name_ci;display_name
 2707e212c64878787ff7;b65da3345b7d4cff9a24;061c5b49e09d4fab6232;b739d140a7a58a65b61f;linux-server;linux-server;Linux Server
 21229b386d88d686e22f;b65da3345b7d4cff9a24;25697d5e364550ee4bb3;b77b58b5ce480395acb2;windows;windows;Windows
 2f27f2ad0f9e725febb1;b65da3345b7d4cff9a24;75e381fffc334e19c372;167e9930fd7b55b376aa;Dc1;dc1;DC 1

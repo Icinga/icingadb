@@ -12,7 +12,7 @@ var (
 		"id",
 		"command_id",
 		"envvar_key",
-		"env_id",
+		"environment_id",
 		"properties_checksum",
 		"envvar_value",
 	}
@@ -22,7 +22,7 @@ type CheckCommandEnvvar struct {
 	Id						string 		`json:"id"`
 	CommandId				string		`json:"command_id"`
 	EnvvarKey				string		`json:"envvar_key"`
-	EnvId           		string		`json:"env_id"`
+	EnvId           		string		`json:"environment_id"`
 	PropertiesChecksum		string		`json:"checksum"`
 	EnvvarValue				string		`json:"value"`
 }
