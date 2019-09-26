@@ -21,26 +21,29 @@ func Sha1bytes(bytes []byte) []byte {
 	return hash.Sum(nil)
 }
 
-func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment) error {
+func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment, chErr chan error) {
 	log.Info("Starting heartbeat listener")
 
 	subscription := rdb.Subscribe()
 	defer subscription.Close()
 	if err := subscription.Subscribe("icinga:stats"); err != nil {
-		return err
+		chErr <- err
+		return
 	}
 
 	for {
 		msg, err := subscription.ReceiveMessage()
 		if err != nil {
-			return err
+			chErr <- err
+			return
 		}
 
 		log.Debug("Got heartbeat")
 
 		var unJson interface{} = nil
 		if err = json.Unmarshal([]byte(msg.Payload), &unJson); err != nil {
-			return err
+			chErr <- err
+			return
 		}
 
 		environment := unJson.(map[string]interface{})["IcingaApplication"].(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["environment"].(string)
