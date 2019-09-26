@@ -28,6 +28,7 @@ type HA struct {
 	notificationListenersMutex 	sync.Mutex
 	lastEventId					string
 	logger						*log.Entry
+	heartbeatTimer				*time.Timer
 }
 
 func NewHA(super *supervisor.Supervisor) (*HA, error) {
@@ -56,10 +57,6 @@ var mysqlObservers = struct {
 	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by environment_id"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "insert into icingadb_instance"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "select id, heartbeat from icingadb_instance where environment_id = ourEnvID"),
-}
-
-func (h *HA) icinga2HeartBeat() {
-	h.lastHeartbeat = time.Now().Unix()
 }
 
 func (h *HA) updateOwnInstance() error {
@@ -102,7 +99,7 @@ func (h *HA) getInstance() (bool, uuid.UUID, int64, error) {
 }
 
 func (h *HA) StartHA(chEnv chan *Environment) {
-	h.WaitForEnvironment(chEnv)
+	h.waitForEnvironment(chEnv)
 
 	h.logger = log.WithFields(log.Fields{
 		"context":     "HA",
@@ -112,11 +109,16 @@ func (h *HA) StartHA(chEnv chan *Environment) {
 
 	h.logger.Info("Got initial environment.")
 
-	h.CheckResponsibility()
-	h.RunHA(chEnv)
+	h.checkResponsibility()
+
+	h.heartbeatTimer = time.NewTimer(time.Second * 15)
+
+	for {
+		h.runHA(chEnv)
+	}
 }
 
-func (h *HA) WaitForEnvironment(chEnv chan *Environment) {
+func (h *HA) waitForEnvironment(chEnv chan *Environment) {
 	// Wait for first heartbeat
 	env := <-chEnv
 	if env == nil {
@@ -129,7 +131,7 @@ func (h *HA) WaitForEnvironment(chEnv chan *Environment) {
 	h.super.EnvId = env.ID
 }
 
-func (h *HA) CheckResponsibility() {
+func (h *HA) checkResponsibility() {
 	found, _, beat, err := h.getInstance()
 	if err != nil {
 		h.logger.Errorf("Failed to fetch instance: %v", err)
@@ -161,76 +163,72 @@ func (h *HA) CheckResponsibility() {
 	}
 }
 
-func (h *HA) RunHA(chEnv chan *Environment) {
-	timerHA := time.NewTimer(time.Second * 15)
-	for {
-		select {
-		case env := <-chEnv:
-			if bytes.Compare(env.ID, h.super.EnvId) != 0 {
-				h.logger.Error("Received environment is not the one we expected. Panic.")
-				h.super.ChErr <- errors.New("received unexpected environment")
+func (h *HA) runHA(chEnv chan *Environment) {
+	select {
+	case env := <-chEnv:
+		if bytes.Compare(env.ID, h.super.EnvId) != 0 {
+			h.logger.Error("Received environment is not the one we expected. Panic.")
+			h.super.ChErr <- errors.New("received unexpected environment")
+			return
+		}
+
+		h.heartbeatTimer.Reset(time.Second * 15)
+		previous := h.lastHeartbeat
+		h.lastHeartbeat = time.Now().Unix()
+
+		if h.lastHeartbeat-previous < 10 && h.isActive {
+			err := h.updateOwnInstance()
+
+			if err != nil {
+				h.logger.Errorf("Failed to update instance: %v", err)
+				h.super.ChErr <- errors.New("failed to update instance")
+				return
 			}
+		} else {
+			_, they, beat, err := h.getInstance()
+			if err != nil {
+				h.logger.Errorf("Failed to fetch instance: %v", err)
+				h.super.ChErr <- errors.New("failed to fetch instance")
+				return
+			}
+			if they == h.uid {
+				h.logger.Debug("We are active.")
+				if !h.isActive {
+					h.logger.Info("Icinga 2 sent heartbeat after restart. Taking over.")
+					h.isActive = true
+				}
 
-			timerHA.Reset(time.Second * 15)
-			previous := h.lastHeartbeat
-			h.icinga2HeartBeat()
-
-			if h.lastHeartbeat-previous < 10 && h.isActive {
-				err := h.updateOwnInstance()
-
-				if err != nil {
+				if err := h.updateOwnInstance(); err != nil {
 					h.logger.Errorf("Failed to update instance: %v", err)
 					h.super.ChErr <- errors.New("failed to update instance")
 					return
 				}
+			} else if h.lastHeartbeat-beat > 15 {
+				h.logger.Info("Taking over.")
+				if err := h.takeOverInstance(); err != nil {
+					h.logger.Errorf("Failed to update instance: %v", err)
+					h.super.ChErr <- errors.New("failed to update instance")
+				}
+				h.isActive = true
 			} else {
-				_, they, beat, err := h.getInstance()
-				if err != nil {
-					h.logger.Errorf("Failed to fetch instance: %v", err)
-					h.super.ChErr <- errors.New("failed to fetch instance")
-					return
-				}
-				if they == h.uid {
-					h.logger.Debug("We are active.")
-					if !h.isActive {
-						h.logger.Info("Icinga 2 sent heartbeat after restart. Taking over.")
-						h.isActive = true
-					}
-
-					if err := h.updateOwnInstance(); err != nil {
-						h.logger.Errorf("Failed to update instance: %v", err)
-						h.super.ChErr <- errors.New("failed to update instance")
-						return
-					}
-				} else if h.lastHeartbeat-beat > 15 {
-					h.logger.Info("Taking over.")
-					if err := h.takeOverInstance(); err != nil {
-						h.logger.Errorf("Failed to update instance: %v", err)
-						h.super.ChErr <- errors.New("failed to update instance")
-					}
-					h.isActive = true
-				} else {
-					h.logger.Debug("Other instance is active.")
-				}
+				h.logger.Debug("Other instance is active.")
 			}
-		case <-timerHA.C:
-			h.logger.Info("Icinga 2 sent no heartbeat for 15 seconds, pronouncing dead.")
-			h.isActive = false
-			h.lastEventId = "0-0"
-			h.notifyNotificationListener("*", Notify_StopSync)
 		}
+	case <-h.heartbeatTimer.C:
+		h.logger.Info("Icinga 2 sent no heartbeat for 15 seconds, pronouncing dead.")
+		h.isActive = false
+		h.lastEventId = "0-0"
+		h.notifyNotificationListener("*", Notify_StopSync)
 	}
 }
 
 func (h *HA) StartEventListener() {
-	go func() {
-		every1s := time.NewTicker(time.Second)
+	every1s := time.NewTicker(time.Second)
 
-		for {
-			<-every1s.C
-			h.runEventListener()
-		}
-	}()
+	for {
+		<-every1s.C
+		h.runEventListener()
+	}
 }
 
 func (h *HA) runEventListener() {
