@@ -39,7 +39,7 @@ func NewEndpoint() connection.Row {
 func (e *Endpoint) InsertValues() []interface{} {
 	v := e.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(e.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(e.Id)}, v...)
 }
 
 func (e *Endpoint) UpdateValues() []interface{} {
@@ -47,12 +47,12 @@ func (e *Endpoint) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(e.EnvId),
-		utils.Checksum(e.NameChecksum),
-		utils.Checksum(e.PropertiesChecksum),
+		utils.EncodeChecksum(e.EnvId),
+		utils.EncodeChecksum(e.NameChecksum),
+		utils.EncodeChecksum(e.PropertiesChecksum),
 		e.Name,
 		e.NameCi,
-		utils.Checksum(e.ZoneId),
+		utils.EncodeChecksum(e.ZoneId),
 	)
 
 	return v

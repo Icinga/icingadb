@@ -45,7 +45,7 @@ func NewZone() connection.Row {
 func (z *Zone) InsertValues() []interface{} {
 	v := z.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(z.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(z.Id)}, v...)
 }
 
 func (z *Zone) UpdateValues() []interface{} {
@@ -53,14 +53,14 @@ func (z *Zone) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(z.EnvId),
-		utils.Checksum(z.NameChecksum),
-		utils.Checksum(z.PropertiesChecksum),
-		utils.Checksum(z.ParentsChecksum),
+		utils.EncodeChecksum(z.EnvId),
+		utils.EncodeChecksum(z.NameChecksum),
+		utils.EncodeChecksum(z.PropertiesChecksum),
+		utils.EncodeChecksum(z.ParentsChecksum),
 		z.Name,
 		z.NameCi,
 		utils.Bool[z.IsGlobal],
-		utils.Checksum(z.ParentId),
+		utils.EncodeChecksum(z.ParentId),
 		z.Depth,
 	)
 

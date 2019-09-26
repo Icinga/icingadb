@@ -30,7 +30,7 @@ func NewIconImage() connection.Row {
 func (a *IconImage) InsertValues() []interface{} {
 	v := a.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(a.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(a.Id)}, v...)
 }
 
 func (a *IconImage) UpdateValues() []interface{} {
@@ -38,7 +38,7 @@ func (a *IconImage) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(a.EnvId),
+		utils.EncodeChecksum(a.EnvId),
 		a.IconImage,
 	)
 

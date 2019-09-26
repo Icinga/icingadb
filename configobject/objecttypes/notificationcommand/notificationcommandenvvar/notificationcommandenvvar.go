@@ -35,7 +35,7 @@ func NewNotificationCommandEnvvar() connection.Row {
 func (c *NotificationCommandEnvvar) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(c.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
 func (c *NotificationCommandEnvvar) UpdateValues() []interface{} {
@@ -43,10 +43,10 @@ func (c *NotificationCommandEnvvar) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(c.CommandId),
+		utils.EncodeChecksum(c.CommandId),
 		c.EnvvarKey,
-		utils.Checksum(c.EnvId),
-		utils.Checksum(c.PropertiesChecksum),
+		utils.EncodeChecksum(c.EnvId),
+		utils.EncodeChecksum(c.PropertiesChecksum),
 		c.EnvvarValue,
 	)
 

@@ -76,7 +76,7 @@ func NewHostState() connection.Row {
 func (h *HostState) InsertValues() []interface{} {
 	v := h.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(h.HostId)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(h.HostId)}, v...)
 }
 
 func (h *HostState) UpdateValues() []interface{} {
@@ -84,7 +84,7 @@ func (h *HostState) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(h.EnvId),
+		utils.EncodeChecksum(h.EnvId),
 		utils.IcingaStateTypeToString(h.StateType),
 		h.SoftState,
 		h.HardState,
@@ -99,7 +99,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		utils.Bool[h.IsReachable],
 		utils.Bool[h.IsFlapping],
 		utils.Bool[h.IsAcknowledged],
-		utils.Checksum(h.AcknowledgementCommentId),
+		utils.EncodeChecksum(h.AcknowledgementCommentId),
 		utils.Bool[h.InDowntime],
 		h.ExecutionTime,
 		h.Latency,

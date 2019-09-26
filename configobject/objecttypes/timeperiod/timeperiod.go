@@ -43,7 +43,7 @@ func NewTimeperiod() connection.Row {
 func (t *Timeperiod) InsertValues() []interface{} {
 	v := t.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(t.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(t.Id)}, v...)
 }
 
 func (t *Timeperiod) UpdateValues() []interface{} {
@@ -51,14 +51,14 @@ func (t *Timeperiod) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(t.EnvId),
-		utils.Checksum(t.NameChecksum),
-		utils.Checksum(t.PropertiesChecksum),
+		utils.EncodeChecksum(t.EnvId),
+		utils.EncodeChecksum(t.NameChecksum),
+		utils.EncodeChecksum(t.PropertiesChecksum),
 		t.Name,
 		t.NameCi,
 		t.DisplayName,
 		utils.Bool[t.PreferIncludes],
-		utils.Checksum(t.ZoneId),
+		utils.EncodeChecksum(t.ZoneId),
 	)
 
 	return v

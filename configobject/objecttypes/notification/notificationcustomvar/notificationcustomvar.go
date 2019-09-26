@@ -31,7 +31,7 @@ func NewNotificationCustomvar() connection.Row {
 func (c *NotificationCustomvar) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(c.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
 func (c *NotificationCustomvar) UpdateValues() []interface{} {
@@ -39,9 +39,9 @@ func (c *NotificationCustomvar) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(c.NotificationId),
-		utils.Checksum(c.CustomvarId),
-		utils.Checksum(c.EnvId),
+		utils.EncodeChecksum(c.NotificationId),
+		utils.EncodeChecksum(c.CustomvarId),
+		utils.EncodeChecksum(c.EnvId),
 	)
 
 	return v

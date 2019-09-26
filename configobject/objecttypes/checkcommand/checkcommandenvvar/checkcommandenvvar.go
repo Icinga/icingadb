@@ -35,7 +35,7 @@ func NewCheckCommandEnvvar() connection.Row {
 func (c *CheckCommandEnvvar) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(c.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
 func (c *CheckCommandEnvvar) UpdateValues() []interface{} {
@@ -43,10 +43,10 @@ func (c *CheckCommandEnvvar) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(c.CommandId),
+		utils.EncodeChecksum(c.CommandId),
 		c.EnvvarKey,
-		utils.Checksum(c.EnvId),
-		utils.Checksum(c.PropertiesChecksum),
+		utils.EncodeChecksum(c.EnvId),
+		utils.EncodeChecksum(c.PropertiesChecksum),
 		c.EnvvarValue,
 	)
 

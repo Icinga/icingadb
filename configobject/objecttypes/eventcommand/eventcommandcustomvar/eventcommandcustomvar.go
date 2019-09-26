@@ -31,7 +31,7 @@ func NewEventCommandCustomvar() connection.Row {
 func (c *EventCommandCustomvar) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(c.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
 func (c *EventCommandCustomvar) UpdateValues() []interface{} {
@@ -39,9 +39,9 @@ func (c *EventCommandCustomvar) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(c.EventCommandId),
-		utils.Checksum(c.CustomvarId),
-		utils.Checksum(c.EnvId),
+		utils.EncodeChecksum(c.EventCommandId),
+		utils.EncodeChecksum(c.CustomvarId),
+		utils.EncodeChecksum(c.EnvId),
 	)
 
 	return v

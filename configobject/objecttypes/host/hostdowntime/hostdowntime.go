@@ -58,7 +58,7 @@ func NewHostDowntime() connection.Row {
 func (h *HostDowntime) InsertValues() []interface{} {
 	v := h.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(h.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(h.Id)}, v...)
 }
 
 func (h *HostDowntime) UpdateValues() []interface{} {
@@ -66,10 +66,10 @@ func (h *HostDowntime) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(h.EnvId),
-		utils.Checksum(h.HostId),
-		utils.Checksum(h.NameChecksum),
-		utils.Checksum(h.PropertiesChecksum),
+		utils.EncodeChecksum(h.EnvId),
+		utils.EncodeChecksum(h.HostId),
+		utils.EncodeChecksum(h.NameChecksum),
+		utils.EncodeChecksum(h.PropertiesChecksum),
 		h.Name,
 		h.Author,
 		h.Comment,
@@ -81,7 +81,7 @@ func (h *HostDowntime) UpdateValues() []interface{} {
 		utils.Bool[h.IsInEffect],
 		h.ActualStartTime,
 		h.ActualEndTime,
-		utils.Checksum(h.ZoneId),
+		utils.EncodeChecksum(h.ZoneId),
 	)
 
 	return v

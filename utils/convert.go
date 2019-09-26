@@ -32,15 +32,15 @@ var (
 	}
 )
 
-// StringToSha1String converts the given string into a SHA1 string
-func StringToSha1String(s string) string {
+// Checksum converts the given string into a SHA1 checksum string
+func Checksum(s string) string {
 	hash := sha1.New()
 	hash.Write([]byte(s))
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-// Checksum converts a hex string to a byte array
-func Checksum(s string) []byte {
+// EncodeChecksum converts a hex string to a byte array
+func EncodeChecksum(s string) []byte {
 	c, err := hex.DecodeString(s)
 	if err != nil {
 		panic(err)

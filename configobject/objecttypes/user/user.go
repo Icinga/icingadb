@@ -57,7 +57,7 @@ func NewUser() connection.Row {
 func (u *User) InsertValues() []interface{} {
 	v := u.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(u.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(u.Id)}, v...)
 }
 
 func (u *User) UpdateValues() []interface{} {
@@ -65,21 +65,21 @@ func (u *User) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(u.EnvId),
-		utils.Checksum(u.NameChecksum),
-		utils.Checksum(u.PropertiesChecksum),
-		utils.Checksum(u.CustomvarsChecksum),
-		utils.Checksum(u.GroupsChecksum),
+		utils.EncodeChecksum(u.EnvId),
+		utils.EncodeChecksum(u.NameChecksum),
+		utils.EncodeChecksum(u.PropertiesChecksum),
+		utils.EncodeChecksum(u.CustomvarsChecksum),
+		utils.EncodeChecksum(u.GroupsChecksum),
 		u.Name,
 		u.NameCi,
 		u.DisplayName,
 		u.EMail,
 		u.Pager,
 		u.NotificationsEnabled,
-		utils.Checksum(u.PeriodId),
+		utils.EncodeChecksum(u.PeriodId),
 		utils.NotificationStatesToBitMask(u.States),
 		utils.NotificationTypesToBitMask(u.Types),
-		utils.Checksum(u.ZoneId),
+		utils.EncodeChecksum(u.ZoneId),
 	)
 
 	return v

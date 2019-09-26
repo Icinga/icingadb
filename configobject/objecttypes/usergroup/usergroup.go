@@ -43,7 +43,7 @@ func NewUsergroup() connection.Row {
 func (u *Usergroup) InsertValues() []interface{} {
 	v := u.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(u.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(u.Id)}, v...)
 }
 
 func (u *Usergroup) UpdateValues() []interface{} {
@@ -51,14 +51,14 @@ func (u *Usergroup) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(u.EnvId),
-		utils.Checksum(u.NameChecksum),
-		utils.Checksum(u.PropertiesChecksum),
-		utils.Checksum(u.CustomvarsChecksum),
+		utils.EncodeChecksum(u.EnvId),
+		utils.EncodeChecksum(u.NameChecksum),
+		utils.EncodeChecksum(u.PropertiesChecksum),
+		utils.EncodeChecksum(u.CustomvarsChecksum),
 		u.Name,
 		u.NameCi,
 		u.DisplayName,
-		utils.Checksum(u.ZoneId),
+		utils.EncodeChecksum(u.ZoneId),
 	)
 
 	return v

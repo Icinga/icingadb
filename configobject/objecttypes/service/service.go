@@ -101,7 +101,7 @@ func NewService() connection.Row {
 func (s *Service) InsertValues() []interface{} {
 	v := s.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(s.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(s.Id)}, v...)
 }
 
 func (s *Service) UpdateValues() []interface{} {
@@ -109,20 +109,20 @@ func (s *Service) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(s.EnvId),
-		utils.Checksum(s.NameChecksum),
-		utils.Checksum(s.PropertiesChecksum),
-		utils.Checksum(s.CustomvarsChecksum),
-		utils.Checksum(s.GroupsChecksum),
-		utils.Checksum(s.HostId),
+		utils.EncodeChecksum(s.EnvId),
+		utils.EncodeChecksum(s.NameChecksum),
+		utils.EncodeChecksum(s.PropertiesChecksum),
+		utils.EncodeChecksum(s.CustomvarsChecksum),
+		utils.EncodeChecksum(s.GroupsChecksum),
+		utils.EncodeChecksum(s.HostId),
 		s.Name,
 		s.NameCi,
 		s.DisplayName,
 		s.Checkcommand,
-		utils.Checksum(s.CheckcommandId),
+		utils.EncodeChecksum(s.CheckcommandId),
 		s.MaxCheckAttempts,
 		s.CheckPeriod,
-		utils.Checksum(s.CheckPeriodId),
+		utils.EncodeChecksum(s.CheckPeriodId),
 		s.CheckTimeout,
 		s.CheckInterval,
 		s.CheckRetryInterval,
@@ -135,17 +135,17 @@ func (s *Service) UpdateValues() []interface{} {
 		s.FlappingThresholdHigh,
 		utils.Bool[s.PerfdataEnabled],
 		s.Eventcommand,
-		utils.Checksum(s.EventcommandId),
+		utils.EncodeChecksum(s.EventcommandId),
 		utils.Bool[s.IsVolatile],
-		utils.Checksum(s.ActionUrlId),
-		utils.Checksum(s.NotesUrlId),
+		utils.EncodeChecksum(s.ActionUrlId),
+		utils.EncodeChecksum(s.NotesUrlId),
 		s.Notes,
-		utils.Checksum(s.IconImageId),
+		utils.EncodeChecksum(s.IconImageId),
 		s.IconImageAlt,
 		s.Zone,
-		utils.Checksum(s.ZoneId),
+		utils.EncodeChecksum(s.ZoneId),
 		s.CommandEndpoint,
-		utils.Checksum(s.CommandEndpointId),
+		utils.EncodeChecksum(s.CommandEndpointId),
 	)
 
 	return v

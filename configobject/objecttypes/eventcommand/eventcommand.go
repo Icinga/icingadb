@@ -43,7 +43,7 @@ func NewEventCommand() connection.Row {
 func (c *EventCommand) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(c.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
 func (c *EventCommand) UpdateValues() []interface{} {
@@ -51,12 +51,12 @@ func (c *EventCommand) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(c.EnvId),
-		utils.Checksum(c.NameChecksum),
-		utils.Checksum(c.PropertiesChecksum),
+		utils.EncodeChecksum(c.EnvId),
+		utils.EncodeChecksum(c.NameChecksum),
+		utils.EncodeChecksum(c.PropertiesChecksum),
 		c.Name,
 		c.NameCi,
-		utils.Checksum(c.ZoneId),
+		utils.EncodeChecksum(c.ZoneId),
 		c.Command,
 		c.Timeout,
 	)

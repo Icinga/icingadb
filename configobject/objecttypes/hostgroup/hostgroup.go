@@ -43,7 +43,7 @@ func NewHostgroup() connection.Row {
 func (h *Hostgroup) InsertValues() []interface{} {
 	v := h.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(h.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(h.Id)}, v...)
 }
 
 func (h *Hostgroup) UpdateValues() []interface{} {
@@ -51,14 +51,14 @@ func (h *Hostgroup) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(h.EnvId),
-		utils.Checksum(h.NameChecksum),
-		utils.Checksum(h.PropertiesChecksum),
-		utils.Checksum(h.CustomvarsChecksum),
+		utils.EncodeChecksum(h.EnvId),
+		utils.EncodeChecksum(h.NameChecksum),
+		utils.EncodeChecksum(h.PropertiesChecksum),
+		utils.EncodeChecksum(h.CustomvarsChecksum),
 		h.Name,
 		h.NameCi,
 		h.DisplayName,
-		utils.Checksum(h.ZoneId),
+		utils.EncodeChecksum(h.ZoneId),
 	)
 
 	return v

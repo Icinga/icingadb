@@ -30,7 +30,7 @@ func NewNotesUrl() connection.Row {
 func (a *NotesUrl) InsertValues() []interface{} {
 	v := a.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(a.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(a.Id)}, v...)
 }
 
 func (a *NotesUrl) UpdateValues() []interface{} {
@@ -38,7 +38,7 @@ func (a *NotesUrl) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(a.EnvId),
+		utils.EncodeChecksum(a.EnvId),
 		a.NotesUrl,
 	)
 
