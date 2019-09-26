@@ -97,6 +97,7 @@ func (s *Server) Start() (string, error) {
 		"--expire_logs_days=10",
 		"--character-set-server=utf8mb4",
 		"--collation-server=utf8mb4_general_ci",
+		"--skip-grant-tables",
 	}
 
 	{
