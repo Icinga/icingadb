@@ -367,13 +367,8 @@ func mkTestDb(host string) error {
 
 	defer noDb.Close()
 
-	for _, ddl := range []string{
-		"CREATE DATABASE icingadb",
-		"GRANT ALL ON icingadb.* TO icingadb@localhost IDENTIFIED BY 'icingadb'",
-	} {
-		if _, errEx := noDb.Exec(ddl); errEx != nil {
-			return errEx
-		}
+	if _, errEx := noDb.Exec("CREATE DATABASE icingadb"); errEx != nil {
+		return errEx
 	}
 
 	db, errDb := sql.Open("mysql", fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
