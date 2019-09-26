@@ -107,7 +107,7 @@ func NewHost() connection.Row {
 func (h *Host) InsertValues() []interface{} {
 	v := h.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(h.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(h.Id)}, v...)
 }
 
 func (h *Host) UpdateValues() []interface{} {
@@ -115,11 +115,11 @@ func (h *Host) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(h.EnvId),
-		utils.Checksum(h.NameChecksum),
-		utils.Checksum(h.PropertiesChecksum),
-		utils.Checksum(h.CustomvarsChecksum),
-		utils.Checksum(h.GroupsChecksum),
+		utils.EncodeChecksum(h.EnvId),
+		utils.EncodeChecksum(h.NameChecksum),
+		utils.EncodeChecksum(h.PropertiesChecksum),
+		utils.EncodeChecksum(h.CustomvarsChecksum),
+		utils.EncodeChecksum(h.GroupsChecksum),
 		h.Name,
 		h.NameCi,
 		h.DisplayName,
@@ -128,10 +128,10 @@ func (h *Host) UpdateValues() []interface{} {
 		h.AddressBin,
 		h.Address6Bin,
 		h.Checkcommand,
-		utils.Checksum(h.CheckcommandId),
+		utils.EncodeChecksum(h.CheckcommandId),
 		h.MaxCheckAttempts,
 		h.CheckPeriod,
-		utils.Checksum(h.CheckPeriodId),
+		utils.EncodeChecksum(h.CheckPeriodId),
 		h.CheckTimeout,
 		h.CheckInterval,
 		h.CheckRetryInterval,
@@ -144,17 +144,17 @@ func (h *Host) UpdateValues() []interface{} {
 		h.FlappingThresholdHigh,
 		utils.Bool[h.PerfdataEnabled],
 		h.Eventcommand,
-		utils.Checksum(h.EventcommandId),
+		utils.EncodeChecksum(h.EventcommandId),
 		utils.Bool[h.IsVolatile],
-		utils.Checksum(h.ActionUrlId),
-		utils.Checksum(h.NotesUrlId),
+		utils.EncodeChecksum(h.ActionUrlId),
+		utils.EncodeChecksum(h.NotesUrlId),
 		h.Notes,
-		utils.Checksum(h.IconImageId),
+		utils.EncodeChecksum(h.IconImageId),
 		h.IconImageAlt,
 		h.Zone,
-		utils.Checksum(h.ZoneId),
+		utils.EncodeChecksum(h.ZoneId),
 		h.CommandEndpoint,
-		utils.Checksum(h.CommandEndpointId),
+		utils.EncodeChecksum(h.CommandEndpointId),
 	)
 
 	return v

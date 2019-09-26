@@ -30,7 +30,7 @@ func NewActionUrl() connection.Row {
 func (a *ActionUrl) InsertValues() []interface{} {
 	v := a.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(a.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(a.Id)}, v...)
 }
 
 func (a *ActionUrl) UpdateValues() []interface{} {
@@ -38,7 +38,7 @@ func (a *ActionUrl) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(a.EnvId),
+		utils.EncodeChecksum(a.EnvId),
 		a.ActionUrl,
 	)
 

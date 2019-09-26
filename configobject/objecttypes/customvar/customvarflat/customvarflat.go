@@ -81,10 +81,10 @@ func CollectScalarVars(c *CustomvarFlat, value interface{}, name string, path []
 		flatValue := fmt.Sprintf("%v", v)
 		return []connection.Row{
 			&CustomvarFlatFinal{
-				Id:               utils.StringToSha1String(c.EnvId + flatName +  flatValue),
+				Id:               utils.Checksum(c.EnvId + flatName +  flatValue),
 				EnvId:            c.EnvId,
 				CustomvarId:      c.Id,
-				FlatNameChecksum: utils.StringToSha1String(flatName),
+				FlatNameChecksum: utils.Checksum(flatName),
 				FlatName:         flatName,
 				FlatValue:        flatValue,
 			},
@@ -104,7 +104,7 @@ type CustomvarFlatFinal struct {
 func (c *CustomvarFlatFinal) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(c.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
 func (c *CustomvarFlatFinal) UpdateValues() []interface{} {
@@ -112,9 +112,9 @@ func (c *CustomvarFlatFinal) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(c.EnvId),
-		utils.Checksum(c.CustomvarId),
-		utils.Checksum(c.FlatNameChecksum),
+		utils.EncodeChecksum(c.EnvId),
+		utils.EncodeChecksum(c.CustomvarId),
+		utils.EncodeChecksum(c.FlatNameChecksum),
 		c.FlatName,
 		c.FlatValue,
 	)

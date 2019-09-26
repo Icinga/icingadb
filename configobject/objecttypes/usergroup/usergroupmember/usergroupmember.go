@@ -31,7 +31,7 @@ func NewUsergroupMember() connection.Row {
 func (u *UsergroupMember) InsertValues() []interface{} {
 	v := u.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(u.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(u.Id)}, v...)
 }
 
 func (u *UsergroupMember) UpdateValues() []interface{} {
@@ -39,9 +39,9 @@ func (u *UsergroupMember) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(u.UsergroupId),
-		utils.Checksum(u.UserId),
-		utils.Checksum(u.EnvId),
+		utils.EncodeChecksum(u.UsergroupId),
+		utils.EncodeChecksum(u.UserId),
+		utils.EncodeChecksum(u.EnvId),
 	)
 
 	return v

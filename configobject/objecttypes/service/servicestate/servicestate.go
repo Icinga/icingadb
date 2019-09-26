@@ -76,7 +76,7 @@ func NewServiceState() connection.Row {
 func (s *ServiceState) InsertValues() []interface{} {
 	v := s.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(s.ServiceId)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(s.ServiceId)}, v...)
 }
 
 func (s *ServiceState) UpdateValues() []interface{} {
@@ -84,7 +84,7 @@ func (s *ServiceState) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(s.EnvId),
+		utils.EncodeChecksum(s.EnvId),
 		utils.IcingaStateTypeToString(s.StateType),
 		s.SoftState,
 		s.HardState,
@@ -99,7 +99,7 @@ func (s *ServiceState) UpdateValues() []interface{} {
 		utils.Bool[s.IsReachable],
 		utils.Bool[s.IsFlapping],
 		utils.Bool[s.IsAcknowledged],
-		utils.Checksum(s.AcknowledgementCommentId),
+		utils.EncodeChecksum(s.AcknowledgementCommentId),
 		utils.Bool[s.InDowntime],
 		s.ExecutionTime,
 		s.Latency,

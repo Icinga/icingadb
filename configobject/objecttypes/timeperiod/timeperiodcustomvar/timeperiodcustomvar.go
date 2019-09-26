@@ -31,7 +31,7 @@ func NewTimeperiodCustomvar() connection.Row {
 func (c *TimeperiodCustomvar) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(c.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
 func (c *TimeperiodCustomvar) UpdateValues() []interface{} {
@@ -39,9 +39,9 @@ func (c *TimeperiodCustomvar) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(c.TimeperiodId),
-		utils.Checksum(c.CustomvarId),
-		utils.Checksum(c.EnvId),
+		utils.EncodeChecksum(c.TimeperiodId),
+		utils.EncodeChecksum(c.CustomvarId),
+		utils.EncodeChecksum(c.EnvId),
 	)
 
 	return v

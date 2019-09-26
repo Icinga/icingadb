@@ -31,7 +31,7 @@ func NewTimeperiodOverrideExclude() connection.Row {
 func (t *TimeperiodOverrideExclude) InsertValues() []interface{} {
 	v := t.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(t.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(t.Id)}, v...)
 }
 
 func (t *TimeperiodOverrideExclude) UpdateValues() []interface{} {
@@ -39,9 +39,9 @@ func (t *TimeperiodOverrideExclude) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(t.TimeperiodId),
-		utils.Checksum(t.OverrideId),
-		utils.Checksum(t.EnvId),
+		utils.EncodeChecksum(t.TimeperiodId),
+		utils.EncodeChecksum(t.OverrideId),
+		utils.EncodeChecksum(t.EnvId),
 	)
 
 	return v

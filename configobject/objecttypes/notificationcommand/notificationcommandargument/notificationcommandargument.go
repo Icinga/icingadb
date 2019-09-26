@@ -49,7 +49,7 @@ func NewNotificationCommandArgument() connection.Row {
 func (c *NotificationCommandArgument) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(c.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
 func (c *NotificationCommandArgument) UpdateValues() []interface{} {
@@ -57,10 +57,10 @@ func (c *NotificationCommandArgument) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(c.CommandId),
+		utils.EncodeChecksum(c.CommandId),
 		c.ArgumentKey,
-		utils.Checksum(c.EnvId),
-		utils.Checksum(c.PropertiesChecksum),
+		utils.EncodeChecksum(c.EnvId),
+		utils.EncodeChecksum(c.PropertiesChecksum),
 		c.ArgumentValue,
 		c.ArgumentOrder,
 		c.Description,

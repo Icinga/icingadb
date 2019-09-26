@@ -50,7 +50,7 @@ func NewHostComment() connection.Row {
 func (h *HostComment) InsertValues() []interface{} {
 	v := h.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(h.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(h.Id)}, v...)
 }
 
 func (h *HostComment) UpdateValues() []interface{} {
@@ -58,10 +58,10 @@ func (h *HostComment) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(h.EnvId),
-		utils.Checksum(h.HostId),
-		utils.Checksum(h.NameChecksum),
-		utils.Checksum(h.PropertiesChecksum),
+		utils.EncodeChecksum(h.EnvId),
+		utils.EncodeChecksum(h.HostId),
+		utils.EncodeChecksum(h.NameChecksum),
+		utils.EncodeChecksum(h.PropertiesChecksum),
 		h.Name,
 		h.Author,
 		h.Text,
@@ -69,7 +69,7 @@ func (h *HostComment) UpdateValues() []interface{} {
 		h.EntryTime,
 		utils.Bool[h.IsPersistent],
 		h.ExpireTime,
-		utils.Checksum(h.ZoneId),
+		utils.EncodeChecksum(h.ZoneId),
 	)
 
 	return v

@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-func TestChecksum(t *testing.T) {
+func TestEncodeChecksum(t *testing.T) {
 	assert.Equal(t, []byte{
 		218, 57, 163, 238, 94, 107, 75, 13, 50, 85, 191, 239, 149, 96, 24, 144, 175, 216, 7, 9,
-	}, Checksum("da39a3ee5e6b4b0d3255bfef95601890afd80709"))
+	}, EncodeChecksum("da39a3ee5e6b4b0d3255bfef95601890afd80709"))
 
 	assert.Panics(t, func() {
-		Checksum("x")
+		EncodeChecksum("x")
 	})
 }
 
@@ -21,9 +21,9 @@ func TestDecodeChecksum(t *testing.T) {
 	}))
 }
 
-func TestStringToSha1String(t *testing.T) {
-	assert.Equal(t, "661295c9cbf9d6b2f6428414504a8deed3020641", StringToSha1String("test string"))
-	assert.Equal(t, "e6c8d9df653f15466261cc7c318743a7534f9462", StringToSha1String("herp da derp"))
+func TestChecksum(t *testing.T) {
+	assert.Equal(t, "661295c9cbf9d6b2f6428414504a8deed3020641", Checksum("test string"))
+	assert.Equal(t, "e6c8d9df653f15466261cc7c318743a7534f9462", Checksum("herp da derp"))
 }
 
 func TestNotificationTypesToBitMask(t *testing.T) {

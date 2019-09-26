@@ -58,7 +58,7 @@ func NewServiceDowntime() connection.Row {
 func (s *ServiceDowntime) InsertValues() []interface{} {
 	v := s.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(s.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(s.Id)}, v...)
 }
 
 func (s *ServiceDowntime) UpdateValues() []interface{} {
@@ -66,10 +66,10 @@ func (s *ServiceDowntime) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(s.EnvId),
-		utils.Checksum(s.ServiceId),
-		utils.Checksum(s.NameChecksum),
-		utils.Checksum(s.PropertiesChecksum),
+		utils.EncodeChecksum(s.EnvId),
+		utils.EncodeChecksum(s.ServiceId),
+		utils.EncodeChecksum(s.NameChecksum),
+		utils.EncodeChecksum(s.PropertiesChecksum),
 		s.Name,
 		s.Author,
 		s.Comment,
@@ -81,7 +81,7 @@ func (s *ServiceDowntime) UpdateValues() []interface{} {
 		utils.Bool[s.IsInEffect],
 		s.ActualStartTime,
 		s.ActualEndTime,
-		utils.Checksum(s.ZoneId),
+		utils.EncodeChecksum(s.ZoneId),
 	)
 
 	return v

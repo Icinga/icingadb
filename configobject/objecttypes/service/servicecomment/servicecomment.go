@@ -50,7 +50,7 @@ func NewServiceComment() connection.Row {
 func (s *ServiceComment) InsertValues() []interface{} {
 	v := s.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(s.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(s.Id)}, v...)
 }
 
 func (s *ServiceComment) UpdateValues() []interface{} {
@@ -58,10 +58,10 @@ func (s *ServiceComment) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(s.EnvId),
-		utils.Checksum(s.ServiceId),
-		utils.Checksum(s.NameChecksum),
-		utils.Checksum(s.PropertiesChecksum),
+		utils.EncodeChecksum(s.EnvId),
+		utils.EncodeChecksum(s.ServiceId),
+		utils.EncodeChecksum(s.NameChecksum),
+		utils.EncodeChecksum(s.PropertiesChecksum),
 		s.Name,
 		s.Author,
 		s.Text,
@@ -69,7 +69,7 @@ func (s *ServiceComment) UpdateValues() []interface{} {
 		s.EntryTime,
 		utils.Bool[s.IsPersistent],
 		s.ExpireTime,
-		utils.Checksum(s.ZoneId),
+		utils.EncodeChecksum(s.ZoneId),
 	)
 
 	return v

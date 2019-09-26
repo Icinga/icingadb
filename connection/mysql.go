@@ -698,7 +698,7 @@ func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
 		values := make([]interface{}, len(bulk))
 
 		for i, key := range bulk {
-			values[i] = utils.Checksum(key)
+			values[i] = utils.EncodeChecksum(key)
 		}
 		query := fmt.Sprintf(stmt.Format, placeholders)
 

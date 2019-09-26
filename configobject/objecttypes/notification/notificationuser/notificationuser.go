@@ -31,7 +31,7 @@ func NewNotificationUser() connection.Row {
 func (n *NotificationUser) InsertValues() []interface{} {
 	v := n.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(n.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(n.Id)}, v...)
 }
 
 func (n *NotificationUser) UpdateValues() []interface{} {
@@ -39,9 +39,9 @@ func (n *NotificationUser) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(n.NotificationId),
-		utils.Checksum(n.UserId),
-		utils.Checksum(n.EnvId),
+		utils.EncodeChecksum(n.NotificationId),
+		utils.EncodeChecksum(n.UserId),
+		utils.EncodeChecksum(n.EnvId),
 	)
 
 	return v

@@ -34,7 +34,7 @@ func NewCustomvar() connection.Row {
 func (c *Customvar) InsertValues() []interface{} {
 	v := c.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(c.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
 func (c *Customvar) UpdateValues() []interface{} {
@@ -42,8 +42,8 @@ func (c *Customvar) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(c.EnvId),
-		utils.Checksum(c.NameChecksum),
+		utils.EncodeChecksum(c.EnvId),
+		utils.EncodeChecksum(c.NameChecksum),
 		c.Name,
 		c.Value,
 	)

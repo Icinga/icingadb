@@ -63,7 +63,7 @@ func NewNotification() connection.Row {
 func (n *Notification) InsertValues() []interface{} {
 	v := n.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(n.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(n.Id)}, v...)
 }
 
 func (n *Notification) UpdateValues() []interface{} {
@@ -71,24 +71,24 @@ func (n *Notification) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(n.EnvId),
-		utils.Checksum(n.NameChecksum),
-		utils.Checksum(n.PropertiesChecksum),
-		utils.Checksum(n.CustomvarsChecksum),
-		utils.Checksum(n.UsersChecksum),
-		utils.Checksum(n.UsergroupsChecksum),
+		utils.EncodeChecksum(n.EnvId),
+		utils.EncodeChecksum(n.NameChecksum),
+		utils.EncodeChecksum(n.PropertiesChecksum),
+		utils.EncodeChecksum(n.CustomvarsChecksum),
+		utils.EncodeChecksum(n.UsersChecksum),
+		utils.EncodeChecksum(n.UsergroupsChecksum),
 		n.Name,
 		n.NameCi,
-		utils.Checksum(n.HostId),
-		utils.Checksum(n.ServiceId),
-		utils.Checksum(n.CommandId),
+		utils.EncodeChecksum(n.HostId),
+		utils.EncodeChecksum(n.ServiceId),
+		utils.EncodeChecksum(n.CommandId),
 		n.TimesBegin,
 		n.TimesEnd,
 		n.NotificationInterval,
-		utils.Checksum(n.PeriodId),
+		utils.EncodeChecksum(n.PeriodId),
 		utils.NotificationStatesToBitMask(n.States),
 		utils.NotificationTypesToBitMask(n.Types),
-		utils.Checksum(n.ZoneId),
+		utils.EncodeChecksum(n.ZoneId),
 	)
 
 	return v

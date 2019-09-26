@@ -43,7 +43,7 @@ func NewServicegroup() connection.Row {
 func (s *Servicegroup) InsertValues() []interface{} {
 	v := s.UpdateValues()
 
-	return append([]interface{}{utils.Checksum(s.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(s.Id)}, v...)
 }
 
 func (s *Servicegroup) UpdateValues() []interface{} {
@@ -51,14 +51,14 @@ func (s *Servicegroup) UpdateValues() []interface{} {
 
 	v = append(
 		v,
-		utils.Checksum(s.EnvId),
-		utils.Checksum(s.NameChecksum),
-		utils.Checksum(s.PropertiesChecksum),
-		utils.Checksum(s.CustomvarsChecksum),
+		utils.EncodeChecksum(s.EnvId),
+		utils.EncodeChecksum(s.NameChecksum),
+		utils.EncodeChecksum(s.PropertiesChecksum),
+		utils.EncodeChecksum(s.CustomvarsChecksum),
 		s.Name,
 		s.NameCi,
 		s.DisplayName,
-		utils.Checksum(s.ZoneId),
+		utils.EncodeChecksum(s.ZoneId),
 	)
 
 	return v
