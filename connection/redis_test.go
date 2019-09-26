@@ -124,6 +124,50 @@ func TestRDBWrapper_HGetAll(t *testing.T) {
 	assert.Contains(t, data, "two")
 }
 
+func TestRDBWrapper_HKeys(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
+		DialTimeout:  time.Minute / 2,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+	})
+	rdbw := NewTestRDBW(rdb)
+
+	if !rdbw.CheckConnection(true) {
+		t.Fatal("This test needs a working Redis connection")
+	}
+
+	rdb.Del("firstKey")
+	rdb.Del("secondKey")
+	rdb.HSet("firstKey", "foo", 5)
+	rdb.HSet("firstKey", "abc", 2)
+	rdb.HSet("secondKey", "bar", 11)
+
+	assert.Equal(t, []string{"foo", "abc"}, rdbw.HKeys("firstKey").Val())
+	assert.Equal(t, []string{"bar"}, rdbw.HKeys("secondKey").Val())
+}
+
+func TestRDBWrapper_HMGet(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
+		DialTimeout:  time.Minute / 2,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+	})
+	rdbw := NewTestRDBW(rdb)
+
+	if !rdbw.CheckConnection(true) {
+		t.Fatal("This test needs a working Redis connection")
+	}
+
+	rdb.Del("firstKey")
+	rdb.HSet("firstKey", "foo", "5")
+	rdb.HSet("firstKey", "abc", "2")
+
+	assert.Equal(t, []interface{}{"5"}, rdbw.HMGet("firstKey", "foo").Val())
+	assert.Equal(t, []interface{}{"2"}, rdbw.HMGet("firstKey", "abc").Val())
+}
+
 func TestRDBWrapper_XRead(t *testing.T) {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
@@ -274,5 +318,51 @@ func TestRDBWrapper_TxPipelined(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, firstMap.Val(), "foo")
 	assert.Contains(t, secondMap.Val(), "bar")
+}
 
+func TestRDBWrapper_PipeConfigChunks(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
+		DialTimeout:  time.Minute / 2,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+	})
+	rdbw := NewTestRDBW(rdb)
+
+	if !rdbw.CheckConnection(true) {
+		t.Fatal("This test needs a working Redis connection")
+	}
+
+	rdb.Del("icinga:config:testkey")
+	rdb.Del("icinga:checksum:testkey")
+
+	rdb.HSet("icinga:config:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-config")
+	rdb.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
+
+	chChunk := rdbw.PipeConfigChunks(make(chan struct{}), []string{"123534534fsdf12sdas12312adg23423f"}, "testkey")
+	chunk := <- chChunk
+	assert.Equal(t, "this-should-be-the-config", chunk.Configs[0])
+	assert.Equal(t, "this-should-be-the-checksum", chunk.Checksums[0])
+}
+
+func TestRDBWrapper_PipeChecksumChunks(t *testing.T) {
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
+		DialTimeout:  time.Minute / 2,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+	})
+	rdbw := NewTestRDBW(rdb)
+
+	if !rdbw.CheckConnection(true) {
+		t.Fatal("This test needs a working Redis connection")
+	}
+
+	rdb.Del("icinga:checksum:testkey")
+
+	rdb.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
+
+	chChunk := rdbw.PipeChecksumChunks(make(chan struct{}), []string{"123534534fsdf12sdas12312adg23423f"}, "testkey")
+	chunk := <- chChunk
+	assert.Equal(t, "this-should-be-the-checksum", chunk.Checksums[0])
 }
