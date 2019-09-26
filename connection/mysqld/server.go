@@ -90,10 +90,8 @@ func (s *Server) Start() (string, error) {
 		"--user=" + me.Username,
 		"--pid-file=" + path.Join(s.basedir, "pid"),
 		"--socket=" + socket,
-		"--basedir=/usr",
 		"--datadir=" + dataDir,
 		"--tmpdir=/tmp",
-		"--lc-messages-dir=/usr/share/mysql",
 		"--skip-networking",
 		"--query_cache_size=16M",
 		"--expire_logs_days=10",
@@ -102,7 +100,21 @@ func (s *Server) Start() (string, error) {
 	}
 
 	{
-		cmd := exec.Command("mysql_install_db", append(params, "--log_error=/dev/null")...)
+		cmd := exec.Command("mysql_install_db")
+
+		realPath, errRL := os.Readlink(cmd.Path)
+		if errRL != nil {
+			realPath = cmd.Path
+		}
+
+		if !path.IsAbs(realPath) {
+			realPath = path.Join(path.Dir(cmd.Path), realPath)
+		}
+
+		basedir := path.Dir(path.Dir(realPath))
+		params = append(params, "--basedir="+basedir, "--lc-messages-dir="+path.Join(basedir, "share/mysql/english"))
+
+		cmd.Args = append(params, "--log_error="+path.Join(s.basedir, "install"))
 		cmd.Dir = s.basedir
 
 		if errRun := cmd.Run(); errRun != nil {
