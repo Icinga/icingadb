@@ -35,6 +35,7 @@ var (
 		"last_soft_state",
 		"last_hard_state",
 		"next_check",
+		"next_update",
 	}
 )
 
@@ -65,6 +66,7 @@ type HostState struct {
 	LastSoftState				float32	`json:"last_soft_state"`
 	LastHardState				float32	`json:"last_hard_state"`
 	NextCheck					float32	`json:"next_check"`
+	NextUpdate					float32	`json:"next_update"`
 }
 
 func NewHostState() connection.Row {
@@ -109,6 +111,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		h.LastSoftState,
 		h.LastHardState,
 		h.NextCheck,
+		h.NextUpdate,
 	)
 
 	return v
