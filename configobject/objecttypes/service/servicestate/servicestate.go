@@ -35,6 +35,7 @@ var (
 		"last_soft_state",
 		"last_hard_state",
 		"next_check",
+		"next_update",
 	}
 )
 
@@ -65,6 +66,7 @@ type ServiceState struct {
 	LastSoftState				float32	`json:"last_soft_state"`
 	LastHardState				float32	`json:"last_hard_state"`
 	NextCheck					float32	`json:"next_check"`
+	NextUpdate					float32	`json:"next_update"`
 }
 
 func NewServiceState() connection.Row {
@@ -109,6 +111,7 @@ func (s *ServiceState) UpdateValues() []interface{} {
 		s.LastSoftState,
 		s.LastHardState,
 		s.NextCheck,
+		s.NextUpdate,
 	)
 
 	return v

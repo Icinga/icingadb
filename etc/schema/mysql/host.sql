@@ -141,6 +141,7 @@ CREATE TABLE host_state (
   last_soft_state tinyint(1) unsigned NOT NULL,
   last_hard_state tinyint(1) unsigned NOT NULL,
   next_check bigint(20) unsigned NOT NULL,
+  next_update bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (host_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
