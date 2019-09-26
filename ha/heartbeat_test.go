@@ -24,8 +24,9 @@ func TestIcingaHeartbeatListener(t *testing.T) {
 	chEnv := make(chan *Environment)
 
 	go func() {
-		err := IcingaHeartbeatListener(rdb, chEnv)
-		assert.NoError(t, err, "redis connection error")
+		chErr := make(chan error)
+		IcingaHeartbeatListener(rdb, chEnv, chErr)
+		assert.NoError(t, <-chErr, "redis connection error")
 	}()
 
 	time.Sleep(time.Second * 2)

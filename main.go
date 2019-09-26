@@ -100,9 +100,7 @@ func main() {
 	}
 
 	go haInstance.StartHA(chEnv)
-	go func() {
-		super.ChErr <- ha.IcingaHeartbeatListener(redisConn, chEnv)
-	}()
+	go ha.IcingaHeartbeatListener(redisConn, chEnv, super.ChErr)
 
 	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)
 
@@ -110,7 +108,7 @@ func main() {
 
 	statesync.StartStateSync(&super)
 
-	haInstance.StartEventListener()
+	go haInstance.StartEventListener()
 
 	go prometheus.HandleHttp("0.0.0.0:8080", super.ChErr)
 
