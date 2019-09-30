@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 	"time"
@@ -26,7 +27,7 @@ func TestIcingaHeartbeatListener(t *testing.T) {
 	go func() {
 		chErr := make(chan error)
 		IcingaHeartbeatListener(rdb, chEnv, chErr)
-		assert.NoError(t, <-chErr, "redis connection error")
+		require.NoError(t, <-chErr, "redis connection error")
 	}()
 
 	time.Sleep(time.Second * 2)

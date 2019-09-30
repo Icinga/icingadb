@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"sync"
 	"testing"
@@ -36,7 +37,7 @@ func createTestingHA(t *testing.T) *HA {
 	ha.uid = uuid.MustParse("551bc748-94b2-4d27-b6a4-15c52aecfe85")
 
 	_, err = ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
-	assert.NoError(t, err, "This test needs a working MySQL connection!")
+	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	ha.logger = log.WithFields(log.Fields{
 		"context":     "HA-Testing",
@@ -52,14 +53,14 @@ func TestHA_InsertInstance(t *testing.T) {
 	ha := createTestingHA(t)
 
 	err := ha.insertInstance()
-	assert.NoError(t, err, "insertInstance should not return an error")
+	require.NoError(t, err, "insertInstance should not return an error")
 
 	rows, err := ha.super.Dbw.SqlFetchAll(mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		ha.super.EnvId,
 	)
 
-	assert.NoError(t, err, "There was an unexpected SQL error")
+	require.NoError(t, err, "There was an unexpected SQL error")
 	assert.Equal(t, 1, len(rows), "There should be a row inserted")
 
 	var theirUUID uuid.UUID
@@ -75,13 +76,13 @@ func TestHA_checkResponsibility(t *testing.T) {
 	assert.Equal(t, true, ha.isActive, "HA should be responsible, if no other instance is active")
 
 	_, err := ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
-	assert.NoError(t, err, "This test needs a working MySQL connection!")
+	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	_, err = ha.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, 'y')",
 		ha.uid[:], ha.super.EnvId, 0)
 
-	assert.NoError(t, err, "This test needs a working MySQL connection!")
+	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	ha.isActive = false
 	ha.checkResponsibility()
@@ -89,7 +90,7 @@ func TestHA_checkResponsibility(t *testing.T) {
 	assert.Equal(t, true, ha.isActive, "HA should be responsible, if another instance was inactive for a long time")
 
 	_, err = ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
-	assert.NoError(t, err, "This test needs a working MySQL connection!")
+	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	_, err = ha.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, 'y')",
