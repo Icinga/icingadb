@@ -22,7 +22,7 @@ var (
 		"checkcommand",
 		"checkcommand_id",
 		"max_check_attempts",
-		"check_period",
+		"check_timeperiod",
 		"check_timeperiod_id",
 		"check_timeout",
 		"check_interval",
@@ -64,7 +64,7 @@ type Service struct {
 	Checkcommand          string  `json:"checkcommand"`
 	CheckcommandId        string  `json:"checkcommand_id"`
 	MaxCheckAttempts      float32 `json:"max_check_attempts"`
-	CheckPeriod           string  `json:"check_period"`
+	CheckPeriod           string  `json:"check_timeperiod"`
 	CheckPeriodId         string  `json:"check_timeperiod_id"`
 	CheckTimeout          float32 `json:"check_timeout"`
 	CheckInterval         float32 `json:"check_interval"`
