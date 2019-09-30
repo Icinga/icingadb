@@ -1,20 +1,24 @@
 package connection
 
 import (
+	"git.icinga.com/icingadb/icingadb-main/connection/redisd"
 	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/assert"
-	"os"
 	"testing"
 	"time"
 )
 
 func TestPubSubWrapper(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {

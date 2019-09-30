@@ -2,23 +2,25 @@ package ha
 
 import (
 	"crypto/sha1"
+	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/connection"
+	"git.icinga.com/icingadb/icingadb-main/connection/mysqld"
+	"git.icinga.com/icingadb/icingadb-main/connection/redisd"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/go-redis/redis"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"os"
 	"sync"
 	"testing"
 	"time"
 )
 
-func createTestingHA(t *testing.T) *HA {
-	redisConn := connection.NewRDBWrapper(os.Getenv("ICINGADB_TEST_REDIS"))
+func createTestingHA(t *testing.T, redisAddr, mysqlHost string) *HA {
+	redisConn := connection.NewRDBWrapper(redisAddr)
 
-	mysqlConn, err := connection.NewDBWrapper(os.Getenv("ICINGADB_TEST_MYSQL"))
+	mysqlConn, err := connection.NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", mysqlHost))
 	if err != nil {
 		assert.Fail(t, "This test needs a working Redis connection!")
 	}
@@ -50,7 +52,33 @@ func createTestingHA(t *testing.T) *HA {
 var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
 
 func TestHA_InsertInstance(t *testing.T) {
-	ha := createTestingHA(t)
+	var redisServer redisd.Server
+
+	client, errSrv := redisServer.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer redisServer.Stop()
+	defer client.Close()
+
+	var mysqlServer mysqld.Server
+
+	host, errSt := mysqlServer.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer mysqlServer.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	ha := createTestingHA(t, client.Options().Addr, host)
 
 	err := ha.insertInstance()
 	require.NoError(t, err, "insertInstance should not return an error")
@@ -70,7 +98,33 @@ func TestHA_InsertInstance(t *testing.T) {
 }
 
 func TestHA_checkResponsibility(t *testing.T) {
-	ha := createTestingHA(t)
+	var redisServer redisd.Server
+
+	client, errSrv := redisServer.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer redisServer.Stop()
+	defer client.Close()
+
+	var mysqlServer mysqld.Server
+
+	host, errSt := mysqlServer.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer mysqlServer.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	ha := createTestingHA(t, client.Options().Addr, host)
 	ha.checkResponsibility()
 
 	assert.Equal(t, true, ha.isActive, "HA should be responsible, if no other instance is active")
@@ -103,7 +157,33 @@ func TestHA_checkResponsibility(t *testing.T) {
 }
 
 func TestHA_waitForEnvironment(t *testing.T) {
-	ha := createTestingHA(t)
+	var redisServer redisd.Server
+
+	client, errSrv := redisServer.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer redisServer.Stop()
+	defer client.Close()
+
+	var mysqlServer mysqld.Server
+
+	host, errSt := mysqlServer.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer mysqlServer.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	ha := createTestingHA(t, client.Options().Addr, host)
 
 	chEnv := make(chan *Environment)
 
@@ -138,7 +218,33 @@ func TestHA_waitForEnvironment(t *testing.T) {
 }
 
 func TestHA_runHA(t *testing.T) {
-	ha := createTestingHA(t)
+	var redisServer redisd.Server
+
+	client, errSrv := redisServer.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer redisServer.Stop()
+	defer client.Close()
+
+	var mysqlServer mysqld.Server
+
+	host, errSt := mysqlServer.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer mysqlServer.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	ha := createTestingHA(t, client.Options().Addr, host)
 	ha.heartbeatTimer = time.NewTimer(10 * time.Second)
 
 	chEnv := make(chan *Environment)
@@ -175,7 +281,33 @@ func TestHA_runHA(t *testing.T) {
 }
 
 func TestHA_NotificationListeners(t *testing.T) {
-	ha := createTestingHA(t)
+	var redisServer redisd.Server
+
+	client, errSrv := redisServer.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer redisServer.Stop()
+	defer client.Close()
+
+	var mysqlServer mysqld.Server
+
+	host, errSt := mysqlServer.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer mysqlServer.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	ha := createTestingHA(t, client.Options().Addr, host)
 	chHost := ha.RegisterNotificationListener("host")
 
 	wg := sync.WaitGroup{}
@@ -213,18 +345,36 @@ func TestHA_NotificationListeners(t *testing.T) {
 }
 
 func TestHA_EventListener(t *testing.T) {
-	ha := createTestingHA(t)
+	var redisServer redisd.Server
+
+	client, errSrv := redisServer.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer redisServer.Stop()
+
+	var mysqlServer mysqld.Server
+
+	host, errSt := mysqlServer.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer mysqlServer.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	ha := createTestingHA(t, client.Options().Addr, host)
 	ha.isActive = true
 	go ha.StartEventListener()
 
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
-
-	rdb.Del("icinga:dump")
+	client.Del("icinga:dump")
 
 	chHost := ha.RegisterNotificationListener("host")
 	chService := ha.RegisterNotificationListener("service")
@@ -247,11 +397,11 @@ func TestHA_EventListener(t *testing.T) {
 		wg.Done()
 	}()
 
-	rdb.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "host", "state": "done"}})
-	rdb.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "host", "state": "wip"}})
-	rdb.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "*", "state": "done"}})
-	rdb.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "*", "state": "wip"}})
-	rdb.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "service", "state": "done"}})
+	client.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "host", "state": "done"}})
+	client.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "host", "state": "wip"}})
+	client.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "*", "state": "done"}})
+	client.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "*", "state": "wip"}})
+	client.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "service", "state": "done"}})
 
 	wg.Wait()
 }

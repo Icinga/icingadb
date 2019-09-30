@@ -4,11 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"git.icinga.com/icingadb/icingadb-main/connection/mysqld"
 	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -161,7 +162,22 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 }
 
 func TestDBWrapper_SqlTransaction(t *testing.T) {
-	dbw, err := NewDBWrapper(os.Getenv("ICINGADB_TEST_MYSQL"))
+	var server mysqld.Server
+
+	host, errSt := server.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer server.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
@@ -295,7 +311,22 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 }
 
 func TestDBWrapper_SqlFetchAll(t *testing.T) {
-	dbw, err := NewDBWrapper(os.Getenv("ICINGADB_TEST_MYSQL"))
+	var server mysqld.Server
+
+	host, errSt := server.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer server.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name varchar(255) NOT NULL)")
