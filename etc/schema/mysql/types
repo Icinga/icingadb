@@ -99,7 +99,7 @@ object:host/service
 	notes
 	icon_image_alt
 	command_endpoint
-	check_period
+	check_timeperiod
 	eventcommand
 	display_name
 	address (if host)

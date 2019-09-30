@@ -23,7 +23,7 @@ CREATE TABLE host (
 
   max_check_attempts int(10) unsigned NOT NULL,
 
-  check_period varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
+  check_timeperiod varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
   check_timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
   check_timeout int(10) unsigned DEFAULT NULL,
