@@ -7,6 +7,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -161,7 +162,7 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 
 func TestDBWrapper_SqlTransaction(t *testing.T) {
 	dbw, err := NewDBWrapper(os.Getenv("ICINGADB_TEST_MYSQL"))
-	assert.NoError(t, err, "Is the MySQL server running?")
+	require.NoError(t, err, "Is the MySQL server running?")
 
 	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
 		return nil
@@ -295,13 +296,13 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 
 func TestDBWrapper_SqlFetchAll(t *testing.T) {
 	dbw, err := NewDBWrapper(os.Getenv("ICINGADB_TEST_MYSQL"))
-	assert.NoError(t, err, "Is the MySQL server running?")
+	require.NoError(t, err, "Is the MySQL server running?")
 
 	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name varchar(255) NOT NULL)")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	_, err = dbw.Db.Exec("INSERT INTO testing0815 (name) VALUES ('horst'), ('test')")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var res [][]interface{}
 	done := make(chan bool)
