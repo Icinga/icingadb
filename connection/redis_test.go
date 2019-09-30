@@ -145,12 +145,16 @@ func TestRDBWrapper_HGetAll(t *testing.T) {
 }
 
 func TestRDBWrapper_HKeys(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {
@@ -168,12 +172,16 @@ func TestRDBWrapper_HKeys(t *testing.T) {
 }
 
 func TestRDBWrapper_HMGet(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {
@@ -357,12 +365,16 @@ func TestRDBWrapper_TxPipelined(t *testing.T) {
 }
 
 func TestRDBWrapper_PipeConfigChunks(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {
@@ -382,12 +394,16 @@ func TestRDBWrapper_PipeConfigChunks(t *testing.T) {
 }
 
 func TestRDBWrapper_PipeChecksumChunks(t *testing.T) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr:         os.Getenv("ICINGADB_TEST_REDIS"),
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
-	})
+	var server redisd.Server
+
+	rdb, errSrv := server.Start()
+	if errSrv != nil {
+		t.Fatal(errSrv)
+		return
+	}
+
+	defer server.Stop()
+
 	rdbw := NewTestRDBW(rdb)
 
 	if !rdbw.CheckConnection(true) {
