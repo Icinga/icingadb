@@ -6,6 +6,7 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -105,7 +106,15 @@ func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
 
 func NewRDBWrapper(address string) *RDBWrapper {
 	log.Info("Connecting to Redis")
+
+	// TODO: remove this in favor of https://github.com/go-redis/redis/pull/1165
+	var net string
+	if strings.HasPrefix(address, "/") {
+		net = "unix"
+	}
+
 	rdb := redis.NewClient(&redis.Options{
+		Network:      net,
 		Addr:         address,
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,

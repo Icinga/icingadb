@@ -9,10 +9,9 @@ stages:
 
 test:
   stage: test
-  image: golang:latest
+  image: $CI_REGISTRY/icingadb/docker/master-test-icingadb:latest
   variables:
-    ICINGADB_TEST_REDIS: 10.77.27.16:6379
-    ICINGADB_TEST_MYSQL: 'module-dev:icinga0815!@tcp(10.77.27.16:3306)/icingadb'
+    GOPATH: /home/icingadb/go
   before_script:
     - mkdir -p $GOPATH/src/$REPO_BASE_PATH
     - ln -svf $CI_PROJECT_DIR $GOPATH/src/$REPO_BASE_PATH
