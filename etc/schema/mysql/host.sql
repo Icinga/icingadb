@@ -201,9 +201,10 @@ CREATE TABLE host_downtime_history (
   was_cancelled enum('y', 'n') NOT NULL,
   is_in_effect enum('y', 'n') NOT NULL,
   trigger_time bigint(20) unsigned NOT NULL,
-  deletion_time bigint(20) unsigned NOT NULL,
+  deletion_time bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT '0 = not deleted yet',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE INDEX idx_downtime_id (downtime_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE host_comment_history (
@@ -218,9 +219,10 @@ CREATE TABLE host_comment_history (
   entry_type enum('comment','ack','downtime','flapping') NOT NULL,
   is_persistent enum('y','n') NOT NULL,
   expire_time bigint(20) unsigned DEFAULT NULL,
-  deletion_time bigint(20) unsigned NOT NULL,
+  deletion_time bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT '0 = not deleted yet',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE INDEX idx_comment_id (comment_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE host_flapping_history (
@@ -228,11 +230,19 @@ CREATE TABLE host_flapping_history (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   host_id binary(20) NOT NULL COMMENT 'host.id',
 
-  event_time bigint(20) unsigned NOT NULL,
-  event_type enum('start', 'end') NOT NULL,
+  start_time bigint(20) unsigned NOT NULL,
+  end_time bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT '0 = not ended yet',
   percent_state_change float unsigned NOT NULL,
   flapping_threshold_low float unsigned NOT NULL,
   flapping_threshold_high float unsigned NOT NULL,
 
   PRIMARY KEY (id)
+) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+
+CREATE TABLE host_flapping_current (
+  host_id binary(20) NOT NULL COMMENT 'host.id',
+  flapping_history_id binary(16) NOT NULL COMMENT 'host_flapping_history.id',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+
+  PRIMARY KEY (host_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
