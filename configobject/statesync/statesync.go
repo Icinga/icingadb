@@ -26,19 +26,13 @@ var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
 //Start the sync goroutines for hosts and services
 func StartStateSync(super *supervisor.Supervisor) {
 	go func() {
-		every1s := time.NewTicker(time.Second)
-
 		for {
-			<-every1s.C
 			syncStates(super,"host")
 		}
 	}()
 
 	go func() {
-		every1s := time.NewTicker(time.Second)
-
 		for {
-			<-every1s.C
 			syncStates(super,"service")
 		}
 	}()
@@ -65,7 +59,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 		return
 	}
 
-	result := super.Rdbw.XRead(&redis.XReadArgs{Streams: []string{"icinga:state:stream:" + objectType, "0"}})
+	result := super.Rdbw.XRead(&redis.XReadArgs{Block: 0, Count: 1000, Streams: []string{"icinga:state:stream:" + objectType, "0"}})
 	streams, err := result.Result()
 	if err != nil {
 		super.ChErr <- err
