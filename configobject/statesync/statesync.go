@@ -71,77 +71,101 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 		return
 	}
 
-	errTx := super.Dbw.SqlTransaction(true, true, false, func(tx connection.DbTransaction) error {
-		for _, state := range states {
-			values := state.Values
-
-			id, _ := hex.DecodeString(values["id"].(string))
-
-			var acknowledgementCommentId []byte
-			if values["acknowledgement_comment_id"] != nil {
-				acknowledgementCommentId, _ = hex.DecodeString(values["acknowledgement_comment_id"].(string))
-			}
-
-			_, errExec := super.Dbw.SqlExecTx(
-				tx,
-				mysqlObservers[objectType],
-				`REPLACE INTO `+objectType+`_state (`+objectType+`_id, environment_id, state_type, soft_state, hard_state, attempt, severity, output, long_output, performance_data,`+
-					`check_commandline, is_problem, is_handled, is_reachable, is_flapping, is_acknowledged, acknowledgement_comment_id,`+
-					`in_downtime, execution_time, latency, timeout, last_update, last_state_change, last_soft_state,`+
-					`last_hard_state, next_check, next_update) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-				id,
-				super.EnvId,
-				redisStateTypeToDBStateType(values["state_type"]),
-				values["state"],
-				values["last_hard_state"],
-				values["check_attempt"],
-				redisIntToDBInt(values["severity"]),
-				values["output"],
-				values["long_output"],
-				values["performance_data"],
-				values["commandline"],
-				redisBooleanToDBBoolean(values["is_problem"]),
-				redisBooleanToDBBoolean(values["is_handled"]),
-				redisBooleanToDBBoolean(values["is_reachable"]),
-				redisBooleanToDBBoolean(values["is_flapping"]),
-				redisBooleanToDBBoolean(values["is_acknowledged"]),
-				acknowledgementCommentId,
-				redisBooleanToDBBoolean(values["in_downtime"]),
-				values["execution_time"],
-				redisIntToDBInt(values["latency"]),
-				redisIntToDBInt(values["check_timeout"]),
-				values["last_update"],
-				values["last_state_change"],
-				values["last_soft_state"],
-				values["last_hard_state"],
-				values["next_check"],
-				values["next_update"],
-			)
-
-			if errExec != nil {
-				return errExec
-			}
-		}
-
-		return nil
-	})
-
-	if errTx != nil {
-		super.ChErr <- errTx
-		return
-	}
-
-	//Delete synced states from redis stream
+	log.Debugf("%d %s state will be synced", len(states), objectType)
 	var storedStateIds []string
+	brokenStates := 0
+
 	for _, state := range states {
 		storedStateIds = append(storedStateIds, state.ID)
 	}
 
+	for {
+		errTx := super.Dbw.SqlTransaction(true, true, false, func(tx connection.DbTransaction) error {
+			for i, state := range states {
+				values := state.Values
+				id, _ := hex.DecodeString(values["id"].(string))
+
+				var acknowledgementCommentId []byte
+				if values["acknowledgement_comment_id"] != nil {
+					acknowledgementCommentId, _ = hex.DecodeString(values["acknowledgement_comment_id"].(string))
+				}
+
+				_, errExec := super.Dbw.SqlExecTx(
+					tx,
+					mysqlObservers[objectType],
+					`REPLACE INTO `+objectType+`_state (`+objectType+`_id, environment_id, state_type, soft_state, hard_state, attempt, severity, output, long_output, performance_data,`+
+						`check_commandline, is_problem, is_handled, is_reachable, is_flapping, is_acknowledged, acknowledgement_comment_id,`+
+						`in_downtime, execution_time, latency, timeout, last_update, last_state_change, last_soft_state,`+
+						`last_hard_state, next_check, next_update) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+					id,
+					super.EnvId,
+					redisStateTypeToDBStateType(values["state_type"]),
+					values["state"],
+					values["last_hard_state"],
+					values["check_attempt"],
+					redisIntToDBInt(values["severity"]),
+					values["output"],
+					values["long_output"],
+					values["performance_data"],
+					values["commandline"],
+					redisBooleanToDBBoolean(values["is_problem"]),
+					redisBooleanToDBBoolean(values["is_handled"]),
+					redisBooleanToDBBoolean(values["is_reachable"]),
+					redisBooleanToDBBoolean(values["is_flapping"]),
+					redisBooleanToDBBoolean(values["is_acknowledged"]),
+					acknowledgementCommentId,
+					redisBooleanToDBBoolean(values["in_downtime"]),
+					values["execution_time"],
+					redisIntToDBInt(values["latency"]),
+					redisIntToDBInt(values["check_timeout"]),
+					values["last_update"],
+					values["last_state_change"],
+					values["last_soft_state"],
+					values["last_hard_state"],
+					values["next_check"],
+					values["next_update"],
+				)
+
+				if errExec != nil {
+					log.WithFields(log.Fields{
+						"context": "StateSync",
+						"objectType": objectType,
+						"state": values,
+					}).Error(errExec)
+
+					states = removeStateFromStatesSlice(states, i)
+
+					brokenStates++
+
+					return errExec
+				}
+			}
+
+			return nil
+		})
+
+		if errTx != nil {
+			log.WithFields(log.Fields{
+				"context": "StateSync",
+			}).Error(errTx)
+		} else {
+			break
+		}
+	}
+
+	//Delete synced states from redis stream
 	super.Rdbw.XDel("icinga:state:stream:"+objectType, storedStateIds...)
 
-	log.Debugf("%d %s state synced", len(storedStateIds), objectType)
+	log.Debugf("%d %s state synced", len(storedStateIds) - brokenStates, objectType)
+	log.Debugf("%d %s state broken", brokenStates, objectType)
 	syncCounter[objectType] += len(storedStateIds)
 	StateSyncsTotal.WithLabelValues(objectType).Add(float64(len(storedStateIds)))
+}
+
+//Removes one redis.XMessage at given index from given slice and returns the resulting slice
+func removeStateFromStatesSlice(s []redis.XMessage, i int) []redis.XMessage {
+	s[len(s)-1], s[i] = s[i], s[len(s)-1]
+	return s[:len(s)-1]
 }
 
 //Converts a Icinga state type(0 for soft, 1 for hard) we got from Redis into a DB state type(soft, hard)
