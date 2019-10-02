@@ -242,3 +242,19 @@ CREATE TABLE host_flapping_current (
 
   PRIMARY KEY (host_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+
+CREATE TABLE host_history (
+  id binary(16) NOT NULL COMMENT 'notification_history_id, state_history_id, flapping_history_id or UUID',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
+  notification_history_id binary(16) NOT NULL COMMENT 'host_notification_history.id or 00000000-0000-0000-0000-000000000000',
+  state_history_id binary(16) NOT NULL COMMENT 'host_state_history.id or 00000000-0000-0000-0000-000000000000',
+  downtime_history_id binary(20) NOT NULL COMMENT 'host_downtime_history.downtime_id or 0000000000000000000000000000000000000000',
+  comment_history_id binary(20) NOT NULL COMMENT 'host_comment_history.comment_id or 0000000000000000000000000000000000000000',
+  flapping_history_id binary(16) NOT NULL COMMENT 'host_flapping_history.id or 00000000-0000-0000-0000-000000000000',
+
+  event_type enum('notification','state','downtime','comment','flapping') NOT NULL,
+  event_time bigint(20) unsigned NOT NULL,
+
+  PRIMARY KEY (id)
+) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
