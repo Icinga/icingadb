@@ -182,10 +182,9 @@ CREATE TABLE host_state_history (
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE host_downtime_history (
-  id binary(16) NOT NULL COMMENT 'UUID',
+  downtime_id binary(20) NOT NULL COMMENT 'host_downtime.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  downtime_id binary(20) NOT NULL COMMENT 'host_downtime.id',
   triggered_by_id binary(20) NOT NULL COMMENT 'host_downtime.id',
 
   entry_time bigint(20) unsigned NOT NULL,
@@ -203,15 +202,13 @@ CREATE TABLE host_downtime_history (
   trigger_time bigint(20) unsigned NOT NULL,
   deletion_time bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT '0 = not deleted yet',
 
-  PRIMARY KEY (id),
-  UNIQUE INDEX idx_downtime_id (downtime_id)
+  PRIMARY KEY (downtime_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE host_comment_history (
-  id binary(16) NOT NULL COMMENT 'UUID',
+  comment_id binary(20) NOT NULL COMMENT 'host_comment.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  comment_id binary(20) NOT NULL COMMENT 'host_comment.id',
 
   entry_time bigint(20) unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
@@ -221,8 +218,7 @@ CREATE TABLE host_comment_history (
   expire_time bigint(20) unsigned DEFAULT NULL,
   deletion_time bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT '0 = not deleted yet',
 
-  PRIMARY KEY (id),
-  UNIQUE INDEX idx_comment_id (comment_id)
+  PRIMARY KEY (comment_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE host_flapping_history (
