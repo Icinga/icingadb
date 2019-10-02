@@ -193,7 +193,7 @@ CREATE TABLE service_downtime_history (
   was_cancelled enum('y', 'n') NOT NULL,
   is_in_effect enum('y', 'n') NOT NULL,
   trigger_time bigint(20) unsigned NOT NULL,
-  deletion_time bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT '0 = not deleted yet',
+  deletion_time bigint(20) unsigned NULL DEFAULT NULL,
 
   PRIMARY KEY (downtime_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
@@ -209,7 +209,7 @@ CREATE TABLE service_comment_history (
   entry_type enum('comment','ack','downtime','flapping') NOT NULL,
   is_persistent enum('y','n') NOT NULL,
   expire_time bigint(20) unsigned DEFAULT NULL,
-  deletion_time bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT '0 = not deleted yet',
+  deletion_time bigint(20) unsigned NULL DEFAULT NULL,
 
   PRIMARY KEY (comment_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
@@ -220,7 +220,7 @@ CREATE TABLE service_flapping_history (
   service_id binary(20) NOT NULL COMMENT 'service.id',
 
   start_time bigint(20) unsigned NOT NULL,
-  end_time bigint(20) unsigned NOT NULL DEFAULT 0 COMMENT '0 = not ended yet',
+  end_time bigint(20) unsigned NULL DEFAULT NULL,
   percent_state_change float unsigned NOT NULL,
   flapping_threshold_low float unsigned NOT NULL,
   flapping_threshold_high float unsigned NOT NULL,
