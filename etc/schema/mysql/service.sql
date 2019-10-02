@@ -178,7 +178,7 @@ CREATE TABLE service_downtime_history (
   downtime_id binary(20) NOT NULL COMMENT 'service_downtime.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   service_id binary(20) NOT NULL COMMENT 'service.id',
-  triggered_by_id binary(20) NOT NULL COMMENT 'service_downtime.id',
+  triggered_by_id binary(20) NULL DEFAULT NULL COMMENT 'service_downtime.id',
 
   entry_time bigint(20) unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
