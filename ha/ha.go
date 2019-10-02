@@ -263,7 +263,7 @@ func (h *HA) runEventListener() {
 }
 
 func (h *HA) RegisterNotificationListener(listenerType string) chan int {
-	ch := make(chan int)
+	ch := make(chan int, 10)
 	h.notificationListenersMutex.Lock()
 	h.notificationListeners[listenerType] = append(h.notificationListeners[listenerType], ch)
 	h.notificationListenersMutex.Unlock()
@@ -274,9 +274,7 @@ func (h *HA) notifyNotificationListener(listenerType string, msg int) {
 	for t, chs  := range h.notificationListeners {
 		if t == listenerType || listenerType == "*" {
 			for _, c := range chs {
-				go func(ch chan int) {
-					ch <- msg
-				}(c)
+				c <- msg
 			}
 		}
 	}
