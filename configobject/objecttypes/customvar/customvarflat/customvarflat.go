@@ -6,6 +6,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/utils"
+	"strconv"
 )
 
 var (
@@ -77,7 +78,18 @@ func CollectScalarVars(c *CustomvarFlat, value interface{}, name string, path []
 
 		return rows
 	default:
-		flatName := fmt.Sprintf("%v", path)
+		flatName := ""
+		for i, pathPart := range path {
+			if _, err := strconv.Atoi(pathPart); err == nil {
+				flatName = flatName + "[" + pathPart + "]"
+			} else {
+				if i > 0 {
+					flatName = flatName + "."
+				}
+				flatName = flatName + pathPart
+			}
+		}
+
 		flatValue := fmt.Sprintf("%v", v)
 		return []connection.Row{
 			&CustomvarFlatFinal{
