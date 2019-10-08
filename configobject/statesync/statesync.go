@@ -7,11 +7,13 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"sync"
 	"time"
 )
 
 //Counter on how many host/service states have synced since the last logSyncCounters()
 var syncCounter = make(map[string]int)
+var syncCounterLock = sync.Mutex{}
 
 var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
 	mysqlObservers = map[string]prometheus.Observer{}
@@ -48,7 +50,9 @@ func logSyncCounters() {
 	for {
 		<-every20s.C
 		log.Infof("Synced %d host and %d service states in the last 20 seconds", syncCounter["host"], syncCounter["service"])
+		syncCounterLock.Lock()
 		syncCounter = make(map[string]int)
+		syncCounterLock.Unlock()
 	}
 }
 
@@ -159,7 +163,9 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 
 	log.Debugf("%d %s state synced", len(storedStateIds) - brokenStates, objectType)
 	log.Debugf("%d %s state broken", brokenStates, objectType)
+	syncCounterLock.Lock()
 	syncCounter[objectType] += len(storedStateIds)
+	syncCounterLock.Unlock()
 	StateSyncsTotal.WithLabelValues(objectType).Add(float64(len(storedStateIds)))
 }
 
