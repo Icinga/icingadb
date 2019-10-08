@@ -1,6 +1,7 @@
 package servicecomment
 
 import (
+	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/utils"
@@ -65,7 +66,7 @@ func (s *ServiceComment) UpdateValues() []interface{} {
 		s.Name,
 		s.Author,
 		s.Text,
-		s.EntryType,
+		utils.CommentEntryTypes[fmt.Sprintf("%.0f", s.EntryType)],
 		s.EntryTime,
 		utils.Bool[s.IsPersistent],
 		s.ExpireTime,
