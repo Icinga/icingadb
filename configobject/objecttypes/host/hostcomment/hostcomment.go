@@ -1,6 +1,7 @@
 package hostcomment
 
 import (
+	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/utils"
@@ -65,7 +66,7 @@ func (h *HostComment) UpdateValues() []interface{} {
 		h.Name,
 		h.Author,
 		h.Text,
-		h.EntryType,
+		utils.CommentEntryTypes[fmt.Sprintf("%.0f", h.EntryType)],
 		h.EntryTime,
 		utils.Bool[h.IsPersistent],
 		h.ExpireTime,
