@@ -211,14 +211,12 @@ func downtimeHistoryWorker(super *supervisor.Supervisor, objectType string) {
 
 			var eventTime string
 			switch values["event_type"] {
+			case "downtime_schedule":
+				eventTime = values["entry_time"].(string)
 			case "downtime_start":
-				if values["is_fixed"] == "1" {
-					eventTime = values["entry_time"].(string)
-				} else {
-					eventTime = values["trigger_time"].(string)
-				}
+				eventTime = values["actual_start_time"].(string)
 			case "downtime_end":
-				eventTime = values["deletion_time"].(string)
+				eventTime = values["actual_end_time"].(string)
 			}
 
 			data := []interface{}{
