@@ -5,6 +5,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/config"
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
+	"git.icinga.com/icingadb/icingadb-main/configobject/history"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/actionurl"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandargument"
@@ -107,6 +108,8 @@ func main() {
 	startConfigSyncOperators(&super, haInstance)
 
 	statesync.StartStateSync(&super)
+
+	history.StartHistoryWorkers(&super)
 
 	go haInstance.StartEventListener()
 

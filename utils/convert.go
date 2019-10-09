@@ -30,6 +30,12 @@ var (
 		"FlappingStart":	128,
 		"FlappingEnd":		256,
 	}
+	CommentEntryTypes = map[string]string{
+		"1": "comment",
+		"2": "downtime",
+		"3": "flapping",
+		"4": "ack",
+	}
 )
 
 // Checksum converts the given string into a SHA1 checksum string
@@ -77,5 +83,22 @@ func IcingaStateTypeToString(stateType float32) string {
 		return "hard"
 	} else {
 		return "soft"
+	}
+}
+
+//Converts a boolean we got from Redis into a DB boolean
+func JSONBooleanToDBBoolean(value interface{}) string {
+	if value == "true" {
+		return "y"
+	} else { //Should catch empty strings and nil
+		return "n"
+	}
+}
+
+func RedisIntToDBBoolean(value interface{}) string {
+	if value == "1" {
+		return "y"
+	} else { //Should catch empty strings and nil
+		return "n"
 	}
 }
