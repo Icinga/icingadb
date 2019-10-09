@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"git.icinga.com/icingadb/icingadb-main/connection"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
+	"git.icinga.com/icingadb/icingadb-main/utils"
 	"github.com/go-redis/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -113,13 +114,13 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 					values["long_output"],
 					values["performance_data"],
 					values["commandline"],
-					redisBooleanToDBBoolean(values["is_problem"]),
-					redisBooleanToDBBoolean(values["is_handled"]),
-					redisBooleanToDBBoolean(values["is_reachable"]),
-					redisBooleanToDBBoolean(values["is_flapping"]),
-					redisBooleanToDBBoolean(values["is_acknowledged"]),
+					utils.JSONBooleanToDBBoolean(values["is_problem"]),
+					utils.JSONBooleanToDBBoolean(values["is_handled"]),
+					utils.JSONBooleanToDBBoolean(values["is_reachable"]),
+					utils.JSONBooleanToDBBoolean(values["is_flapping"]),
+					utils.JSONBooleanToDBBoolean(values["is_acknowledged"]),
 					acknowledgementCommentId,
-					redisBooleanToDBBoolean(values["in_downtime"]),
+					utils.JSONBooleanToDBBoolean(values["in_downtime"]),
 					values["execution_time"],
 					redisIntToDBInt(values["latency"]),
 					redisIntToDBInt(values["check_timeout"]),
@@ -181,15 +182,6 @@ func redisStateTypeToDBStateType(value interface{}) string {
 		return "hard"
 	} else {
 		return "soft"
-	}
-}
-
-//Converts a boolean we got from Redis into a DB boolean
-func redisBooleanToDBBoolean(value interface{}) string {
-	if value == "true" {
-		return "y"
-	} else { //Should catch empty strings and nil
-		return "n"
 	}
 }
 
