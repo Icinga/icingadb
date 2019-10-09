@@ -12,7 +12,7 @@ CREATE TABLE checkcommand (
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   command text NOT NULL,
-  timeout smallint(5) unsigned NOT NULL,
+  timeout int(10) unsigned NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;

@@ -132,9 +132,9 @@ CREATE TABLE host_state (
 
   in_downtime enum('y', 'n') NOT NULL,
 
-  execution_time bigint(20) unsigned DEFAULT NULL,
-  latency bigint(20) unsigned DEFAULT NULL,
-  timeout bigint(20) unsigned DEFAULT NULL,
+  execution_time int(10) unsigned DEFAULT NULL,
+  latency int(10) unsigned DEFAULT NULL,
+  timeout int(10) unsigned DEFAULT NULL,
 
   last_update bigint(20) unsigned NOT NULL,
   last_state_change bigint(20) unsigned NOT NULL,
