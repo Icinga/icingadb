@@ -137,7 +137,7 @@ func init() {
 		PrimaryMySqlField: "host_id",
 		Factory: NewHostState,
 		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields, "host_id"),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
 		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "host_id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "host",

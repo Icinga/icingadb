@@ -100,7 +100,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 			go UpdatePrepWorker(super, objectInformation, done, chUpdate, chUpdateBack)
 			go UpdateExecWorker(super, objectInformation, done, chUpdateBack, wgUpdate, updateCounter)
 
-			go RuntimeUpdateWorker(super, objectInformation, done, chInsert, chDelete, wgInsert, wgDelete)
+			go RuntimeUpdateWorker(super, objectInformation, done, chUpdate, chDelete, wgUpdate, wgDelete)
 
 			waitOrKill := func(wg *sync.WaitGroup, done chan struct{}) (kill bool) {
 				waitDone := make(chan bool)
@@ -426,7 +426,7 @@ func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 	}
 }
 
-func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsert chan []string, chDelete chan []string, wgInsert *sync.WaitGroup, wgDelete *sync.WaitGroup) {
+func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdate chan []string, chDelete chan []string, wgUpdate *sync.WaitGroup, wgDelete *sync.WaitGroup) {
 	subscription := super.Rdbw.Subscribe()
 	defer subscription.Close()
 	if err := subscription.Subscribe("icinga:config:delete", "icinga:config:update"); err != nil {
@@ -459,19 +459,19 @@ func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *config
 			objectId := data[2]
 			switch msg.Channel {
 			case "icinga:config:update":
-				wgInsert.Add(1)
-				chInsert <- []string{objectId}
+				wgUpdate.Add(1)
+				chUpdate <- []string{objectId}
 				log.WithFields(log.Fields{
 					"type": 		objectInformation.ObjectType,
 					"action":		"runtime insert/update",
-				}).Infof("Inserting 1 %v on runtime update", objectInformation.ObjectType)
+				}).Infof("Inserting 1 %v on runtime update (%s)", objectInformation.ObjectType, objectId)
 			case "icinga:config:delete":
 				wgDelete.Add(1)
 				chDelete <- []string{objectId}
 				log.WithFields(log.Fields{
 					"type": 		objectInformation.ObjectType,
 					"action":		"runtime delete",
-				}).Infof("Deleting 1 %v on runtime update", objectInformation.ObjectType)
+				}).Infof("Deleting 1 %v on runtime update (%s)", objectInformation.ObjectType, objectId)
 			}
 		}
 	}

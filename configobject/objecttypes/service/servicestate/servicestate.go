@@ -137,7 +137,7 @@ func init() {
 		PrimaryMySqlField: "service_id",
 		Factory: NewServiceState,
 		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields, "service_id"),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
 		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "service_id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "service",

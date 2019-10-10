@@ -376,11 +376,11 @@ type BulkInsertStmt struct {
 	NumField    int
 }
 
-func NewBulkInsertStmt(table string, fields []string, primaryKey string) *BulkInsertStmt {
+func NewBulkInsertStmt(table string, fields []string) *BulkInsertStmt {
 	numField := len(fields)
 	placeholder := fmt.Sprintf("(%s)", strings.TrimSuffix(strings.Repeat("?, ", numField), ", "))
 	stmt := BulkInsertStmt{
-		Format:      fmt.Sprintf("INSERT INTO %s (%s) VALUES %s ON DUPLICATE KEY UPDATE %s = %s", table, strings.Join(fields, ", "), "%s", primaryKey, primaryKey),
+		Format:      fmt.Sprintf("REPLACE INTO %s (%s) VALUES %s", table, strings.Join(fields, ", "), "%s"),
 		Fields:      fields,
 		Placeholder: placeholder,
 		NumField:    numField,

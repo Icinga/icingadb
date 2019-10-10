@@ -154,7 +154,7 @@ func init() {
 		PrimaryMySqlField: "customvar_id",
 		Factory: NewCustomvarFlat,
 		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields, "id"),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
 		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "customvar_id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 	}
