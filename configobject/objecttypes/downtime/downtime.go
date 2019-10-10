@@ -1,4 +1,4 @@
-package servicedowntime
+package downtime
 
 import (
 	"git.icinga.com/icingadb/icingadb-main/configobject"
@@ -11,6 +11,8 @@ var (
 	Fields         = []string{
 		"id",
 		"environment_id",
+		"object_type",
+		"host_id",
 		"service_id",
 		"name_checksum",
 		"properties_checksum",
@@ -29,9 +31,11 @@ var (
 	}
 )
 
-type ServiceDowntime struct {
+type Downtime struct {
 	Id                    string  	`json:"id"`
 	EnvId                 string  	`json:"environment_id"`
+	ObjectType            string  	`json:"object_type"`
+	HostId                string  	`json:"host_id"`
 	ServiceId             string  	`json:"service_id"`
 	NameChecksum          string  	`json:"name_checksum"`
 	PropertiesChecksum    string  	`json:"checksum"`
@@ -49,67 +53,69 @@ type ServiceDowntime struct {
 	ZoneId                string	`json:"zone_id"`
 }
 
-func NewServiceDowntime() connection.Row {
-	s := ServiceDowntime{}
+func NewDowntime() connection.Row {
+	d := Downtime{}
 
-	return &s
+	return &d
 }
 
-func (s *ServiceDowntime) InsertValues() []interface{} {
-	v := s.UpdateValues()
+func (d *Downtime) InsertValues() []interface{} {
+	v := d.UpdateValues()
 
-	return append([]interface{}{utils.EncodeChecksum(s.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(d.Id)}, v...)
 }
 
-func (s *ServiceDowntime) UpdateValues() []interface{} {
+func (d *Downtime) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
 	v = append(
 		v,
-		utils.EncodeChecksum(s.EnvId),
-		utils.EncodeChecksum(s.ServiceId),
-		utils.EncodeChecksum(s.NameChecksum),
-		utils.EncodeChecksum(s.PropertiesChecksum),
-		s.Name,
-		s.Author,
-		s.Comment,
-		s.EntryTime,
-		s.ScheduledStartTime,
-		s.ScheduledEndTime,
-		s.Duration,
-		utils.Bool[s.IsFixed],
-		utils.Bool[s.IsInEffect],
-		s.ActualStartTime,
-		s.ActualEndTime,
-		utils.EncodeChecksum(s.ZoneId),
+		utils.EncodeChecksum(d.EnvId),
+		d.ObjectType,
+		utils.EncodeChecksum(d.HostId),
+		utils.EncodeChecksum(d.ServiceId),
+		utils.EncodeChecksum(d.NameChecksum),
+		utils.EncodeChecksum(d.PropertiesChecksum),
+		d.Name,
+		d.Author,
+		d.Comment,
+		d.EntryTime,
+		d.ScheduledStartTime,
+		d.ScheduledEndTime,
+		d.Duration,
+		utils.Bool[d.IsFixed],
+		utils.Bool[d.IsInEffect],
+		d.ActualStartTime,
+		d.ActualEndTime,
+		utils.EncodeChecksum(d.ZoneId),
 	)
 
 	return v
 }
 
-func (s *ServiceDowntime) GetId() string {
-	return s.Id
+func (d *Downtime) GetId() string {
+	return d.Id
 }
 
-func (s *ServiceDowntime) SetId(id string) {
-	s.Id = id
+func (d *Downtime) SetId(id string) {
+	d.Id = id
 }
 
-func (s *ServiceDowntime) GetFinalRows() ([]connection.Row, error) {
-	return []connection.Row{s}, nil
+func (d *Downtime) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{d}, nil
 }
 
 func init() {
-	name := "service_downtime"
+	name := "downtime"
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
-		RedisKey: "servicedowntime",
+		RedisKey: "downtime",
 		PrimaryMySqlField: "id",
-		Factory: NewServiceDowntime,
+		Factory: NewDowntime,
 		HasChecksum: true,
 		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
+		BulkDeleteStmt: connection.NewBulkDeleteStmt(name, "id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
-		NotificationListenerType: "servicedowntime",
+		NotificationListenerType: "downtime",
 	}
 }

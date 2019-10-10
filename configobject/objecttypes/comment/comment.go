@@ -1,4 +1,4 @@
-package hostcomment
+package comment
 
 import (
 	"fmt"
@@ -12,7 +12,9 @@ var (
 	Fields         = []string{
 		"id",
 		"environment_id",
+		"object_type",
 		"host_id",
+		"service_id",
 		"name_checksum",
 		"properties_checksum",
 		"name",
@@ -26,10 +28,12 @@ var (
 	}
 )
 
-type HostComment struct {
+type Comment struct {
 	Id					string	`json:"id"`
 	EnvId               string	`json:"environment_id"`
-	HostId           	string	`json:"host_id"`
+	ObjectType          string  `json:"object_type"`
+	HostId              string  `json:"host_id"`
+	ServiceId           string  `json:"service_id"`
 	NameChecksum        string	`json:"name_checksum"`
 	PropertiesChecksum  string	`json:"checksum"`
 	Name                string	`json:"name"`
@@ -42,63 +46,65 @@ type HostComment struct {
 	ZoneId              string	`json:"zone_id"`
 }
 
-func NewHostComment() connection.Row {
-	h := HostComment{}
+func NewComment() connection.Row {
+	c := Comment{}
 
-	return &h
+	return &c
 }
 
-func (h *HostComment) InsertValues() []interface{} {
-	v := h.UpdateValues()
+func (c *Comment) InsertValues() []interface{} {
+	v := c.UpdateValues()
 
-	return append([]interface{}{utils.EncodeChecksum(h.Id)}, v...)
+	return append([]interface{}{utils.EncodeChecksum(c.Id)}, v...)
 }
 
-func (h *HostComment) UpdateValues() []interface{} {
+func (c *Comment) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
 	v = append(
 		v,
-		utils.EncodeChecksum(h.EnvId),
-		utils.EncodeChecksum(h.HostId),
-		utils.EncodeChecksum(h.NameChecksum),
-		utils.EncodeChecksum(h.PropertiesChecksum),
-		h.Name,
-		h.Author,
-		h.Text,
-		utils.CommentEntryTypes[fmt.Sprintf("%.0f", h.EntryType)],
-		h.EntryTime,
-		utils.Bool[h.IsPersistent],
-		h.ExpireTime,
-		utils.EncodeChecksum(h.ZoneId),
+		utils.EncodeChecksum(c.EnvId),
+		c.ObjectType,
+		utils.EncodeChecksum(c.HostId),
+		utils.EncodeChecksum(c.ServiceId),
+		utils.EncodeChecksum(c.NameChecksum),
+		utils.EncodeChecksum(c.PropertiesChecksum),
+		c.Name,
+		c.Author,
+		c.Text,
+		utils.CommentEntryTypes[fmt.Sprintf("%.0f", c.EntryType)],
+		c.EntryTime,
+		utils.Bool[c.IsPersistent],
+		c.ExpireTime,
+		utils.EncodeChecksum(c.ZoneId),
 	)
 
 	return v
 }
 
-func (h *HostComment) GetId() string {
-	return h.Id
+func (c *Comment) GetId() string {
+	return c.Id
 }
 
-func (h *HostComment) SetId(id string) {
-	h.Id = id
+func (c *Comment) SetId(id string) {
+	c.Id = id
 }
 
-func (h *HostComment) GetFinalRows() ([]connection.Row, error) {
-	return []connection.Row{h}, nil
+func (c *Comment) GetFinalRows() ([]connection.Row, error) {
+	return []connection.Row{c}, nil
 }
 
 func init() {
-	name := "host_comment"
+	name := "comment"
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType: name,
-		RedisKey: "hostcomment",
+		RedisKey: "comment",
 		PrimaryMySqlField: "id",
-		Factory: NewHostComment,
+		Factory: NewComment,
 		HasChecksum: true,
 		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
 		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
-		NotificationListenerType: "hostcomment",
+		NotificationListenerType: "comment",
 	}
 }

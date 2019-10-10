@@ -11,17 +11,17 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandargument"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandenvvar"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/comment"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/customvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/customvar/customvarflat"
+	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/downtime"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/endpoint"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandargument"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/eventcommand/eventcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host"
-	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcomment"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostcustomvar"
-	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hostdowntime"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/host/hoststate"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/hostgroup/hostgroupcustomvar"
@@ -37,9 +37,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandcustomvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/notificationcommand/notificationcommandenvvar"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service"
-	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecomment"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicecustomvar"
-	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicedowntime"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/service/servicestate"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/servicegroup/servicegroupcustomvar"
@@ -129,14 +127,10 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 	objectTypes := []*configobject.ObjectInformation{
 		&host.ObjectInformation,
 		&hostcustomvar.ObjectInformation,
-		&hostdowntime.ObjectInformation,
-		&hostcomment.ObjectInformation,
-		&hoststate.ObjectInformation,
+		&downtime.ObjectInformation,
 
 		&service.ObjectInformation,
 		&servicecustomvar.ObjectInformation,
-		&servicedowntime.ObjectInformation,
-		&servicecomment.ObjectInformation,
 		&servicestate.ObjectInformation,
 
 		&hostgroup.ObjectInformation,
@@ -190,6 +184,9 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&notificationcommandcustomvar.ObjectInformation,
 		&notificationcommandargument.ObjectInformation,
 		&notificationcommandenvvar.ObjectInformation,
+
+		&comment.ObjectInformation,
+		&hoststate.ObjectInformation,
 	}
 
 	for _, objectInformation := range objectTypes {
