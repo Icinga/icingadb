@@ -67,7 +67,7 @@ func init() {
 		PrimaryMySqlField: "id",
 		Factory: NewHostgroupCustomvar,
 		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields, "id"),
+		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
 		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
 		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "hostgroup",
