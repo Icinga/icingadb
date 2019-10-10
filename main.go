@@ -6,6 +6,7 @@ import (
 	"git.icinga.com/icingadb/icingadb-main/configobject"
 	"git.icinga.com/icingadb/icingadb-main/configobject/configsync"
 	"git.icinga.com/icingadb/icingadb-main/configobject/history"
+	"git.icinga.com/icingadb/icingadb-main/configobject/nullrows"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/actionurl"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand"
 	"git.icinga.com/icingadb/icingadb-main/configobject/objecttypes/checkcommand/checkcommandargument"
@@ -102,6 +103,8 @@ func main() {
 	go ha.IcingaHeartbeatListener(redisConn, chEnv, super.ChErr)
 
 	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)
+
+	go nullrows.InsertNullRows(&super)
 
 	startConfigSyncOperators(&super, haInstance)
 
