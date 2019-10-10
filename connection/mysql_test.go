@@ -2,10 +2,12 @@ package connection
 
 import (
 	"context"
+	"crypto/sha1"
 	"database/sql"
 	"errors"
 	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/connection/mysqld"
+	"git.icinga.com/icingadb/icingadb-main/utils"
 	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -355,3 +357,90 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 	_, err = dbw.Db.Exec("DROP TABLE testing0815")
 	assert.NoError(t, err)
 }
+
+func TestDBWrapper_SqlFetchIds(t *testing.T) {
+	var server mysqld.Server
+
+	host, errSt := server.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer server.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
+	require.NoError(t, err, "Is the MySQL server running?")
+
+	hash := sha1.New()
+	hash.Write([]byte("derp"))
+	envId := hash.Sum(nil)
+
+	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id binary(20) NOT NULL PRIMARY KEY, environment_id binary(20) NOT NULL)")
+	assert.NoError(t, err)
+
+	hashHorst := sha1.New()
+	hashHorst.Write([]byte("horst"))
+	horst := hashHorst.Sum(nil)
+
+	hashPeter := sha1.New()
+	hashPeter.Write([]byte("peter"))
+	peter := hashPeter.Sum(nil)
+
+	_, err = dbw.Db.Exec("INSERT INTO testing0815 (id, environment_id) VALUES (?, ?), (?, ?)", horst, envId, peter, envId)
+	assert.NoError(t, err)
+
+	ids, err := dbw.SqlFetchIds(envId, "testing0815", "id")
+	assert.NoError(t, err)
+
+	assert.ElementsMatch(t, []string{utils.DecodeChecksum(horst), utils.DecodeChecksum(peter)}, ids)
+
+	_, err = dbw.Db.Exec("DROP TABLE testing0815")
+	assert.NoError(t, err)
+}
+
+func TestDBWrapper_SqlFetchChecksums(t *testing.T) {
+	var server mysqld.Server
+
+	host, errSt := server.Start()
+	if errSt != nil {
+		t.Fatal(errSt)
+		return
+	}
+
+	defer server.Stop()
+
+	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
+		t.Fatal(errMTD)
+		return
+	}
+
+	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
+	require.NoError(t, err, "Is the MySQL server running?")
+
+	envId := utils.Checksum("derp")
+
+	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id binary(20) NOT NULL PRIMARY KEY, environment_id binary(20) NOT NULL, properties_checksum binary(20) NOT NULL)")
+	assert.NoError(t, err)
+
+	horst := utils.Checksum("horst")
+	peter := utils.Checksum("peter")
+
+	_, err = dbw.Db.Exec("INSERT INTO testing0815 (id, environment_id, properties_checksum) VALUES (?, ?, ?), (?, ?, ?)", utils.EncodeChecksum(horst), utils.EncodeChecksum(envId), utils.EncodeChecksum(utils.Checksum("hans wurst")), utils.EncodeChecksum(peter), utils.EncodeChecksum(envId), utils.EncodeChecksum(utils.Checksum("peter wurst")))
+	assert.NoError(t, err)
+
+	checksums, err := dbw.SqlFetchChecksums("testing0815", []string{horst, peter})
+	assert.NoError(t, err)
+
+	assert.Equal(t, utils.Checksum("hans wurst"), checksums[horst]["properties_checksum"])
+	assert.Equal(t, utils.Checksum("peter wurst"), checksums[peter]["properties_checksum"])
+
+	_, err = dbw.Db.Exec("DROP TABLE testing0815")
+	assert.NoError(t, err)
+}
+
