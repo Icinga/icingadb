@@ -114,11 +114,13 @@ func NewRDBWrapper(address string) *RDBWrapper {
 	}
 
 	rdb := redis.NewClient(&redis.Options{
-		Network:      net,
-		Addr:         address,
-		DialTimeout:  time.Minute / 2,
-		ReadTimeout:  time.Minute,
-		WriteTimeout: time.Minute,
+		Network:      	net,
+		Addr:         	address,
+		DialTimeout:  	time.Minute / 2,
+		ReadTimeout:  	time.Minute,
+		WriteTimeout: 	time.Minute,
+		PoolTimeout: 	time.Minute,
+		PoolSize: 		64,
 	})
 
 	rdbw := RDBWrapper{

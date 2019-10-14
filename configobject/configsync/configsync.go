@@ -433,45 +433,40 @@ func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *config
 		super.ChErr <- err
 	}
 
-	for {
-		msg, err := subscription.ReceiveMessage()
+	msgCh := subscription.Channel()
 
+	for {
 		select {
 		case _, ok := <-done:
 			if !ok {
 				return
 			}
-		default:
-		}
+		case msg := <-msgCh:
+			// Split string on last ':'
+			// host:customvar:050ecceaf1ce87e7d503184135d99f47eda5ee85
+			// => [host:customvar:050ecceaf1ce87e7d503184135d99f47eda5ee85 host:customvar 050ecceaf1ce87e7d503184135d99f47eda5ee85]
+			re := regexp.MustCompile(`\A(.*):(.*?)\z`)
+			data := re.FindStringSubmatch(msg.Payload)
 
-		if err != nil {
-			super.ChErr <- err
-		}
-
-		// Split string on last ':'
-		// host:customvar:050ecceaf1ce87e7d503184135d99f47eda5ee85
-		// => [host:customvar:050ecceaf1ce87e7d503184135d99f47eda5ee85 host:customvar 050ecceaf1ce87e7d503184135d99f47eda5ee85]
-		re := regexp.MustCompile(`\A(.*):(.*?)\z`)
-		data := re.FindStringSubmatch(msg.Payload)
-
-		objectType := data[1]
-		if objectType == objectInformation.RedisKey {
-			objectId := data[2]
-			switch msg.Channel {
-			case "icinga:config:update":
-				wgUpdate.Add(1)
-				chUpdate <- []string{objectId}
-				log.WithFields(log.Fields{
-					"type": 		objectInformation.ObjectType,
-					"action":		"runtime insert/update",
-				}).Infof("Inserting 1 %v on runtime update (%s)", objectInformation.ObjectType, objectId)
-			case "icinga:config:delete":
-				wgDelete.Add(1)
-				chDelete <- []string{objectId}
-				log.WithFields(log.Fields{
-					"type": 		objectInformation.ObjectType,
-					"action":		"runtime delete",
-				}).Infof("Deleting 1 %v on runtime update (%s)", objectInformation.ObjectType, objectId)
+			objectType := data[1]
+			if objectType == objectInformation.RedisKey {
+				objectId := data[2]
+				switch msg.Channel {
+				case "icinga:config:update":
+					wgUpdate.Add(1)
+					chUpdate <- []string{objectId}
+					log.WithFields(log.Fields{
+						"type": 		objectInformation.ObjectType,
+						"action":		"runtime insert/update",
+					}).Infof("Inserting 1 %v on runtime update (%s)", objectInformation.ObjectType, objectId)
+				case "icinga:config:delete":
+					wgDelete.Add(1)
+					chDelete <- []string{objectId}
+					log.WithFields(log.Fields{
+						"type": 		objectInformation.ObjectType,
+						"action":		"runtime delete",
+					}).Infof("Deleting 1 %v on runtime update (%s)", objectInformation.ObjectType, objectId)
+				}
 			}
 		}
 	}
