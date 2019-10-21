@@ -18,12 +18,12 @@ CREATE TABLE downtime (
   entry_time bigint(20) unsigned NOT NULL,
   scheduled_start_time bigint(20) unsigned NOT NULL,
   scheduled_end_time bigint(20) unsigned NOT NULL,
-  duration bigint(20) unsigned NOT NULL,
+  flexible_duration bigint(20) unsigned NOT NULL,
   is_flexible enum('y', 'n') NOT NULL,
 
   is_in_effect enum('y', 'n') NOT NULL,
   actual_start_time bigint(20) unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
-  actual_end_time bigint(20) unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + duration otherwise',
+  actual_end_time bigint(20) unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + flexible_duration otherwise',
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 

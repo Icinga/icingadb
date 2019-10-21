@@ -52,7 +52,7 @@ func InsertNullRows(super *supervisor.Supervisor) {
 		// *_downtime_history
 		execFunc(
 			objectType + "_downtime_history",
-			fmt.Sprintf("REPLACE INTO %s_downtime_history(downtime_id, environment_id, %s_id, triggered_by_id, entry_time, author, comment, is_flexible, duration, scheduled_start_time, scheduled_end_time, was_started, actual_start_time, actual_end_time, was_cancelled, is_in_effect, trigger_time, deletion_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", objectType, objectType),
+			fmt.Sprintf("REPLACE INTO %s_downtime_history(downtime_id, environment_id, %s_id, triggered_by_id, entry_time, author, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, was_started, actual_start_time, actual_end_time, was_cancelled, is_in_effect, trigger_time, deletion_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", objectType, objectType),
 			emptyID, super.EnvId, emptyID, emptyID, 0, "", "", "y", 0, 0, 0, "y", 0, 0, "y", "y", 0, 0,
 		)
 
