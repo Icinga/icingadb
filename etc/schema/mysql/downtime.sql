@@ -19,7 +19,7 @@ CREATE TABLE downtime (
   scheduled_start_time bigint(20) unsigned NOT NULL,
   scheduled_end_time bigint(20) unsigned NOT NULL,
   duration bigint(20) unsigned NOT NULL,
-  is_fixed enum('y', 'n') NOT NULL,
+  is_flexible enum('y', 'n') NOT NULL,
 
   is_in_effect enum('y', 'n') NOT NULL,
   actual_start_time bigint(20) unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
