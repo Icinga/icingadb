@@ -23,7 +23,7 @@ var (
 		"scheduled_start_time",
 		"scheduled_end_time",
 		"duration",
-		"is_fixed",
+		"is_flexible",
 		"is_in_effect",
 		"actual_start_time",
 		"actual_end_time",
@@ -46,7 +46,7 @@ type Downtime struct {
 	ScheduledStartTime    float64  	`json:"scheduled_start_time"`
 	ScheduledEndTime      float64  	`json:"scheduled_end_time"`
 	Duration		      float64  	`json:"duration"`
-	IsFixed		      	  bool  	`json:"is_fixed"`
+	IsFlexible		      bool  	`json:"is_flexible"`
 	IsInEffect		      bool  	`json:"is_in_effect"`
 	ActualStartTime       float64  	`json:"actual_start_time"`
 	ActualEndTime         float64  	`json:"actual_end_time"`
@@ -83,7 +83,7 @@ func (d *Downtime) UpdateValues() []interface{} {
 		d.ScheduledStartTime,
 		d.ScheduledEndTime,
 		d.Duration,
-		utils.Bool[d.IsFixed],
+		utils.Bool[d.IsFlexible],
 		utils.Bool[d.IsInEffect],
 		d.ActualStartTime,
 		d.ActualEndTime,

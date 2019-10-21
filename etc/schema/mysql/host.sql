@@ -190,7 +190,7 @@ CREATE TABLE host_downtime_history (
   entry_time bigint(20) unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,
-  is_fixed enum('y', 'n') NOT NULL,
+  is_flexible enum('y', 'n') NOT NULL,
   duration bigint(20) unsigned NOT NULL,
   scheduled_start_time bigint(20) unsigned NOT NULL,
   scheduled_end_time bigint(20) unsigned NOT NULL,
