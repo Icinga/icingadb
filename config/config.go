@@ -19,10 +19,12 @@ type RedisInfo struct {
 	Port     string `ini:"port"`
 	User     string `ini:"user"`
 	Password string `ini:"password"`
+	PoolSize int    `ini:"pool_size"`
 }
 
 var redisInfo = &RedisInfo{
-	Port: "6379",
+	Port:     "6379",
+	PoolSize: 64,
 }
 
 type MysqlInfo struct {
