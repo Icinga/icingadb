@@ -59,8 +59,8 @@ func InsertNullRows(super *supervisor.Supervisor) {
 		// *_flapping_history
 		execFunc(
 			objectType + "_flapping_history",
-			fmt.Sprintf("REPLACE INTO %s_flapping_history(id, environment_id, %s_id, start_time, end_time, percent_state_change, flapping_threshold_low, flapping_threshold_high) VALUES (?,?,?,?,?,?,?,?)", objectType, objectType),
-			emptyUUID[:], super.EnvId, emptyID, 0, 0, 0, 0, 0,
+			fmt.Sprintf("REPLACE INTO %s_flapping_history(id, environment_id, %s_id, change_time, change_type, percent_state_change, flapping_threshold_low, flapping_threshold_high) VALUES (?,?,?,?,?,?,?,?)", objectType, objectType),
+			emptyUUID[:], super.EnvId, emptyID, 0, "start", 0, 0, 0,
 		)
 
 		// *_notification_history

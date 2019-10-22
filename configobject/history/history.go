@@ -300,7 +300,7 @@ func commentHistoryWorker(super *supervisor.Supervisor, objectType string) {
 
 func flappingHistoryWorker(super *supervisor.Supervisor, objectType string) {
 	statements := []string{
-		`REPLACE INTO `+objectType+`_flapping_history (id, environment_id, `+objectType+`_id, start_time, end_time,` +
+		`REPLACE INTO `+objectType+`_flapping_history (id, environment_id, `+objectType+`_id, change_time, change_type,` +
 			`percent_state_change, flapping_threshold_low, flapping_threshold_high)` +
 			`VALUES (?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO `+objectType+`_history (id, environment_id, `+objectType+`_id, notification_history_id,` +
@@ -315,8 +315,8 @@ func flappingHistoryWorker(super *supervisor.Supervisor, objectType string) {
 				id[:],
 				super.EnvId,
 				utils.EncodeChecksum(values[objectType+"_id"].(string)),
-				values["start_time"],
-				values["end_time"],
+				values["change_time"],
+				values["change_type"],
 				values["percent_state_change"],
 				values["flapping_threshold_low"],
 				values["flapping_threshold_high"],
