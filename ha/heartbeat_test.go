@@ -30,7 +30,7 @@ func TestIcingaHeartbeatListener(t *testing.T) {
 	defer server.Stop()
 	defer client.Close()
 
-	rdb := connection.NewRDBWrapper(client.Options().Addr)
+	rdb := connection.NewRDBWrapper(client.Options().Addr, 64)
 	assert.True(t, rdb.CheckConnection(false), "This test needs a working Redis connection")
 
 	chEnv := make(chan *Environment)

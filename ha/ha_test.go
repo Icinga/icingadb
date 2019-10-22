@@ -18,7 +18,7 @@ import (
 )
 
 func createTestingHA(t *testing.T, redisAddr, mysqlHost string) *HA {
-	redisConn := connection.NewRDBWrapper(redisAddr)
+	redisConn := connection.NewRDBWrapper(redisAddr, 64)
 
 	mysqlConn, err := connection.NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", mysqlHost), 50)
 	if err != nil {
