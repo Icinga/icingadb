@@ -77,7 +77,7 @@ func NewTestDBW(db DbClient) DBWrapper {
 }
 
 func TestNewDBWrapper(t *testing.T) {
-	dbw, err := NewDBWrapper("asdasd")
+	dbw, err := NewDBWrapper("asdasd", 50)
 	if err == nil {
 		assert.False(t, dbw.checkConnection(false), "DBWrapper should not be connected")
 	}
@@ -179,7 +179,7 @@ func TestDBWrapper_SqlTransaction(t *testing.T) {
 		return
 	}
 
-	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
+	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
@@ -328,7 +328,7 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 		return
 	}
 
-	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
+	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name varchar(255) NOT NULL)")
@@ -374,7 +374,7 @@ func TestDBWrapper_SqlFetchIds(t *testing.T) {
 		return
 	}
 
-	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
+	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	hash := sha1.New()
@@ -420,7 +420,7 @@ func TestDBWrapper_SqlFetchChecksums(t *testing.T) {
 		return
 	}
 
-	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
+	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	envId := utils.Checksum("derp")
