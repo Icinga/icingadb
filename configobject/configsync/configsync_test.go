@@ -41,7 +41,7 @@ func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation
 	}
 
 	rdbw := connection.NewRDBWrapper(redisClient.Options().Addr)
-	dbw, err := connection.NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host))
+	dbw, err := connection.NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	super := supervisor.Supervisor{

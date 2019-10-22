@@ -50,9 +50,9 @@ type DbTransaction interface {
 	Rollback() error
 }
 
-func NewDBWrapper(dbDsn string) (*DBWrapper, error) {
+func NewDBWrapper(dbDsn string, maxOpenConns int) (*DBWrapper, error) {
 	log.Info("Connecting to MySQL")
-	db, err := mkMysql("mysql", dbDsn)
+	db, err := mkMysql("mysql", dbDsn, maxOpenConns)
 
 	if err != nil {
 		return nil, err
