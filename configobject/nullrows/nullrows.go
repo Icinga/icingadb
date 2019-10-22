@@ -1,7 +1,6 @@
 package nullrows
 
 import (
-	"fmt"
 	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -41,42 +40,40 @@ func InsertNullRows(super *supervisor.Supervisor) {
 		emptyID, super.EnvId, emptyID, emptyID, emptyID, emptyID, emptyID, "", "", "", "", emptyID, 0, "", emptyID, 0, 0, 0, "y", "y", "y", "y", "y", 0, 0, "y", "", emptyID, "y", emptyID, emptyID, "", emptyID, "", "", emptyID, "", emptyID,
 	)
 
-	for _, objectType := range []string{"host", "service"} {
-		// *_comment_history
-		execFunc(
-			objectType + "_comment_history",
-			fmt.Sprintf("REPLACE INTO %s_comment_history(comment_id, environment_id, %s_id, entry_time, author, comment, entry_type, is_persistent, expire_time, deletion_time) VALUES (?,?,?,?,?,?,?,?,?,?)", objectType, objectType),
-			emptyID, super.EnvId, emptyID, 0, "", "", "comment", "y", 0, 0,
-		)
+	// comment_history
+	execFunc(
+		"comment_history",
+		"REPLACE INTO comment_history(comment_id, environment_id, object_type, host_id, service_id, entry_time, author, comment, entry_type, is_persistent, expire_time, deletion_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+		emptyID, super.EnvId, "host", nil, nil, 0, "", "", "comment", "y", 0, 0,
+	)
 
-		// *_downtime_history
-		execFunc(
-			objectType + "_downtime_history",
-			fmt.Sprintf("REPLACE INTO %s_downtime_history(downtime_id, environment_id, %s_id, triggered_by_id, entry_time, author, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, was_started, actual_start_time, actual_end_time, was_cancelled, is_in_effect, trigger_time, deletion_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", objectType, objectType),
-			emptyID, super.EnvId, emptyID, emptyID, 0, "", "", "y", 0, 0, 0, "y", 0, 0, "y", "y", 0, 0,
-		)
+	// downtime_history
+	execFunc(
+		"downtime_history",
+		"REPLACE INTO downtime_history(downtime_id, environment_id, object_type, host_id, service_id, triggered_by_id, entry_time, author, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, was_started, actual_start_time, actual_end_time, was_cancelled, is_in_effect, trigger_time, deletion_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		emptyID, super.EnvId, "host", nil, nil, emptyID, 0, "", "", "y", 0, 0, 0, "y", 0, 0, "y", "y", 0, 0,
+	)
 
-		// *_flapping_history
-		execFunc(
-			objectType + "_flapping_history",
-			fmt.Sprintf("REPLACE INTO %s_flapping_history(id, environment_id, %s_id, change_time, change_type, percent_state_change, flapping_threshold_low, flapping_threshold_high) VALUES (?,?,?,?,?,?,?,?)", objectType, objectType),
-			emptyUUID[:], super.EnvId, emptyID, 0, "start", 0, 0, 0,
-		)
+	// flapping_history
+	execFunc(
+		"flapping_history",
+		"REPLACE INTO flapping_history(id, environment_id, object_type, host_id, service_id, change_time, change_type, percent_state_change, flapping_threshold_low, flapping_threshold_high) VALUES (?,?,?,?,?,?,?,?,?,?)",
+		emptyUUID[:], super.EnvId, "host", nil, nil, 0, "start", 0, 0, 0,
+	)
 
-		// *_notification_history
-		execFunc(
-			objectType + "_notification_history",
-			fmt.Sprintf("REPLACE INTO %s_notification_history(id, environment_id, %s_id, notification_id, type, send_time, state, output, long_output, users_notified) VALUES (?,?,?,?,?,?,?,?,?,?)", objectType, objectType),
-			emptyUUID[:], super.EnvId, emptyID, emptyID, 0, 0, 0, "", "", 0,
-		)
+	// notification_history
+	execFunc(
+		"notification_history",
+		"REPLACE INTO notification_history(id, environment_id, object_type, host_id, service_id, notification_id, type, send_time, state, output, long_output, users_notified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+		emptyUUID[:], super.EnvId, "host", nil, nil, emptyID, 0, 0, 0, "", "", 0,
+	)
 
-		// *_state_history
-		execFunc(
-			objectType + "_state_history",
-			fmt.Sprintf("REPLACE INTO %s_state_history(id, environment_id, %s_id, change_time, state_type, soft_state, hard_state, attempt, last_soft_state, last_hard_state, output, long_output, max_check_attempts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", objectType, objectType),
-			emptyUUID[:], super.EnvId, emptyID, 0, "hard", 0, 0, 0, 0, 0, "", "", 0,
-		)
-	}
+	// state_history
+	execFunc(
+		"state_history",
+		"REPLACE INTO state_history(id, environment_id, object_type, host_id, service_id, change_time, state_type, soft_state, hard_state, attempt, last_soft_state, last_hard_state, output, long_output, max_check_attempts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		emptyUUID[:], super.EnvId, "host", nil, nil, 0, "hard", 0, 0, 0, 0, 0, "", "", 0,
+	)
 
 	log.Info("Inserted \"NULL\" rows")
 }

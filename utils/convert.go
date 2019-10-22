@@ -55,6 +55,15 @@ func EncodeChecksum(s string) []byte {
 	return c
 }
 
+// DecodeHexIfNotNil converts a hex string to a byte array
+func DecodeHexIfNotNil(hexStr interface{}) interface{} {
+	if hexStr == nil {
+		return nil
+	}
+
+	return EncodeChecksum(hexStr.(string))
+}
+
 // DecodeChecksum coverts a byte array into a hex string
 func DecodeChecksum(c []byte) string {
 	return hex.EncodeToString(c)
