@@ -168,7 +168,7 @@ func stateHistoryWorker(super *supervisor.Supervisor, objectType string) {
 func downtimeHistoryWorker(super *supervisor.Supervisor, objectType string) {
 	statements := []string{
 		`REPLACE INTO ` + objectType + `_downtime_history (downtime_id, environment_id, ` + objectType + `_id, triggered_by_id, entry_time,` +
-			`author, comment, is_fixed, duration, scheduled_start_time, scheduled_end_time, was_started, actual_start_time, actual_end_time, was_cancelled, is_in_effect, trigger_time, deletion_time)` +
+			`author, comment, is_flexible, duration, scheduled_start_time, scheduled_end_time, was_started, actual_start_time, actual_end_time, was_cancelled, is_in_effect, trigger_time, deletion_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO `+objectType+`_history (id, environment_id, `+objectType+`_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
@@ -190,7 +190,7 @@ func downtimeHistoryWorker(super *supervisor.Supervisor, objectType string) {
 				values["entry_time"],
 				values["author"],
 				values["comment"],
-				utils.RedisIntToDBBoolean(values["is_fixed"]),
+				utils.RedisIntToDBBoolean(values["is_flexible"]),
 				values["duration"],
 				values["scheduled_start_time"],
 				values["scheduled_end_time"],
