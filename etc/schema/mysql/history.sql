@@ -14,8 +14,8 @@ CREATE TABLE notification_history (
   send_time bigint(20) unsigned NOT NULL,
   state tinyint(1) unsigned NOT NULL,
   previous_hard_state tinyint(1) unsigned NOT NULL,
-  output text DEFAULT NULL,
-  long_output text DEFAULT NULL,
+  author text DEFAULT NULL,
+  `text` text DEFAULT NULL,
   users_notified smallint(5) unsigned NOT NULL,
 
   PRIMARY KEY (id)

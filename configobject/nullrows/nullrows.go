@@ -64,7 +64,7 @@ func InsertNullRows(super *supervisor.Supervisor) {
 	// notification_history
 	execFunc(
 		"notification_history",
-		"REPLACE INTO notification_history(id, environment_id, object_type, host_id, service_id, notification_id, type, send_time, state, previous_hard_state, output, long_output, users_notified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		"REPLACE INTO notification_history(id, environment_id, object_type, host_id, service_id, notification_id, type, send_time, state, previous_hard_state, author, `text`, users_notified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
 		emptyUUID[:], super.EnvId, "host", nil, nil, emptyID, 0, 0, 0, 0, "", "", 0,
 	)
 
