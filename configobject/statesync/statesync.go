@@ -86,7 +86,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 	}
 
 	for {
-		errTx := super.Dbw.SqlTransaction(true, true, false, func(tx connection.DbTransaction) error {
+		errTx := super.Dbw.SqlTransaction(false, true, false, func(tx connection.DbTransaction) error {
 			for i, state := range states {
 				values := state.Values
 				id, _ := hex.DecodeString(values["id"].(string))
