@@ -384,7 +384,7 @@ func historyWorker(super *supervisor.Supervisor, objectType string, historyType 
 	}
 
 	for {
-		errTx := super.Dbw.SqlTransaction(true, true, false, func(tx connection.DbTransaction) error {
+		errTx := super.Dbw.SqlTransaction(false, true, false, func(tx connection.DbTransaction) error {
 			for i, state := range entries {
 				for statementIndex, statement := range preparedStatements {
 					_, errExec := super.Dbw.SqlExecTx(
