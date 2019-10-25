@@ -219,21 +219,13 @@ CREATE TABLE service_flapping_history (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   service_id binary(20) NOT NULL COMMENT 'service.id',
 
-  start_time bigint(20) unsigned NOT NULL,
-  end_time bigint(20) unsigned NULL DEFAULT NULL,
+  change_time bigint(20) unsigned NOT NULL,
+  change_type enum('start', 'end') NOT NULL,
   percent_state_change float unsigned NOT NULL,
   flapping_threshold_low float unsigned NOT NULL,
   flapping_threshold_high float unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
-
-CREATE TABLE service_flapping_current (
-  service_id binary(20) NOT NULL COMMENT 'service.id',
-  flapping_history_id binary(16) NOT NULL COMMENT 'service_flapping_history.id',
-  environment_id binary(20) NOT NULL COMMENT 'environment.id',
-
-  PRIMARY KEY (service_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE service_history (
