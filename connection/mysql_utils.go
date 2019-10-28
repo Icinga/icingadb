@@ -15,7 +15,7 @@ import (
 )
 
 // mkMysql creates a new MySQL client.
-func mkMysql(dbType string, dbDsn string) (*sql.DB, error) {
+func mkMysql(dbType string, dbDsn string, maxOpenConns int) (*sql.DB, error) {
 	sep := "?"
 
 	if dbDsn == "" {
@@ -37,7 +37,7 @@ func mkMysql(dbType string, dbDsn string) (*sql.DB, error) {
 
 	mysql.SetLogger(oldlog.New(ioutil.Discard, "", 0))
 
-	db.SetMaxOpenConns(50)
+	db.SetMaxOpenConns(maxOpenConns)
 	db.SetMaxIdleConns(0)
 
 	return db, nil

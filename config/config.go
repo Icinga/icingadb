@@ -19,23 +19,27 @@ type RedisInfo struct {
 	Port     string `ini:"port"`
 	User     string `ini:"user"`
 	Password string `ini:"password"`
+	PoolSize int    `ini:"pool_size"`
 }
 
 var redisInfo = &RedisInfo{
-	Port: "6379",
+	Port:     "6379",
+	PoolSize: 64,
 }
 
 type MysqlInfo struct {
-	Host     string `ini:"host"`
-	Port     string `ini:"port"`
-	Database string `ini:"database"`
-	User     string `ini:"user"`
-	Password string `ini:"password"`
+	Host         string `ini:"host"`
+	Port         string `ini:"port"`
+	Database     string `ini:"database"`
+	User         string `ini:"user"`
+	Password     string `ini:"password"`
+	MaxOpenConns int    `ini:"max_open_conns"`
 }
 
 var mysqlInfo = &MysqlInfo{
-	Port:     "3306",
-	Database: "icingadb",
+	Port:         "3306",
+	Database:     "icingadb",
+	MaxOpenConns: 50,
 }
 
 func ParseConfig(path string) error {
