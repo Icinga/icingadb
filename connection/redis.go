@@ -104,7 +104,7 @@ func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
 	}
 }
 
-func NewRDBWrapper(address string) *RDBWrapper {
+func NewRDBWrapper(address string, poolSize int) *RDBWrapper {
 	log.Info("Connecting to Redis")
 
 	// TODO: remove this in favor of https://github.com/go-redis/redis/pull/1165
@@ -120,7 +120,7 @@ func NewRDBWrapper(address string) *RDBWrapper {
 		ReadTimeout:  	time.Minute,
 		WriteTimeout: 	time.Minute,
 		PoolTimeout: 	time.Minute,
-		PoolSize: 		64,
+		PoolSize: 		poolSize,
 	})
 
 	rdbw := RDBWrapper{
