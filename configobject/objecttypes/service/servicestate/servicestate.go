@@ -14,6 +14,7 @@ var (
 		"state_type",
 		"soft_state",
 		"hard_state",
+		"previous_hard_state",
 		"attempt",
 		"severity",
 		"output",
@@ -46,6 +47,7 @@ type ServiceState struct {
 	StateType					float32	`json:"state_type"`
 	SoftState					float32	`json:"state"`
 	HardState					float32	`json:"NONE"` //TODO (NoH): I'm not sure where to get this from
+	PreviousHardState 			uint8 	`json:"previous_hard_state"`
 	Attempt						float32	`json:"check_attempt"`
 	Severity					float32	`json:"severity"`
 	Output						string	`json:"output"`
@@ -92,6 +94,7 @@ func (s *ServiceState) UpdateValues() []interface{} {
 		utils.IcingaStateTypeToString(s.StateType),
 		s.SoftState,
 		s.HardState,
+		s.PreviousHardState,
 		s.Attempt,
 		s.Severity,
 		s.Output,
