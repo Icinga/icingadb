@@ -30,6 +30,7 @@ var (
 		"execution_time",
 		"latency",
 		"timeout",
+		"check_source",
 		"last_update",
 		"last_state_change",
 		"last_soft_state",
@@ -61,6 +62,7 @@ type HostState struct {
 	ExecutionTime				float32	`json:"execution_time"`
 	Latency						float32	`json:"latency"`
 	Timeout						float32	`json:"check_timeout"`
+	CheckSource              	string  `json:"check_source"`
 	LastUpdate					float32	`json:"last_update"`
 	LastStateChange				float32	`json:"last_state_change"`
 	LastSoftState				float32	`json:"last_soft_state"`
@@ -106,6 +108,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		h.ExecutionTime,
 		h.Latency,
 		h.Timeout,
+		h.CheckSource,
 		h.LastUpdate,
 		h.LastStateChange,
 		h.LastSoftState,
