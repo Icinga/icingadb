@@ -40,6 +40,7 @@ CREATE TABLE state_history (
   output text DEFAULT NULL,
   long_output text DEFAULT NULL,
   max_check_attempts int(10) unsigned NOT NULL,
+  check_source text DEFAULT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;

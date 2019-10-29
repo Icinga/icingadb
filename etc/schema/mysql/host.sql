@@ -135,6 +135,7 @@ CREATE TABLE host_state (
   execution_time int(10) unsigned DEFAULT NULL,
   latency int(10) unsigned DEFAULT NULL,
   timeout int(10) unsigned DEFAULT NULL,
+  check_source text DEFAULT NULL,
 
   last_update bigint(20) unsigned NOT NULL,
   last_state_change bigint(20) unsigned NOT NULL,
