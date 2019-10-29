@@ -50,10 +50,12 @@ func logSyncCounters() {
 
 	for {
 		<-every20s.C
-		log.Infof("Synced %d host and %d service states in the last 20 seconds", syncCounter["host"], syncCounter["service"])
-		syncCounterLock.Lock()
-		syncCounter = make(map[string]int)
-		syncCounterLock.Unlock()
+		if syncCounter["host"] > 0 || syncCounter["service"] > 0 {
+			log.Infof("Synced %d host and %d service states in the last 20 seconds", syncCounter["host"], syncCounter["service"])
+			syncCounterLock.Lock()
+			syncCounter = make(map[string]int)
+			syncCounterLock.Unlock()
+		}
 	}
 }
 

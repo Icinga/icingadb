@@ -60,10 +60,10 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 	log.Debugf("%s: Ready", objectInformation.ObjectType)
 	for msg := range chHA {
 		switch msg {
-		// Icinga 2 probably died, stop operations and tell all workers to shut down.
+		// Icinga 2 probably restarted or died, stop operations and tell all workers to shut down.
 		case ha.Notify_StopSync:
 			if done != nil {
-				log.Info(fmt.Sprintf("%s: Lost responsibility", objectInformation.ObjectType))
+				log.Debugf("%s: Lost responsibility", objectInformation.ObjectType)
 				close(done)
 				done = nil
 			}
@@ -73,7 +73,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				continue
 			}
 
-			log.Infof("%s: Got responsibility", objectInformation.ObjectType)
+			log.Debugf("%s: Got responsibility", objectInformation.ObjectType)
 
 			//TODO: This should only be done, if HA was taken over from another instance
 			insert, update, delete := GetDelta(super, objectInformation)
