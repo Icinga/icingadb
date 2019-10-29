@@ -114,6 +114,7 @@ CREATE TABLE host_state (
   state_type enum('hard', 'soft') NOT NULL,
   soft_state tinyint(1) unsigned NOT NULL,
   hard_state tinyint(1) unsigned NOT NULL,
+  previous_hard_state tinyint(1) unsigned NOT NULL,
   attempt tinyint(1) unsigned NOT NULL,
   severity smallint unsigned NOT NULL,
 

@@ -101,7 +101,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 				_, errExec := super.Dbw.SqlExecTx(
 					tx,
 					mysqlObservers[objectType],
-					`REPLACE INTO `+objectType+`_state (`+objectType+`_id, environment_id, state_type, soft_state, hard_state, attempt, severity, output, long_output, performance_data,`+
+					`REPLACE INTO `+objectType+`_state (`+objectType+`_id, environment_id, state_type, soft_state, hard_state, previous_hard_state, attempt, severity, output, long_output, performance_data,`+
 						`check_commandline, is_problem, is_handled, is_reachable, is_flapping, is_acknowledged, acknowledgement_comment_id,`+
 						`in_downtime, execution_time, latency, timeout, last_update, last_state_change, last_soft_state,`+
 						`last_hard_state, next_check, next_update) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -110,6 +110,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 					redisStateTypeToDBStateType(values["state_type"]),
 					values["state"],
 					values["last_hard_state"],
+					values["previous_hard_state"],
 					values["check_attempt"],
 					redisIntToDBInt(values["severity"]),
 					values["output"],
