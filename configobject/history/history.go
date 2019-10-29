@@ -51,12 +51,12 @@ func StartHistoryWorkers(super *supervisor.Supervisor) {
 
 func notificationHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO notification_history (id, environment_id, object_type, host_id, service_id, notification_id, type,` +
+		`REPLACE INTO notification_history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_id, type,` +
 			`send_time, state, output, long_output, users_notified)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-		`REPLACE INTO history (id, environment_id, object_type, host_id, service_id, notification_history_id,` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -65,6 +65,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				id[:],
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
@@ -85,6 +86,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				eventId[:],
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
@@ -106,12 +108,12 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 
 func stateHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO state_history (id, environment_id, object_type, host_id, service_id, change_time, state_type,` +
+		`REPLACE INTO state_history (id, environment_id, endpoint_id, object_type, host_id, service_id, change_time, state_type,` +
 			`soft_state, hard_state, attempt, last_soft_state, last_hard_state, output, long_output, max_check_attempts)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		`REPLACE INTO history (id, environment_id, object_type, host_id, service_id, notification_history_id,` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -126,6 +128,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				id[:],
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
@@ -149,6 +152,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				eventId[:],
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
@@ -170,12 +174,12 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 
 func downtimeHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO downtime_history (downtime_id, environment_id, object_type, host_id, service_id, triggered_by_id, entry_time,` +
+		`REPLACE INTO downtime_history (downtime_id, environment_id, endpoint_id, object_type, host_id, service_id, triggered_by_id, entry_time,` +
 			`author, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, was_started, actual_start_time, actual_end_time, was_cancelled, is_in_effect, trigger_time, deletion_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		`REPLACE INTO history (id, environment_id, object_type, host_id, service_id, notification_history_id,` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -188,6 +192,7 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				utils.EncodeChecksum(values["downtime_id"].(string)),
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
@@ -227,6 +232,7 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				eventId[:],
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
@@ -248,12 +254,12 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 
 func commentHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO comment_history (comment_id, environment_id, object_type, host_id, service_id, entry_time, author,` +
+		`REPLACE INTO comment_history (comment_id, environment_id, endpoint_id, object_type, host_id, service_id, entry_time, author,` +
 			`comment, entry_type, is_persistent, expire_time, deletion_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-		`REPLACE INTO history (id, environment_id, object_type, host_id, service_id, notification_history_id,` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -261,6 +267,7 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				utils.EncodeChecksum(values["comment_id"].(string)),
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
@@ -290,6 +297,7 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				eventId[:],
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
@@ -311,12 +319,12 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 
 func flappingHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO flapping_history (id, environment_id, object_type, host_id, service_id, change_time, change_type,` +
+		`REPLACE INTO flapping_history (id, environment_id, endpoint_id, object_type, host_id, service_id, change_time, change_type,` +
 			`percent_state_change, flapping_threshold_low, flapping_threshold_high)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?)`,
-		`REPLACE INTO history (id, environment_id, object_type, host_id, service_id, notification_history_id,` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -325,6 +333,7 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				id[:],
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
@@ -352,6 +361,7 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 			data := []interface{}{
 				eventId[:],
 				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),

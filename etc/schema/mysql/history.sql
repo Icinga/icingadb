@@ -4,6 +4,7 @@ SET innodb_strict_mode = 1;
 CREATE TABLE notification_history (
   id binary(16) NOT NULL COMMENT 'UUID',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
@@ -22,6 +23,7 @@ CREATE TABLE notification_history (
 CREATE TABLE state_history (
   id binary(16) NOT NULL COMMENT 'UUID',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
@@ -43,6 +45,7 @@ CREATE TABLE state_history (
 CREATE TABLE downtime_history (
   downtime_id binary(20) NOT NULL COMMENT 'downtime.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
@@ -69,6 +72,7 @@ CREATE TABLE downtime_history (
 CREATE TABLE comment_history (
   comment_id binary(20) NOT NULL COMMENT 'comment.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
@@ -87,6 +91,7 @@ CREATE TABLE comment_history (
 CREATE TABLE flapping_history (
   id binary(16) NOT NULL COMMENT 'UUID',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
@@ -103,6 +108,7 @@ CREATE TABLE flapping_history (
 CREATE TABLE history (
   id binary(16) NOT NULL COMMENT 'notification_history_id, state_history_id, flapping_history_id or UUID',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
