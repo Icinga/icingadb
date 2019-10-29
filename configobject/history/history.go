@@ -52,7 +52,7 @@ func StartHistoryWorkers(super *supervisor.Supervisor) {
 func notificationHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
 		`REPLACE INTO notification_history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_id, type,` +
-			`send_time, state, previous_hard_state, output, long_output, users_notified)` +
+			"send_time, state, previous_hard_state, author, `text`, users_notified)" +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
@@ -74,8 +74,8 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 				values["send_time"],
 				values["state"],
 				values["previous_hard_state"],
-				values["output"],
-				values["long_output"],
+				values["author"],
+				values["text"],
 				values["users_notified"],
 			}
 
