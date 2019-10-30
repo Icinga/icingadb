@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"command_id",
 		"envvar_key",
@@ -19,12 +19,12 @@ var (
 )
 
 type NotificationCommandEnvvar struct {
-	Id						string 		`json:"id"`
-	CommandId				string		`json:"command_id"`
-	EnvvarKey				string		`json:"envvar_key"`
-	EnvId           		string		`json:"environment_id"`
-	PropertiesChecksum		string		`json:"checksum"`
-	EnvvarValue				string		`json:"value"`
+	Id                 string `json:"id"`
+	CommandId          string `json:"command_id"`
+	EnvvarKey          string `json:"envvar_key"`
+	EnvId              string `json:"environment_id"`
+	PropertiesChecksum string `json:"checksum"`
+	EnvvarValue        string `json:"value"`
 }
 
 func NewNotificationCommandEnvvar() connection.Row {
@@ -68,14 +68,14 @@ func (c *NotificationCommandEnvvar) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "notificationcommand_envvar"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "notificationcommand:envvar",
-		PrimaryMySqlField: "id",
-		Factory: NewNotificationCommandEnvvar,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "notificationcommand:envvar",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewNotificationCommandEnvvar,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "notificationcommand",
 	}
 }

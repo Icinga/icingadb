@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"name_checksum",
@@ -23,16 +23,16 @@ var (
 )
 
 type Zone struct {
-	Id                  string  `json:"id"`
-	EnvId               string  `json:"environment_id"`
-	NameChecksum        string  `json:"name_checksum"`
-	PropertiesChecksum  string  `json:"checksum"`
-	ParentsChecksum     string  `json:"parents_checksum"`
-	Name                string  `json:"name"`
-	NameCi              *string `json:"name_ci"`
-	IsGlobal			bool	`json:"is_global"`
-	ParentId            string  `json:"parent_id"`
-	Depth				float64	`json:"depth"`
+	Id                 string  `json:"id"`
+	EnvId              string  `json:"environment_id"`
+	NameChecksum       string  `json:"name_checksum"`
+	PropertiesChecksum string  `json:"checksum"`
+	ParentsChecksum    string  `json:"parents_checksum"`
+	Name               string  `json:"name"`
+	NameCi             *string `json:"name_ci"`
+	IsGlobal           bool    `json:"is_global"`
+	ParentId           string  `json:"parent_id"`
+	Depth              float64 `json:"depth"`
 }
 
 func NewZone() connection.Row {
@@ -82,14 +82,14 @@ func (z *Zone) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "zone"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: name,
-		PrimaryMySqlField: "id",
-		Factory: NewZone,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 name,
+		PrimaryMySqlField:        "id",
+		Factory:                  NewZone,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "zone",
 	}
 }

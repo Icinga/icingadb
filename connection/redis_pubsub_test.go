@@ -30,8 +30,8 @@ func TestPubSubWrapper(t *testing.T) {
 	rdbw.CompareAndSetConnected(false)
 
 	var errSubscribe error
-	done1:= make(chan bool)
-	go func () {
+	done1 := make(chan bool)
+	go func() {
 		errSubscribe = ps.Subscribe("testchannel")
 		done1 <- true
 	}()
@@ -39,7 +39,7 @@ func TestPubSubWrapper(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
-	<- done1
+	<-done1
 
 	rdbw.CompareAndSetConnected(false)
 
@@ -56,13 +56,13 @@ func TestPubSubWrapper(t *testing.T) {
 
 	rdbw.Publish("testchannel", "Hello there")
 
-	<- done2
+	<-done2
 
 	rdbw.CompareAndSetConnected(false)
 
 	var errClose error
-	done3:= make(chan bool)
-	go func () {
+	done3 := make(chan bool)
+	go func() {
 		errClose = ps.Close()
 		done3 <- true
 	}()
@@ -70,7 +70,7 @@ func TestPubSubWrapper(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
-	<- done3
+	<-done3
 
 	assert.NoError(t, errSubscribe)
 	assert.NoError(t, errReceive)

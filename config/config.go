@@ -7,7 +7,7 @@ import (
 )
 
 type Logging struct {
-	Level    string `ini:"level"`
+	Level string `ini:"level"`
 }
 
 var logging = &Logging{

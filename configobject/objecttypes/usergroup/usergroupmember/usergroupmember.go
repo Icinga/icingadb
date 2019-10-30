@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"usergroup_id",
 		"user_id",
@@ -17,10 +17,10 @@ var (
 )
 
 type UsergroupMember struct {
-	Id					string 		`json:"id"`
-	UsergroupId			string		`json:"group_id"`
-	UserId	 			string 		`json:"user_id"`
-	EnvId           	string		`json:"environment_id"`
+	Id          string `json:"id"`
+	UsergroupId string `json:"group_id"`
+	UserId      string `json:"user_id"`
+	EnvId       string `json:"environment_id"`
 }
 
 func NewUsergroupMember() connection.Row {
@@ -62,14 +62,14 @@ func (u *UsergroupMember) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "usergroup_member"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "user:groupmember",
-		PrimaryMySqlField: "id",
-		Factory: NewUsergroupMember,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "user:groupmember",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewUsergroupMember,
+		HasChecksum:              false,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "user",
 	}
 }

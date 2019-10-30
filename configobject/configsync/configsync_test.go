@@ -50,7 +50,7 @@ func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation
 		Rdbw:     rdbw,
 		Dbw:      dbw,
 		EnvLock:  &sync.Mutex{},
-		EnvId: utils.EncodeChecksum("e057d4ea363fbab414a874371da253dba3d713bc"),
+		EnvId:    utils.EncodeChecksum("e057d4ea363fbab414a874371da253dba3d713bc"),
 	}
 
 	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)
@@ -87,7 +87,7 @@ func TestOperator_InsertHost(t *testing.T) {
 	_, err := super.Dbw.Db.Exec("TRUNCATE TABLE host")
 	require.NoError(t, err)
 
-	redisClient.HSet("icinga:config:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"active_checks_enabled\":false,\"address\":\"localhost\",\"address6\":\"\",\"check_interval\":10.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"dummy\",\"checkcommand_id\":\"adc77319f261b771b35ce671aaf956d3c7534808\",\"display_name\":\"TestHost - 603\",\"environment_id\":\"" + utils.DecodeChecksum(super.EnvId) + "\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"TestHost - 603\",\"name_checksum\":\"8ae04eb17df433de95fb6b855464e393f3d6ef72\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}")
+	redisClient.HSet("icinga:config:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"active_checks_enabled\":false,\"address\":\"localhost\",\"address6\":\"\",\"check_interval\":10.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"dummy\",\"checkcommand_id\":\"adc77319f261b771b35ce671aaf956d3c7534808\",\"display_name\":\"TestHost - 603\",\"environment_id\":\""+utils.DecodeChecksum(super.EnvId)+"\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"TestHost - 603\",\"name_checksum\":\"8ae04eb17df433de95fb6b855464e393f3d6ef72\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}")
 	redisClient.HSet("icinga:checksum:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"checksum\":\"b6e87de3d4f31b3d4d35466171f4088693b46071\"}")
 
 	for _, ch := range chs {
@@ -106,7 +106,7 @@ func TestOperator_InsertHost(t *testing.T) {
 		} else {
 			return false
 		}
-	}, 3 * time.Second, 1 * time.Second, "Exactly 1 host should be synced")
+	}, 3*time.Second, 1*time.Second, "Exactly 1 host should be synced")
 }
 
 func TestOperator_DeleteHost(t *testing.T) {
@@ -178,7 +178,7 @@ func TestOperator_DeleteHost(t *testing.T) {
 		require.NoError(t, err)
 
 		return len(objects) == 0
-	}, 3 * time.Second, 1 * time.Second, "Exactly 1 host should be deleted")
+	}, 3*time.Second, 1*time.Second, "Exactly 1 host should be deleted")
 }
 
 func TestOperator_UpdateHost(t *testing.T) {
@@ -193,9 +193,8 @@ func TestOperator_UpdateHost(t *testing.T) {
 	_, err := super.Dbw.Db.Exec("TRUNCATE TABLE host")
 	require.NoError(t, err)
 
-	redisClient.HSet("icinga:config:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"active_checks_enabled\":false,\"address\":\"localhost\",\"address6\":\"\",\"check_interval\":10.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"dummy\",\"checkcommand_id\":\"adc77319f261b771b35ce671aaf956d3c7534808\",\"display_name\":\"TestHost - 603\",\"environment_id\":\"" + utils.DecodeChecksum(super.EnvId) + "\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"TestHost - 603\",\"name_checksum\":\"8ae04eb17df433de95fb6b855464e393f3d6ef72\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}")
+	redisClient.HSet("icinga:config:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"active_checks_enabled\":false,\"address\":\"localhost\",\"address6\":\"\",\"check_interval\":10.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"dummy\",\"checkcommand_id\":\"adc77319f261b771b35ce671aaf956d3c7534808\",\"display_name\":\"TestHost - 603\",\"environment_id\":\""+utils.DecodeChecksum(super.EnvId)+"\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"TestHost - 603\",\"name_checksum\":\"8ae04eb17df433de95fb6b855464e393f3d6ef72\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}")
 	redisClient.HSet("icinga:checksum:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"checksum\":\"b6e87de3d4f31b3d4d35466171f4088693b46071\"}")
-
 
 	someChecksum := utils.EncodeChecksum(utils.Checksum("some_checksum"))
 
@@ -262,5 +261,5 @@ func TestOperator_UpdateHost(t *testing.T) {
 		} else {
 			return false
 		}
-	}, 3 * time.Second, 1 * time.Second, "Exactly 1 host should be synced")
+	}, 3*time.Second, 1*time.Second, "Exactly 1 host should be synced")
 }

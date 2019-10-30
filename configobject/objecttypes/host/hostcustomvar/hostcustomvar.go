@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"host_id",
 		"customvar_id",
@@ -17,10 +17,10 @@ var (
 )
 
 type HostCustomvar struct {
-	Id						string 		`json:"id"`
-	HostId					string		`json:"object_id"`
-	CustomvarId 			string 		`json:"customvar_id"`
-	EnvId           		string		`json:"environment_id"`
+	Id          string `json:"id"`
+	HostId      string `json:"object_id"`
+	CustomvarId string `json:"customvar_id"`
+	EnvId       string `json:"environment_id"`
 }
 
 func NewHostCustomvar() connection.Row {
@@ -62,14 +62,14 @@ func (h *HostCustomvar) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "host_customvar"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "host:customvar",
-		PrimaryMySqlField: "id",
-		Factory: NewHostCustomvar,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "host:customvar",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewHostCustomvar,
+		HasChecksum:              false,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "host",
 	}
 }

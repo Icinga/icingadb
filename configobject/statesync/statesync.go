@@ -30,13 +30,13 @@ var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
 func StartStateSync(super *supervisor.Supervisor) {
 	go func() {
 		for {
-			syncStates(super,"host")
+			syncStates(super, "host")
 		}
 	}()
 
 	go func() {
 		for {
-			syncStates(super,"service")
+			syncStates(super, "service")
 		}
 	}()
 
@@ -63,7 +63,7 @@ func logSyncCounters() {
 func syncStates(super *supervisor.Supervisor, objectType string) {
 	if super.EnvId == nil {
 		log.Debug("StateSync: Waiting for EnvId to be set")
-		<- time.NewTimer(time.Second).C
+		<-time.NewTimer(time.Second).C
 		return
 	}
 
@@ -138,9 +138,9 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 
 				if errExec != nil {
 					log.WithFields(log.Fields{
-						"context": "StateSync",
+						"context":    "StateSync",
 						"objectType": objectType,
-						"state": values,
+						"state":      values,
 					}).Error(errExec)
 
 					states = removeStateFromStatesSlice(states, i)
@@ -166,7 +166,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 	//Delete synced states from redis stream
 	super.Rdbw.XDel("icinga:state:stream:"+objectType, storedStateIds...)
 
-	log.Debugf("%d %s state synced", len(storedStateIds) - brokenStates, objectType)
+	log.Debugf("%d %s state synced", len(storedStateIds)-brokenStates, objectType)
 	log.Debugf("%d %s state broken", brokenStates, objectType)
 	syncCounterLock.Lock()
 	syncCounter[objectType] += len(storedStateIds)
