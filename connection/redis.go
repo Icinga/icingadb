@@ -114,13 +114,13 @@ func NewRDBWrapper(address string, poolSize int) *RDBWrapper {
 	}
 
 	rdb := redis.NewClient(&redis.Options{
-		Network:      	net,
-		Addr:         	address,
-		DialTimeout:  	time.Minute / 2,
-		ReadTimeout:  	time.Minute,
-		WriteTimeout: 	time.Minute,
-		PoolTimeout: 	time.Minute,
-		PoolSize: 		poolSize,
+		Network:      net,
+		Addr:         address,
+		DialTimeout:  time.Minute / 2,
+		ReadTimeout:  time.Minute,
+		WriteTimeout: time.Minute,
+		PoolTimeout:  time.Minute,
+		PoolSize:     poolSize,
 	})
 
 	rdbw := RDBWrapper{
@@ -285,7 +285,7 @@ func (rdbw *RDBWrapper) HKeys(key string) *redis.StringSliceCmd {
 	}
 }
 
-func (rdbw * RDBWrapper) HMGet(key string, fields ...string) *redis.SliceCmd {
+func (rdbw *RDBWrapper) HMGet(key string, fields ...string) *redis.SliceCmd {
 	for {
 		if !rdbw.IsConnected() {
 			rdbw.WaitForConnection()
@@ -487,4 +487,3 @@ func (rdbw *RDBWrapper) PipeChecksumChunks(done <-chan struct{}, keys []string, 
 
 	return out
 }
-

@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"servicegroup_id",
 		"service_id",
@@ -17,10 +17,10 @@ var (
 )
 
 type ServicegroupMember struct {
-	Id						string 		`json:"id"`
-	ServicegroupId			string		`json:"group_id"`
-	ServiceId	 			string 		`json:"object_id"`
-	EnvId           		string		`json:"environment_id"`
+	Id             string `json:"id"`
+	ServicegroupId string `json:"group_id"`
+	ServiceId      string `json:"object_id"`
+	EnvId          string `json:"environment_id"`
 }
 
 func NewServicegroupMember() connection.Row {
@@ -62,14 +62,14 @@ func (s *ServicegroupMember) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "servicegroup_member"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "service:groupmember",
-		PrimaryMySqlField: "id",
-		Factory: NewServicegroupMember,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "service:groupmember",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewServicegroupMember,
+		HasChecksum:              false,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "service",
 	}
 }

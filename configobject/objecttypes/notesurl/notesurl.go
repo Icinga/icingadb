@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"notes_url",
@@ -16,9 +16,9 @@ var (
 )
 
 type NotesUrl struct {
-	Id               string  `json:"id"`
-	EnvId            string  `json:"environment_id"`
-	NotesUrl       	 string  `json:"notes_url"`
+	Id       string `json:"id"`
+	EnvId    string `json:"environment_id"`
+	NotesUrl string `json:"notes_url"`
 }
 
 func NewNotesUrl() connection.Row {
@@ -60,13 +60,13 @@ func (a *NotesUrl) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "notes_url"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: name,
+		ObjectType:        name,
+		RedisKey:          name,
 		PrimaryMySqlField: "id",
-		Factory: NewNotesUrl,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		Factory:           NewNotesUrl,
+		HasChecksum:       false,
+		BulkInsertStmt:    connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:    connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:    connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

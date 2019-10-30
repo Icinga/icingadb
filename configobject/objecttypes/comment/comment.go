@@ -9,7 +9,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"object_type",
@@ -29,21 +29,21 @@ var (
 )
 
 type Comment struct {
-	Id					string	`json:"id"`
-	EnvId               string	`json:"environment_id"`
-	ObjectType          string  `json:"object_type"`
-	HostId              string  `json:"host_id"`
-	ServiceId           string  `json:"service_id"`
-	NameChecksum        string	`json:"name_checksum"`
-	PropertiesChecksum  string	`json:"checksum"`
-	Name                string	`json:"name"`
-	Author              string	`json:"author"`
-	Text               	string	`json:"text"`
-	EntryType           float64	`json:"entry_type"`
-	EntryTime           float64	`json:"entry_time"`
-	IsPersistent      	bool	`json:"is_persistent"`
-	ExpireTime          float64	`json:"expire_time"`
-	ZoneId              string	`json:"zone_id"`
+	Id                 string  `json:"id"`
+	EnvId              string  `json:"environment_id"`
+	ObjectType         string  `json:"object_type"`
+	HostId             string  `json:"host_id"`
+	ServiceId          string  `json:"service_id"`
+	NameChecksum       string  `json:"name_checksum"`
+	PropertiesChecksum string  `json:"checksum"`
+	Name               string  `json:"name"`
+	Author             string  `json:"author"`
+	Text               string  `json:"text"`
+	EntryType          float64 `json:"entry_type"`
+	EntryTime          float64 `json:"entry_time"`
+	IsPersistent       bool    `json:"is_persistent"`
+	ExpireTime         float64 `json:"expire_time"`
+	ZoneId             string  `json:"zone_id"`
 }
 
 func NewComment() connection.Row {
@@ -97,14 +97,14 @@ func (c *Comment) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "comment"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "comment",
-		PrimaryMySqlField: "id",
-		Factory: NewComment,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "comment",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewComment,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "comment",
 	}
 }

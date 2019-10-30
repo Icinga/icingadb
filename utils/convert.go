@@ -12,23 +12,23 @@ var (
 		false: "n",
 	}
 	NotificationStates = map[string]int{
-		"OK": 		1,
-		"Warning":	2,
+		"OK":       1,
+		"Warning":  2,
 		"Critical": 4,
-		"Unknown":	8,
-		"Up":		16,
-		"Down":		32,
+		"Unknown":  8,
+		"Up":       16,
+		"Down":     32,
 	}
 	NotificationTypes = map[string]int{
-		"DowntimeStart": 	1,
-		"DowntimeEnd":		2,
-		"DowntimeRemoved": 	4,
-		"Custom":			8,
-		"Acknowledgement":	16,
-		"Problem":			32,
-		"Recovery":			64,
-		"FlappingStart":	128,
-		"FlappingEnd":		256,
+		"DowntimeStart":   1,
+		"DowntimeEnd":     2,
+		"DowntimeRemoved": 4,
+		"Custom":          8,
+		"Acknowledgement": 16,
+		"Problem":         32,
+		"Recovery":        64,
+		"FlappingStart":   128,
+		"FlappingEnd":     256,
 	}
 	CommentEntryTypes = map[string]string{
 		"1": "comment",

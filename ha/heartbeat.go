@@ -7,11 +7,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-
 type Environment struct {
-	ID                   []byte
-	Name                 string
-	NodeName             string
+	ID       []byte
+	Name     string
+	NodeName string
 }
 
 // Compute SHA1

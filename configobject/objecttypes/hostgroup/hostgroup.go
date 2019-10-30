@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"name_checksum",
@@ -22,15 +22,15 @@ var (
 )
 
 type Hostgroup struct {
-	Id                    string  `json:"id"`
-	EnvId                 string  `json:"environment_id"`
-	NameChecksum          string  `json:"name_checksum"`
-	PropertiesChecksum    string  `json:"checksum"`
-	CustomvarsChecksum    string  `json:"customvars_checksum"`
-	Name                  string  `json:"name"`
-	NameCi                *string `json:"name_ci"`
-	DisplayName           string  `json:"display_name"`
-	ZoneId                string  `json:"zone_id"`
+	Id                 string  `json:"id"`
+	EnvId              string  `json:"environment_id"`
+	NameChecksum       string  `json:"name_checksum"`
+	PropertiesChecksum string  `json:"checksum"`
+	CustomvarsChecksum string  `json:"customvars_checksum"`
+	Name               string  `json:"name"`
+	NameCi             *string `json:"name_ci"`
+	DisplayName        string  `json:"display_name"`
+	ZoneId             string  `json:"zone_id"`
 }
 
 func NewHostgroup() connection.Row {
@@ -79,14 +79,14 @@ func (h *Hostgroup) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "hostgroup"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: name,
-		PrimaryMySqlField: "id",
-		Factory: NewHostgroup,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 name,
+		PrimaryMySqlField:        "id",
+		Factory:                  NewHostgroup,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "hostgroup",
 	}
 }

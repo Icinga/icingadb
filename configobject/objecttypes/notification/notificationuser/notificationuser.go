@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"notification_id",
 		"user_id",
@@ -17,10 +17,10 @@ var (
 )
 
 type NotificationUser struct {
-	Id						string 		`json:"id"`
-	NotificationId			string		`json:"notification_id"`
-	UserId	 				string 		`json:"user_id"`
-	EnvId           		string		`json:"environment_id"`
+	Id             string `json:"id"`
+	NotificationId string `json:"notification_id"`
+	UserId         string `json:"user_id"`
+	EnvId          string `json:"environment_id"`
 }
 
 func NewNotificationUser() connection.Row {
@@ -62,14 +62,14 @@ func (n *NotificationUser) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "notification_user"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "notification:user",
-		PrimaryMySqlField: "id",
-		Factory: NewNotificationUser,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "notification:user",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewNotificationUser,
+		HasChecksum:              false,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "notification",
 	}
 }

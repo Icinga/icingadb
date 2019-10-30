@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"command_id",
 		"envvar_key",
@@ -19,12 +19,12 @@ var (
 )
 
 type EventCommandEnvvar struct {
-	Id						string 		`json:"id"`
-	CommandId				string		`json:"command_id"`
-	EnvvarKey				string		`json:"envvar_key"`
-	EnvId           		string		`json:"environment_id"`
-	PropertiesChecksum		string		`json:"checksum"`
-	EnvvarValue				string		`json:"value"`
+	Id                 string `json:"id"`
+	CommandId          string `json:"command_id"`
+	EnvvarKey          string `json:"envvar_key"`
+	EnvId              string `json:"environment_id"`
+	PropertiesChecksum string `json:"checksum"`
+	EnvvarValue        string `json:"value"`
 }
 
 func NewEventCommandEnvvar() connection.Row {
@@ -68,14 +68,14 @@ func (c *EventCommandEnvvar) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "eventcommand_envvar"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "eventcommand:envvar",
-		PrimaryMySqlField: "id",
-		Factory: NewEventCommandEnvvar,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "eventcommand:envvar",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewEventCommandEnvvar,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "eventcommand",
 	}
 }

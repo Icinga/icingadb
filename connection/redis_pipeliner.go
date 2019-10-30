@@ -3,8 +3,8 @@ package connection
 import "github.com/go-redis/redis"
 
 type PipelinerWrapper struct {
-	pipeliner	redis.Pipeliner
-	rdbw 		*RDBWrapper
+	pipeliner redis.Pipeliner
+	rdbw      *RDBWrapper
 }
 
 func (plw *PipelinerWrapper) Exec() ([]redis.Cmder, error) {
