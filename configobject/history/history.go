@@ -111,7 +111,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
 		`REPLACE INTO state_history (id, environment_id, endpoint_id, object_type, host_id, service_id, change_time, state_type,` +
 			`soft_state, hard_state, previous_hard_state, attempt, last_soft_state, last_hard_state, output, long_output, max_check_attempts, check_source)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
