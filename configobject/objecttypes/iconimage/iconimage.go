@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"icon_image",
@@ -16,9 +16,9 @@ var (
 )
 
 type IconImage struct {
-	Id               string  `json:"id"`
-	EnvId            string  `json:"environment_id"`
-	IconImage        string  `json:"icon_image"`
+	Id        string `json:"id"`
+	EnvId     string `json:"environment_id"`
+	IconImage string `json:"icon_image"`
 }
 
 func NewIconImage() connection.Row {
@@ -60,13 +60,13 @@ func (a *IconImage) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "icon_image"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: name,
+		ObjectType:        name,
+		RedisKey:          name,
 		PrimaryMySqlField: "id",
-		Factory: NewIconImage,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		Factory:           NewIconImage,
+		HasChecksum:       false,
+		BulkInsertStmt:    connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:    connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:    connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

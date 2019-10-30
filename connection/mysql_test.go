@@ -111,7 +111,7 @@ func TestDBWrapper_SqlCommit(t *testing.T) {
 	mockTx := new(TransactionMock)
 
 	mockTx.On("Commit").Return(errors.New("whoops")).Once()
-	mockTx.On("Commit").Return( nil).Once()
+	mockTx.On("Commit").Return(nil).Once()
 	mockDb.On("Ping").Return(errors.New("whoops")).Once()
 
 	var err error
@@ -128,7 +128,7 @@ func TestDBWrapper_SqlCommit(t *testing.T) {
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
 
-	<- done
+	<-done
 
 	assert.NoError(t, err)
 	mockTx.AssertExpectations(t)
@@ -157,7 +157,7 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
 
-	<- done
+	<-done
 
 	assert.NoError(t, err)
 	mockDb.AssertExpectations(t)
@@ -243,7 +243,7 @@ func TestDBWrapper_SqlQuery(t *testing.T) {
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
 
-	<- done
+	<-done
 
 	assert.NoError(t, err)
 	mockDb.AssertExpectations(t)
@@ -273,7 +273,7 @@ func TestDBWrapper_SqlExec(t *testing.T) {
 	dbw.CompareAndSetConnected(true)
 	dbw.ConnectionUpCondition.Broadcast()
 
-	<- done
+	<-done
 
 	assert.NoError(t, err)
 	mockDb.AssertExpectations(t)
@@ -349,10 +349,10 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 
 	dbw.checkConnection(true)
 
-	<- done
+	<-done
 
 	assert.NoError(t, err)
-	assert.Equal(t, [][]interface {}([][]interface {}{{int64(1), "horst"}, {int64(2), "test"}}), res)
+	assert.Equal(t, [][]interface{}([][]interface{}{{int64(1), "horst"}, {int64(2), "test"}}), res)
 
 	_, err = dbw.Db.Exec("DROP TABLE testing0815")
 	assert.NoError(t, err)
@@ -443,4 +443,3 @@ func TestDBWrapper_SqlFetchChecksums(t *testing.T) {
 	_, err = dbw.Db.Exec("DROP TABLE testing0815")
 	assert.NoError(t, err)
 }
-

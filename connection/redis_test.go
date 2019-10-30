@@ -137,7 +137,7 @@ func TestRDBWrapper_HGetAll(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
-	<- done
+	<-done
 
 	assert.NoError(t, err)
 	assert.Contains(t, data, "one")
@@ -228,7 +228,7 @@ func TestRDBWrapper_XRead(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
-	<- done
+	<-done
 
 	streams, err := data.Result()
 	assert.NoError(t, err)
@@ -269,7 +269,7 @@ func TestRDBWrapper_XDel(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
-	<- done
+	<-done
 
 	data := rdbw.XRead(&redis.XReadArgs{Streams: []string{"teststream", "0"}, Block: -1})
 	streams, err := data.Result()
@@ -304,14 +304,14 @@ func TestRDBWrapper_Publish(t *testing.T) {
 
 	rdbw.CompareAndSetConnected(false)
 
-	go func () {
+	go func() {
 		rdbw.Publish("testchannel", "Hello there")
 	}()
 
 	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
-	<- done
+	<-done
 
 	assert.NoError(t, err)
 	assert.Equal(t, "Hello there", msg.Payload)
@@ -357,7 +357,7 @@ func TestRDBWrapper_TxPipelined(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	rdbw.CheckConnection(true)
 
-	<- done
+	<-done
 
 	assert.NoError(t, err)
 	assert.Contains(t, firstMap.Val(), "foo")
@@ -388,7 +388,7 @@ func TestRDBWrapper_PipeConfigChunks(t *testing.T) {
 	rdb.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
 
 	chChunk := rdbw.PipeConfigChunks(make(chan struct{}), []string{"123534534fsdf12sdas12312adg23423f"}, "testkey")
-	chunk := <- chChunk
+	chunk := <-chChunk
 	assert.Equal(t, "this-should-be-the-config", chunk.Configs[0])
 	assert.Equal(t, "this-should-be-the-checksum", chunk.Checksums[0])
 }
@@ -415,6 +415,6 @@ func TestRDBWrapper_PipeChecksumChunks(t *testing.T) {
 	rdb.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
 
 	chChunk := rdbw.PipeChecksumChunks(make(chan struct{}), []string{"123534534fsdf12sdas12312adg23423f"}, "testkey")
-	chunk := <- chChunk
+	chunk := <-chChunk
 	assert.Equal(t, "this-should-be-the-checksum", chunk.Checksums[0])
 }

@@ -20,24 +20,24 @@ const (
 )
 
 type HA struct {
-	isActive              		bool
-	lastHeartbeat          		int64
-	uid                   		uuid.UUID
-	super                 		*supervisor.Supervisor
-	notificationListeners 		map[string][]chan int
-	notificationListenersMutex 	sync.Mutex
-	lastEventId					string
-	logger						*log.Entry
-	heartbeatTimer				*time.Timer
+	isActive                   bool
+	lastHeartbeat              int64
+	uid                        uuid.UUID
+	super                      *supervisor.Supervisor
+	notificationListeners      map[string][]chan int
+	notificationListenersMutex sync.Mutex
+	lastEventId                string
+	logger                     *log.Entry
+	heartbeatTimer             *time.Timer
 }
 
 func NewHA(super *supervisor.Supervisor) (*HA, error) {
 	var err error
 	ho := HA{
-		super: super,
-		notificationListeners: make(map[string][]chan int),
+		super:                      super,
+		notificationListeners:      make(map[string][]chan int),
 		notificationListenersMutex: sync.Mutex{},
-		lastEventId: "0-0",
+		lastEventId:                "0-0",
 	}
 
 	if ho.uid, err = uuid.NewRandom(); err != nil {
@@ -68,14 +68,14 @@ func (h *HA) updateOwnInstance() error {
 func (h *HA) takeOverInstance() error {
 	_, err := h.super.Dbw.SqlExec(mysqlObservers.updateIcingadbInstanceByEnvironmentId,
 		"UPDATE icingadb_instance SET id = ?, heartbeat = ? WHERE environment_id = ?",
-			h.uid[:], h.lastHeartbeat, h.super.EnvId)
+		h.uid[:], h.lastHeartbeat, h.super.EnvId)
 	return err
 }
 
 func (h *HA) insertInstance() error {
 	_, err := h.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, 'y')",
-			h.uid[:], h.super.EnvId, h.lastHeartbeat)
+		h.uid[:], h.super.EnvId, h.lastHeartbeat)
 	return err
 }
 
@@ -271,7 +271,7 @@ func (h *HA) RegisterNotificationListener(listenerType string) chan int {
 }
 
 func (h *HA) notifyNotificationListener(listenerType string, msg int) {
-	for t, chs  := range h.notificationListeners {
+	for t, chs := range h.notificationListeners {
 		if t == listenerType || listenerType == "*" {
 			for _, c := range chs {
 				c <- msg

@@ -24,7 +24,7 @@ type JsonDecodePackage struct {
 
 type JsonDecodePackages struct {
 	Packages []JsonDecodePackage
-	ChBack chan<- []connection.Row
+	ChBack   chan<- []connection.Row
 }
 
 // decodeString unmarshals the string toDecode using the json package. The decoded json will be written to row.
@@ -58,7 +58,7 @@ func decodePackage(chInput <-chan *JsonDecodePackages) error {
 					return err
 				}
 			}
-			if pkg.ConfigRaw != ""{
+			if pkg.ConfigRaw != "" {
 				if err = decodeString(pkg.ConfigRaw, row); err != nil {
 					return err
 				}

@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"user_id",
 		"customvar_id",
@@ -17,10 +17,10 @@ var (
 )
 
 type UserCustomvar struct {
-	Id						string 		`json:"id"`
-	UserId					string		`json:"object_id"`
-	CustomvarId 			string 		`json:"customvar_id"`
-	EnvId           		string		`json:"environment_id"`
+	Id          string `json:"id"`
+	UserId      string `json:"object_id"`
+	CustomvarId string `json:"customvar_id"`
+	EnvId       string `json:"environment_id"`
 }
 
 func NewUserCustomvar() connection.Row {
@@ -62,14 +62,14 @@ func (c *UserCustomvar) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "user_customvar"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "user:customvar",
-		PrimaryMySqlField: "id",
-		Factory: NewUserCustomvar,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "user:customvar",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewUserCustomvar,
+		HasChecksum:              false,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "user",
 	}
 }

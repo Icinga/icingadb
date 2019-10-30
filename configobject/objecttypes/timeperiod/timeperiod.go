@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"name_checksum",
@@ -22,15 +22,15 @@ var (
 )
 
 type Timeperiod struct {
-	Id                  string  `json:"id"`
-	EnvId               string  `json:"environment_id"`
-	NameChecksum        string  `json:"name_checksum"`
-	PropertiesChecksum  string  `json:"checksum"`
-	Name                string  `json:"name"`
-	NameCi              *string `json:"name_ci"`
-	DisplayName         string 	`json:"display_name"`
-	PreferIncludes      bool 	`json:"prefer_includes"`
-	ZoneId            	string  `json:"zone_id"`
+	Id                 string  `json:"id"`
+	EnvId              string  `json:"environment_id"`
+	NameChecksum       string  `json:"name_checksum"`
+	PropertiesChecksum string  `json:"checksum"`
+	Name               string  `json:"name"`
+	NameCi             *string `json:"name_ci"`
+	DisplayName        string  `json:"display_name"`
+	PreferIncludes     bool    `json:"prefer_includes"`
+	ZoneId             string  `json:"zone_id"`
 }
 
 func NewTimeperiod() connection.Row {
@@ -79,14 +79,14 @@ func (t *Timeperiod) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "timeperiod"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: name,
-		PrimaryMySqlField: "id",
-		Factory: NewTimeperiod,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 name,
+		PrimaryMySqlField:        "id",
+		Factory:                  NewTimeperiod,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "timeperiod",
 	}
 }

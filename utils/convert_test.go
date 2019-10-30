@@ -27,13 +27,13 @@ func TestChecksum(t *testing.T) {
 }
 
 func TestNotificationTypesToBitMask(t *testing.T) {
-	assert.Equal(t,81, NotificationTypesToBitMask([]string{"DowntimeStart", "Acknowledgement", "Recovery"}))
-	assert.Equal(t,0, NotificationTypesToBitMask([]string{}))
+	assert.Equal(t, 81, NotificationTypesToBitMask([]string{"DowntimeStart", "Acknowledgement", "Recovery"}))
+	assert.Equal(t, 0, NotificationTypesToBitMask([]string{}))
 }
 
 func TestNotificationStatesToBitMask(t *testing.T) {
-	assert.Equal(t,53, NotificationStatesToBitMask([]string{"OK", "Up", "Down", "Critical"}))
-	assert.Equal(t,49, NotificationStatesToBitMask([]string{"OK", "Up", "Down"}))
+	assert.Equal(t, 53, NotificationStatesToBitMask([]string{"OK", "Up", "Down", "Critical"}))
+	assert.Equal(t, 49, NotificationStatesToBitMask([]string{"OK", "Up", "Down"}))
 }
 
 func TestIcingaStateTypeToString(t *testing.T) {

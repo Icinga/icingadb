@@ -81,10 +81,10 @@ func NewDBWrapper(dbDsn string, maxOpenConns int) (*DBWrapper, error) {
 
 // Database wrapper including helper functions
 type DBWrapper struct {
-	Db                   		 DbClient
-	ConnectedAtomic  		     *uint32 //uint32 to be able to use atomic operations
-	ConnectionUpCondition		 *sync.Cond
-	ConnectionLostCounterAtomic	 *uint32 //uint32 to be able to use atomic operations
+	Db                          DbClient
+	ConnectedAtomic             *uint32 //uint32 to be able to use atomic operations
+	ConnectionUpCondition       *sync.Cond
+	ConnectionLostCounterAtomic *uint32 //uint32 to be able to use atomic operations
 }
 
 func (dbw *DBWrapper) IsConnected() bool {
@@ -369,7 +369,6 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prome
 			}).Debug("Finished Exec")
 		}
 
-
 		if err != nil {
 			if !dbw.checkConnection(false) {
 				continue
@@ -570,7 +569,6 @@ func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string, field string) ([]s
 			fmt.Sprintf("SELECT %s FROM %s WHERE environment_id=(X'%s') AND NOT %s=?", field, table, utils.DecodeChecksum(envId), field),
 			[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		)
-
 
 		if err != nil {
 			if !dbw.checkConnection(false) {

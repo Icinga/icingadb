@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"command_id",
 		"argument_key",
@@ -26,19 +26,19 @@ var (
 )
 
 type NotificationCommandArgument struct {
-	Id						string 		`json:"id"`
-	CommandId				string		`json:"command_id"`
-	ArgumentKey				string		`json:"argument_key"`
-	EnvId           		string		`json:"environment_id"`
-	PropertiesChecksum		string		`json:"checksum"`
-	ArgumentValue			string		`json:"value"`
-	ArgumentOrder			float32		`json:"order"`
-	Description				string		`json:"description"`
-	ArgumentKeyOverride		string		`json:"key"`
-	RepeatKey				bool		`json:"repeat_key"`
-	Required				bool		`json:"required"`
-	SetIf					string		`json:"set_if"`
-	SkipKey					bool		`json:"skip_key"`
+	Id                  string  `json:"id"`
+	CommandId           string  `json:"command_id"`
+	ArgumentKey         string  `json:"argument_key"`
+	EnvId               string  `json:"environment_id"`
+	PropertiesChecksum  string  `json:"checksum"`
+	ArgumentValue       string  `json:"value"`
+	ArgumentOrder       float32 `json:"order"`
+	Description         string  `json:"description"`
+	ArgumentKeyOverride string  `json:"key"`
+	RepeatKey           bool    `json:"repeat_key"`
+	Required            bool    `json:"required"`
+	SetIf               string  `json:"set_if"`
+	SkipKey             bool    `json:"skip_key"`
 }
 
 func NewNotificationCommandArgument() connection.Row {
@@ -89,14 +89,14 @@ func (c *NotificationCommandArgument) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "notificationcommand_argument"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "notificationcommand:argument",
-		PrimaryMySqlField: "id",
-		Factory: NewNotificationCommandArgument,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "notificationcommand:argument",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewNotificationCommandArgument,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "notificationcommand",
 	}
 }

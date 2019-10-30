@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"name_checksum",
@@ -29,22 +29,22 @@ var (
 )
 
 type User struct {
-	Id						string  	`json:"id"`
-	EnvId					string  	`json:"environment_id"`
-	NameChecksum			string  	`json:"name_checksum"`
-	PropertiesChecksum  	string  	`json:"checksum"`
-	CustomvarsChecksum  	string  	`json:"customvars_checksum"`
-	GroupsChecksum      	string  	`json:"groups_checksum"`
-	Name                	string  	`json:"name"`
-	NameCi              	*string 	`json:"name_ci"`
-	DisplayName         	string  	`json:"display_name"`
-	EMail           		string  	`json:"email"`
-	Pager           		string  	`json:"pager"`
-	NotificationsEnabled	bool 		`json:"notifications_enabled"`
-	PeriodId				string 		`json:"timeperiod_id"`
-	States           		[]string  	`json:"states"`
-	Types           		[]string	`json:"types"`
-	ZoneId              	string  	`json:"zone_id"`
+	Id                   string   `json:"id"`
+	EnvId                string   `json:"environment_id"`
+	NameChecksum         string   `json:"name_checksum"`
+	PropertiesChecksum   string   `json:"checksum"`
+	CustomvarsChecksum   string   `json:"customvars_checksum"`
+	GroupsChecksum       string   `json:"groups_checksum"`
+	Name                 string   `json:"name"`
+	NameCi               *string  `json:"name_ci"`
+	DisplayName          string   `json:"display_name"`
+	EMail                string   `json:"email"`
+	Pager                string   `json:"pager"`
+	NotificationsEnabled bool     `json:"notifications_enabled"`
+	PeriodId             string   `json:"timeperiod_id"`
+	States               []string `json:"states"`
+	Types                []string `json:"types"`
+	ZoneId               string   `json:"zone_id"`
 }
 
 func NewUser() connection.Row {
@@ -100,14 +100,14 @@ func (u *User) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "user"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: name,
-		PrimaryMySqlField: "id",
-		Factory: NewUser,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 name,
+		PrimaryMySqlField:        "id",
+		Factory:                  NewUser,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "user",
 	}
 }
