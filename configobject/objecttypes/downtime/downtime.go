@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"object_type",
@@ -32,25 +32,25 @@ var (
 )
 
 type Downtime struct {
-	Id                    string  	`json:"id"`
-	EnvId                 string  	`json:"environment_id"`
-	ObjectType            string  	`json:"object_type"`
-	HostId                string  	`json:"host_id"`
-	ServiceId             string  	`json:"service_id"`
-	NameChecksum          string  	`json:"name_checksum"`
-	PropertiesChecksum    string  	`json:"checksum"`
-	Name                  string  	`json:"name"`
-	Author                string  	`json:"author"`
-	Comment               string  	`json:"comment"`
-	EntryTime             float64  	`json:"entry_time"`
-	ScheduledStartTime    float64  	`json:"scheduled_start_time"`
-	ScheduledEndTime      float64  	`json:"scheduled_end_time"`
-	FlexibleDuration      float64  	`json:"flexible_duration"`
-	IsFlexible		      bool  	`json:"is_flexible"`
-	IsInEffect		      bool  	`json:"is_in_effect"`
-	ActualStartTime       float64  	`json:"actual_start_time"`
-	ActualEndTime         float64  	`json:"actual_end_time"`
-	ZoneId                string	`json:"zone_id"`
+	Id                 string  `json:"id"`
+	EnvId              string  `json:"environment_id"`
+	ObjectType         string  `json:"object_type"`
+	HostId             string  `json:"host_id"`
+	ServiceId          string  `json:"service_id"`
+	NameChecksum       string  `json:"name_checksum"`
+	PropertiesChecksum string  `json:"checksum"`
+	Name               string  `json:"name"`
+	Author             string  `json:"author"`
+	Comment            string  `json:"comment"`
+	EntryTime          float64 `json:"entry_time"`
+	ScheduledStartTime float64 `json:"scheduled_start_time"`
+	ScheduledEndTime   float64 `json:"scheduled_end_time"`
+	FlexibleDuration   float64 `json:"flexible_duration"`
+	IsFlexible         bool    `json:"is_flexible"`
+	IsInEffect         bool    `json:"is_in_effect"`
+	ActualStartTime    float64 `json:"actual_start_time"`
+	ActualEndTime      float64 `json:"actual_end_time"`
+	ZoneId             string  `json:"zone_id"`
 }
 
 func NewDowntime() connection.Row {
@@ -108,14 +108,14 @@ func (d *Downtime) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "downtime"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "downtime",
-		PrimaryMySqlField: "id",
-		Factory: NewDowntime,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name, "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "downtime",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewDowntime,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "downtime",
 	}
 }

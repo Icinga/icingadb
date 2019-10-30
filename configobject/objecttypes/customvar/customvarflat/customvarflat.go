@@ -11,7 +11,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"customvar_id",
@@ -22,11 +22,11 @@ var (
 )
 
 type CustomvarFlat struct {
-	Id                   string `json:"id"`
-	EnvId                string `json:"environment_id"`
-	NameChecksum         string `json:"name_checksum"`
-	Name                 string `json:"name"`
-	Value                string `json:"value"`
+	Id           string `json:"id"`
+	EnvId        string `json:"environment_id"`
+	NameChecksum string `json:"name_checksum"`
+	Name         string `json:"name"`
+	Value        string `json:"value"`
 }
 
 func NewCustomvarFlat() connection.Row {
@@ -93,7 +93,7 @@ func CollectScalarVars(c *CustomvarFlat, value interface{}, name string, path []
 		flatValue := fmt.Sprintf("%v", v)
 		return []connection.Row{
 			&CustomvarFlatFinal{
-				Id:               utils.Checksum(c.EnvId + flatName +  flatValue),
+				Id:               utils.Checksum(c.EnvId + flatName + flatValue),
 				EnvId:            c.EnvId,
 				CustomvarId:      c.Id,
 				FlatNameChecksum: utils.Checksum(flatName),
@@ -105,12 +105,12 @@ func CollectScalarVars(c *CustomvarFlat, value interface{}, name string, path []
 }
 
 type CustomvarFlatFinal struct {
-	Id          		string
-	EnvId       		string
-	CustomvarId			string
-	FlatNameChecksum    string
-	FlatName        	string
-	FlatValue       	string
+	Id               string
+	EnvId            string
+	CustomvarId      string
+	FlatNameChecksum string
+	FlatName         string
+	FlatValue        string
 }
 
 func (c *CustomvarFlatFinal) InsertValues() []interface{} {
@@ -149,13 +149,13 @@ func (c *CustomvarFlatFinal) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "customvar_flat"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "customvar",
+		ObjectType:        name,
+		RedisKey:          "customvar",
 		PrimaryMySqlField: "customvar_id",
-		Factory: NewCustomvarFlat,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "customvar_id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		Factory:           NewCustomvarFlat,
+		HasChecksum:       false,
+		BulkInsertStmt:    connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:    connection.NewBulkDeleteStmt(name, "customvar_id"),
+		BulkUpdateStmt:    connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

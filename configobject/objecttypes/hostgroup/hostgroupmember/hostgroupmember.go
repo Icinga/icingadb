@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"hostgroup_id",
 		"host_id",
@@ -17,10 +17,10 @@ var (
 )
 
 type HostgroupMember struct {
-	Id						string 		`json:"id"`
-	HostgroupId				string		`json:"group_id"`
-	HostId		 			string 		`json:"object_id"`
-	EnvId           		string		`json:"environment_id"`
+	Id          string `json:"id"`
+	HostgroupId string `json:"group_id"`
+	HostId      string `json:"object_id"`
+	EnvId       string `json:"environment_id"`
 }
 
 func NewHostgroupMember() connection.Row {
@@ -62,14 +62,14 @@ func (h *HostgroupMember) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "hostgroup_member"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "host:groupmember",
-		PrimaryMySqlField: "id",
-		Factory: NewHostgroupMember,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "host:groupmember",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewHostgroupMember,
+		HasChecksum:              false,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "host",
 	}
 }

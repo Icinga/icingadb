@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"command_id",
 		"argument_key",
@@ -26,19 +26,19 @@ var (
 )
 
 type EventCommandArgument struct {
-	Id						string 		`json:"id"`
-	CommandId				string		`json:"command_id"`
-	ArgumentKey				string		`json:"argument_key"`
-	EnvId           		string		`json:"environment_id"`
-	PropertiesChecksum		string		`json:"checksum"`
-	ArgumentValue			string		`json:"value"`
-	ArgumentOrder			float32		`json:"order"`
-	Description				string		`json:"description"`
-	ArgumentKeyOverride		string		`json:"key"`
-	RepeatKey				bool		`json:"repeat_key"`
-	Required				bool		`json:"required"`
-	SetIf					string		`json:"set_if"`
-	SkipKey					bool		`json:"skip_key"`
+	Id                  string  `json:"id"`
+	CommandId           string  `json:"command_id"`
+	ArgumentKey         string  `json:"argument_key"`
+	EnvId               string  `json:"environment_id"`
+	PropertiesChecksum  string  `json:"checksum"`
+	ArgumentValue       string  `json:"value"`
+	ArgumentOrder       float32 `json:"order"`
+	Description         string  `json:"description"`
+	ArgumentKeyOverride string  `json:"key"`
+	RepeatKey           bool    `json:"repeat_key"`
+	Required            bool    `json:"required"`
+	SetIf               string  `json:"set_if"`
+	SkipKey             bool    `json:"skip_key"`
 }
 
 func NewEventCommandArgument() connection.Row {
@@ -89,14 +89,14 @@ func (c *EventCommandArgument) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "eventcommand_argument"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "eventcommand:argument",
-		PrimaryMySqlField: "id",
-		Factory: NewEventCommandArgument,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "eventcommand:argument",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewEventCommandArgument,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "eventcommand",
 	}
 }

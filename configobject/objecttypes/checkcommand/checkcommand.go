@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"name_checksum",
@@ -22,15 +22,15 @@ var (
 )
 
 type CheckCommand struct {
-	Id                    string  	`json:"id"`
-	EnvId                 string  	`json:"environment_id"`
-	NameChecksum          string  	`json:"name_checksum"`
-	PropertiesChecksum    string  	`json:"checksum"`
-	Name                  string  	`json:"name"`
-	NameCi                *string 	`json:"name_ci"`
-	ZoneId                string  	`json:"zone_id"`
-	Command               string  	`json:"command"`
-	Timeout               float32	`json:"timeout"`
+	Id                 string  `json:"id"`
+	EnvId              string  `json:"environment_id"`
+	NameChecksum       string  `json:"name_checksum"`
+	PropertiesChecksum string  `json:"checksum"`
+	Name               string  `json:"name"`
+	NameCi             *string `json:"name_ci"`
+	ZoneId             string  `json:"zone_id"`
+	Command            string  `json:"command"`
+	Timeout            float32 `json:"timeout"`
 }
 
 func NewCheckCommand() connection.Row {
@@ -79,14 +79,14 @@ func (c *CheckCommand) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "checkcommand"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: name,
-		PrimaryMySqlField: "id",
-		Factory: NewCheckCommand,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 name,
+		PrimaryMySqlField:        "id",
+		Factory:                  NewCheckCommand,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "checkcommand",
 	}
 }

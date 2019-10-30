@@ -18,10 +18,10 @@ import (
 )
 
 type Checksums struct {
-	NameChecksum          string  `json:"name_checksum"`
-	PropertiesChecksum    string  `json:"checksum"`
-	CustomvarsChecksum    string  `json:"customvars_checksum"`
-	GroupsChecksum        string  `json:"groups_checksum"`
+	NameChecksum       string `json:"name_checksum"`
+	PropertiesChecksum string `json:"checksum"`
+	CustomvarsChecksum string `json:"customvars_checksum"`
+	GroupsChecksum     string `json:"groups_checksum"`
 }
 
 // Operator is the main worker for each config type. It takes a reference to a supervisor super, holding all required
@@ -34,28 +34,28 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 	var (
 		// If this IcingaDB-Instance looses responsibility, this channel will be
 		// closed, resulting in a shutdown of all underlying workers
-		done			chan struct{}
+		done chan struct{}
 		// Used by this Operator to provide the InsertPrepWorker with IDs to insert
 		// Operator -> InsertPrepWorker
-		chInsert      	chan []string
+		chInsert chan []string
 		// Used by the JsonDecodePool to provide the InsertExecWorker with decoded rows, ready to be inserted
 		// JsonDecodePool -> InsertExecWorker
-		chInsertBack  	chan []connection.Row
+		chInsertBack chan []connection.Row
 		// Used by this Operator to provide the DeleteExecWorker with IDs to delete
 		// Operator -> DeleteExecWorker
-		chDelete      	chan []string
+		chDelete chan []string
 		// Used by this Operator to provide the UpdateCompWorker with IDs to compare
 		// Operator -> UpdateCompWorker
-		chUpdateComp  	chan []string
+		chUpdateComp chan []string
 		// Used by the UpdateCompWorker to provide the UpdatePrepWorker with IDs that have to be updated
 		// UpdateCompWorker -> UpdatePrepWorker
-		chUpdate      	chan []string
+		chUpdate chan []string
 		// Used by the JsonDecodePool to provide the UpdateExecWorker with decoded rows, ready to be updated
 		// JsonDecodePool -> UpdateExecWorker
-		chUpdateBack  	chan []connection.Row
-		wgInsert      	*sync.WaitGroup
-		wgDelete      	*sync.WaitGroup
-		wgUpdate      	*sync.WaitGroup
+		chUpdateBack chan []connection.Row
+		wgInsert     *sync.WaitGroup
+		wgDelete     *sync.WaitGroup
+		wgUpdate     *sync.WaitGroup
 	)
 	log.Debugf("%s: Ready", objectInformation.ObjectType)
 	for msg := range chHA {
@@ -80,16 +80,16 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 			//log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", objectInformation.ObjectType, len(insert), len(update), len(delete))
 
 			// Clean up all channels and wait groups for a fresh config dump
-			done 			= make(chan struct{})
-			chInsert      	= make(chan []string)
-			chInsertBack  	= make(chan []connection.Row)
-			chDelete      	= make(chan []string)
-			chUpdateComp  	= make(chan []string)
-			chUpdate      	= make(chan []string)
-			chUpdateBack  	= make(chan []connection.Row)
-			wgInsert      	= &sync.WaitGroup{}
-			wgDelete      	= &sync.WaitGroup{}
-			wgUpdate      	= &sync.WaitGroup{}
+			done = make(chan struct{})
+			chInsert = make(chan []string)
+			chInsertBack = make(chan []connection.Row)
+			chDelete = make(chan []string)
+			chUpdateComp = make(chan []string)
+			chUpdate = make(chan []string)
+			chUpdateBack = make(chan []connection.Row)
+			wgInsert = &sync.WaitGroup{}
+			wgDelete = &sync.WaitGroup{}
+			wgUpdate = &sync.WaitGroup{}
 
 			updateCounter := new(uint32)
 
@@ -131,10 +131,10 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				benchmarc.Stop()
 				if !kill && len(insert) > 0 {
 					log.WithFields(log.Fields{
-						"type": 		objectInformation.ObjectType,
-						"count": 		len(insert),
-						"benchmark":	benchmarc.String(),
-						"action": 		"insert",
+						"type":      objectInformation.ObjectType,
+						"count":     len(insert),
+						"benchmark": benchmarc.String(),
+						"action":    "insert",
 					}).Infof("Inserted %v %ss in %v", len(insert), objectInformation.ObjectType, benchmarc.String())
 				}
 			}()
@@ -159,7 +159,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				}
 			}()
 
-			if (objectInformation.HasChecksum) {
+			if objectInformation.HasChecksum {
 				go func() {
 					benchmarc := utils.NewBenchmark()
 					wgUpdate.Add(len(update))
@@ -195,7 +195,7 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 	var (
 		redisIds []string
 		mysqlIds []string
-		wg = sync.WaitGroup{}
+		wg       = sync.WaitGroup{}
 	)
 
 	//get ids from redis
@@ -243,10 +243,10 @@ func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 			}
 
 			pkg := jsondecoder.JsonDecodePackage{
-				Id:           	key,
-				ConfigRaw:		chunk.Configs[i].(string),
-				Factory:		objectInformation.Factory,
-				ObjectType:		objectInformation.ObjectType,
+				Id:         key,
+				ConfigRaw:  chunk.Configs[i].(string),
+				Factory:    objectInformation.Factory,
+				ObjectType: objectInformation.ObjectType,
 			}
 
 			if chunk.Checksums[i] != nil {
@@ -377,11 +377,11 @@ func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 				continue
 			}
 			pkg := jsondecoder.JsonDecodePackage{
-				Id:           	key,
-				ChecksumsRaw:	chunk.Checksums[i].(string),
-				ConfigRaw:   	chunk.Configs[i].(string),
-				Factory:		objectInformation.Factory,
-				ObjectType:		objectInformation.ObjectType,
+				Id:           key,
+				ChecksumsRaw: chunk.Checksums[i].(string),
+				ConfigRaw:    chunk.Configs[i].(string),
+				Factory:      objectInformation.Factory,
+				ObjectType:   objectInformation.ObjectType,
 			}
 			pkgs.Packages = append(pkgs.Packages, pkg)
 		}

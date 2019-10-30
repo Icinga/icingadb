@@ -26,9 +26,9 @@ func createTestingHA(t *testing.T, redisAddr, mysqlHost string) *HA {
 	}
 
 	super := supervisor.Supervisor{
-		ChErr:    make(chan error),
-		Rdbw:     redisConn,
-		Dbw:      mysqlConn,
+		ChErr: make(chan error),
+		Rdbw:  redisConn,
+		Dbw:   mysqlConn,
 	}
 
 	ha, _ := NewHA(&super)
@@ -42,8 +42,8 @@ func createTestingHA(t *testing.T, redisAddr, mysqlHost string) *HA {
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	ha.logger = log.WithFields(log.Fields{
-		"context":     "HA-Testing",
-		"UUID":        ha.uid,
+		"context": "HA-Testing",
+		"UUID":    ha.uid,
 	})
 
 	return ha
@@ -256,23 +256,23 @@ func TestHA_runHA(t *testing.T) {
 	hash2 := sha1.New()
 	hash2.Write([]byte("perp"))
 
-	go func () {
+	go func() {
 		chEnv <- &Environment{ID: hash2.Sum(nil)}
 	}()
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	go func () {
+	go func() {
 		timer := time.NewTimer(time.Second)
 		select {
 		case err := <-ha.super.ChErr:
 			assert.Error(t, err, "runHA() should return an error on environment change")
 		case <-timer.C:
-			assert.Fail(t,"runHA() should return an error on environment change")
+			assert.Fail(t, "runHA() should return an error on environment change")
 		}
 
-		wg.Done();
+		wg.Done()
 	}()
 
 	ha.runHA(chEnv)
@@ -313,8 +313,8 @@ func TestHA_NotificationListeners(t *testing.T) {
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 
-	go func () {
-		assert.Equal(t, Notify_StartSync, <- chHost)
+	go func() {
+		assert.Equal(t, Notify_StartSync, <-chHost)
 		wg.Done()
 	}()
 
@@ -324,8 +324,8 @@ func TestHA_NotificationListeners(t *testing.T) {
 	chService := ha.RegisterNotificationListener("service")
 	wg.Add(1)
 
-	go func () {
-		assert.Equal(t, Notify_StartSync, <- chService)
+	go func() {
+		assert.Equal(t, Notify_StartSync, <-chService)
 		wg.Done()
 	}()
 
@@ -334,9 +334,9 @@ func TestHA_NotificationListeners(t *testing.T) {
 
 	wg.Add(1)
 
-	go func () {
-		assert.Equal(t, Notify_StartSync, <- chService)
-		assert.Equal(t, Notify_StartSync, <- chHost)
+	go func() {
+		assert.Equal(t, Notify_StartSync, <-chService)
+		assert.Equal(t, Notify_StartSync, <-chHost)
 		wg.Done()
 	}()
 
@@ -383,17 +383,17 @@ func TestHA_EventListener(t *testing.T) {
 	wg.Add(2)
 
 	go func() {
-		assert.Equal(t, Notify_StartSync, <- chHost)
-		assert.Equal(t, Notify_StopSync, <- chHost)
-		assert.Equal(t, Notify_StartSync, <- chHost)
-		assert.Equal(t, Notify_StopSync, <- chHost)
+		assert.Equal(t, Notify_StartSync, <-chHost)
+		assert.Equal(t, Notify_StopSync, <-chHost)
+		assert.Equal(t, Notify_StartSync, <-chHost)
+		assert.Equal(t, Notify_StopSync, <-chHost)
 		wg.Done()
 	}()
 
 	go func() {
-		assert.Equal(t, Notify_StartSync, <- chService)
-		assert.Equal(t, Notify_StopSync, <- chService)
-		assert.Equal(t, Notify_StartSync, <- chService)
+		assert.Equal(t, Notify_StartSync, <-chService)
+		assert.Equal(t, Notify_StopSync, <-chService)
+		assert.Equal(t, Notify_StartSync, <-chService)
 		wg.Done()
 	}()
 

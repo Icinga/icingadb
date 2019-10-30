@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"timeperiod_id",
 		"override_id",
@@ -17,10 +17,10 @@ var (
 )
 
 type TimeperiodOverrideInclude struct {
-	Id						string 		`json:"id"`
-	TimeperiodId			string		`json:"timeperiod_id"`
-	OverrideId	 			string 		`json:"include_id"`
-	EnvId           		string		`json:"environment_id"`
+	Id           string `json:"id"`
+	TimeperiodId string `json:"timeperiod_id"`
+	OverrideId   string `json:"include_id"`
+	EnvId        string `json:"environment_id"`
 }
 
 func NewTimeperiodOverrideInclude() connection.Row {
@@ -62,14 +62,14 @@ func (t *TimeperiodOverrideInclude) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "timeperiod_override_include"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: "timeperiod:override:include",
-		PrimaryMySqlField: "id",
-		Factory: NewTimeperiodOverrideInclude,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 "timeperiod:override:include",
+		PrimaryMySqlField:        "id",
+		Factory:                  NewTimeperiodOverrideInclude,
+		HasChecksum:              false,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "timeperiod",
 	}
 }

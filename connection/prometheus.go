@@ -67,5 +67,3 @@ var DbBulkDeletes = promauto.NewCounter(prometheus.CounterOpts{
 	Name: "db_bulk_deletes",
 	Help: "Database bulk deletes since startup",
 })
-
-

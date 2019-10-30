@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"name_checksum",
@@ -18,11 +18,11 @@ var (
 )
 
 type Customvar struct {
-	Id                   string `json:"id"`
-	EnvId                string `json:"environment_id"`
-	NameChecksum         string `json:"name_checksum"`
-	Name                 string `json:"name"`
-	Value                string `json:"value"`
+	Id           string `json:"id"`
+	EnvId        string `json:"environment_id"`
+	NameChecksum string `json:"name_checksum"`
+	Name         string `json:"name"`
+	Value        string `json:"value"`
 }
 
 func NewCustomvar() connection.Row {
@@ -66,13 +66,13 @@ func (c *Customvar) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "customvar"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: name,
+		ObjectType:        name,
+		RedisKey:          name,
 		PrimaryMySqlField: "id",
-		Factory: NewCustomvar,
-		HasChecksum: false,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		Factory:           NewCustomvar,
+		HasChecksum:       false,
+		BulkInsertStmt:    connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:    connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:    connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

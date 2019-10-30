@@ -8,7 +8,7 @@ import (
 
 var (
 	ObjectInformation configobject.ObjectInformation
-	Fields         = []string{
+	Fields            = []string{
 		"id",
 		"environment_id",
 		"name_checksum",
@@ -20,13 +20,13 @@ var (
 )
 
 type Endpoint struct {
-	Id                  string  `json:"id"`
-	EnvId               string  `json:"environment_id"`
-	NameChecksum        string  `json:"name_checksum"`
-	PropertiesChecksum  string  `json:"checksum"`
-	Name                string  `json:"name"`
-	NameCi              *string `json:"name_ci"`
-	ZoneId            	string  `json:"zone_id"`
+	Id                 string  `json:"id"`
+	EnvId              string  `json:"environment_id"`
+	NameChecksum       string  `json:"name_checksum"`
+	PropertiesChecksum string  `json:"checksum"`
+	Name               string  `json:"name"`
+	NameCi             *string `json:"name_ci"`
+	ZoneId             string  `json:"zone_id"`
 }
 
 func NewEndpoint() connection.Row {
@@ -73,14 +73,14 @@ func (e *Endpoint) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "endpoint"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType: name,
-		RedisKey: name,
-		PrimaryMySqlField: "id",
-		Factory: NewEndpoint,
-		HasChecksum: true,
-		BulkInsertStmt: connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt: connection.NewBulkDeleteStmt(name,  "id"),
-		BulkUpdateStmt: connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:               name,
+		RedisKey:                 name,
+		PrimaryMySqlField:        "id",
+		Factory:                  NewEndpoint,
+		HasChecksum:              true,
+		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:           connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:           connection.NewBulkUpdateStmt(name, Fields),
 		NotificationListenerType: "endpoint",
 	}
 }

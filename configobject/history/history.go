@@ -186,9 +186,9 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
-		func(values map[string]interface{}) []interface{}{
+		func(values map[string]interface{}) []interface{} {
 			var triggeredById []byte
-			if values["triggered_by_id"] != nil{
+			if values["triggered_by_id"] != nil {
 				triggeredById = utils.EncodeChecksum(values["triggered_by_id"].(string))
 			}
 
@@ -386,8 +386,8 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 
 func historyWorker(super *supervisor.Supervisor, historyType string, preparedStatements []string, dataFunctions []func(map[string]interface{}) []interface{}, observer prometheus.Observer) {
 	if super.EnvId == nil {
-		log.Debug( historyType + "History: Waiting for EnvId to be set")
-		<- time.NewTimer(time.Second).C
+		log.Debug(historyType + "History: Waiting for EnvId to be set")
+		<-time.NewTimer(time.Second).C
 		return
 	}
 
@@ -425,7 +425,7 @@ func historyWorker(super *supervisor.Supervisor, historyType string, preparedSta
 					if errExec != nil {
 						log.WithFields(log.Fields{
 							"context": historyType + "History",
-							"values": state.Values,
+							"values":  state.Values,
 						}).Error(errExec)
 
 						entries = removeEntryFromEntriesSlice(entries, i)
@@ -450,9 +450,9 @@ func historyWorker(super *supervisor.Supervisor, historyType string, preparedSta
 	}
 
 	//Delete synced entries from redis stream
-	super.Rdbw.XDel("icinga:history:stream:" + historyType, storedEntryIds...)
+	super.Rdbw.XDel("icinga:history:stream:"+historyType, storedEntryIds...)
 
-	log.Debugf("%d %s history entries synced", len(storedEntryIds) - brokenEntries, historyType)
+	log.Debugf("%d %s history entries synced", len(storedEntryIds)-brokenEntries, historyType)
 	log.Debugf("%d %s history entries broken", brokenEntries, historyType)
 }
 
@@ -461,4 +461,3 @@ func removeEntryFromEntriesSlice(s []redis.XMessage, i int) []redis.XMessage {
 	s[len(s)-1], s[i] = s[i], s[len(s)-1]
 	return s[:len(s)-1]
 }
-

@@ -5,8 +5,8 @@ import (
 )
 
 type PubSubWrapper struct {
-	ps 		*redis.PubSub
-	rdbw 	*RDBWrapper
+	ps   *redis.PubSub
+	rdbw *RDBWrapper
 }
 
 func (psw *PubSubWrapper) Subscribe(channels ...string) error {
