@@ -435,8 +435,8 @@ func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *config
 		super.ChErr <- err
 	}
 
-	currentUpdatePackage := []string{}
-	currentDeletePackage := []string{}
+	var currentUpdatePackage []string
+	var currentDeletePackage []string
 	updateMutex := sync.Mutex{}
 	deleteMutex := sync.Mutex{}
 
@@ -462,12 +462,11 @@ func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *config
 			"type":   objectInformation.ObjectType,
 			"action": "runtime delete",
 		}).Infof("Deleting %v %ss on runtime update", deleteLen, objectInformation.ObjectType)
-
 	}
 
 	ticker1s := time.NewTicker(time.Second)
 
-	msgCh := subscription.Channel()
+	msgCh := subscription.ChannelSize(250000)
 
 	for {
 		select {
