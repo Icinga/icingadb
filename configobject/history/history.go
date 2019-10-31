@@ -177,9 +177,9 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 
 func downtimeHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO downtime_history (downtime_id, environment_id, endpoint_id, object_type, host_id, service_id, triggered_by_id, entry_time,` +
-			`author, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, was_started, actual_start_time, actual_end_time, was_cancelled, is_in_effect, trigger_time, deletion_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`REPLACE INTO downtime_history (downtime_id, environment_id, endpoint_id, triggered_by_id, object_type, host_id, service_id, entry_time,` +
+			`author, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, start_time, end_time, has_been_cancelled, trigger_time, cancel_time)` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -196,10 +196,10 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 				utils.EncodeChecksum(values["downtime_id"].(string)),
 				super.EnvId,
 				utils.DecodeHexIfNotNil(values["endpoint_id"]),
+				triggeredById,
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				triggeredById,
 				values["entry_time"],
 				values["author"],
 				values["comment"],
@@ -207,13 +207,11 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 				values["flexible_duration"],
 				values["scheduled_start_time"],
 				values["scheduled_end_time"],
-				utils.RedisIntToDBBoolean(values["was_started"]),
-				values["actual_start_time"],
-				values["actual_end_time"],
-				utils.RedisIntToDBBoolean(values["was_cancelled"]),
-				utils.RedisIntToDBBoolean(values["is_in_effect"]),
+				values["start_time"],
+				values["end_time"],
+				utils.RedisIntToDBBoolean(values["has_been_cancelled"]),
 				values["trigger_time"],
-				values["deletion_time"],
+				values["cancel_time"],
 			}
 
 			return data
@@ -224,12 +222,10 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 
 			var eventTime string
 			switch values["event_type"] {
-			case "downtime_schedule":
-				eventTime = values["entry_time"].(string)
 			case "downtime_start":
-				eventTime = values["actual_start_time"].(string)
+				eventTime = values["start_time"].(string)
 			case "downtime_end":
-				eventTime = values["actual_end_time"].(string)
+				eventTime = values["end_time"].(string)
 			}
 
 			data := []interface{}{

@@ -11,6 +11,7 @@ var (
 	Fields            = []string{
 		"id",
 		"environment_id",
+		"triggered_by_id",
 		"object_type",
 		"host_id",
 		"service_id",
@@ -25,8 +26,8 @@ var (
 		"flexible_duration",
 		"is_flexible",
 		"is_in_effect",
-		"actual_start_time",
-		"actual_end_time",
+		"start_time",
+		"end_time",
 		"zone_id",
 	}
 )
@@ -34,6 +35,7 @@ var (
 type Downtime struct {
 	Id                 string  `json:"id"`
 	EnvId              string  `json:"environment_id"`
+	TriggeredById      string  `json:"triggered_by_id"`
 	ObjectType         string  `json:"object_type"`
 	HostId             string  `json:"host_id"`
 	ServiceId          string  `json:"service_id"`
@@ -48,8 +50,8 @@ type Downtime struct {
 	FlexibleDuration   float64 `json:"flexible_duration"`
 	IsFlexible         bool    `json:"is_flexible"`
 	IsInEffect         bool    `json:"is_in_effect"`
-	ActualStartTime    float64 `json:"actual_start_time"`
-	ActualEndTime      float64 `json:"actual_end_time"`
+	StartTime          float64 `json:"start_time"`
+	EndTime            float64 `json:"end_time"`
 	ZoneId             string  `json:"zone_id"`
 }
 
@@ -71,6 +73,7 @@ func (d *Downtime) UpdateValues() []interface{} {
 	v = append(
 		v,
 		utils.EncodeChecksum(d.EnvId),
+		utils.EncodeChecksum(d.TriggeredById),
 		d.ObjectType,
 		utils.EncodeChecksum(d.HostId),
 		utils.EncodeChecksum(d.ServiceId),
@@ -85,8 +88,8 @@ func (d *Downtime) UpdateValues() []interface{} {
 		d.FlexibleDuration,
 		utils.Bool[d.IsFlexible],
 		utils.Bool[d.IsInEffect],
-		d.ActualStartTime,
-		d.ActualEndTime,
+		d.StartTime,
+		d.EndTime,
 		utils.EncodeChecksum(d.ZoneId),
 	)
 
