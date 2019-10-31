@@ -10,7 +10,7 @@ CREATE TABLE notification_history (
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
 
-  type smallint(3) unsigned NOT NULL,
+  type enum('downtime_start', 'downtime_end', 'downtime_removed', 'custom', 'acknowledgement', 'problem', 'recovery', 'flapping_start', 'flapping_end') NOT NULL,
   event_time bigint(20) unsigned NOT NULL,
   state tinyint(1) unsigned NOT NULL,
   previous_hard_state tinyint(1) unsigned NOT NULL,
