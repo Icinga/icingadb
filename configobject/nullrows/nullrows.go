@@ -57,21 +57,21 @@ func InsertNullRows(super *supervisor.Supervisor) {
 	// flapping_history
 	execFunc(
 		"flapping_history",
-		"REPLACE INTO flapping_history(id, environment_id, object_type, host_id, service_id, change_time, change_type, percent_state_change, flapping_threshold_low, flapping_threshold_high) VALUES (?,?,?,?,?,?,?,?,?,?)",
+		"REPLACE INTO flapping_history(id, environment_id, object_type, host_id, service_id, event_time, event_type, percent_state_change, flapping_threshold_low, flapping_threshold_high) VALUES (?,?,?,?,?,?,?,?,?,?)",
 		emptyUUID[:], super.EnvId, "host", nil, nil, 0, "start", 0, 0, 0,
 	)
 
 	// notification_history
 	execFunc(
 		"notification_history",
-		"REPLACE INTO notification_history(id, environment_id, object_type, host_id, service_id, notification_id, type, send_time, state, previous_hard_state, author, `text`, users_notified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		"REPLACE INTO notification_history(id, environment_id, object_type, host_id, service_id, notification_id, type, event_time, state, previous_hard_state, author, `text`, users_notified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
 		emptyUUID[:], super.EnvId, "host", nil, nil, emptyID, 0, 0, 0, 0, "", "", 0,
 	)
 
 	// state_history
 	execFunc(
 		"state_history",
-		"REPLACE INTO state_history(id, environment_id, object_type, host_id, service_id, change_time, state_type, soft_state, hard_state, previous_hard_state, attempt, last_soft_state, last_hard_state, output, long_output, max_check_attempts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		"REPLACE INTO state_history(id, environment_id, object_type, host_id, service_id, event_time, state_type, soft_state, hard_state, previous_hard_state, attempt, last_soft_state, last_hard_state, output, long_output, max_check_attempts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 		emptyUUID[:], super.EnvId, "host", nil, nil, 0, "hard", 0, 0, 0, 0, 0, 0, "", "", 0,
 	)
 

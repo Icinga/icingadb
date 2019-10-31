@@ -11,7 +11,7 @@ CREATE TABLE notification_history (
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
 
   type smallint(3) unsigned NOT NULL,
-  send_time bigint(20) unsigned NOT NULL,
+  event_time bigint(20) unsigned NOT NULL,
   state tinyint(1) unsigned NOT NULL,
   previous_hard_state tinyint(1) unsigned NOT NULL,
   author text DEFAULT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE state_history (
   host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
 
-  change_time bigint(20) unsigned NOT NULL,
+  event_time bigint(20) unsigned NOT NULL,
   state_type enum('hard', 'soft') NOT NULL,
   soft_state tinyint(1) unsigned NOT NULL,
   hard_state tinyint(1) unsigned NOT NULL,
@@ -99,8 +99,8 @@ CREATE TABLE flapping_history (
   host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
 
-  change_time bigint(20) unsigned NOT NULL,
-  change_type enum('start', 'end') NOT NULL,
+  event_time bigint(20) unsigned NOT NULL,
+  event_type enum('flapping_start', 'flapping_end') NOT NULL,
   percent_state_change float unsigned NOT NULL,
   flapping_threshold_low float unsigned NOT NULL,
   flapping_threshold_high float unsigned NOT NULL,
