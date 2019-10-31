@@ -258,8 +258,8 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 func commentHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
 		`REPLACE INTO comment_history (comment_id, environment_id, endpoint_id, object_type, host_id, service_id, entry_time, author,` +
-			`comment, entry_type, is_persistent, expire_time, deletion_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`comment, entry_type, is_persistent, expire_time, remove_time, has_been_removed)` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -280,7 +280,8 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 				utils.CommentEntryTypes[values["entry_type"].(string)],
 				utils.RedisIntToDBBoolean(values["is_persistent"]),
 				values["expire_time"],
-				values["deletion_time"],
+				values["remove_time"],
+				utils.RedisIntToDBBoolean(values["has_been_removed"]),
 			}
 
 			return data
@@ -294,7 +295,7 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 			case "comment_add":
 				eventTime = values["entry_time"].(string)
 			case "comment_remove":
-				eventTime = values["deletion_time"].(string)
+				eventTime = values["remove_time"].(string)
 			}
 
 			data := []interface{}{

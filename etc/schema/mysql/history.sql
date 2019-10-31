@@ -86,7 +86,8 @@ CREATE TABLE comment_history (
   entry_type enum('comment','ack','downtime','flapping') NOT NULL,
   is_persistent enum('y','n') NOT NULL,
   expire_time bigint(20) unsigned DEFAULT NULL,
-  deletion_time bigint(20) unsigned NULL DEFAULT NULL,
+  remove_time bigint(20) unsigned NULL DEFAULT NULL,
+  has_been_removed enum('y','n') NOT NULL,
 
   PRIMARY KEY (comment_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
