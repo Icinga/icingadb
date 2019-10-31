@@ -18,6 +18,7 @@ CREATE TABLE comment (
   entry_type enum('comment','ack','downtime','flapping') NOT NULL,
   entry_time bigint(20) unsigned NOT NULL,
   is_persistent enum('y','n') NOT NULL,
+  is_sticky enum('y','n') NOT NULL,
   expire_time bigint(20) unsigned DEFAULT NULL,
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',

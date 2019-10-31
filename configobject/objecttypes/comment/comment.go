@@ -23,6 +23,7 @@ var (
 		"entry_type",
 		"entry_time",
 		"is_persistent",
+		"is_sticky",
 		"expire_time",
 		"zone_id",
 	}
@@ -42,6 +43,7 @@ type Comment struct {
 	EntryType          float64 `json:"entry_type"`
 	EntryTime          float64 `json:"entry_time"`
 	IsPersistent       bool    `json:"is_persistent"`
+	IsSticky           bool    `json:"is_sticky"`
 	ExpireTime         float64 `json:"expire_time"`
 	ZoneId             string  `json:"zone_id"`
 }
@@ -75,6 +77,7 @@ func (c *Comment) UpdateValues() []interface{} {
 		utils.CommentEntryTypes[fmt.Sprintf("%.0f", c.EntryType)],
 		c.EntryTime,
 		utils.Bool[c.IsPersistent],
+		utils.Bool[c.IsSticky],
 		c.ExpireTime,
 		utils.EncodeChecksum(c.ZoneId),
 	)
