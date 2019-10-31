@@ -70,7 +70,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
 				utils.EncodeChecksum(values["notification_id"].(string)),
-				values["type"],
+				utils.NotificationTypesToDbEnumString[values["type"].(string)],
 				values["event_time"],
 				values["state"],
 				values["previous_hard_state"],

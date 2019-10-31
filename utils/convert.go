@@ -11,7 +11,7 @@ var (
 		true:  "y",
 		false: "n",
 	}
-	NotificationStates = map[string]int{
+	NotificationStatesToInt = map[string]int{
 		"OK":       1,
 		"Warning":  2,
 		"Critical": 4,
@@ -19,7 +19,7 @@ var (
 		"Up":       16,
 		"Down":     32,
 	}
-	NotificationTypes = map[string]int{
+	NotificationTypesToInt = map[string]int{
 		"DowntimeStart":   1,
 		"DowntimeEnd":     2,
 		"DowntimeRemoved": 4,
@@ -29,6 +29,17 @@ var (
 		"Recovery":        64,
 		"FlappingStart":   128,
 		"FlappingEnd":     256,
+	}
+	NotificationTypesToDbEnumString = map[string]string{
+		"1": "downtime_start",
+		"2": "downtime_end",
+		"4": "downtime_removed",
+		"8": "custom",
+		"16": "acknowledgement",
+		"32": "problem",
+		"64": "recovery",
+		"128": "flapping_start",
+		"256": "flapping_end",
 	}
 	CommentEntryTypes = map[string]string{
 		"1": "comment",
@@ -73,7 +84,7 @@ func DecodeChecksum(c []byte) string {
 func NotificationStatesToBitMask(states []string) int {
 	mask := 0
 	for _, s := range states {
-		mask += NotificationStates[s]
+		mask += NotificationStatesToInt[s]
 	}
 	return mask
 }
@@ -82,7 +93,7 @@ func NotificationStatesToBitMask(states []string) int {
 func NotificationTypesToBitMask(types []string) int {
 	mask := 0
 	for _, t := range types {
-		mask += NotificationTypes[t]
+		mask += NotificationTypesToInt[t]
 	}
 	return mask
 }
