@@ -120,7 +120,7 @@ CREATE TABLE history (
   comment_history_id binary(20) NOT NULL COMMENT 'comment_history.comment_id or 0000000000000000000000000000000000000000',
   flapping_history_id binary(16) NOT NULL COMMENT 'flapping_history.id or 00000000-0000-0000-0000-000000000000',
 
-  event_type enum('notification','state','downtime_schedule','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end') NOT NULL,
+  event_type enum('notification','state_change','downtime_schedule','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end') NOT NULL,
   event_time bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (id)
