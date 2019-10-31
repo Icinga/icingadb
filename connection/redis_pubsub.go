@@ -51,6 +51,10 @@ func (psw *PubSubWrapper) Channel() <-chan *redis.Message {
 	return psw.ps.Channel()
 }
 
+func (psw *PubSubWrapper) ChannelSize(size int) <-chan *redis.Message {
+	return psw.ps.ChannelSize(size)
+}
+
 func (psw *PubSubWrapper) Close() error {
 	for {
 		if !psw.rdbw.IsConnected() {
