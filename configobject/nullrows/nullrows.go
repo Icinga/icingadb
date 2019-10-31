@@ -43,8 +43,8 @@ func InsertNullRows(super *supervisor.Supervisor) {
 	// comment_history
 	execFunc(
 		"comment_history",
-		"REPLACE INTO comment_history(comment_id, environment_id, object_type, host_id, service_id, entry_time, author, comment, entry_type, is_persistent, expire_time, remove_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
-		emptyID, super.EnvId, "host", nil, nil, 0, "", "", "comment", "y", 0, 0,
+		"REPLACE INTO comment_history(comment_id, environment_id, object_type, host_id, service_id, entry_time, author, comment, entry_type, is_persistent, is_sticky, expire_time, remove_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		emptyID, super.EnvId, "host", nil, nil, 0, "", "", "comment", "y", "y", 0, 0,
 	)
 
 	// downtime_history

@@ -83,6 +83,7 @@ CREATE TABLE comment_history (
   comment text NOT NULL,
   entry_type enum('comment','ack','downtime','flapping') NOT NULL,
   is_persistent enum('y','n') NOT NULL,
+  is_sticky enum('y','n') NOT NULL,
   expire_time bigint(20) unsigned DEFAULT NULL,
   remove_time bigint(20) unsigned NULL DEFAULT NULL,
   has_been_removed enum('y','n') NOT NULL,
