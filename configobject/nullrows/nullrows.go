@@ -50,8 +50,8 @@ func InsertNullRows(super *supervisor.Supervisor) {
 	// downtime_history
 	execFunc(
 		"downtime_history",
-		"REPLACE INTO downtime_history(downtime_id, environment_id, object_type, host_id, service_id, triggered_by_id, entry_time, author, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, was_started, actual_start_time, actual_end_time, was_cancelled, is_in_effect, trigger_time, deletion_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-		emptyID, super.EnvId, "host", nil, nil, emptyID, 0, "", "", "y", 0, 0, 0, "y", 0, 0, "y", "y", 0, 0,
+		"REPLACE INTO downtime_history(downtime_id, environment_id, triggered_by_id, object_type, host_id, service_id, entry_time, author, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, start_time, end_time, has_been_cancelled, trigger_time, cancel_time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		emptyID, super.EnvId, emptyID, "host", nil, nil, 0, "", "", "y", 0, 0, 0, 0, 0, "y", 0, 0,
 	)
 
 	// flapping_history

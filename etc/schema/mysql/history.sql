@@ -49,10 +49,10 @@ CREATE TABLE downtime_history (
   downtime_id binary(20) NOT NULL COMMENT 'downtime.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
+  triggered_by_id binary(20) NULL DEFAULT NULL COMMENT 'downtime.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
-  triggered_by_id binary(20) NULL DEFAULT NULL COMMENT 'downtime.id',
 
   entry_time bigint(20) unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
@@ -61,13 +61,11 @@ CREATE TABLE downtime_history (
   flexible_duration bigint(20) unsigned NOT NULL,
   scheduled_start_time bigint(20) unsigned NOT NULL,
   scheduled_end_time bigint(20) unsigned NOT NULL,
-  was_started enum('y', 'n') NOT NULL,
-  actual_start_time bigint(20) unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
-  actual_end_time bigint(20) unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + duration otherwise',
-  was_cancelled enum('y', 'n') NOT NULL,
-  is_in_effect enum('y', 'n') NOT NULL,
+  start_time bigint(20) unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
+  end_time bigint(20) unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + duration otherwise',
+  has_been_cancelled enum('y', 'n') NOT NULL,
   trigger_time bigint(20) unsigned NOT NULL,
-  deletion_time bigint(20) unsigned NULL DEFAULT NULL,
+  cancel_time bigint(20) unsigned NULL DEFAULT NULL,
 
   PRIMARY KEY (downtime_id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;

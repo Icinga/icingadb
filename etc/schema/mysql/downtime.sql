@@ -5,6 +5,7 @@ CREATE TABLE downtime (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
 
+  triggered_by_id binary(20) NULL DEFAULT NULL COMMENT 'downtime.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
@@ -22,8 +23,8 @@ CREATE TABLE downtime (
   is_flexible enum('y', 'n') NOT NULL,
 
   is_in_effect enum('y', 'n') NOT NULL,
-  actual_start_time bigint(20) unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
-  actual_end_time bigint(20) unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + flexible_duration otherwise',
+  start_time bigint(20) unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
+  end_time bigint(20) unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + flexible_duration otherwise',
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
