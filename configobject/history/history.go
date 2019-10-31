@@ -52,7 +52,7 @@ func StartHistoryWorkers(super *supervisor.Supervisor) {
 func notificationHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
 		`REPLACE INTO notification_history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_id, type,` +
-			"send_time, state, previous_hard_state, author, `text`, users_notified)" +
+			"event_time, state, previous_hard_state, author, `text`, users_notified)" +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
@@ -71,7 +71,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 				utils.DecodeHexIfNotNil(values["service_id"]),
 				utils.EncodeChecksum(values["notification_id"].(string)),
 				values["type"],
-				values["send_time"],
+				values["event_time"],
 				values["state"],
 				values["previous_hard_state"],
 				values["author"],
@@ -97,7 +97,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 				emptyID,
 				emptyUUID[:],
 				values["event_type"],
-				values["send_time"],
+				values["event_time"],
 			}
 
 			return data
@@ -109,7 +109,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 
 func stateHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO state_history (id, environment_id, endpoint_id, object_type, host_id, service_id, change_time, state_type,` +
+		`REPLACE INTO state_history (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time, state_type,` +
 			`soft_state, hard_state, previous_hard_state, attempt, last_soft_state, last_hard_state, output, long_output, max_check_attempts, check_source)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
@@ -133,7 +133,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				values["change_time"],
+				values["event_time"],
 				utils.IcingaStateTypeToString(float32(stateType)),
 				values["soft_state"],
 				values["hard_state"],
@@ -165,7 +165,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 				emptyID,
 				emptyUUID[:],
 				values["event_type"],
-				values["change_time"],
+				values["event_time"],
 			}
 
 			return data
@@ -322,7 +322,7 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 
 func flappingHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO flapping_history (id, environment_id, endpoint_id, object_type, host_id, service_id, change_time, change_type,` +
+		`REPLACE INTO flapping_history (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time, event_type,` +
 			`percent_state_change, flapping_threshold_low, flapping_threshold_high)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
@@ -340,8 +340,8 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				values["change_time"],
-				values["change_type"],
+				values["event_time"],
+				values["event_type"],
 				values["percent_state_change"],
 				values["flapping_threshold_low"],
 				values["flapping_threshold_high"],
