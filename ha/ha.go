@@ -194,7 +194,7 @@ func (h *HA) runHA(chEnv chan *Environment) {
 			if they == h.uid {
 				h.logger.Debug("We are active.")
 				if !h.isActive {
-					h.logger.Info("Icinga 2 sent heartbeat after restart. Taking over.")
+					h.logger.Info("Icinga 2 sent heartbeat. Starting sync")
 					h.isActive = true
 				}
 
@@ -215,7 +215,7 @@ func (h *HA) runHA(chEnv chan *Environment) {
 			}
 		}
 	case <-h.heartbeatTimer.C:
-		h.logger.Info("Icinga 2 sent no heartbeat for 15 seconds, pronouncing dead.")
+		h.logger.Info("Icinga 2 sent no heartbeat for 15 seconds. Pausing sync")
 		h.isActive = false
 		h.lastEventId = "0-0"
 		h.notifyNotificationListener("*", Notify_StopSync)
