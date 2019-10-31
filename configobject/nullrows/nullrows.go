@@ -58,7 +58,7 @@ func InsertNullRows(super *supervisor.Supervisor) {
 	execFunc(
 		"flapping_history",
 		"REPLACE INTO flapping_history(id, environment_id, object_type, host_id, service_id, event_time, event_type, percent_state_change, flapping_threshold_low, flapping_threshold_high) VALUES (?,?,?,?,?,?,?,?,?,?)",
-		emptyUUID[:], super.EnvId, "host", nil, nil, 0, "start", 0, 0, 0,
+		emptyUUID[:], super.EnvId, "host", nil, nil, 0, "flapping_start", 0, 0, 0,
 	)
 
 	// notification_history
