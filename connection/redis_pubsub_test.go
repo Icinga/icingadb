@@ -1,8 +1,8 @@
 package connection
 
 import (
-	"git.icinga.com/icingadb/icingadb-main/connection/redisd"
 	"github.com/go-redis/redis"
+	"github.com/icinga/icingadb/connection/redisd"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

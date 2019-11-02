@@ -31,13 +31,13 @@ var (
 		"FlappingEnd":     256,
 	}
 	NotificationTypesToDbEnumString = map[string]string{
-		"1": "downtime_start",
-		"2": "downtime_end",
-		"4": "downtime_removed",
-		"8": "custom",
-		"16": "acknowledgement",
-		"32": "problem",
-		"64": "recovery",
+		"1":   "downtime_start",
+		"2":   "downtime_end",
+		"4":   "downtime_removed",
+		"8":   "custom",
+		"16":  "acknowledgement",
+		"32":  "problem",
+		"64":  "recovery",
 		"128": "flapping_start",
 		"256": "flapping_end",
 	}
