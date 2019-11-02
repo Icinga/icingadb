@@ -1,7 +1,7 @@
 package jsondecoder
 
 import (
-	"git.icinga.com/icingadb/icingadb-main/connection"
+	"github.com/icinga/icingadb/connection"
 	"github.com/json-iterator/go"
 )
 

@@ -1,8 +1,8 @@
 package supervisor
 
 import (
-	"git.icinga.com/icingadb/icingadb-main/connection"
-	"git.icinga.com/icingadb/icingadb-main/jsondecoder"
+	"github.com/icinga/icingadb/connection"
+	"github.com/icinga/icingadb/jsondecoder"
 	"sync"
 )
 

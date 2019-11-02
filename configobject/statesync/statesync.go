@@ -2,10 +2,10 @@ package statesync
 
 import (
 	"encoding/hex"
-	"git.icinga.com/icingadb/icingadb-main/connection"
-	"git.icinga.com/icingadb/icingadb-main/supervisor"
-	"git.icinga.com/icingadb/icingadb-main/utils"
 	"github.com/go-redis/redis"
+	"github.com/icinga/icingadb/connection"
+	"github.com/icinga/icingadb/supervisor"
+	"github.com/icinga/icingadb/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"sync"

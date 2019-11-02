@@ -1,9 +1,9 @@
 package hostgroup
 
 import (
-	"git.icinga.com/icingadb/icingadb-main/configobject"
-	"git.icinga.com/icingadb/icingadb-main/connection"
-	"git.icinga.com/icingadb/icingadb-main/utils"
+	"github.com/icinga/icingadb/configobject"
+	"github.com/icinga/icingadb/connection"
+	"github.com/icinga/icingadb/utils"
 )
 
 var (
