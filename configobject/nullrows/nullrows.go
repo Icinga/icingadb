@@ -1,8 +1,8 @@
 package nullrows
 
 import (
-	"git.icinga.com/icingadb/icingadb-main/supervisor"
 	"github.com/google/uuid"
+	"github.com/icinga/icingadb/supervisor"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
