@@ -316,7 +316,11 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 			case "comment_add":
 				eventTime = values["entry_time"].(string)
 			case "comment_remove":
-				eventTime = values["remove_time"].(string)
+				if values["remove_time"] != nil {
+					eventTime = values["remove_time"].(string)
+				} else {
+					eventTime = values["expire_time"].(string)
+				}
 			}
 
 			data := []interface{}{
