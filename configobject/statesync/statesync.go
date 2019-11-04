@@ -3,9 +3,9 @@ package statesync
 import (
 	"encoding/hex"
 	"github.com/go-redis/redis"
-	"github.com/icinga/icingadb/connection"
-	"github.com/icinga/icingadb/supervisor"
-	"github.com/icinga/icingadb/utils"
+	"github.com/Icinga/icingadb/connection"
+	"github.com/Icinga/icingadb/supervisor"
+	"github.com/Icinga/icingadb/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"sync"
