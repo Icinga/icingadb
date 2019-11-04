@@ -1,3 +1,5 @@
+// IcingaDB | (c) 2019 Icinga GmbH | GPLv2+
+
 package utils
 
 func ChunkKeys(done <-chan struct{}, keys []string, size int) <-chan []string {

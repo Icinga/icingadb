@@ -1,3 +1,5 @@
+-- IcingaDB | (c) 2019 Icinga GmbH | GPLv2+
+
 LOAD DATA INFILE '/var/lib/mysql-files/environment.csv'
 REPLACE
 INTO TABLE environment

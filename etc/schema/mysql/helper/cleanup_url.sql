@@ -1,3 +1,5 @@
+-- IcingaDB | (c) 2019 Icinga GmbH | GPLv2+
+
 DROP PROCEDURE IF EXISTS cleanup_url;
 DELIMITER //
 CREATE PROCEDURE cleanup_url()
