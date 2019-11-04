@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -25,9 +26,30 @@ var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
 	return
 }()
 
+var historyCounter = make(map[string]int)
+var historyCounterLock = sync.Mutex{}
+
 var emptyUUID = uuid.MustParse("00000000-0000-0000-0000-000000000000")
 var emptyID = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+}
+
+//Logs the amount of history entries added every 20 seconds
+func logHistoryCounters() {
+	every20s := time.NewTicker(time.Second * 20)
+	defer every20s.Stop()
+
+	for {
+		<-every20s.C
+		for _, historyType := range [5]string{"state", "notification", "downtime", "comment", "flapping"} {
+			if historyCounter[historyType] > 0 {
+				log.Infof("Added %d %s history entries in the last 20 seconds", historyCounter[historyType], historyType)
+				historyCounterLock.Lock()
+				historyCounter[historyType] = 0
+				historyCounterLock.Unlock()
+			}
+		}
+	}
 }
 
 func StartHistoryWorkers(super *supervisor.Supervisor) {
@@ -47,6 +69,8 @@ func StartHistoryWorkers(super *supervisor.Supervisor) {
 			}
 		}()
 	}
+
+	go logHistoryCounters()
 }
 
 func notificationHistoryWorker(super *supervisor.Supervisor) {
@@ -450,7 +474,13 @@ func historyWorker(super *supervisor.Supervisor, historyType string, preparedSta
 	//Delete synced entries from redis stream
 	super.Rdbw.XDel("icinga:history:stream:"+historyType, storedEntryIds...)
 
-	log.Debugf("%d %s history entries synced", len(storedEntryIds)-brokenEntries, historyType)
+	count := len(storedEntryIds) - brokenEntries
+
+	historyCounterLock.Lock()
+	historyCounter[historyType]++
+	historyCounterLock.Unlock()
+
+	log.Debugf("%d %s history entries synced", count, historyType)
 	log.Debugf("%d %s history entries broken", brokenEntries, historyType)
 }
 
