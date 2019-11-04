@@ -824,6 +824,7 @@ CREATE TABLE state_history (
   state_type enum('hard', 'soft') NOT NULL,
   soft_state tinyint(1) unsigned NOT NULL,
   hard_state tinyint(1) unsigned NOT NULL,
+  previous_soft_state tinyint(1) unsigned NOT NULL,
   previous_hard_state tinyint(1) unsigned NOT NULL,
   attempt tinyint(1) unsigned NOT NULL,
   last_soft_state tinyint(1) unsigned NOT NULL,
