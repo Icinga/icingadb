@@ -42,6 +42,15 @@ var mysqlInfo = &MysqlInfo{
 	MaxOpenConns: 50,
 }
 
+type MetricsInfo struct {
+	Host string `ini:"host"`
+	Port string `ini:"port"`
+}
+
+var metricsInfo = &MetricsInfo{
+	Port: "8080",
+}
+
 func ParseConfig(path string) error {
 	cfg, err := ini.Load(path)
 	if err != nil {
@@ -69,6 +78,10 @@ func ParseConfig(path string) error {
 		return err
 	}
 
+	if err = cfg.Section("metrics").MapTo(metricsInfo); err != nil {
+		return err
+	}
+
 	if mysqlInfo.Host == "" {
 		return errors.New("missing mysql host")
 	}
@@ -89,4 +102,8 @@ func GetMysqlInfo() *MysqlInfo {
 
 func GetRedisInfo() *RedisInfo {
 	return redisInfo
+}
+
+func GetMetricsInfo() *MetricsInfo {
+	return metricsInfo
 }

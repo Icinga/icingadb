@@ -76,6 +76,7 @@ func main() {
 
 	redisInfo := config.GetRedisInfo()
 	mysqlInfo := config.GetMysqlInfo()
+	metricsInfo := config.GetMetricsInfo()
 
 	redisConn := connection.NewRDBWrapper(redisInfo.Host+":"+redisInfo.Port, redisInfo.PoolSize)
 
@@ -114,7 +115,9 @@ func main() {
 
 	go haInstance.StartEventListener()
 
-	go prometheus.HandleHttp("0.0.0.0:8080", super.ChErr)
+	if metricsInfo.Host != "" {
+		go prometheus.HandleHttp(metricsInfo.Host+":"+metricsInfo.Port, super.ChErr)
+	}
 
 	for {
 		select {
