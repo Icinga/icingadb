@@ -134,8 +134,8 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 func stateHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
 		`REPLACE INTO state_history (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time, state_type,` +
-			`soft_state, hard_state, previous_hard_state, attempt, last_soft_state, last_hard_state, output, long_output, max_check_attempts, check_source)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`soft_state, hard_state, previous_soft_state, previous_hard_state, attempt, last_soft_state, last_hard_state, output, long_output, max_check_attempts, check_source)` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -161,6 +161,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 				utils.IcingaStateTypeToString(float32(stateType)),
 				values["soft_state"],
 				values["hard_state"],
+				values["previous_soft_state"],
 				values["previous_hard_state"],
 				values["attempt"],
 				values["last_soft_state"],
