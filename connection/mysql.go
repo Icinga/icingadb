@@ -34,6 +34,31 @@ var mysqlObservers = struct {
 	DbIoSeconds.WithLabelValues("mysql", "Bulk update"),
 }
 
+var connectionErrors = []string{
+	"server has gone away",
+	"no connection to the server",
+	"Lost connection",
+	"Error while sending",
+	"is dead or not enabled",
+	"decryption failed or bad record mac",
+	"server closed the connection unexpectedly",
+	"SSL connection has been closed unexpectedly",
+	"Error writing data to the connection",
+	"Resource deadlock avoided",
+	"Transaction() on null",
+	"child connection forced to terminate due to client_idle_limit",
+	"query_wait_timeout",
+	"reset by peer",
+	"Physical connection is not usable",
+	"TCP Provider: Error code 0x68",
+	"ORA-03114",
+	"Packets out of order. Expected",
+	"Adaptive Server connection failed",
+	"Communication link failure",
+	"Deadlock found when trying to get lock",
+	"operation timed out",
+}
+
 // This is used in SqlFetchAll and SqlFetchAllQuiet
 type DbClientOrTransaction interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
@@ -149,6 +174,21 @@ func (dbw *DBWrapper) checkConnection(isTicker bool) bool {
 	}
 }
 
+func (dbw *DBWrapper) isConnectionError(err error) bool {
+	errString := err.Error()
+	for _, str := range connectionErrors {
+		if strings.Contains(errString, str) {
+			log.WithFields(log.Fields{
+				"context": "sql",
+				"error":   errString,
+			}).Error("Got connection error. Trying again")
+			return true
+		}
+	}
+
+	return !dbw.checkConnection(false)
+}
+
 func (dbw *DBWrapper) WaitForConnection() {
 	dbw.ConnectionUpCondition.L.Lock()
 	dbw.ConnectionUpCondition.Wait()
@@ -182,7 +222,7 @@ func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, er
 		res, err := dbw.Db.Query(query, args...)
 
 		if err != nil {
-			if !dbw.checkConnection(false) {
+			if dbw.isConnectionError(err) {
 				continue
 			}
 		}
@@ -225,7 +265,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransactio
 		}
 
 		if err != nil {
-			if !dbw.checkConnection(false) {
+			if dbw.isConnectionError(err) {
 				continue
 			}
 		}
@@ -260,7 +300,7 @@ func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 		}
 
 		if err != nil {
-			if !dbw.checkConnection(false) {
+			if dbw.isConnectionError(err) {
 				continue
 			}
 		}
@@ -295,7 +335,7 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 		}
 
 		if err != nil {
-			if !dbw.checkConnection(false) {
+			if dbw.isConnectionError(err) {
 				continue
 			}
 		}
@@ -372,7 +412,7 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prome
 		}
 
 		if err != nil {
-			if !dbw.checkConnection(false) {
+			if dbw.isConnectionError(err) {
 				continue
 			}
 		}
@@ -393,7 +433,7 @@ func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryObserve
 
 		if err != nil {
 			if _, isDb := db.(*sql.DB); isDb {
-				if !dbw.checkConnection(false) {
+				if dbw.isConnectionError(err) {
 					continue
 				}
 			}
@@ -524,7 +564,7 @@ func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFai
 				continue
 			}
 
-			if !dbw.checkConnection(false) {
+			if dbw.isConnectionError(errTx) {
 				if retryOnConnectionFailure {
 					continue
 				} else {
@@ -573,7 +613,7 @@ func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string, field string) ([]s
 		)
 
 		if err != nil {
-			if !dbw.checkConnection(false) {
+			if dbw.isConnectionError(err) {
 				continue
 			}
 
@@ -613,7 +653,7 @@ func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]
 		rows, err := dbw.SqlQuery(query)
 
 		if err != nil {
-			if !dbw.checkConnection(false) {
+			if dbw.isConnectionError(err) {
 				continue
 			}
 
