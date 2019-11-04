@@ -102,9 +102,9 @@ func NotificationTypesToBitMask(types []string) int {
 
 func IcingaStateTypeToString(stateType float32) string {
 	if stateType == 0 {
-		return "hard"
-	} else {
 		return "soft"
+	} else {
+		return "hard"
 	}
 }
 
