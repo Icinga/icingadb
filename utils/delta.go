@@ -1,3 +1,5 @@
+// IcingaDB | (c) 2019 Icinga GmbH | GPLv2+
+
 package utils
 
 func Delta(a []string, b []string) ([]string, []string, []string) {

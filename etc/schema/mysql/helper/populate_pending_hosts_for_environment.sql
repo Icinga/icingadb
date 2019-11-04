@@ -1,3 +1,5 @@
+-- IcingaDB | (c) 2019 Icinga GmbH | GPLv2+
+
 
 DELIMITER //
 CREATE PROCEDURE populate_pending_hosts_for_environment(

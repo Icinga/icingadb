@@ -1,3 +1,5 @@
+// IcingaDB | (c) 2019 Icinga GmbH | GPLv2+
+
 package servicegroup
 
 import (

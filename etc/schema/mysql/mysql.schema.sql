@@ -1,3 +1,5 @@
+-- IcingaDB | (c) 2019 Icinga GmbH | GPLv2+
+
 SET sql_mode = 'STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION';
 SET innodb_strict_mode = 1;
 
