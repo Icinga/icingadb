@@ -1,8 +1,8 @@
 package jsondecoder
 
 import (
-	"github.com/icinga/icingadb/configobject/objecttypes/host"
-	"github.com/icinga/icingadb/connection"
+	"github.com/Icinga/icingadb/configobject/objecttypes/host"
+	"github.com/Icinga/icingadb/connection"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )

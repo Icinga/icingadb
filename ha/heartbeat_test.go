@@ -2,8 +2,8 @@ package ha
 
 import (
 	"encoding/json"
-	"github.com/icinga/icingadb/connection"
-	"github.com/icinga/icingadb/connection/redisd"
+	"github.com/Icinga/icingadb/connection"
+	"github.com/Icinga/icingadb/connection/redisd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"

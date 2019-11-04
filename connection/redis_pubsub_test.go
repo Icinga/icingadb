@@ -2,7 +2,7 @@ package connection
 
 import (
 	"github.com/go-redis/redis"
-	"github.com/icinga/icingadb/connection/redisd"
+	"github.com/Icinga/icingadb/connection/redisd"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"

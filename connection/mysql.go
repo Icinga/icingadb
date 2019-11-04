@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/icinga/icingadb/utils"
+	"github.com/Icinga/icingadb/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"strings"
