@@ -48,7 +48,7 @@ type ServiceState struct {
 	EnvId                    string  `json:"environment_id"`
 	StateType                float32 `json:"state_type"`
 	SoftState                float32 `json:"state"`
-	HardState                float32 `json:"NONE"` //TODO (NoH): I'm not sure where to get this from
+	HardState                float32 `json:"last_hard_state"`
 	PreviousHardState        float32 `json:"previous_hard_state"`
 	Attempt                  float32 `json:"check_attempt"`
 	Severity                 float32 `json:"severity"`
