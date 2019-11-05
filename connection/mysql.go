@@ -181,7 +181,7 @@ func (dbw *DBWrapper) isConnectionError(err error) bool {
 			log.WithFields(log.Fields{
 				"context": "sql",
 				"error":   errString,
-			}).Error("Got connection error. Trying again")
+			}).Debug("Got connection error. Trying again")
 			return true
 		}
 	}
