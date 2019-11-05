@@ -27,5 +27,5 @@ set -x
 
 	cat $BASEDIR/etc/schema/mysql/{,helper/}*.sql
 
-	echo "GRANT ALL ON icingadb.* TO 'module-dev'@'127.0.0.1' IDENTIFIED BY 'icinga0815!';"
+	echo "GRANT ALL ON icingadb.* TO 'icingadb'@'127.0.0.1' IDENTIFIED BY 'icingadb';"
 ) |mysql -uroot icingadb
