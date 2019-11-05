@@ -39,6 +39,6 @@ func TestNotificationStatesToBitMask(t *testing.T) {
 }
 
 func TestIcingaStateTypeToString(t *testing.T) {
-	assert.Equal(t, "hard", IcingaStateTypeToString(0.0))
-	assert.Equal(t, "soft", IcingaStateTypeToString(1.0))
+	assert.Equal(t, "soft", IcingaStateTypeToString(0.0))
+	assert.Equal(t, "hard", IcingaStateTypeToString(1.0))
 }
