@@ -19,7 +19,7 @@ import (
 var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
 	mysqlObservers = map[string]prometheus.Observer{}
 
-	for _, historyType := range [5]string{"state", "notification", "downtime", "comment", "flapping"} {
+	for _, historyType := range [6]string{"state", "notification", "usernotification", "downtime", "comment", "flapping"} {
 		mysqlObservers[historyType] = connection.DbIoSeconds.WithLabelValues(
 			"mysql", fmt.Sprintf("replace into %s_history", historyType),
 		)
@@ -43,7 +43,7 @@ func logHistoryCounters() {
 
 	for {
 		<-every20s.C
-		for _, historyType := range [5]string{"state", "notification", "downtime", "comment", "flapping"} {
+		for _, historyType := range [6]string{"state", "notification", "usernotification", "downtime", "comment", "flapping"} {
 			if historyCounter[historyType] > 0 {
 				log.Infof("Added %d %s history entries in the last 20 seconds", historyCounter[historyType], historyType)
 				historyCounterLock.Lock()
@@ -57,6 +57,7 @@ func logHistoryCounters() {
 func StartHistoryWorkers(super *supervisor.Supervisor) {
 	workers := []func(supervisor2 *supervisor.Supervisor){
 		notificationHistoryWorker,
+		userNotificationHistoryWorker,
 		stateHistoryWorker,
 		downtimeHistoryWorker,
 		commentHistoryWorker,
@@ -131,6 +132,30 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 	}
 
 	historyWorker(super, "notification", statements, dataFunctions, mysqlObservers["notification"])
+}
+
+func userNotificationHistoryWorker(super *supervisor.Supervisor) {
+	statements := []string{
+		`REPLACE INTO user_notification_history (id, environment_id, notification_history_id, user_id)` +
+			`VALUES (?,?,?,?)`,
+	}
+
+	dataFunctions := []func(values map[string]interface{}) []interface{}{
+		func(values map[string]interface{}) []interface{} {
+			id := uuid.MustParse(values["id"].(string))
+			notificationHistoryId := uuid.MustParse(values["notification_history_id"].(string))
+			data := []interface{}{
+				id[:],
+				super.EnvId,
+				notificationHistoryId[:],
+				utils.EncodeChecksum(values["user_id"].(string)),
+			}
+
+			return data
+		},
+	}
+
+	historyWorker(super, "usernotification", statements, dataFunctions, mysqlObservers["usernotification"])
 }
 
 func stateHistoryWorker(super *supervisor.Supervisor) {

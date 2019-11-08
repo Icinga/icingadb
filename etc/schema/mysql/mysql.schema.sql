@@ -814,6 +814,15 @@ CREATE TABLE notification_history (
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
+CREATE TABLE user_notification_history (
+  id binary(16) NOT NULL COMMENT 'UUID',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  notification_history_id binary(16) NOT NULL COMMENT 'UUID notification_history.id',
+  user_id binary(20) NOT NULL COMMENT 'user.id',
+
+  PRIMARY KEY (id)
+) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+
 CREATE TABLE state_history (
   id binary(16) NOT NULL COMMENT 'UUID',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
