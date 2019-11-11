@@ -48,7 +48,6 @@ type ServiceState struct {
 	EnvId                    string  `json:"environment_id"`
 	StateType                float32 `json:"state_type"`
 	SoftState                float32 `json:"state"`
-	HardState                float32 `json:"last_hard_state"`
 	PreviousHardState        float32 `json:"previous_hard_state"`
 	Attempt                  float32 `json:"check_attempt"`
 	Severity                 float32 `json:"severity"`
@@ -95,7 +94,7 @@ func (s *ServiceState) UpdateValues() []interface{} {
 		utils.EncodeChecksum(s.EnvId),
 		utils.IcingaStateTypeToString(s.StateType),
 		s.SoftState,
-		s.HardState,
+		s.LastHardState,
 		s.PreviousHardState,
 		s.Attempt,
 		s.Severity,
