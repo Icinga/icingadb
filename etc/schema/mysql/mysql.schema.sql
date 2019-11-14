@@ -142,8 +142,6 @@ CREATE TABLE host_state (
 
   last_update bigint(20) unsigned NOT NULL,
   last_state_change bigint(20) unsigned NOT NULL,
-  last_soft_state tinyint(1) unsigned NOT NULL,
-  last_hard_state tinyint(1) unsigned NOT NULL,
   next_check bigint(20) unsigned NOT NULL,
   next_update bigint(20) unsigned NOT NULL,
 
@@ -282,8 +280,6 @@ CREATE TABLE service_state (
 
   last_update bigint(20) unsigned NOT NULL,
   last_state_change bigint(20) unsigned NOT NULL,
-  last_soft_state tinyint(1) unsigned NOT NULL,
-  last_hard_state tinyint(1) unsigned NOT NULL,
   next_check bigint(20) unsigned NOT NULL,
   next_update bigint(20) unsigned NOT NULL,
 
@@ -838,8 +834,6 @@ CREATE TABLE state_history (
   previous_soft_state tinyint(1) unsigned NOT NULL,
   previous_hard_state tinyint(1) unsigned NOT NULL,
   attempt tinyint(1) unsigned NOT NULL,
-  last_soft_state tinyint(1) unsigned NOT NULL,
-  last_hard_state tinyint(1) unsigned NOT NULL,
   output text DEFAULT NULL,
   long_output text DEFAULT NULL,
   max_check_attempts int(10) unsigned NOT NULL,

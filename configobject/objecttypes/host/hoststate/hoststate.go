@@ -36,8 +36,6 @@ var (
 		"check_source",
 		"last_update",
 		"last_state_change",
-		"last_soft_state",
-		"last_hard_state",
 		"next_check",
 		"next_update",
 	}
@@ -48,6 +46,7 @@ type HostState struct {
 	EnvId                    string  `json:"environment_id"`
 	StateType                float32 `json:"state_type"`
 	SoftState                float32 `json:"state"`
+	HardState                float32 `json:"hard_state"`
 	PreviousHardState        float32 `json:"previous_hard_state"`
 	Attempt                  float32 `json:"check_attempt"`
 	Severity                 float32 `json:"severity"`
@@ -68,8 +67,6 @@ type HostState struct {
 	CheckSource              string  `json:"check_source"`
 	LastUpdate               float32 `json:"last_update"`
 	LastStateChange          float32 `json:"last_state_change"`
-	LastSoftState            float32 `json:"last_soft_state"`
-	LastHardState            float32 `json:"last_hard_state"`
 	NextCheck                float32 `json:"next_check"`
 	NextUpdate               float32 `json:"next_update"`
 }
@@ -94,7 +91,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		utils.EncodeChecksum(h.EnvId),
 		utils.IcingaStateTypeToString(h.StateType),
 		h.SoftState,
-		h.LastHardState,
+		h.HardState,
 		h.PreviousHardState,
 		h.Attempt,
 		h.Severity,
@@ -115,8 +112,6 @@ func (h *HostState) UpdateValues() []interface{} {
 		h.CheckSource,
 		h.LastUpdate,
 		h.LastStateChange,
-		h.LastSoftState,
-		h.LastHardState,
 		h.NextCheck,
 		h.NextUpdate,
 	)
