@@ -25,7 +25,7 @@ type RedisInfo struct {
 }
 
 var redisInfo = &RedisInfo{
-	Port:     "6379",
+	Port:     "6380",
 	PoolSize: 64,
 }
 
