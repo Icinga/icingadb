@@ -6,6 +6,7 @@ import (
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
+	"net"
 )
 
 var (
@@ -67,8 +68,6 @@ type Host struct {
 	DisplayName           string  `json:"display_name"`
 	Address               string  `json:"address"`
 	Address6              string  `json:"address6"`
-	AddressBin            string  `json:"address_bin"`
-	Address6Bin           string  `json:"address6_bin"`
 	Checkcommand          string  `json:"checkcommand"`
 	CheckcommandId        string  `json:"checkcommand_id"`
 	MaxCheckAttempts      float32 `json:"max_check_attempts"`
@@ -127,8 +126,8 @@ func (h *Host) UpdateValues() []interface{} {
 		h.DisplayName,
 		h.Address,
 		h.Address6,
-		h.AddressBin,
-		h.Address6Bin,
+		net.ParseIP(h.Address).To4(),
+		net.ParseIP(h.Address6).To16(),
 		h.Checkcommand,
 		utils.EncodeChecksum(h.CheckcommandId),
 		h.MaxCheckAttempts,
