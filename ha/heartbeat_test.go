@@ -4,8 +4,8 @@ package ha
 
 import (
 	"encoding/json"
+	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/connection"
-	"github.com/Icinga/icingadb/connection/redisd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -21,18 +21,7 @@ var icingastate = "{\"IcingaApplication\":" +
 	"}}}}, \"config_dump_in_progress\": false}"
 
 func TestIcingaHeartbeatListener(t *testing.T) {
-	var server redisd.Server
-
-	client, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-	defer client.Close()
-
-	rdb := connection.NewRDBWrapper(client.Options().Addr, 64)
+	rdb := connection.NewRDBWrapper(testbackends.RedisTestAddr, 64)
 	assert.True(t, rdb.CheckConnection(false), "This test needs a working Redis connection")
 
 	chEnv := make(chan *Environment)
