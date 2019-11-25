@@ -3,12 +3,10 @@
 package configsync
 
 import (
-	"fmt"
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/configobject/objecttypes/host"
 	"github.com/Icinga/icingadb/connection"
-	"github.com/Icinga/icingadb/connection/mysqld"
 	"github.com/Icinga/icingadb/ha"
 	"github.com/Icinga/icingadb/jsondecoder"
 	"github.com/Icinga/icingadb/supervisor"
@@ -22,20 +20,9 @@ import (
 
 var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
 
-func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation) (*supervisor.Supervisor, []chan int, *mysqld.Server) {
-	var mysqlServer mysqld.Server
-
-	host, errSt := mysqlServer.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-	}
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-	}
-
+func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation) (*supervisor.Supervisor, []chan int) {
 	rdbw := connection.NewRDBWrapper(testbackends.RedisTestAddr, 64)
-	dbw, err := connection.NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
+	dbw, err := connection.NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	super := supervisor.Supervisor{
@@ -60,18 +47,13 @@ func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation
 		}(objectInformation, ch)
 	}
 
-	return &super, chs, &mysqlServer
-}
-
-func TearDownConfigSync(mysqlServer *mysqld.Server) {
-	mysqlServer.Stop()
+	return &super, chs
 }
 
 func TestOperator_InsertHost(t *testing.T) {
-	super, chs, mysqlServer := SetupConfigSync(t, []*configobject.ObjectInformation{
+	super, chs := SetupConfigSync(t, []*configobject.ObjectInformation{
 		&host.ObjectInformation,
 	})
-	defer TearDownConfigSync(mysqlServer)
 
 	testbackends.RedisTestClient.Del("icinga:config:host")
 	testbackends.RedisTestClient.Del("icinga:checksum:host")
@@ -102,10 +84,9 @@ func TestOperator_InsertHost(t *testing.T) {
 }
 
 func TestOperator_DeleteHost(t *testing.T) {
-	super, chs, mysqlServer := SetupConfigSync(t, []*configobject.ObjectInformation{
+	super, chs := SetupConfigSync(t, []*configobject.ObjectInformation{
 		&host.ObjectInformation,
 	})
-	defer TearDownConfigSync(mysqlServer)
 
 	testbackends.RedisTestClient.Del("icinga:config:host")
 	testbackends.RedisTestClient.Del("icinga:checksum:host")
@@ -174,10 +155,9 @@ func TestOperator_DeleteHost(t *testing.T) {
 }
 
 func TestOperator_UpdateHost(t *testing.T) {
-	super, chs, mysqlServer := SetupConfigSync(t, []*configobject.ObjectInformation{
+	super, chs := SetupConfigSync(t, []*configobject.ObjectInformation{
 		&host.ObjectInformation,
 	})
-	defer TearDownConfigSync(mysqlServer)
 
 	testbackends.RedisTestClient.Del("icinga:config:host")
 	testbackends.RedisTestClient.Del("icinga:checksum:host")
