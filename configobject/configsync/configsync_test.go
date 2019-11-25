@@ -4,12 +4,11 @@ package configsync
 
 import (
 	"fmt"
-	"github.com/go-redis/redis"
+	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/configobject/objecttypes/host"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/connection/mysqld"
-	"github.com/Icinga/icingadb/connection/redisd"
 	"github.com/Icinga/icingadb/ha"
 	"github.com/Icinga/icingadb/jsondecoder"
 	"github.com/Icinga/icingadb/supervisor"
@@ -23,14 +22,7 @@ import (
 
 var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
 
-func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation) (*supervisor.Supervisor, []chan int, *redisd.Server, *redis.Client, *mysqld.Server) {
-	var redisServer redisd.Server
-
-	redisClient, errSrv := redisServer.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-	}
-
+func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation) (*supervisor.Supervisor, []chan int, *mysqld.Server) {
 	var mysqlServer mysqld.Server
 
 	host, errSt := mysqlServer.Start()
@@ -42,7 +34,7 @@ func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation
 		t.Fatal(errMTD)
 	}
 
-	rdbw := connection.NewRDBWrapper(redisClient.Options().Addr, 64)
+	rdbw := connection.NewRDBWrapper(testbackends.RedisTestAddr, 64)
 	dbw, err := connection.NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
@@ -68,29 +60,27 @@ func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation
 		}(objectInformation, ch)
 	}
 
-	return &super, chs, &redisServer, redisClient, &mysqlServer
+	return &super, chs, &mysqlServer
 }
 
-func TearDownConfigSync(redisServer *redisd.Server, redisClient *redis.Client, mysqlServer *mysqld.Server) {
-	redisServer.Stop()
-	redisClient.Close()
+func TearDownConfigSync(mysqlServer *mysqld.Server) {
 	mysqlServer.Stop()
 }
 
 func TestOperator_InsertHost(t *testing.T) {
-	super, chs, redisServer, redisClient, mysqlServer := SetupConfigSync(t, []*configobject.ObjectInformation{
+	super, chs, mysqlServer := SetupConfigSync(t, []*configobject.ObjectInformation{
 		&host.ObjectInformation,
 	})
-	defer TearDownConfigSync(redisServer, redisClient, mysqlServer)
+	defer TearDownConfigSync(mysqlServer)
 
-	redisClient.Del("icinga:config:host")
-	redisClient.Del("icinga:checksum:host")
+	testbackends.RedisTestClient.Del("icinga:config:host")
+	testbackends.RedisTestClient.Del("icinga:checksum:host")
 
 	_, err := super.Dbw.Db.Exec("TRUNCATE TABLE host")
 	require.NoError(t, err)
 
-	redisClient.HSet("icinga:config:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"active_checks_enabled\":false,\"address\":\"localhost\",\"address6\":\"\",\"check_interval\":10.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"dummy\",\"checkcommand_id\":\"adc77319f261b771b35ce671aaf956d3c7534808\",\"display_name\":\"TestHost - 603\",\"environment_id\":\""+utils.DecodeChecksum(super.EnvId)+"\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"TestHost - 603\",\"name_checksum\":\"8ae04eb17df433de95fb6b855464e393f3d6ef72\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}")
-	redisClient.HSet("icinga:checksum:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"checksum\":\"b6e87de3d4f31b3d4d35466171f4088693b46071\"}")
+	testbackends.RedisTestClient.HSet("icinga:config:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"active_checks_enabled\":false,\"address\":\"localhost\",\"address6\":\"\",\"check_interval\":10.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"dummy\",\"checkcommand_id\":\"adc77319f261b771b35ce671aaf956d3c7534808\",\"display_name\":\"TestHost - 603\",\"environment_id\":\""+utils.DecodeChecksum(super.EnvId)+"\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"TestHost - 603\",\"name_checksum\":\"8ae04eb17df433de95fb6b855464e393f3d6ef72\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}")
+	testbackends.RedisTestClient.HSet("icinga:checksum:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"checksum\":\"b6e87de3d4f31b3d4d35466171f4088693b46071\"}")
 
 	for _, ch := range chs {
 		ch <- ha.Notify_StartSync
@@ -112,13 +102,13 @@ func TestOperator_InsertHost(t *testing.T) {
 }
 
 func TestOperator_DeleteHost(t *testing.T) {
-	super, chs, redisServer, redisClient, mysqlServer := SetupConfigSync(t, []*configobject.ObjectInformation{
+	super, chs, mysqlServer := SetupConfigSync(t, []*configobject.ObjectInformation{
 		&host.ObjectInformation,
 	})
-	defer TearDownConfigSync(redisServer, redisClient, mysqlServer)
+	defer TearDownConfigSync(mysqlServer)
 
-	redisClient.Del("icinga:config:host")
-	redisClient.Del("icinga:checksum:host")
+	testbackends.RedisTestClient.Del("icinga:config:host")
+	testbackends.RedisTestClient.Del("icinga:checksum:host")
 
 	_, err := super.Dbw.Db.Exec("TRUNCATE TABLE host")
 	require.NoError(t, err)
@@ -184,19 +174,19 @@ func TestOperator_DeleteHost(t *testing.T) {
 }
 
 func TestOperator_UpdateHost(t *testing.T) {
-	super, chs, redisServer, redisClient, mysqlServer := SetupConfigSync(t, []*configobject.ObjectInformation{
+	super, chs, mysqlServer := SetupConfigSync(t, []*configobject.ObjectInformation{
 		&host.ObjectInformation,
 	})
-	defer TearDownConfigSync(redisServer, redisClient, mysqlServer)
+	defer TearDownConfigSync(mysqlServer)
 
-	redisClient.Del("icinga:config:host")
-	redisClient.Del("icinga:checksum:host")
+	testbackends.RedisTestClient.Del("icinga:config:host")
+	testbackends.RedisTestClient.Del("icinga:checksum:host")
 
 	_, err := super.Dbw.Db.Exec("TRUNCATE TABLE host")
 	require.NoError(t, err)
 
-	redisClient.HSet("icinga:config:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"active_checks_enabled\":false,\"address\":\"localhost\",\"address6\":\"\",\"check_interval\":10.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"dummy\",\"checkcommand_id\":\"adc77319f261b771b35ce671aaf956d3c7534808\",\"display_name\":\"TestHost - 603\",\"environment_id\":\""+utils.DecodeChecksum(super.EnvId)+"\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"TestHost - 603\",\"name_checksum\":\"8ae04eb17df433de95fb6b855464e393f3d6ef72\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}")
-	redisClient.HSet("icinga:checksum:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"checksum\":\"b6e87de3d4f31b3d4d35466171f4088693b46071\"}")
+	testbackends.RedisTestClient.HSet("icinga:config:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"active_checks_enabled\":false,\"address\":\"localhost\",\"address6\":\"\",\"check_interval\":10.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"dummy\",\"checkcommand_id\":\"adc77319f261b771b35ce671aaf956d3c7534808\",\"display_name\":\"TestHost - 603\",\"environment_id\":\""+utils.DecodeChecksum(super.EnvId)+"\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"TestHost - 603\",\"name_checksum\":\"8ae04eb17df433de95fb6b855464e393f3d6ef72\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}")
+	testbackends.RedisTestClient.HSet("icinga:checksum:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"checksum\":\"b6e87de3d4f31b3d4d35466171f4088693b46071\"}")
 
 	someChecksum := utils.EncodeChecksum(utils.Checksum("some_checksum"))
 

@@ -3,25 +3,15 @@
 package connection
 
 import (
+	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/go-redis/redis"
-	"github.com/Icinga/icingadb/connection/redisd"
 	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 )
 
 func TestPubSubWrapper(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")

@@ -3,8 +3,8 @@
 package connection
 
 import (
+	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/go-redis/redis"
-	"github.com/Icinga/icingadb/connection/redisd"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"sync/atomic"
@@ -19,18 +19,7 @@ func NewTestRDBW(rdb RedisClient) RDBWrapper {
 }
 
 func TestNewRDBWrapper(t *testing.T) {
-	var server redisd.Server
-
-	client, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-	defer client.Close()
-
-	rdbw := NewRDBWrapper(client.Options().Addr, 64)
+	rdbw := NewRDBWrapper(testbackends.RedisTestAddr, 64)
 	assert.True(t, rdbw.CheckConnection(false), "Redis should be connected")
 
 	rdbw = NewRDBWrapper("asdasdasdasdasd:5123", 64)
@@ -72,19 +61,9 @@ func TestRDBWrapper_GetConnectionCheckInterval(t *testing.T) {
 }
 
 func TestRDBWrapper_CheckConnection(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
 	rdbw := NewTestRDBW(nil)
 
-	rdbw.Rdb = rdb
+	rdbw.Rdb = testbackends.RedisTestClient
 	atomic.StoreUint32(rdbw.ConnectionLostCounterAtomic, 512312312)
 	assert.True(t, rdbw.CheckConnection(false), "DBWrapper should be connected")
 	assert.Equal(t, uint32(0), atomic.LoadUint32(rdbw.ConnectionLostCounterAtomic))
@@ -105,25 +84,15 @@ func TestRDBWrapper_CheckConnection(t *testing.T) {
 }
 
 func TestRDBWrapper_HGetAll(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")
 	}
 
-	rdb.Del("herpdaderp")
-	rdb.HSet("herpdaderp", "one", 5)
-	rdb.HSet("herpdaderp", "two", 11)
+	testbackends.RedisTestClient.Del("herpdaderp")
+	testbackends.RedisTestClient.HSet("herpdaderp", "one", 5)
+	testbackends.RedisTestClient.HSet("herpdaderp", "two", 11)
 
 	rdbw.CompareAndSetConnected(false)
 
@@ -147,76 +116,46 @@ func TestRDBWrapper_HGetAll(t *testing.T) {
 }
 
 func TestRDBWrapper_HKeys(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")
 	}
 
-	rdb.Del("firstKey")
-	rdb.Del("secondKey")
-	rdb.HSet("firstKey", "foo", 5)
-	rdb.HSet("firstKey", "abc", 2)
-	rdb.HSet("secondKey", "bar", 11)
+	testbackends.RedisTestClient.Del("firstKey")
+	testbackends.RedisTestClient.Del("secondKey")
+	testbackends.RedisTestClient.HSet("firstKey", "foo", 5)
+	testbackends.RedisTestClient.HSet("firstKey", "abc", 2)
+	testbackends.RedisTestClient.HSet("secondKey", "bar", 11)
 
 	assert.Equal(t, []string{"foo", "abc"}, rdbw.HKeys("firstKey").Val())
 	assert.Equal(t, []string{"bar"}, rdbw.HKeys("secondKey").Val())
 }
 
 func TestRDBWrapper_HMGet(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")
 	}
 
-	rdb.Del("firstKey")
-	rdb.HSet("firstKey", "foo", "5")
-	rdb.HSet("firstKey", "abc", "2")
+	testbackends.RedisTestClient.Del("firstKey")
+	testbackends.RedisTestClient.HSet("firstKey", "foo", "5")
+	testbackends.RedisTestClient.HSet("firstKey", "abc", "2")
 
 	assert.Equal(t, []interface{}{"5"}, rdbw.HMGet("firstKey", "foo").Val())
 	assert.Equal(t, []interface{}{"2"}, rdbw.HMGet("firstKey", "abc").Val())
 }
 
 func TestRDBWrapper_XRead(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")
 	}
 
-	rdb.XTrim("teststream", 0)
-	rdb.XAdd(&redis.XAddArgs{Stream: "teststream", Values: map[string]interface{}{"one": "5", "two": "11", "herp": "11"}})
+	testbackends.RedisTestClient.XTrim("teststream", 0)
+	testbackends.RedisTestClient.XAdd(&redis.XAddArgs{Stream: "teststream", Values: map[string]interface{}{"one": "5", "two": "11", "herp": "11"}})
 
 	rdbw.CompareAndSetConnected(false)
 
@@ -241,24 +180,14 @@ func TestRDBWrapper_XRead(t *testing.T) {
 }
 
 func TestRDBWrapper_XDel(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")
 	}
 
-	rdb.XTrim("teststream", 0)
-	adds := rdb.XAdd(&redis.XAddArgs{Stream: "teststream", Values: map[string]interface{}{"one": "5", "two": "11", "herp": "11"}})
+	testbackends.RedisTestClient.XTrim("teststream", 0)
+	adds := testbackends.RedisTestClient.XAdd(&redis.XAddArgs{Stream: "teststream", Values: map[string]interface{}{"one": "5", "two": "11", "herp": "11"}})
 
 	rdbw.CompareAndSetConnected(false)
 
@@ -280,17 +209,7 @@ func TestRDBWrapper_XDel(t *testing.T) {
 }
 
 func TestRDBWrapper_Publish(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")
@@ -300,7 +219,7 @@ func TestRDBWrapper_Publish(t *testing.T) {
 	var err error
 	done := make(chan bool)
 	go func() {
-		msg, err = rdb.Subscribe("testchannel").ReceiveMessage()
+		msg, err = testbackends.RedisTestClient.Subscribe("testchannel").ReceiveMessage()
 		done <- true
 	}()
 
@@ -320,26 +239,16 @@ func TestRDBWrapper_Publish(t *testing.T) {
 }
 
 func TestRDBWrapper_TxPipelined(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")
 	}
 
-	rdb.Del("firstKey")
-	rdb.Del("secondKey")
-	rdb.HSet("firstKey", "foo", 5)
-	rdb.HSet("secondKey", "bar", 11)
+	testbackends.RedisTestClient.Del("firstKey")
+	testbackends.RedisTestClient.Del("secondKey")
+	testbackends.RedisTestClient.HSet("firstKey", "foo", 5)
+	testbackends.RedisTestClient.HSet("secondKey", "bar", 11)
 
 	rdbw.CompareAndSetConnected(false)
 
@@ -367,27 +276,17 @@ func TestRDBWrapper_TxPipelined(t *testing.T) {
 }
 
 func TestRDBWrapper_PipeConfigChunks(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")
 	}
 
-	rdb.Del("icinga:config:testkey")
-	rdb.Del("icinga:checksum:testkey")
+	testbackends.RedisTestClient.Del("icinga:config:testkey")
+	testbackends.RedisTestClient.Del("icinga:checksum:testkey")
 
-	rdb.HSet("icinga:config:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-config")
-	rdb.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
+	testbackends.RedisTestClient.HSet("icinga:config:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-config")
+	testbackends.RedisTestClient.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
 
 	chChunk := rdbw.PipeConfigChunks(make(chan struct{}), []string{"123534534fsdf12sdas12312adg23423f"}, "testkey")
 	chunk := <-chChunk
@@ -396,25 +295,15 @@ func TestRDBWrapper_PipeConfigChunks(t *testing.T) {
 }
 
 func TestRDBWrapper_PipeChecksumChunks(t *testing.T) {
-	var server redisd.Server
-
-	rdb, errSrv := server.Start()
-	if errSrv != nil {
-		t.Fatal(errSrv)
-		return
-	}
-
-	defer server.Stop()
-
-	rdbw := NewTestRDBW(rdb)
+	rdbw := NewTestRDBW(testbackends.RedisTestClient)
 
 	if !rdbw.CheckConnection(true) {
 		t.Fatal("This test needs a working Redis connection")
 	}
 
-	rdb.Del("icinga:checksum:testkey")
+	testbackends.RedisTestClient.Del("icinga:checksum:testkey")
 
-	rdb.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
+	testbackends.RedisTestClient.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
 
 	chChunk := rdbw.PipeChecksumChunks(make(chan struct{}), []string{"123534534fsdf12sdas12312adg23423f"}, "testkey")
 	chunk := <-chChunk
