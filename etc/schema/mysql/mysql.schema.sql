@@ -803,8 +803,8 @@ CREATE TABLE notification_history (
   event_time bigint(20) unsigned NOT NULL,
   state tinyint(1) unsigned NOT NULL,
   previous_hard_state tinyint(1) unsigned NOT NULL,
-  author text DEFAULT NULL,
-  `text` text DEFAULT NULL,
+  author text NOT NULL,
+  `text` text NOT NULL,
   users_notified smallint(5) unsigned NOT NULL,
 
   PRIMARY KEY (id)
