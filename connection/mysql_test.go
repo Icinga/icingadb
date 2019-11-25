@@ -7,9 +7,8 @@ import (
 	"crypto/sha1"
 	"database/sql"
 	"errors"
-	"fmt"
+	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/go-sql-driver/mysql"
-	"github.com/Icinga/icingadb/connection/mysqld"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -166,22 +165,7 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 }
 
 func TestDBWrapper_SqlTransaction(t *testing.T) {
-	var server mysqld.Server
-
-	host, errSt := server.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer server.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
+	dbw, err := NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
@@ -315,22 +299,7 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 }
 
 func TestDBWrapper_SqlFetchAll(t *testing.T) {
-	var server mysqld.Server
-
-	host, errSt := server.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer server.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
+	dbw, err := NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name varchar(255) NOT NULL)")
@@ -361,22 +330,7 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 }
 
 func TestDBWrapper_SqlFetchIds(t *testing.T) {
-	var server mysqld.Server
-
-	host, errSt := server.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer server.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
+	dbw, err := NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	hash := sha1.New()
@@ -407,22 +361,7 @@ func TestDBWrapper_SqlFetchIds(t *testing.T) {
 }
 
 func TestDBWrapper_SqlFetchChecksums(t *testing.T) {
-	var server mysqld.Server
-
-	host, errSt := server.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer server.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	dbw, err := NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", host), 50)
+	dbw, err := NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	envId := utils.Checksum("derp")

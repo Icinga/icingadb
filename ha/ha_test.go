@@ -4,12 +4,10 @@ package ha
 
 import (
 	"crypto/sha1"
-	"fmt"
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/go-redis/redis"
 	"github.com/google/uuid"
 	"github.com/Icinga/icingadb/connection"
-	"github.com/Icinga/icingadb/connection/mysqld"
 	"github.com/Icinga/icingadb/supervisor"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -19,10 +17,10 @@ import (
 	"time"
 )
 
-func createTestingHA(t *testing.T, redisAddr, mysqlHost string) *HA {
+func createTestingHA(t *testing.T, redisAddr string) *HA {
 	redisConn := connection.NewRDBWrapper(redisAddr, 64)
 
-	mysqlConn, err := connection.NewDBWrapper(fmt.Sprintf("icingadb:icingadb@%s/icingadb", mysqlHost), 50)
+	mysqlConn, err := connection.NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	if err != nil {
 		assert.Fail(t, "This test needs a working Redis connection!")
 	}
@@ -54,22 +52,7 @@ func createTestingHA(t *testing.T, redisAddr, mysqlHost string) *HA {
 var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
 
 func TestHA_InsertInstance(t *testing.T) {
-	var mysqlServer mysqld.Server
-
-	host, errSt := mysqlServer.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer mysqlServer.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	ha := createTestingHA(t, testbackends.RedisTestAddr, host)
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
 	err := ha.insertInstance()
 	require.NoError(t, err, "insertInstance should not return an error")
@@ -89,22 +72,7 @@ func TestHA_InsertInstance(t *testing.T) {
 }
 
 func TestHA_checkResponsibility(t *testing.T) {
-	var mysqlServer mysqld.Server
-
-	host, errSt := mysqlServer.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer mysqlServer.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	ha := createTestingHA(t, testbackends.RedisTestAddr, host)
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
 	ha.checkResponsibility()
 
 	assert.Equal(t, true, ha.isActive, "HA should be responsible, if no other instance is active")
@@ -137,22 +105,7 @@ func TestHA_checkResponsibility(t *testing.T) {
 }
 
 func TestHA_waitForEnvironment(t *testing.T) {
-	var mysqlServer mysqld.Server
-
-	host, errSt := mysqlServer.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer mysqlServer.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	ha := createTestingHA(t, testbackends.RedisTestAddr, host)
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
 	chEnv := make(chan *Environment)
 
@@ -187,22 +140,7 @@ func TestHA_waitForEnvironment(t *testing.T) {
 }
 
 func TestHA_runHA(t *testing.T) {
-	var mysqlServer mysqld.Server
-
-	host, errSt := mysqlServer.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer mysqlServer.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	ha := createTestingHA(t, testbackends.RedisTestAddr, host)
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
 	ha.heartbeatTimer = time.NewTimer(10 * time.Second)
 
 	chEnv := make(chan *Environment)
@@ -239,22 +177,7 @@ func TestHA_runHA(t *testing.T) {
 }
 
 func TestHA_NotificationListeners(t *testing.T) {
-	var mysqlServer mysqld.Server
-
-	host, errSt := mysqlServer.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer mysqlServer.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	ha := createTestingHA(t, testbackends.RedisTestAddr, host)
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
 	chHost := ha.RegisterNotificationListener("host")
 
 	wg := sync.WaitGroup{}
@@ -292,22 +215,7 @@ func TestHA_NotificationListeners(t *testing.T) {
 }
 
 func TestHA_EventListener(t *testing.T) {
-	var mysqlServer mysqld.Server
-
-	host, errSt := mysqlServer.Start()
-	if errSt != nil {
-		t.Fatal(errSt)
-		return
-	}
-
-	defer mysqlServer.Stop()
-
-	if errMTD := mysqld.MkTestDb(host); errMTD != nil {
-		t.Fatal(errMTD)
-		return
-	}
-
-	ha := createTestingHA(t, testbackends.RedisTestAddr, host)
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
 	ha.isActive = true
 	go ha.StartEventListener()
 
