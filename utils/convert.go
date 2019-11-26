@@ -84,6 +84,10 @@ func DecodeChecksum(c []byte) string {
 
 // Converts an array of notification state strings into a bit mask
 func NotificationStatesToBitMask(states []string) int {
+	if states == nil {
+		return 63
+	}
+
 	mask := 0
 	for _, s := range states {
 		mask += NotificationStatesToInt[s]
@@ -93,6 +97,10 @@ func NotificationStatesToBitMask(states []string) int {
 
 // Converts an array of notification type strings into a bit mask
 func NotificationTypesToBitMask(types []string) int {
+	if types == nil {
+		return 511
+	}
+
 	mask := 0
 	for _, t := range types {
 		mask += NotificationTypesToInt[t]
