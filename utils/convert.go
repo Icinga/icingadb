@@ -45,8 +45,6 @@ var (
 	}
 	CommentEntryTypes = map[string]string{
 		"1": "comment",
-		"2": "downtime",
-		"3": "flapping",
 		"4": "ack",
 	}
 )
