@@ -84,27 +84,27 @@ CREATE TABLE hostgroup (
 
 CREATE TABLE hostgroup_member (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + host_id + hostgroup_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   host_id binary(20) NOT NULL COMMENT 'host.id',
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE host_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + host_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   host_id binary(20) NOT NULL COMMENT 'host.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + hostgroup_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
@@ -222,27 +222,27 @@ CREATE TABLE servicegroup (
 
 CREATE TABLE servicegroup_member (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + service_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + service_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
@@ -317,8 +317,8 @@ CREATE TABLE icingadb_instance (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 CREATE TABLE checkcommand (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + type + name)',
-  zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
+  zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -333,9 +333,9 @@ CREATE TABLE checkcommand (
 
 CREATE TABLE checkcommand_argument (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + argument_key)',
+  environment_id binary(20) NOT NULL COMMENT 'env.id',
   command_id binary(20) NOT NULL COMMENT 'command.id',
   argument_key varchar(64) NOT NULL,
-  environment_id binary(20) NOT NULL COMMENT 'env.id',
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
@@ -353,9 +353,9 @@ CREATE TABLE checkcommand_argument (
 
 CREATE TABLE checkcommand_envvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + envvar_key)',
+  environment_id binary(20) NOT NULL COMMENT 'env.id',
   command_id binary(20) NOT NULL COMMENT 'command.id',
   envvar_key varchar(64) NOT NULL,
-  environment_id binary(20) NOT NULL COMMENT 'env.id',
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
@@ -366,17 +366,18 @@ CREATE TABLE checkcommand_envvar (
 
 CREATE TABLE checkcommand_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+
   command_id binary(20) NOT NULL COMMENT 'command.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 
 CREATE TABLE eventcommand (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + type + name)',
-  zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
+  zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -391,9 +392,9 @@ CREATE TABLE eventcommand (
 
 CREATE TABLE eventcommand_argument (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + argument_key)',
+  environment_id binary(20) NOT NULL COMMENT 'env.id',
   command_id binary(20) NOT NULL COMMENT 'command.id',
   argument_key varchar(64) NOT NULL,
-  environment_id binary(20) NOT NULL COMMENT 'env.id',
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
@@ -411,9 +412,9 @@ CREATE TABLE eventcommand_argument (
 
 CREATE TABLE eventcommand_envvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + envvar_key)',
+  environment_id binary(20) NOT NULL COMMENT 'env.id',
   command_id binary(20) NOT NULL COMMENT 'command.id',
   envvar_key varchar(64) NOT NULL,
-  environment_id binary(20) NOT NULL COMMENT 'env.id',
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
@@ -424,16 +425,17 @@ CREATE TABLE eventcommand_envvar (
 
 CREATE TABLE eventcommand_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   command_id binary(20) NOT NULL COMMENT 'command.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE notificationcommand (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + type + name)',
-  zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
+  zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -448,9 +450,9 @@ CREATE TABLE notificationcommand (
 
 CREATE TABLE notificationcommand_argument (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + argument_key)',
+  environment_id binary(20) NOT NULL COMMENT 'env.id',
   command_id binary(20) NOT NULL COMMENT 'command.id',
   argument_key varchar(64) NOT NULL,
-  environment_id binary(20) NOT NULL COMMENT 'env.id',
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
@@ -468,9 +470,9 @@ CREATE TABLE notificationcommand_argument (
 
 CREATE TABLE notificationcommand_envvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + envvar_key)',
+  environment_id binary(20) NOT NULL COMMENT 'env.id',
   command_id binary(20) NOT NULL COMMENT 'command.id',
   envvar_key varchar(64) NOT NULL,
-  environment_id binary(20) NOT NULL COMMENT 'env.id',
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
@@ -481,9 +483,10 @@ CREATE TABLE notificationcommand_envvar (
 
 CREATE TABLE notificationcommand_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   command_id binary(20) NOT NULL COMMENT 'command.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
@@ -573,34 +576,35 @@ CREATE TABLE notification (
 
 CREATE TABLE notification_user (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + user_id)',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   user_id binary(20) NOT NULL COMMENT 'user.id',
-  environment_id binary(20) NOT NULL COMMENT 'environment.id',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_usergroup (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + usergroup_id)',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
-  environment_id binary(20) NOT NULL COMMENT 'environment.id',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE icon_image (
   id binary(20) NOT NULL COMMENT 'sha1(icon_image)',
-  icon_image text COLLATE utf8mb4_unicode_ci NOT NULL,
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  icon_image text COLLATE utf8mb4_unicode_ci NOT NULL,
 
   PRIMARY KEY (environment_id, id),
   KEY idx_icon_image (icon_image(255))
@@ -608,8 +612,8 @@ CREATE TABLE icon_image (
 
 CREATE TABLE action_url (
   id binary(20) NOT NULL COMMENT 'sha1(action_url)',
-  action_url text COLLATE utf8mb4_unicode_ci NOT NULL,
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  action_url text COLLATE utf8mb4_unicode_ci NOT NULL,
 
   PRIMARY KEY (environment_id, id),
   KEY idx_action_url (action_url(255))
@@ -617,8 +621,8 @@ CREATE TABLE action_url (
 
 CREATE TABLE notes_url (
   id binary(20) NOT NULL COMMENT 'sha1(notes_url)',
-  notes_url text COLLATE utf8mb4_unicode_ci NOT NULL,
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  notes_url text COLLATE utf8mb4_unicode_ci NOT NULL,
 
   PRIMARY KEY (environment_id, id),
   KEY idx_notes_url (notes_url(255))
@@ -643,9 +647,9 @@ CREATE TABLE timeperiod (
 
 CREATE TABLE timeperiod_range (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + range_id + timeperiod_id)',
+  environment_id binary(20) NOT NULL COMMENT 'env.id',
   timeperiod_id binary(20) NOT NULL COMMENT 'timeperiod.id',
   range_key varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
-  environment_id binary(20) NOT NULL COMMENT 'env.id',
 
   range_value varchar(255) NOT NULL,
 
@@ -654,27 +658,27 @@ CREATE TABLE timeperiod_range (
 
 CREATE TABLE timeperiod_override_include (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + include_id + timeperiod_id)',
+  environment_id binary(20) NOT NULL COMMENT 'env.id',
   timeperiod_id binary(20) NOT NULL COMMENT 'timeperiod.id',
   override_id binary(20) NOT NULL COMMENT 'timeperiod.id',
-  environment_id binary(20) NOT NULL COMMENT 'env.id',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE timeperiod_override_exclude (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + exclude_id + timeperiod_id)',
+  environment_id binary(20) NOT NULL COMMENT 'env.id',
   timeperiod_id binary(20) NOT NULL COMMENT 'timeperiod.id',
   override_id binary(20) NOT NULL COMMENT 'timeperiod.id',
-  environment_id binary(20) NOT NULL COMMENT 'env.id',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE timeperiod_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + timeperiod_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   timeperiod_id binary(20) NOT NULL COMMENT 'timeperiod.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
@@ -747,26 +751,28 @@ CREATE TABLE usergroup (
 
 CREATE TABLE usergroup_member (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + usergroup_id + user_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   user_id binary(20) NOT NULL COMMENT 'user.id',
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + user_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   user_id binary(20) NOT NULL COMMENT 'user.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
 CREATE TABLE usergroup_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + usergroup_id + customvar_id)',
+  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
