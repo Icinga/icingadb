@@ -374,9 +374,9 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 
 func flappingHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO flapping_history (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time, event_type,` +
+		`REPLACE INTO flapping_history (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time,` +
 			`percent_state_change, flapping_threshold_low, flapping_threshold_high)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+			`VALUES (?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -393,7 +393,6 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
 				values["event_time"],
-				values["event_type"],
 				values["percent_state_change"],
 				values["flapping_threshold_low"],
 				values["flapping_threshold_high"],
