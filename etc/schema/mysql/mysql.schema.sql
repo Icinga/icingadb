@@ -897,7 +897,6 @@ CREATE TABLE flapping_history (
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
 
   event_time bigint(20) unsigned NOT NULL,
-  event_type enum('flapping_start', 'flapping_end') NOT NULL,
   percent_state_change float unsigned NOT NULL,
   flapping_threshold_low float unsigned NOT NULL,
   flapping_threshold_high float unsigned NOT NULL,
