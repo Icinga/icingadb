@@ -5,10 +5,10 @@ package ha
 import (
 	"crypto/sha1"
 	"github.com/Icinga/icingadb/config/testbackends"
-	"github.com/go-redis/redis"
-	"github.com/google/uuid"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
+	"github.com/go-redis/redis"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

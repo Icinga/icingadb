@@ -4,11 +4,11 @@ package history
 
 import (
 	"fmt"
-	"github.com/go-redis/redis"
-	"github.com/google/uuid"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
+	"github.com/go-redis/redis"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"strconv"
