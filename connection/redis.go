@@ -4,8 +4,8 @@ package connection
 
 import (
 	"fmt"
-	"github.com/go-redis/redis"
 	"github.com/Icinga/icingadb/utils"
+	"github.com/go-redis/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"strings"
