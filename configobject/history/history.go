@@ -79,7 +79,7 @@ func StartHistoryWorkers(super *supervisor.Supervisor) {
 func notificationHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
 		`REPLACE INTO notification_history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_id, type,` +
-			"event_time, state, previous_hard_state, author, `text`, users_notified)" +
+			"send_time, state, previous_hard_state, author, `text`, users_notified)" +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
@@ -98,7 +98,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 				utils.DecodeHexIfNotNil(values["service_id"]),
 				utils.EncodeChecksum(values["notification_id"].(string)),
 				utils.NotificationTypesToDbEnumString[values["type"].(string)],
-				values["event_time"],
+				values["send_time"],
 				values["state"],
 				values["previous_hard_state"],
 				values["author"],
@@ -124,7 +124,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 				emptyID,
 				emptyUUID[:],
 				values["event_type"],
-				values["event_time"],
+				values["send_time"],
 			}
 
 			return data
