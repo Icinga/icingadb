@@ -801,7 +801,7 @@ CREATE TABLE notification_history (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
-  host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
 
@@ -830,7 +830,7 @@ CREATE TABLE state_history (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
-  host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
 
   event_time bigint(20) unsigned NOT NULL,
@@ -854,7 +854,7 @@ CREATE TABLE downtime_history (
   endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   triggered_by_id binary(20) NULL DEFAULT NULL COMMENT 'downtime.id',
   object_type enum('host', 'service') NOT NULL,
-  host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
 
   entry_time bigint(20) unsigned NOT NULL,
@@ -878,7 +878,7 @@ CREATE TABLE comment_history (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
-  host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
 
   entry_time bigint(20) unsigned NOT NULL,
@@ -899,7 +899,7 @@ CREATE TABLE flapping_history (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
-  host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
 
   event_time bigint(20) unsigned NOT NULL,
@@ -915,7 +915,7 @@ CREATE TABLE history (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
-  host_id binary(20) NULL DEFAULT NULL COMMENT 'host.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
   notification_history_id binary(16) NULL DEFAULT NULL COMMENT 'notification_history.id',
   state_history_id binary(16) NULL DEFAULT NULL COMMENT 'state_history.id',
