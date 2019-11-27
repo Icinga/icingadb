@@ -504,7 +504,7 @@ CREATE TABLE comment (
 
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   text text NOT NULL,
-  entry_type enum('comment','ack','downtime','flapping') NOT NULL,
+  entry_type enum('comment','ack') NOT NULL,
   entry_time bigint(20) unsigned NOT NULL,
   is_persistent enum('y','n') NOT NULL,
   is_sticky enum('y','n') NOT NULL,
@@ -884,7 +884,7 @@ CREATE TABLE comment_history (
   entry_time bigint(20) unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,
-  entry_type enum('comment','ack','downtime','flapping') NOT NULL,
+  entry_type enum('comment','ack') NOT NULL,
   is_persistent enum('y','n') NOT NULL,
   is_sticky enum('y','n') NOT NULL,
   expire_time bigint(20) unsigned DEFAULT NULL,
