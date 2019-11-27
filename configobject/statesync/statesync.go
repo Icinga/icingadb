@@ -10,6 +10,7 @@ import (
 	"github.com/go-redis/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -100,12 +101,19 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 					acknowledgementCommentId, _ = hex.DecodeString(values["acknowledgement_comment_id"].(string))
 				}
 
+				isOverdue := false
+				if str, ok := values["next_update"].(string); ok {
+					if millis, errPF := strconv.ParseFloat(str, 64); errPF == nil {
+						isOverdue = time.Now().After(utils.MillisecsToTime(millis))
+					}
+				}
+
 				_, errExec := super.Dbw.SqlExecTx(
 					tx,
 					mysqlObservers[objectType],
 					`REPLACE INTO `+objectType+`_state (`+objectType+`_id, environment_id, state_type, soft_state, hard_state, previous_hard_state, attempt, severity, output, long_output, performance_data,`+
-						`check_commandline, is_problem, is_handled, is_reachable, is_flapping, is_acknowledged, acknowledgement_comment_id,`+
-						`in_downtime, execution_time, latency, timeout, check_source, last_update, last_state_change, next_check, next_update) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+						`check_commandline, is_problem, is_handled, is_reachable, is_flapping, is_overdue, is_acknowledged, acknowledgement_comment_id,`+
+						`in_downtime, execution_time, latency, timeout, check_source, last_update, last_state_change, next_check, next_update) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 					id,
 					super.EnvId,
 					redisStateTypeToDBStateType(values["state_type"]),
@@ -122,6 +130,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 					utils.JSONBooleanToDBBoolean(values["is_handled"]),
 					utils.JSONBooleanToDBBoolean(values["is_reachable"]),
 					utils.JSONBooleanToDBBoolean(values["is_flapping"]),
+					utils.Bool[isOverdue],
 					utils.JSONBooleanToDBBoolean(values["is_acknowledged"]),
 					acknowledgementCommentId,
 					utils.JSONBooleanToDBBoolean(values["in_downtime"]),

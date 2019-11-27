@@ -6,6 +6,8 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"math"
+	"time"
 )
 
 var (
@@ -129,4 +131,11 @@ func RedisIntToDBBoolean(value interface{}) string {
 	} else { //Should catch empty strings and nil
 		return "n"
 	}
+}
+
+func MillisecsToTime(millis float64) time.Time {
+	secs := millis / 1000
+	wholeSecs := math.Floor(secs)
+
+	return time.Unix(int64(wholeSecs), int64((secs-wholeSecs)*(float64(time.Second)/float64(time.Nanosecond))))
 }

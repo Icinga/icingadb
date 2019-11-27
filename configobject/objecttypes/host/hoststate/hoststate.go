@@ -6,6 +6,7 @@ import (
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
+	"time"
 )
 
 var (
@@ -27,6 +28,7 @@ var (
 		"is_handled",
 		"is_reachable",
 		"is_flapping",
+		"is_overdue",
 		"is_acknowledged",
 		"acknowledgement_comment_id",
 		"in_downtime",
@@ -103,6 +105,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		utils.Bool[h.IsHandled],
 		utils.Bool[h.IsReachable],
 		utils.Bool[h.IsFlapping],
+		utils.Bool[time.Now().After(utils.MillisecsToTime(float64(h.NextUpdate)))],
 		utils.Bool[h.IsAcknowledged],
 		utils.EncodeChecksum(h.AcknowledgementCommentId),
 		utils.Bool[h.InDowntime],
