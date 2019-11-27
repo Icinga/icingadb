@@ -31,6 +31,8 @@ var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
 
 // StartStateSync starts the sync goroutines for hosts and services.
 func StartStateSync(super *supervisor.Supervisor) {
+	startOverdueSync(super)
+
 	go func() {
 		for {
 			syncStates(super, "host")

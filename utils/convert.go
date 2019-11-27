@@ -139,3 +139,8 @@ func MillisecsToTime(millis float64) time.Time {
 
 	return time.Unix(int64(wholeSecs), int64((secs-wholeSecs)*(float64(time.Second)/float64(time.Nanosecond))))
 }
+
+func TimeToFloat(t time.Time) float64 {
+	secs := t.Unix()
+	return float64(secs) + float64(t.Sub(time.Unix(secs, 0)))/float64(time.Second)
+}
