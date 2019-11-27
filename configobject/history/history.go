@@ -31,11 +31,6 @@ var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
 var historyCounter = make(map[string]int)
 var historyCounterLock = sync.Mutex{}
 
-var emptyUUID = uuid.MustParse("00000000-0000-0000-0000-000000000000")
-var emptyID = []byte{
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-}
-
 //Logs the amount of history entries added every 20 seconds
 func logHistoryCounters() {
 	every20s := time.NewTicker(time.Second * 20)
@@ -119,10 +114,10 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
 				notificationHistoryId[:],
-				emptyUUID[:],
-				emptyID,
-				emptyID,
-				emptyUUID[:],
+				nil,
+				nil,
+				nil,
+				nil,
 				values["event_type"],
 				values["send_time"],
 			}
@@ -209,11 +204,11 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				emptyUUID[:],
+				nil,
 				stateHistoryId[:],
-				emptyID,
-				emptyID,
-				emptyUUID[:],
+				nil,
+				nil,
+				nil,
 				values["event_type"],
 				values["event_time"],
 			}
@@ -285,11 +280,11 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				emptyUUID[:],
-				emptyUUID[:],
+				nil,
+				nil,
 				downtimeHistoryId,
-				emptyID,
-				emptyUUID[:],
+				nil,
+				nil,
 				values["event_type"],
 				eventTime,
 			}
@@ -356,11 +351,11 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				emptyUUID[:],
-				emptyUUID[:],
-				emptyID,
+				nil,
+				nil,
+				nil,
 				commentHistoryId,
-				emptyUUID[:],
+				nil,
 				values["event_type"],
 				eventTime,
 			}
@@ -419,10 +414,10 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 				values["object_type"].(string),
 				utils.DecodeHexIfNotNil(values["host_id"]),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				emptyUUID[:],
-				emptyUUID[:],
-				emptyID,
-				emptyID,
+				nil,
+				nil,
+				nil,
+				nil,
 				flappingHistoryId[:],
 				values["event_type"],
 				eventTime,
