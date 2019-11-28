@@ -54,4 +54,8 @@ jobs:
           ICINGADB_TEST_MYSQL_USER: icingadb
           ICINGADB_TEST_MYSQL_PASSWORD: icingadb
         timeout-minutes: 10
-        run: go test -v ./...
+        run: |
+          mysql -h ${ICINGADB_TEST_MYSQL_HOST} -P ${ICINGADB_TEST_MYSQL_PORT} \
+            -u${ICINGADB_TEST_MYSQL_USER} -p${ICINGADB_TEST_MYSQL_PASSWORD} ${ICINGADB_TEST_MYSQL_DATABASE} \
+            <etc/schema/mysql/mysql.schema.sql
+          go test -v ./...
