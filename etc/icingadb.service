@@ -1,0 +1,13 @@
+[Unit]
+Description=Icinga DB
+After=syslog.target network-online.target icinga-redis.service mariadb.service
+
+[Service]
+Type=simple
+KillMode=process
+ExecStart=/usr/sbin/icingadb --config /etc/icingadb/icingadb.ini
+User=icingadb
+Group=icingadb
+
+[Install]
+WantedBy=multi-user.target
