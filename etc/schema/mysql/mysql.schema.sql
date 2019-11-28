@@ -899,8 +899,26 @@ CREATE TABLE flapping_history (
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
 
+CREATE TABLE acknowledgement_history (
+  id binary(16) NOT NULL COMMENT 'UUID',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
+  object_type enum('host', 'service') NOT NULL,
+  host_id binary(20) NOT NULL COMMENT 'host.id',
+  service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
+
+  event_time bigint(20) unsigned NOT NULL,
+  author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
+  comment text DEFAULT NULL,
+  expire_time bigint(20) unsigned DEFAULT NULL,
+  is_sticky enum('y','n') DEFAULT NULL,
+  is_persistent enum('y','n') DEFAULT NULL,
+
+  PRIMARY KEY (id)
+) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+
 CREATE TABLE history (
-  id binary(16) NOT NULL COMMENT 'notification_history_id, state_history_id, flapping_history_id or UUID',
+  id binary(16) NOT NULL COMMENT 'notification_history_id, state_history_id, flapping_history_id, acknowledgement_history_id or UUID',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
@@ -911,8 +929,9 @@ CREATE TABLE history (
   downtime_history_id binary(20) NULL DEFAULT NULL COMMENT 'downtime_history.downtime_id',
   comment_history_id binary(20) NULL DEFAULT NULL COMMENT 'comment_history.comment_id',
   flapping_history_id binary(16) NULL DEFAULT NULL COMMENT 'flapping_history.id',
+  acknowledgement_history_id binary(16) NULL DEFAULT NULL COMMENT 'acknowledgement_history.id',
 
-  event_type enum('notification','state_change','downtime_schedule','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end') NOT NULL,
+  event_type enum('notification','state_change','downtime_schedule','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end','ack_set','ack_clear') NOT NULL,
   event_time bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (id)
