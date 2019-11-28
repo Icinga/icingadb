@@ -1,0 +1,61 @@
+name: Go
+on: [push]
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        go: [ '1.11', '1.12', '1.13' ]
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: icingadb
+          MYSQL_USER: icingadb
+          MYSQL_PASSWORD: icingadb
+        ports:
+          - 3800:3306
+
+      redis:
+        image: redis:5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Set up Go ${{ matrix.go }}
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+        id: go
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v1
+
+      - name: Get dependencies
+        run: |
+          go get -v -t -d ./...
+
+      - name: Go Build
+        run: go build -v -o icingadb .
+
+      - name: Go Test
+        env:
+          ICINGADB_TEST_REDIS_HOST: 127.0.0.1
+          ICINGADB_TEST_REDIS_PORT: 6379
+
+          ICINGADB_TEST_MYSQL_HOST: 127.0.0.1
+          ICINGADB_TEST_MYSQL_PORT: 3800
+          ICINGADB_TEST_MYSQL_DATABASE: icingadb
+          ICINGADB_TEST_MYSQL_USER: icingadb
+          ICINGADB_TEST_MYSQL_PASSWORD: icingadb
+        timeout-minutes: 10
+        run: |
+          mysql -h ${ICINGADB_TEST_MYSQL_HOST} -P ${ICINGADB_TEST_MYSQL_PORT} \
+            -u${ICINGADB_TEST_MYSQL_USER} -p${ICINGADB_TEST_MYSQL_PASSWORD} ${ICINGADB_TEST_MYSQL_DATABASE} \
+            <etc/schema/mysql/mysql.schema.sql
+          go test -v ./...
