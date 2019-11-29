@@ -4,6 +4,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/Icinga/icingadb/config"
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/configobject/configsync"
@@ -64,9 +65,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
+	"regexp"
 	"sync"
 	"syscall"
 )
+
+var gitVersion = regexp.MustCompile(`\A(.+)-\d+-g([A-Fa-f0-9]+)\z`)
 
 func main() {
 	{
@@ -76,7 +80,17 @@ func main() {
 	}
 
 	configPath := flag.String("config", "icingadb.ini", "path to config")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		if match := gitVersion.FindStringSubmatch(version); match == nil {
+			fmt.Printf("Icinga DB version: %s\n", version)
+		} else {
+			fmt.Printf("Icinga DB version:%s build:%s\n", match[1], match[2])
+		}
+		return
+	}
 
 	if err := config.ParseConfig(*configPath); err != nil {
 		log.Fatalf("Error reading config: %v", err)
