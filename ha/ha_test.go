@@ -54,7 +54,7 @@ var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
 func TestHA_InsertInstance(t *testing.T) {
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
-	err := ha.insertInstance()
+	err := ha.insertInstance(&Environment{})
 	require.NoError(t, err, "insertInstance should not return an error")
 
 	rows, err := ha.super.Dbw.SqlFetchAll(mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
@@ -73,7 +73,7 @@ func TestHA_InsertInstance(t *testing.T) {
 
 func TestHA_checkResponsibility(t *testing.T) {
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
-	ha.checkResponsibility()
+	ha.checkResponsibility(&Environment{})
 
 	assert.Equal(t, true, ha.isActive, "HA should be responsible, if no other instance is active")
 
@@ -81,13 +81,13 @@ func TestHA_checkResponsibility(t *testing.T) {
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	_, err = ha.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
-		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, 'y')",
+		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible, icinga2_version, icinga2_start_time) VALUES (?, ?, ?, 'y', '', 0)",
 		ha.uid[:], ha.super.EnvId, 0)
 
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	ha.isActive = false
-	ha.checkResponsibility()
+	ha.checkResponsibility(&Environment{})
 
 	assert.Equal(t, true, ha.isActive, "HA should be responsible, if another instance was inactive for a long time")
 
@@ -95,11 +95,11 @@ func TestHA_checkResponsibility(t *testing.T) {
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	_, err = ha.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
-		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, 'y')",
+		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible, icinga2_version, icinga2_start_time) VALUES (?, ?, ?, 'y', '', 0)",
 		ha.uid[:], ha.super.EnvId, time.Now().Unix())
 
 	ha.isActive = false
-	ha.checkResponsibility()
+	ha.checkResponsibility(&Environment{})
 
 	assert.Equal(t, false, ha.isActive, "HA should not be responsible, if another instance is active")
 }

@@ -4,6 +4,7 @@ package ha
 
 import (
 	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/go-redis/redis"
@@ -14,6 +15,13 @@ type Environment struct {
 	ID       []byte
 	Name     string
 	NodeName string
+	Icinga2  Icinga2Info
+}
+
+type Icinga2Info struct {
+	Version      string
+	ProgramStart float64
+	EndpointId   []byte
 }
 
 // Sha1bytes computes SHA1.
@@ -50,8 +58,11 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 						Status struct {
 							IcingaApplication struct {
 								App struct {
-									Environment string `json:"environment"`
-									NodeName    string `json:"node_name"`
+									Environment  string  `json:"environment"`
+									NodeName     string  `json:"node_name"`
+									Version      string  `json:"version"`
+									ProgramStart float64 `json:"program_start"`
+									EndpointId   string  `json:"endpoint_id"`
 								} `json:"app"`
 							} `json:"icingaapplication"`
 						} `json:"status"`
@@ -63,7 +74,20 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 					}
 
 					app := &unJson.Status.IcingaApplication.App
-					env := &Environment{Name: app.Environment, ID: Sha1bytes([]byte(app.Environment)), NodeName: app.NodeName}
+
+					env := &Environment{
+						Name:     app.Environment,
+						ID:       Sha1bytes([]byte(app.Environment)),
+						NodeName: app.NodeName,
+						Icinga2:  Icinga2Info{app.Version, app.ProgramStart, nil},
+					}
+
+					if app.EndpointId != "" {
+						if unHex, errHD := hex.DecodeString(app.EndpointId); errHD == nil {
+							env.Icinga2.EndpointId = unHex
+						}
+					}
+
 					chEnv <- env
 				}
 			}
