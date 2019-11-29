@@ -15,8 +15,6 @@ var (
 		"environment_id",
 		"name_checksum",
 		"properties_checksum",
-		"customvars_checksum",
-		"groups_checksum",
 		"host_id",
 		"name",
 		"name_ci",
@@ -57,8 +55,6 @@ type Service struct {
 	EnvId                 string  `json:"environment_id"`
 	NameChecksum          string  `json:"name_checksum"`
 	PropertiesChecksum    string  `json:"checksum"`
-	CustomvarsChecksum    string  `json:"customvars_checksum"`
-	GroupsChecksum        string  `json:"groups_checksum"`
 	HostId                string  `json:"host_id"`
 	Name                  string  `json:"name"`
 	NameCi                *string `json:"name_ci"`
@@ -114,8 +110,6 @@ func (s *Service) UpdateValues() []interface{} {
 		utils.EncodeChecksum(s.EnvId),
 		utils.EncodeChecksum(s.NameChecksum),
 		utils.EncodeChecksum(s.PropertiesChecksum),
-		utils.EncodeChecksum(s.CustomvarsChecksum),
-		utils.EncodeChecksum(s.GroupsChecksum),
 		utils.EncodeChecksum(s.HostId),
 		s.Name,
 		s.NameCi,

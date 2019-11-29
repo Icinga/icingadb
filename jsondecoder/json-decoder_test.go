@@ -29,7 +29,7 @@ func Test_DecodePool(t *testing.T) {
 
 	var TestPackageA = JsonDecodePackage{
 		"3a18e07f776af383cd7355b89eefd1fdf0fd47a9",
-		"{\"checkcommand_id\":\"0bba6ab6747f1c0de3bf80932d10bc7b603e27fc\",\"customvars_checksum\":\"5ba93c9db0cff93f52b521d7420e43f6eda2784f\",\"environment_id\":\"90a8834de76326869f3e703cd61513081ad73d3c\",\"group_ids\":[],\"groups_checksum\":\"a0930d202ae77bbafbc4d898e3d060f462160904\",\"name_checksum\":\"21021feda571e19d8afb53fb11ca089db7578cee\",\"properties_checksum\":\"8d515de29444d9df3e374bcc1b890040fcc48be5\"}",
+		"{\"checkcommand_id\":\"0bba6ab6747f1c0de3bf80932d10bc7b603e27fc\",\"environment_id\":\"90a8834de76326869f3e703cd61513081ad73d3c\",\"group_ids\":[],\"name_checksum\":\"21021feda571e19d8afb53fb11ca089db7578cee\",\"properties_checksum\":\"8d515de29444d9df3e374bcc1b890040fcc48be5\"}",
 		"{\"active_checks_enabled\":true,\"address\":\"\",\"address6\":\"\",\"check_interval\":60.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"random\",\"display_name\":\"aa3derphosta469\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"aa3derphosta469\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}",
 		nil,
 		host.ObjectInformation.Factory,
@@ -38,7 +38,7 @@ func Test_DecodePool(t *testing.T) {
 
 	var TestPackageB = JsonDecodePackage{
 		"7dd90e9833243afef861f257c78ddee941edfa2f",
-		"{\"checkcommand_id\":\"0bba6ab6747f1c0de3bf80932d10bc7b603e27fc\",\"customvars_checksum\":\"5ba93c9db0cff93f52b521d7420e43f6eda2784f\",\"environment_id\":\"90a8834de76326869f3e703cd61513081ad73d3c\",\"group_ids\":[],\"groups_checksum\":\"a0930d202ae77bbafbc4d898e3d060f462160904\",\"name_checksum\":\"f14feab0710d05e4ca9ffd712f8c0af5d8f5119a\",\"properties_checksum\":\"bd3e124054427700571dae7552aa90e3fe4f1fde\"}",
+		"{\"checkcommand_id\":\"0bba6ab6747f1c0de3bf80932d10bc7b603e27fc\",\"environment_id\":\"90a8834de76326869f3e703cd61513081ad73d3c\",\"group_ids\":[],\"name_checksum\":\"f14feab0710d05e4ca9ffd712f8c0af5d8f5119a\",\"properties_checksum\":\"bd3e124054427700571dae7552aa90e3fe4f1fde\"}",
 		"{\"active_checks_enabled\":true,\"address\":\"\",\"address6\":\"\",\"check_interval\":60.0,\"check_retry_interval\":60.0,\"check_timeout\":null,\"checkcommand\":\"random\",\"display_name\":\"aa3derphosta378\",\"event_handler_enabled\":true,\"flapping_enabled\":false,\"flapping_threshold_high\":30.0,\"flapping_threshold_low\":25.0,\"icon_image_alt\":\"\",\"is_volatile\":false,\"max_check_attempts\":3.0,\"name\":\"aa3derphosta378\",\"notes\":\"\",\"notifications_enabled\":true,\"passive_checks_enabled\":true,\"perfdata_enabled\":true}",
 		nil,
 		host.ObjectInformation.Factory,

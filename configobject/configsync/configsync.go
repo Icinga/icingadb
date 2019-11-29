@@ -22,8 +22,6 @@ import (
 type Checksums struct {
 	NameChecksum       string `json:"name_checksum"`
 	PropertiesChecksum string `json:"checksum"`
-	CustomvarsChecksum string `json:"customvars_checksum"`
-	GroupsChecksum     string `json:"groups_checksum"`
 }
 
 // Operator is the main worker for each config type. It takes a reference to a supervisor super, holding all required

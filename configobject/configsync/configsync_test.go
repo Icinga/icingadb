@@ -97,11 +97,9 @@ func TestOperator_DeleteHost(t *testing.T) {
 	someChecksum := utils.EncodeChecksum(utils.Checksum("some_checksum"))
 
 	_, err = super.Dbw.Db.Exec(
-		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, customvars_checksum, groups_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 		someChecksum,
 		super.EnvId,
-		someChecksum,
-		someChecksum,
 		someChecksum,
 		someChecksum,
 		"name",
@@ -171,11 +169,9 @@ func TestOperator_UpdateHost(t *testing.T) {
 	someChecksum := utils.EncodeChecksum(utils.Checksum("some_checksum"))
 
 	_, err = super.Dbw.Db.Exec(
-		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, customvars_checksum, groups_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 		utils.EncodeChecksum("a9ef44eb69fda8fbc32bee33322b6518057f559f"),
 		super.EnvId,
-		someChecksum,
-		someChecksum,
 		someChecksum,
 		someChecksum,
 		"name",

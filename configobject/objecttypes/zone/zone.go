@@ -15,7 +15,6 @@ var (
 		"environment_id",
 		"name_checksum",
 		"properties_checksum",
-		"parents_checksum",
 		"name",
 		"name_ci",
 		"is_global",
@@ -29,7 +28,6 @@ type Zone struct {
 	EnvId              string  `json:"environment_id"`
 	NameChecksum       string  `json:"name_checksum"`
 	PropertiesChecksum string  `json:"checksum"`
-	ParentsChecksum    string  `json:"parents_checksum"`
 	Name               string  `json:"name"`
 	NameCi             *string `json:"name_ci"`
 	IsGlobal           bool    `json:"is_global"`
@@ -58,7 +56,6 @@ func (z *Zone) UpdateValues() []interface{} {
 		utils.EncodeChecksum(z.EnvId),
 		utils.EncodeChecksum(z.NameChecksum),
 		utils.EncodeChecksum(z.PropertiesChecksum),
-		utils.EncodeChecksum(z.ParentsChecksum),
 		z.Name,
 		z.NameCi,
 		utils.Bool[z.IsGlobal],

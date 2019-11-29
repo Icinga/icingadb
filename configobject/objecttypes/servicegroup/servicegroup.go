@@ -15,7 +15,6 @@ var (
 		"environment_id",
 		"name_checksum",
 		"properties_checksum",
-		"customvars_checksum",
 		"name",
 		"name_ci",
 		"display_name",
@@ -28,7 +27,6 @@ type Servicegroup struct {
 	EnvId              string  `json:"environment_id"`
 	NameChecksum       string  `json:"name_checksum"`
 	PropertiesChecksum string  `json:"checksum"`
-	CustomvarsChecksum string  `json:"customvars_checksum"`
 	Name               string  `json:"name"`
 	NameCi             *string `json:"name_ci"`
 	DisplayName        string  `json:"display_name"`
@@ -56,7 +54,6 @@ func (s *Servicegroup) UpdateValues() []interface{} {
 		utils.EncodeChecksum(s.EnvId),
 		utils.EncodeChecksum(s.NameChecksum),
 		utils.EncodeChecksum(s.PropertiesChecksum),
-		utils.EncodeChecksum(s.CustomvarsChecksum),
 		s.Name,
 		s.NameCi,
 		s.DisplayName,

@@ -1,3 +1,3 @@
-id;environment_id;name_checksum;properties_checksum;groups_checksum;name;name_ci;label;email;pager;notifications_enabled;timeperiod_id;states;types;zone_id
-68e12f6f9ebb42cea93b;b65da3345b7d4cff9a24;9379c8d791fe4728ab4c;d75ffc6507b34f18b083;210436e39ad141d189b4;John;john;John;john@doe.com;NULL;y;f98a83dfd1fd4aaa9af9;15;96;5bf526ee976b4ccade5a
+id;environment_id;name_checksum;properties_checksum;name;name_ci;label;email;pager;notifications_enabled;timeperiod_id;states;types;zone_id
+68e12f6f9ebb42cea93b;b65da3345b7d4cff9a24;9379c8d791fe4728ab4c;d75ffc6507b34f18b083;John;john;John;john@doe.com;NULL;y;f98a83dfd1fd4aaa9af9;15;96;5bf526ee976b4ccade5a
 2744e0261ab04aa2ad66;b65da3345b7d4cff9a24;c04cdda645d341c1bfc3;c49635a2d3e74f329d60;9f57dd06be924335ad1c;Bob;bob;Bob;bob@apple.com;NULL;y;996b2dfd57a14d39b815;7;32;5bf526ee976b4ccade5a
