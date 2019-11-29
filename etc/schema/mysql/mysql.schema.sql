@@ -315,6 +315,18 @@ CREATE TABLE icingadb_instance (
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
+CREATE TABLE icingadb_schema (
+  id int(10) unsigned NOT NULL AUTO_INCREMENT,
+  version smallint(5) unsigned NOT NULL,
+  timestamp bigint(20) unsigned NOT NULL,
+
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
+INSERT INTO icingadb_schema (version, timestamp)
+  VALUES (1, CURRENT_TIMESTAMP() * 1000);
+
 CREATE TABLE checkcommand (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + type + name)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
