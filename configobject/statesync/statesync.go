@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-//Counter on how many host/service states have synced since the last logSyncCounters()
+// syncCounter counts on how many host/service states have synced since the last logSyncCounters().
 var syncCounter = make(map[string]int)
 var syncCounterLock = sync.Mutex{}
 
@@ -28,7 +28,7 @@ var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
 	return
 }()
 
-//Start the sync goroutines for hosts and services
+// StartStateSync starts the sync goroutines for hosts and services.
 func StartStateSync(super *supervisor.Supervisor) {
 	go func() {
 		for {
@@ -45,7 +45,7 @@ func StartStateSync(super *supervisor.Supervisor) {
 	go logSyncCounters()
 }
 
-//Logs the amount of synced states every 20 seconds
+// logSyncCounters logs the amount of synced states every 20 seconds.
 func logSyncCounters() {
 	every20s := time.NewTicker(time.Second * 20)
 	defer every20s.Stop()
@@ -61,7 +61,7 @@ func logSyncCounters() {
 	}
 }
 
-//Tries to sync the states of given object type every second
+// syncStates tries to sync the states of given object type every second.
 func syncStates(super *supervisor.Supervisor, objectType string) {
 	if super.EnvId == nil {
 		log.Debug("StateSync: Waiting for EnvId to be set")
@@ -173,13 +173,13 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 	StateSyncsTotal.WithLabelValues(objectType).Add(float64(len(storedStateIds)))
 }
 
-//Removes one redis.XMessage at given index from given slice and returns the resulting slice
+// removeStateFromStatesSlice removes one redis.XMessage at given index from given slice and returns the resulting slice.
 func removeStateFromStatesSlice(s []redis.XMessage, i int) []redis.XMessage {
 	s[len(s)-1], s[i] = s[i], s[len(s)-1]
 	return s[:len(s)-1]
 }
 
-//Converts a Icinga state type(0 for soft, 1 for hard) we got from Redis into a DB state type(soft, hard)
+// redisStateTypeToDBStateType converts a Icinga state type(0 for soft, 1 for hard) we got from Redis into a DB state type(soft, hard).
 func redisStateTypeToDBStateType(value interface{}) string {
 	if value == "1" {
 		return "hard"
@@ -188,7 +188,7 @@ func redisStateTypeToDBStateType(value interface{}) string {
 	}
 }
 
-//Converts a int we got from Redis into a DB int
+// redisIntToDBInt converts a int we got from Redis into a DB int.
 func redisIntToDBInt(value interface{}) string {
 	if value == nil || value == "" {
 		return "0"

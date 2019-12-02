@@ -14,7 +14,7 @@ type Benchmark struct {
 	diff  time.Duration
 }
 
-// MarshalText implements an interface from TextMarshaler
+// MarshalText implements an interface from TextMarshaler.
 func (b *Benchmark) MarshalText() (text []byte, err error) {
 	return []byte(b.String()), nil
 }

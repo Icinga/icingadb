@@ -49,14 +49,14 @@ var (
 	}
 )
 
-// Checksum converts the given string into a SHA1 checksum string
+// Checksum converts the given string into a SHA1 checksum string.
 func Checksum(s string) string {
 	hash := sha1.New()
 	hash.Write([]byte(s))
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-// EncodeChecksum converts a hex string to a byte array
+// EncodeChecksum converts a hex string to a byte array.
 func EncodeChecksum(s string) []byte {
 	c, err := hex.DecodeString(s)
 	if err != nil {
@@ -66,7 +66,7 @@ func EncodeChecksum(s string) []byte {
 	return c
 }
 
-// DecodeHexIfNotNil converts a hex string to a byte array
+// DecodeHexIfNotNil converts a hex string to a byte array.
 func DecodeHexIfNotNil(hexStr interface{}) interface{} {
 	if hexStr == nil {
 		return nil
@@ -75,12 +75,12 @@ func DecodeHexIfNotNil(hexStr interface{}) interface{} {
 	return EncodeChecksum(hexStr.(string))
 }
 
-// DecodeChecksum coverts a byte array into a hex string
+// DecodeChecksum coverts a byte array into a hex string.
 func DecodeChecksum(c []byte) string {
 	return hex.EncodeToString(c)
 }
 
-// Converts an array of notification state strings into a bit mask
+// NotificationStatesToBitMask converts an array of notification state strings into a bit mask.
 func NotificationStatesToBitMask(states []string) int {
 	if states == nil {
 		return 63
@@ -93,7 +93,7 @@ func NotificationStatesToBitMask(states []string) int {
 	return mask
 }
 
-// Converts an array of notification type strings into a bit mask
+// NotificationTypesToBitMask converts an array of notification type strings into a bit mask.
 func NotificationTypesToBitMask(types []string) int {
 	if types == nil {
 		return 511
@@ -114,7 +114,7 @@ func IcingaStateTypeToString(stateType float32) string {
 	}
 }
 
-//Converts a boolean we got from Redis into a DB boolean
+// JSONBooleanToDBBoolean converts a boolean we got from Redis into a DB boolean.
 func JSONBooleanToDBBoolean(value interface{}) string {
 	if value == "true" {
 		return "y"
