@@ -15,9 +15,6 @@ var (
 		"environment_id",
 		"name_checksum",
 		"properties_checksum",
-		"customvars_checksum",
-		"users_checksum",
-		"usergroups_checksum",
 		"name",
 		"name_ci",
 		"host_id",
@@ -38,9 +35,6 @@ type Notification struct {
 	EnvId                string   `json:"environment_id"`
 	NameChecksum         string   `json:"name_checksum"`
 	PropertiesChecksum   string   `json:"checksum"`
-	CustomvarsChecksum   string   `json:"customvars_checksum"`
-	UsersChecksum        string   `json:"users_checksum"`
-	UsergroupsChecksum   string   `json:"usergroups_checksum"`
 	Name                 string   `json:"name"`
 	NameCi               *string  `json:"name_ci"`
 	HostId               string   `json:"host_id"`
@@ -76,9 +70,6 @@ func (n *Notification) UpdateValues() []interface{} {
 		utils.EncodeChecksum(n.EnvId),
 		utils.EncodeChecksum(n.NameChecksum),
 		utils.EncodeChecksum(n.PropertiesChecksum),
-		utils.EncodeChecksum(n.CustomvarsChecksum),
-		utils.EncodeChecksum(n.UsersChecksum),
-		utils.EncodeChecksum(n.UsergroupsChecksum),
 		n.Name,
 		n.NameCi,
 		utils.EncodeChecksum(n.HostId),

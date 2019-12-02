@@ -15,7 +15,6 @@ var (
 		"environment_id",
 		"name_checksum",
 		"properties_checksum",
-		"customvars_checksum",
 		"name",
 		"name_ci",
 		"display_name",
@@ -28,7 +27,6 @@ type Usergroup struct {
 	EnvId              string  `json:"environment_id"`
 	NameChecksum       string  `json:"name_checksum"`
 	PropertiesChecksum string  `json:"checksum"`
-	CustomvarsChecksum string  `json:"customvars_checksum"`
 	Name               string  `json:"name"`
 	NameCi             *string `json:"name_ci"`
 	DisplayName        string  `json:"display_name"`
@@ -56,7 +54,6 @@ func (u *Usergroup) UpdateValues() []interface{} {
 		utils.EncodeChecksum(u.EnvId),
 		utils.EncodeChecksum(u.NameChecksum),
 		utils.EncodeChecksum(u.PropertiesChecksum),
-		utils.EncodeChecksum(u.CustomvarsChecksum),
 		u.Name,
 		u.NameCi,
 		u.DisplayName,

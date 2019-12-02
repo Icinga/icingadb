@@ -8,8 +8,6 @@ CREATE TABLE host (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
-  customvars_checksum binary(20) NOT NULL COMMENT 'sha1(host.vars)',
-  groups_checksum binary(20) NOT NULL COMMENT 'sha1(hostgroup.name + hostgroup.name ...)',
 
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -71,7 +69,6 @@ CREATE TABLE hostgroup (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
-  customvars_checksum binary(20) NOT NULL COMMENT 'sha1(hostgroup.vars)',
 
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -153,8 +150,6 @@ CREATE TABLE service (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
-  customvars_checksum binary(20) NOT NULL COMMENT 'sha1(service.vars)',
-  groups_checksum binary(20) NOT NULL COMMENT 'sha1(servicegroup.name + servicegroup.name ...)',
   host_id binary(20) NOT NULL COMMENT 'sha1(host.id)',
 
   name varchar(255) NOT NULL,
@@ -209,7 +204,6 @@ CREATE TABLE servicegroup (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
-  customvars_checksum binary(20) NOT NULL COMMENT 'sha1(servicegroup.vars)',
 
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -550,9 +544,6 @@ CREATE TABLE notification (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL,
-  customvars_checksum binary(20) NOT NULL COMMENT 'sha1(notification.vars)',
-  users_checksum binary(20) NOT NULL,
-  usergroups_checksum binary(20) NOT NULL,
 
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -711,8 +702,6 @@ CREATE TABLE user (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
-  customvars_checksum binary(20) NOT NULL COMMENT 'sha1(user.vars)',
-  groups_checksum binary(20) NOT NULL COMMENT 'sha1(usergroup.name + userroup.name ...)',
 
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -738,7 +727,6 @@ CREATE TABLE usergroup (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
-  customvars_checksum binary(20) NOT NULL COMMENT 'sha1(usergroup.vars)',
 
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -781,7 +769,6 @@ CREATE TABLE zone (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
-  parents_checksum binary(20) NOT NULL COMMENT 'sha1(all parents checksums)',
 
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,

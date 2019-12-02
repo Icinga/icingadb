@@ -73,9 +73,9 @@ func TestOperator_InsertHost(t *testing.T) {
 		require.NoError(t, err)
 
 		if len(objects) == 1 && utils.DecodeChecksum(objects[0][3].([]byte)) == "b6e87de3d4f31b3d4d35466171f4088693b46071" {
-			require.Equal(t, "TestHost - 603", objects[0][8], "display_name should be set to 'TestHost - 603'")
-			require.Equal(t, "localhost", objects[0][9], "address should be set to 'localhost'")
-			require.Equal(t, "dummy", objects[0][13], "check_command should be set to 'dummy'")
+			require.Equal(t, "TestHost - 603", objects[0][6], "display_name should be set to 'TestHost - 603'")
+			require.Equal(t, "localhost", objects[0][7], "address should be set to 'localhost'")
+			require.Equal(t, "dummy", objects[0][11], "check_command should be set to 'dummy'")
 			return true
 		} else {
 			return false
@@ -97,11 +97,9 @@ func TestOperator_DeleteHost(t *testing.T) {
 	someChecksum := utils.EncodeChecksum(utils.Checksum("some_checksum"))
 
 	_, err = super.Dbw.Db.Exec(
-		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, customvars_checksum, groups_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 		someChecksum,
 		super.EnvId,
-		someChecksum,
-		someChecksum,
 		someChecksum,
 		someChecksum,
 		"name",
@@ -171,11 +169,9 @@ func TestOperator_UpdateHost(t *testing.T) {
 	someChecksum := utils.EncodeChecksum(utils.Checksum("some_checksum"))
 
 	_, err = super.Dbw.Db.Exec(
-		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, customvars_checksum, groups_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
 		utils.EncodeChecksum("a9ef44eb69fda8fbc32bee33322b6518057f559f"),
 		super.EnvId,
-		someChecksum,
-		someChecksum,
 		someChecksum,
 		someChecksum,
 		"name",
@@ -225,9 +221,9 @@ func TestOperator_UpdateHost(t *testing.T) {
 		require.NoError(t, err)
 
 		if len(objects) > 0 && utils.DecodeChecksum(objects[0][3].([]byte)) == "b6e87de3d4f31b3d4d35466171f4088693b46071" {
-			require.Equal(t, "TestHost - 603", objects[0][8], "display_name should be set to 'TestHost - 603'")
-			require.Equal(t, "localhost", objects[0][9], "address should be set to 'localhost'")
-			require.Equal(t, "dummy", objects[0][13], "check_command should be set to 'dummy'")
+			require.Equal(t, "TestHost - 603", objects[0][6], "display_name should be set to 'TestHost - 603'")
+			require.Equal(t, "localhost", objects[0][7], "address should be set to 'localhost'")
+			require.Equal(t, "dummy", objects[0][11], "check_command should be set to 'dummy'")
 			require.Equal(t, 1, len(objects), "There should only be 1 host in the Database")
 			return true
 		} else {

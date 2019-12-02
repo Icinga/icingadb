@@ -16,8 +16,6 @@ var (
 		"environment_id",
 		"name_checksum",
 		"properties_checksum",
-		"customvars_checksum",
-		"groups_checksum",
 		"name",
 		"name_ci",
 		"display_name",
@@ -61,8 +59,6 @@ type Host struct {
 	EnvId                 string  `json:"environment_id"`
 	NameChecksum          string  `json:"name_checksum"`
 	PropertiesChecksum    string  `json:"checksum"`
-	CustomvarsChecksum    string  `json:"customvars_checksum"`
-	GroupsChecksum        string  `json:"groups_checksum"`
 	Name                  string  `json:"name"`
 	NameCi                *string `json:"name_ci"`
 	DisplayName           string  `json:"display_name"`
@@ -119,8 +115,6 @@ func (h *Host) UpdateValues() []interface{} {
 		utils.EncodeChecksum(h.EnvId),
 		utils.EncodeChecksum(h.NameChecksum),
 		utils.EncodeChecksum(h.PropertiesChecksum),
-		utils.EncodeChecksum(h.CustomvarsChecksum),
-		utils.EncodeChecksum(h.GroupsChecksum),
 		h.Name,
 		h.NameCi,
 		h.DisplayName,
