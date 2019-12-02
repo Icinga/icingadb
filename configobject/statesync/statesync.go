@@ -65,7 +65,7 @@ func logSyncCounters() {
 func syncStates(super *supervisor.Supervisor, objectType string) {
 	if super.EnvId == nil {
 		log.Debug("StateSync: Waiting for EnvId to be set")
-		<-time.NewTimer(time.Second).C
+		time.Sleep(time.Second)
 		return
 	}
 
