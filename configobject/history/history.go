@@ -31,7 +31,7 @@ var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
 var historyCounter = make(map[string]int)
 var historyCounterLock = sync.Mutex{}
 
-//Logs the amount of history entries added every 20 seconds
+// logHistoryCounters logs the amount of history entries added every 20 seconds.
 func logHistoryCounters() {
 	every20s := time.NewTicker(time.Second * 20)
 	defer every20s.Stop()
@@ -508,7 +508,7 @@ func historyWorker(super *supervisor.Supervisor, historyType string, preparedSta
 	log.Debugf("%d %s history entries broken", brokenEntries, historyType)
 }
 
-//Removes one redis.XMessage at given index from given slice and returns the resulting slice
+// removeEntryFromEntriesSlice removes one redis.XMessage at given index from given slice and returns the resulting slice.
 func removeEntryFromEntriesSlice(s []redis.XMessage, i int) []redis.XMessage {
 	s[len(s)-1], s[i] = s[i], s[len(s)-1]
 	return s[:len(s)-1]

@@ -15,7 +15,7 @@ type Environment struct {
 	NodeName string
 }
 
-// Compute SHA1
+// Sha1bytes computes SHA1.
 func Sha1bytes(bytes []byte) []byte {
 	hash := sha1.New()
 	hash.Write(bytes)

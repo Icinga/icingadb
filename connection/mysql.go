@@ -59,7 +59,7 @@ var connectionErrors = []string{
 	"operation timed out",
 }
 
-// This is used in SqlFetchAll and SqlFetchAllQuiet
+// DbClientOrTransaction is used in SqlFetchAll and SqlFetchAllQuiet.
 type DbClientOrTransaction interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	Exec(query string, args ...interface{}) (sql.Result, error)
@@ -106,7 +106,7 @@ func NewDBWrapper(dbDsn string, maxOpenConns int) (*DBWrapper, error) {
 	return &dbw, nil
 }
 
-// Database wrapper including helper functions
+// DBWrapper is a database wrapper including helper functions.
 type DBWrapper struct {
 	Db                          DbClient
 	ConnectedAtomic             *uint32 //uint32 to be able to use atomic operations
@@ -231,7 +231,7 @@ func (dbw *DBWrapper) SqlQuery(query string, args ...interface{}) (*sql.Rows, er
 	}
 }
 
-// Wrapper around Db.BeginTx() for auto-logging
+// SqlBegin is a wrapper around Db.BeginTx() for auto-logging.
 func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransaction, error) {
 	DbOperationsBegin.Inc()
 	var isoLvl sql.IsolationLevel
@@ -274,7 +274,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransactio
 	}
 }
 
-// Wrapper around tx.Commit() for auto-logging
+// SqlCommit is a wrapper around tx.Commit() for auto-logging.
 func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 	DbOperationsCommit.Inc()
 	for {
@@ -309,7 +309,7 @@ func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 	}
 }
 
-// Wrapper around tx.Rollback() for auto-logging
+// SqlRollback is a wrapper around tx.Rollback() for auto-logging.
 func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 	DbOperationsRollback.Inc()
 	for {
@@ -344,22 +344,22 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 	}
 }
 
-// Wrapper around sql.Exec() for auto-logging
+// SqlExec is a wrapper around sql.Exec() for auto-logging.
 func (dbw *DBWrapper) SqlExec(opObserver prometheus.Observer, sql string, args ...interface{}) (sql.Result, error) {
 	return dbw.sqlExecInternal(dbw.Db, opObserver, sql, false, args...)
 }
 
-// No logging, no benchmarking
+// SqlExecQuiet is like SqlExec, but doesn't log or benchmark.
 func (dbw *DBWrapper) SqlExecQuiet(opObserver prometheus.Observer, sql string, args ...interface{}) (sql.Result, error) {
 	return dbw.sqlExecInternal(dbw.Db, opObserver, sql, true, args...)
 }
 
-// Wrapper around tx.Exec() for auto-logging
+// SqlExecTx is a wrapper around tx.Exec() for auto-logging.
 func (dbw *DBWrapper) SqlExecTx(tx DbTransaction, opObserver prometheus.Observer, sql string, args ...interface{}) (sql.Result, error) {
 	return dbw.sqlExecInternal(tx, opObserver, sql, false, args...)
 }
 
-// No logging, no benchmarking
+// SqlExecTxQuiet is like SqlExecTx, but doesn't log or benchmark.
 func (dbw *DBWrapper) SqlExecTxQuiet(tx DbTransaction, opObserver prometheus.Observer, sql string, args ...interface{}) (sql.Result, error) {
 	return dbw.sqlExecInternal(tx, opObserver, sql, true, args...)
 }
@@ -380,7 +380,7 @@ func (dbw *DBWrapper) SqlFetchAllTxQuiet(tx DbTransaction, queryObserver prometh
 	return dbw.sqlFetchAllInternal(tx, queryObserver, query, true, args...)
 }
 
-// Wrapper around sql.Exec() for auto-logging
+// sqlExecInternal is a wrapper around sql.Exec() for auto-logging.
 func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prometheus.Observer, sql string, quiet bool, args ...interface{}) (sql.Result, error) {
 	for {
 		if !dbw.IsConnected() {
@@ -421,7 +421,7 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prome
 	}
 }
 
-// Wrapper around Db.SqlQuery() for auto-logging
+// sqlFetchAllInternal is a wrapper around Db.SqlQuery() for auto-logging.
 func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryObserver prometheus.Observer, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
 	for {
 		if !dbw.IsConnected() {
@@ -582,7 +582,7 @@ func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFai
 	}
 }
 
-// Executes the given function inside a transaction
+// sqlTryTransaction executes the given function inside a transaction.
 func (dbw *DBWrapper) sqlTryTransaction(f func(transaction DbTransaction) error, concurrencySafety bool, quiet bool) error {
 	tx, errBegin := dbw.SqlBegin(concurrencySafety, quiet)
 	if errBegin != nil {

@@ -86,7 +86,7 @@ type RedisClient interface {
 type StatusCmd interface {
 }
 
-// Redis wrapper including helper functions
+// RDBWrapper is a redis wrapper including helper functions.
 type RDBWrapper struct {
 	Rdb                         RedisClient
 	ConnectedAtomic             *uint32 //uint32 to be able to use atomic operations
@@ -203,7 +203,7 @@ func (rdbw *RDBWrapper) WaitForConnection() {
 	rdbw.ConnectionUpCondition.L.Unlock()
 }
 
-// Wrapper for connection handling
+// Publish is a wrapper for connection handling.
 func (rdbw *RDBWrapper) Publish(channel string, message interface{}) *redis.IntCmd {
 	for {
 		if !rdbw.IsConnected() {
@@ -224,7 +224,7 @@ func (rdbw *RDBWrapper) Publish(channel string, message interface{}) *redis.IntC
 	}
 }
 
-// Wrapper for connection handling
+// XRead is a wrapper for connection handling.
 func (rdbw *RDBWrapper) XRead(args *redis.XReadArgs) *redis.XStreamSliceCmd {
 	for {
 		if !rdbw.IsConnected() {
@@ -245,7 +245,7 @@ func (rdbw *RDBWrapper) XRead(args *redis.XReadArgs) *redis.XStreamSliceCmd {
 	}
 }
 
-// Wrapper for connection handling
+// XDel is a wrapper for connection handling.
 func (rdbw *RDBWrapper) XDel(stream string, ids ...string) *redis.IntCmd {
 	for {
 		if !rdbw.IsConnected() {
@@ -266,7 +266,7 @@ func (rdbw *RDBWrapper) XDel(stream string, ids ...string) *redis.IntCmd {
 	}
 }
 
-// Wrapper for connection handling
+// HKeys is a wrapper for connection handling.
 func (rdbw *RDBWrapper) HKeys(key string) *redis.StringSliceCmd {
 	for {
 		if !rdbw.IsConnected() {
@@ -307,7 +307,7 @@ func (rdbw *RDBWrapper) HMGet(key string, fields ...string) *redis.SliceCmd {
 	}
 }
 
-// Wrapper for auto-logging and connection handling
+// HGetAll is a wrapper for auto-logging and connection handling.
 func (rdbw *RDBWrapper) HGetAll(key string) *redis.StringStringMapCmd {
 	for {
 		if !rdbw.IsConnected() {
@@ -339,7 +339,7 @@ func (rdbw *RDBWrapper) HGetAll(key string) *redis.StringStringMapCmd {
 	}
 }
 
-// Wrapper for auto-logging and connection handling
+// TxPipelined is a wrapper for auto-logging and connection handling.
 func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([]redis.Cmder, error) {
 	for {
 		if !rdbw.IsConnected() {

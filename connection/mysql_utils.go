@@ -219,12 +219,12 @@ type prettyPrintedSql struct {
 	sql string
 }
 
-// String implements and interface from Stringer
+// String implements and interface from Stringer.
 func (p prettyPrintedSql) String() string {
 	return strings.TrimSpace(prettyPrintedSqlReplacer.Replace(p.sql))
 }
 
-// MarshalText implements an interface from TextMarshaler
+// MarshalText implements an interface from TextMarshaler.
 func (p prettyPrintedSql) MarshalText() (text []byte, err error) {
 	return []byte(p.String()), nil
 }
@@ -247,7 +247,7 @@ func (p *prettyPrintedArgs) String() string {
 	return res + " ]"
 }
 
-// MarshalText implements an interface from TextMarshaler
+// MarshalText implements an interface from TextMarshaler.
 func (p prettyPrintedArgs) MarshalText() (text []byte, err error) {
 	return []byte(p.String()), nil
 }
@@ -256,7 +256,7 @@ type prettyPrintedRowsAffected struct {
 	result sql.Result
 }
 
-// String implements and interface from Stringer
+// String implements and interface from Stringer.
 func (d prettyPrintedRowsAffected) String() string {
 	if d.result != nil {
 		rows, errRA := d.result.RowsAffected()
@@ -268,7 +268,7 @@ func (d prettyPrintedRowsAffected) String() string {
 	return "N/A"
 }
 
-// MarshalText implements an interface from TextMarshaler
+// MarshalText implements an interface from TextMarshaler.
 func (d prettyPrintedRowsAffected) MarshalText() (text []byte, err error) {
 	return []byte(d.String()), nil
 }
@@ -281,7 +281,7 @@ func (e MysqlConnectionError) Error() string {
 	return e.err
 }
 
-// Returns whether the given error signals serialization failure
+// isSerializationFailure returns whether the given error signals serialization failure.
 // https://dev.mysql.com/doc/refman/5.5/en/error-messages-server.html#error_er_lock_deadlock
 func isSerializationFailure(e error) bool {
 	switch err := e.(type) {
