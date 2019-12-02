@@ -433,7 +433,7 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 func historyWorker(super *supervisor.Supervisor, historyType string, preparedStatements []string, dataFunctions []func(map[string]interface{}) []interface{}, observer prometheus.Observer) {
 	if super.EnvId == nil {
 		log.Debug(historyType + "History: Waiting for EnvId to be set")
-		<-time.NewTimer(time.Second).C
+		time.Sleep(time.Second)
 		return
 	}
 
