@@ -3,7 +3,6 @@
 package history
 
 import (
-	"fmt"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
@@ -16,20 +15,41 @@ import (
 	"time"
 )
 
-var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
-	mysqlObservers = map[string]prometheus.Observer{}
+var mysqlObservers = struct {
+	state            prometheus.Observer
+	notification     prometheus.Observer
+	usernotification prometheus.Observer
+	downtime         prometheus.Observer
+	comment          prometheus.Observer
+	flapping         prometheus.Observer
+}{
+	connection.DbIoSeconds.WithLabelValues("mysql", "replace into state_history"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "replace into notification_history"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "replace into usernotification_history"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "replace into downtime_history"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "replace into comment_history"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "replace into flapping_history"),
+}
 
-	for _, historyType := range [6]string{"state", "notification", "usernotification", "downtime", "comment", "flapping"} {
-		mysqlObservers[historyType] = connection.DbIoSeconds.WithLabelValues(
-			"mysql", fmt.Sprintf("replace into %s_history", historyType),
-		)
-	}
+var historyCounter = struct {
+	state            int
+	notification     int
+	usernotification int
+	downtime         int
+	comment          int
+	flapping         int
+}{}
 
-	return
-}()
-
-var historyCounter = make(map[string]int)
 var historyCounterLock = sync.Mutex{}
+
+func printAndResetHistoryCounter(counter *int, historyType string) {
+	if *counter > 0 {
+		log.Infof("Added %d %s history entries in the last 20 seconds", *counter, historyType)
+		historyCounterLock.Lock()
+		*counter = 0
+		historyCounterLock.Unlock()
+	}
+}
 
 // logHistoryCounters logs the amount of history entries added every 20 seconds.
 func logHistoryCounters() {
@@ -38,14 +58,12 @@ func logHistoryCounters() {
 
 	for {
 		<-every20s.C
-		for _, historyType := range [6]string{"state", "notification", "usernotification", "downtime", "comment", "flapping"} {
-			if historyCounter[historyType] > 0 {
-				log.Infof("Added %d %s history entries in the last 20 seconds", historyCounter[historyType], historyType)
-				historyCounterLock.Lock()
-				historyCounter[historyType] = 0
-				historyCounterLock.Unlock()
-			}
-		}
+		printAndResetHistoryCounter(&historyCounter.state, "state")
+		printAndResetHistoryCounter(&historyCounter.notification, "notification")
+		printAndResetHistoryCounter(&historyCounter.usernotification, "usernotification")
+		printAndResetHistoryCounter(&historyCounter.downtime, "downtime")
+		printAndResetHistoryCounter(&historyCounter.comment, "comment")
+		printAndResetHistoryCounter(&historyCounter.flapping, "flapping")
 	}
 }
 
@@ -126,7 +144,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "notification", statements, dataFunctions, mysqlObservers["notification"])
+	historyWorker(super, "notification", statements, dataFunctions, mysqlObservers.notification, &historyCounter.notification)
 }
 
 func userNotificationHistoryWorker(super *supervisor.Supervisor) {
@@ -150,7 +168,7 @@ func userNotificationHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "usernotification", statements, dataFunctions, mysqlObservers["usernotification"])
+	historyWorker(super, "usernotification", statements, dataFunctions, mysqlObservers.usernotification, &historyCounter.usernotification)
 }
 
 func stateHistoryWorker(super *supervisor.Supervisor) {
@@ -217,7 +235,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "state", statements, dataFunctions, mysqlObservers["state"])
+	historyWorker(super, "state", statements, dataFunctions, mysqlObservers.state, &historyCounter.state)
 }
 
 func downtimeHistoryWorker(super *supervisor.Supervisor) {
@@ -293,7 +311,7 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "downtime", statements, dataFunctions, mysqlObservers["downtime"])
+	historyWorker(super, "downtime", statements, dataFunctions, mysqlObservers.downtime, &historyCounter.downtime)
 }
 
 func commentHistoryWorker(super *supervisor.Supervisor) {
@@ -364,7 +382,7 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "comment", statements, dataFunctions, mysqlObservers["comment"])
+	historyWorker(super, "comment", statements, dataFunctions, mysqlObservers.comment, &historyCounter.comment)
 }
 
 func flappingHistoryWorker(super *supervisor.Supervisor) {
@@ -427,10 +445,10 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "flapping", statements, dataFunctions, mysqlObservers["flapping"])
+	historyWorker(super, "flapping", statements, dataFunctions, mysqlObservers.flapping, &historyCounter.flapping)
 }
 
-func historyWorker(super *supervisor.Supervisor, historyType string, preparedStatements []string, dataFunctions []func(map[string]interface{}) []interface{}, observer prometheus.Observer) {
+func historyWorker(super *supervisor.Supervisor, historyType string, preparedStatements []string, dataFunctions []func(map[string]interface{}) []interface{}, observer prometheus.Observer, counter *int) {
 	if super.EnvId == nil {
 		log.Debug(historyType + "History: Waiting for EnvId to be set")
 		time.Sleep(time.Second)
@@ -501,7 +519,7 @@ func historyWorker(super *supervisor.Supervisor, historyType string, preparedSta
 	count := len(storedEntryIds) - brokenEntries
 
 	historyCounterLock.Lock()
-	historyCounter[historyType]++
+	*counter++
 	historyCounterLock.Unlock()
 
 	log.Debugf("%d %s history entries synced", count, historyType)

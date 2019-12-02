@@ -15,30 +15,32 @@ import (
 )
 
 // syncCounter counts on how many host/service states have synced since the last logSyncCounters().
-var syncCounter = make(map[string]int)
+var syncCounter = struct {
+	host    int
+	service int
+}{}
+
 var syncCounterLock = sync.Mutex{}
 
-var mysqlObservers = func() (mysqlObservers map[string]prometheus.Observer) {
-	mysqlObservers = map[string]prometheus.Observer{}
-
-	for _, objectType := range [2]string{"host", "service"} {
-		mysqlObservers[objectType] = connection.DbIoSeconds.WithLabelValues("mysql", "replace into "+objectType+"_state")
-	}
-
-	return
-}()
+var mysqlObservers = struct {
+	host    prometheus.Observer
+	service prometheus.Observer
+}{
+	connection.DbIoSeconds.WithLabelValues("mysql", "replace into host_state"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "replace into service_state"),
+}
 
 // StartStateSync starts the sync goroutines for hosts and services.
 func StartStateSync(super *supervisor.Supervisor) {
 	go func() {
 		for {
-			syncStates(super, "host")
+			syncStates(super, "host", &syncCounter.host, mysqlObservers.host)
 		}
 	}()
 
 	go func() {
 		for {
-			syncStates(super, "service")
+			syncStates(super, "service", &syncCounter.service, mysqlObservers.service)
 		}
 	}()
 
@@ -52,17 +54,18 @@ func logSyncCounters() {
 
 	for {
 		<-every20s.C
-		if syncCounter["host"] > 0 || syncCounter["service"] > 0 {
-			log.Infof("Synced %d host and %d service states in the last 20 seconds", syncCounter["host"], syncCounter["service"])
+		if syncCounter.host > 0 || syncCounter.service > 0 {
+			log.Infof("Synced %d host and %d service states in the last 20 seconds", syncCounter.host, syncCounter.service)
 			syncCounterLock.Lock()
-			syncCounter = make(map[string]int)
+			syncCounter.host = 0
+			syncCounter.service = 0
 			syncCounterLock.Unlock()
 		}
 	}
 }
 
 // syncStates tries to sync the states of given object type every second.
-func syncStates(super *supervisor.Supervisor, objectType string) {
+func syncStates(super *supervisor.Supervisor, objectType string, counter *int, observer prometheus.Observer) {
 	if super.EnvId == nil {
 		log.Debug("StateSync: Waiting for EnvId to be set")
 		time.Sleep(time.Second)
@@ -102,7 +105,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 
 				_, errExec := super.Dbw.SqlExecTx(
 					tx,
-					mysqlObservers[objectType],
+					observer,
 					`REPLACE INTO `+objectType+`_state (`+objectType+`_id, environment_id, state_type, soft_state, hard_state, previous_hard_state, attempt, severity, output, long_output, performance_data,`+
 						`check_commandline, is_problem, is_handled, is_reachable, is_flapping, is_acknowledged, acknowledgement_comment_id,`+
 						`in_downtime, execution_time, latency, timeout, check_source, last_update, last_state_change, next_check, next_update) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -168,7 +171,7 @@ func syncStates(super *supervisor.Supervisor, objectType string) {
 	log.Debugf("%d %s state synced", len(storedStateIds)-brokenStates, objectType)
 	log.Debugf("%d %s state broken", brokenStates, objectType)
 	syncCounterLock.Lock()
-	syncCounter[objectType] += len(storedStateIds)
+	*counter += len(storedStateIds)
 	syncCounterLock.Unlock()
 	StateSyncsTotal.WithLabelValues(objectType).Add(float64(len(storedStateIds)))
 }
