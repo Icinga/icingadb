@@ -57,13 +57,13 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 		wgDelete     *sync.WaitGroup
 		wgUpdate     *sync.WaitGroup
 	)
-	log.Debugf("%s: Ready", objectInformation.ObjectType)
+	log.WithFields(log.Fields{"type": objectInformation.ObjectType}).Debug("Ready")
 	for msg := range chHA {
 		switch msg {
 		// Icinga 2 probably restarted or died, stop operations and tell all workers to shut down.
 		case ha.Notify_StopSync:
 			if done != nil {
-				log.Debugf("%s: Lost responsibility", objectInformation.ObjectType)
+				log.WithFields(log.Fields{"type": objectInformation.ObjectType}).Debug("Lost responsibility")
 				close(done)
 				done = nil
 			}
@@ -73,7 +73,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				continue
 			}
 
-			log.Debugf("%s: Got responsibility", objectInformation.ObjectType)
+			log.WithFields(log.Fields{"type": objectInformation.ObjectType}).Debug("Got responsibility")
 
 			//TODO: This should only be done, if HA was taken over from another instance
 			insert, update, delete := GetDelta(super, objectInformation)
@@ -231,7 +231,7 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 
 // InsertPrepWorker fetches config for IDs(chInsert) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
 func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsert <-chan []string, chInsertBack chan<- []connection.Row) {
-	defer log.Infof("%s: Insert preparation routine stopped", objectInformation.ObjectType)
+	defer log.WithFields(log.Fields{"type": objectInformation.ObjectType}).Info("Insert preparation routine stopped")
 
 	prep := func(chunk *connection.ConfigChunk) {
 		pkgs := jsondecoder.JsonDecodePackages{
@@ -449,7 +449,8 @@ func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *config
 		log.WithFields(log.Fields{
 			"type":   objectInformation.ObjectType,
 			"action": "runtime insert/update",
-		}).Infof("Inserting %v %ss on runtime update", updateLen, objectInformation.ObjectType)
+			"amount": updateLen,
+		}).Info("Inserting some objects on runtime update")
 	}
 
 	insertCurrentDeletePackage := func() {

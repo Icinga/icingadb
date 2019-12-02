@@ -136,7 +136,7 @@ func (h *HA) waitForEnvironment(chEnv chan *Environment) {
 func (h *HA) checkResponsibility() {
 	found, _, beat, err := h.getInstance()
 	if err != nil {
-		h.logger.Errorf("Failed to fetch instance: %v", err)
+		h.logger.WithFields(log.Fields{"error": err}).Error("Failed to fetch instance")
 		h.super.ChErr <- errors.New("failed to fetch instance")
 		return
 	}
@@ -152,7 +152,7 @@ func (h *HA) checkResponsibility() {
 		}
 
 		if err != nil {
-			h.logger.Errorf("Failed to insert/update instance: %v", err)
+			h.logger.WithFields(log.Fields{"error": err}).Error("Failed to insert/update instance")
 			h.super.ChErr <- errors.New("failed to insert/update instance")
 			return
 		}
@@ -182,14 +182,14 @@ func (h *HA) runHA(chEnv chan *Environment) {
 			err := h.updateOwnInstance()
 
 			if err != nil {
-				h.logger.Errorf("Failed to update instance: %v", err)
+				h.logger.WithFields(log.Fields{"error": err}).Error("Failed to update instance")
 				h.super.ChErr <- errors.New("failed to update instance")
 				return
 			}
 		} else {
 			_, they, beat, err := h.getInstance()
 			if err != nil {
-				h.logger.Errorf("Failed to fetch instance: %v", err)
+				h.logger.WithFields(log.Fields{"error": err}).Error("Failed to fetch instance")
 				h.super.ChErr <- errors.New("failed to fetch instance")
 				return
 			}
@@ -201,14 +201,14 @@ func (h *HA) runHA(chEnv chan *Environment) {
 				}
 
 				if err := h.updateOwnInstance(); err != nil {
-					h.logger.Errorf("Failed to update instance: %v", err)
+					h.logger.WithFields(log.Fields{"error": err}).Error("Failed to update instance")
 					h.super.ChErr <- errors.New("failed to update instance")
 					return
 				}
 			} else if h.lastHeartbeat-beat > 15 {
 				h.logger.Info("Taking over.")
 				if err := h.takeOverInstance(); err != nil {
-					h.logger.Errorf("Failed to update instance: %v", err)
+					h.logger.WithFields(log.Fields{"error": err}).Error("Failed to update instance")
 					h.super.ChErr <- errors.New("failed to update instance")
 				}
 				h.isActive = true

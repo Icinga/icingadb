@@ -58,7 +58,10 @@ func logSyncCounters() {
 	for {
 		<-every20s.C
 		if syncCounter.host > 0 || syncCounter.service > 0 {
-			log.Infof("Synced %d host and %d service states in the last 20 seconds", syncCounter.host, syncCounter.service)
+			log.WithFields(log.Fields{
+				"host_states":    syncCounter.host,
+				"service_states": syncCounter.service,
+			}).Info("Synced some host and service states in the last 20 seconds")
 			syncCounterLock.Lock()
 			syncCounter.host = 0
 			syncCounter.service = 0
@@ -87,7 +90,10 @@ func syncStates(super *supervisor.Supervisor, objectType string, counter *int, o
 		return
 	}
 
-	log.Debugf("%d %s state will be synced", len(states), objectType)
+	log.WithFields(log.Fields{
+		"amount": len(states),
+		"type":   objectType,
+	}).Debug("Some states will be synced")
 	var storedStateIds []string
 	brokenStates := 0
 
@@ -179,8 +185,14 @@ func syncStates(super *supervisor.Supervisor, objectType string, counter *int, o
 	//Delete synced states from redis stream
 	super.Rdbw.XDel("icinga:state:stream:"+objectType, storedStateIds...)
 
-	log.Debugf("%d %s state synced", len(storedStateIds)-brokenStates, objectType)
-	log.Debugf("%d %s state broken", brokenStates, objectType)
+	log.WithFields(log.Fields{
+		"amount": len(storedStateIds) - brokenStates,
+		"type":   objectType,
+	}).Debug("State synced")
+	log.WithFields(log.Fields{
+		"amount": brokenStates,
+		"type":   objectType,
+	}).Debug("State broken")
 	syncCounterLock.Lock()
 	*counter += len(storedStateIds)
 	syncCounterLock.Unlock()

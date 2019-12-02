@@ -3,6 +3,7 @@
 package prometheus
 
 import (
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
 	"net/http"
@@ -10,6 +11,6 @@ import (
 
 func HandleHttp(addr string, chErr chan error) {
 	http.Handle("/metrics", promhttp.Handler())
-	log.Infof("Serving metrics at http://%s/metrics", addr)
+	log.WithFields(log.Fields{"address": fmt.Sprintf("http://%s/metrics", addr)}).Info("Serving metrics")
 	chErr <- http.ListenAndServe(addr, nil)
 }

@@ -79,7 +79,7 @@ func main() {
 	flag.Parse()
 
 	if err := config.ParseConfig(*configPath); err != nil {
-		log.Fatalf("Error reading config: %v", err)
+		log.WithFields(log.Fields{"error": err}).Fatal("Error reading config")
 	}
 
 	level, _ := log.ParseLevel(config.GetLogging().Level)

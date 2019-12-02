@@ -44,7 +44,10 @@ var historyCounterLock = sync.Mutex{}
 
 func printAndResetHistoryCounter(counter *int, historyType string) {
 	if *counter > 0 {
-		log.Infof("Added %d %s history entries in the last 20 seconds", *counter, historyType)
+		log.WithFields(log.Fields{
+			"count": *counter,
+			"type":  historyType,
+		}).Info("Added some history entries in the last 20 seconds")
 		historyCounterLock.Lock()
 		*counter = 0
 		historyCounterLock.Unlock()
@@ -187,7 +190,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 			stateType, err := strconv.ParseFloat(values["state_type"].(string), 32)
 
 			if err != nil {
-				log.Errorf("StateHistory: Could not parse stateType (%s) into float32", values["state_type"])
+				log.WithFields(log.Fields{"state_type": values["state_type"]}).Error("StateHistory: Could not parse stateType into float32")
 			}
 
 			data := []interface{}{
@@ -467,7 +470,10 @@ func historyWorker(super *supervisor.Supervisor, historyType string, preparedSta
 		return
 	}
 
-	log.Debugf("%d %s history entries will be synced", len(entries), historyType)
+	log.WithFields(log.Fields{
+		"amount": len(entries),
+		"type":   historyType,
+	}).Debug("History entries will be synced")
 	var storedEntryIds []string
 	brokenEntries := 0
 
@@ -522,8 +528,14 @@ func historyWorker(super *supervisor.Supervisor, historyType string, preparedSta
 	*counter++
 	historyCounterLock.Unlock()
 
-	log.Debugf("%d %s history entries synced", count, historyType)
-	log.Debugf("%d %s history entries broken", brokenEntries, historyType)
+	log.WithFields(log.Fields{
+		"count": count,
+		"type":  historyType,
+	}).Debug("Some history entries synced")
+	log.WithFields(log.Fields{
+		"count": brokenEntries,
+		"type":  historyType,
+	}).Debug("Some history entries broken")
 }
 
 // removeEntryFromEntriesSlice removes one redis.XMessage at given index from given slice and returns the resulting slice.
