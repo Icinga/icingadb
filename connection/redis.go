@@ -75,6 +75,7 @@ type RedisClient interface {
 	Publish(channel string, message interface{}) *redis.IntCmd
 	XRead(a *redis.XReadArgs) *redis.XStreamSliceCmd
 	XDel(stream string, ids ...string) *redis.IntCmd
+	XAdd(a *redis.XAddArgs) *redis.StringCmd
 	HKeys(key string) *redis.StringSliceCmd
 	HMGet(key string, fields ...string) *redis.SliceCmd
 	HGetAll(key string) *redis.StringStringMapCmd
@@ -254,6 +255,27 @@ func (rdbw *RDBWrapper) XDel(stream string, ids ...string) *redis.IntCmd {
 		}
 
 		cmd := rdbw.Rdb.XDel(stream, ids...)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// XAdd is a wrapper for connection handling.
+func (rdbw *RDBWrapper) XAdd(a *redis.XAddArgs) *redis.StringCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.XAdd(a)
 		_, err := cmd.Result()
 
 		if err != nil {

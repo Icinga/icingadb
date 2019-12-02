@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"github.com/Icinga/icingadb/connection"
+	"github.com/go-redis/redis"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -25,31 +26,38 @@ func Sha1bytes(bytes []byte) []byte {
 func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment, chErr chan error) {
 	log.Info("Starting heartbeat listener")
 
-	subscription := rdb.Subscribe()
-	defer subscription.Close()
-	if err := subscription.Subscribe("icinga:stats"); err != nil {
-		chErr <- err
-		return
+	xReadArgs := redis.XReadArgs{
+		Streams: []string{"icinga:stats", "0-0"},
+		Count:   1,
+		Block:   0,
 	}
 
 	for {
-		msg, err := subscription.ReceiveMessage()
-		if err != nil {
-			chErr <- err
+		streams, errXR := rdb.XRead(&xReadArgs).Result()
+		if errXR != nil {
+			chErr <- errXR
 			return
 		}
 
-		log.Debug("Got heartbeat")
+		for _, stream := range streams {
+			for _, message := range stream.Messages {
+				log.Debug("Got heartbeat")
 
-		var unJson interface{} = nil
-		if err = json.Unmarshal([]byte(msg.Payload), &unJson); err != nil {
-			chErr <- err
-			return
+				xReadArgs.Streams[1] = message.ID
+
+				if appJson, ok := message.Values["IcingaApplication"].(string); ok {
+					var unJson interface{} = nil
+					if errJU := json.Unmarshal([]byte(appJson), &unJson); errJU != nil {
+						chErr <- errJU
+						return
+					}
+
+					environment := unJson.(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["environment"].(string)
+					nodeName := unJson.(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["node_name"].(string)
+					env := &Environment{Name: environment, ID: Sha1bytes([]byte(environment)), NodeName: nodeName}
+					chEnv <- env
+				}
+			}
 		}
-
-		environment := unJson.(map[string]interface{})["IcingaApplication"].(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["environment"].(string)
-		nodeName := unJson.(map[string]interface{})["IcingaApplication"].(map[string]interface{})["status"].(map[string]interface{})["icingaapplication"].(map[string]interface{})["app"].(map[string]interface{})["node_name"].(string)
-		env := &Environment{Name: environment, ID: Sha1bytes([]byte(environment)), NodeName: nodeName}
-		chEnv <- env
 	}
 }
