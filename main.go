@@ -62,10 +62,19 @@ import (
 	"github.com/Icinga/icingadb/prometheus"
 	"github.com/Icinga/icingadb/supervisor"
 	log "github.com/sirupsen/logrus"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 )
 
 func main() {
+	{
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGTERM, syscall.SIGINT)
+		go handleSignal(ch)
+	}
+
 	configPath := flag.String("config", "icingadb.ini", "path to config")
 	flag.Parse()
 
@@ -201,5 +210,12 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		go func(information *configobject.ObjectInformation) {
 			super.ChErr <- configsync.Operator(super, haInstance.RegisterNotificationListener(information.NotificationListenerType), information)
 		}(objectInformation)
+	}
+}
+
+func handleSignal(ch <-chan os.Signal) {
+	if sig, ok := <-ch; ok {
+		log.WithFields(log.Fields{"signal": sig}).Info("Shutting down")
+		os.Exit(0)
 	}
 }
