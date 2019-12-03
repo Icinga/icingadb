@@ -6,19 +6,21 @@ import (
 	"encoding/json"
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/connection"
+	"github.com/go-redis/redis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
-var icingastate = "{\"IcingaApplication\":" +
-	"{\"status\": " +
+const app = "{\"status\": " +
 	"{\"icingaapplication\":" +
 	"{\"app\":{" +
 	"\"environment\": \"\"," +
 	"\"node_name\": \"master1.icinga.test.com\"" +
-	"}}}}, \"config_dump_in_progress\": false}"
+	"}}}}"
+
+const dump = "false"
 
 func TestIcingaHeartbeatListener(t *testing.T) {
 	rdb := connection.NewRDBWrapper(testbackends.RedisTestAddr, 64)
@@ -35,11 +37,17 @@ func TestIcingaHeartbeatListener(t *testing.T) {
 	time.Sleep(time.Second * 2)
 
 	var uj interface{} = nil
-	if err := json.Unmarshal([]byte(icingastate), &uj); err != nil {
-		assert.Nil(t, err)
-	}
+	assert.Nil(t, json.Unmarshal([]byte(app), &uj))
+	assert.Nil(t, json.Unmarshal([]byte(dump), &uj))
 
-	rdb.Rdb.Publish("icinga:stats", icingastate)
+	rdb.Rdb.XAdd(&redis.XAddArgs{
+		Stream: "icinga:stats",
+		ID:     "*",
+		Values: map[string]interface{}{
+			"IcingaApplication":       app,
+			"config_dump_in_progress": dump,
+		},
+	})
 
 	env := <-chEnv
 
