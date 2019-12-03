@@ -65,7 +65,8 @@ var mysqlObservers = struct {
 }
 
 func (h *HA) updateOwnInstance(env *Environment) error {
-	_, err := h.super.Dbw.SqlExec(mysqlObservers.updateIcingadbInstanceById,
+	_, err := h.super.Dbw.SqlExec(
+		mysqlObservers.updateIcingadbInstanceById,
 		"UPDATE icingadb_instance SET endpoint_id = ?, heartbeat = ?,"+
 			" icinga2_version = ?, icinga2_start_time = ? WHERE id = ?",
 		env.Icinga2.EndpointId, h.lastHeartbeat, env.Icinga2.Version,
@@ -74,7 +75,8 @@ func (h *HA) updateOwnInstance(env *Environment) error {
 }
 
 func (h *HA) takeOverInstance(env *Environment) error {
-	_, err := h.super.Dbw.SqlExec(mysqlObservers.updateIcingadbInstanceByEnvironmentId,
+	_, err := h.super.Dbw.SqlExec(
+		mysqlObservers.updateIcingadbInstanceByEnvironmentId,
 		"UPDATE icingadb_instance SET id = ?, endpoint_id = ?, heartbeat = ?,"+
 			" icinga2_version = ?, icinga2_start_time = ? WHERE environment_id = ?",
 		h.uid[:], env.Icinga2.EndpointId, h.lastHeartbeat, env.Icinga2.Version,
@@ -83,7 +85,8 @@ func (h *HA) takeOverInstance(env *Environment) error {
 }
 
 func (h *HA) insertInstance(env *Environment) error {
-	_, err := h.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
+	_, err := h.super.Dbw.SqlExec(
+		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, endpoint_id, heartbeat, responsible,"+
 			" icinga2_version, icinga2_start_time) VALUES (?, ?, ?, ?, 'y', ?, ?)",
 		h.uid[:], h.super.EnvId, env.Icinga2.EndpointId,
@@ -92,7 +95,8 @@ func (h *HA) insertInstance(env *Environment) error {
 }
 
 func (h *HA) getInstance() (bool, uuid.UUID, int64, error) {
-	rows, err := h.super.Dbw.SqlFetchAll(mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
+	rows, err := h.super.Dbw.SqlFetchAll(
+		mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		h.super.EnvId,
 	)
