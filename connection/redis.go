@@ -82,6 +82,12 @@ type RedisClient interface {
 	TxPipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
 	Pipeline() redis.Pipeliner
 	Subscribe(channels ...string) *redis.PubSub
+	Eval(script string, keys []string, args ...interface{}) *redis.Cmd
+	EvalSha(sha1 string, keys []string, args ...interface{}) *redis.Cmd
+	ScriptExists(hashes ...string) *redis.BoolSliceCmd
+	ScriptLoad(script string) *redis.StringCmd
+	SAdd(key string, members ...interface{}) *redis.IntCmd
+	SRem(key string, members ...interface{}) *redis.IntCmd
 }
 
 type StatusCmd interface {
@@ -358,6 +364,132 @@ func (rdbw *RDBWrapper) HGetAll(key string) *redis.StringStringMapCmd {
 		}).Debug("Ran Query")
 
 		return res
+	}
+}
+
+// Eval is a wrapper for connection handling.
+func (rdbw *RDBWrapper) Eval(script string, keys []string, args ...interface{}) *redis.Cmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.Eval(script, keys, args...)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// EvalSha is a wrapper for connection handling.
+func (rdbw *RDBWrapper) EvalSha(sha1 string, keys []string, args ...interface{}) *redis.Cmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.EvalSha(sha1, keys, args...)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// ScriptExists is a wrapper for connection handling.
+func (rdbw *RDBWrapper) ScriptExists(hashes ...string) *redis.BoolSliceCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.ScriptExists(hashes...)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// ScriptLoad is a wrapper for connection handling.
+func (rdbw *RDBWrapper) ScriptLoad(script string) *redis.StringCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.ScriptLoad(script)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// SAdd is a wrapper for connection handling.
+func (rdbw *RDBWrapper) SAdd(key string, members ...interface{}) *redis.IntCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.SAdd(key, members...)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// SRem is a wrapper for connection handling.
+func (rdbw *RDBWrapper) SRem(key string, members ...interface{}) *redis.IntCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.SRem(key, members...)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
 	}
 }
 

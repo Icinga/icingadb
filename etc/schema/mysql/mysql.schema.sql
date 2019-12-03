@@ -126,6 +126,7 @@ CREATE TABLE host_state (
   is_handled enum('y', 'n') NOT NULL,
   is_reachable enum('y', 'n') NOT NULL,
   is_flapping enum('y', 'n') NOT NULL,
+  is_overdue enum('y', 'n') NOT NULL,
 
   is_acknowledged enum('y', 'n', 'sticky') NOT NULL,
   acknowledgement_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
@@ -261,6 +262,7 @@ CREATE TABLE service_state (
   is_handled enum('y', 'n') NOT NULL,
   is_reachable enum('y', 'n') NOT NULL,
   is_flapping enum('y', 'n') NOT NULL,
+  is_overdue enum('y', 'n') NOT NULL,
 
   is_acknowledged enum('y', 'n', 'sticky') NOT NULL,
   acknowledgement_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
