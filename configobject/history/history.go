@@ -22,6 +22,7 @@ var mysqlObservers = struct {
 	downtime         prometheus.Observer
 	comment          prometheus.Observer
 	flapping         prometheus.Observer
+	acknowledgement  prometheus.Observer
 }{
 	connection.DbIoSeconds.WithLabelValues("mysql", "replace into state_history"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "replace into notification_history"),
@@ -29,6 +30,7 @@ var mysqlObservers = struct {
 	connection.DbIoSeconds.WithLabelValues("mysql", "replace into downtime_history"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "replace into comment_history"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "replace into flapping_history"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "replace into acknowledgement_history"),
 }
 
 var historyCounter = struct {
@@ -38,6 +40,7 @@ var historyCounter = struct {
 	downtime         int
 	comment          int
 	flapping         int
+	acknowledgement  int
 }{}
 
 var historyCounterLock = sync.Mutex{}
@@ -64,6 +67,7 @@ func logHistoryCounters() {
 		printAndResetHistoryCounter(&historyCounter.downtime, "downtime")
 		printAndResetHistoryCounter(&historyCounter.comment, "comment")
 		printAndResetHistoryCounter(&historyCounter.flapping, "flapping")
+		printAndResetHistoryCounter(&historyCounter.acknowledgement, "acknowledgement")
 	}
 }
 
@@ -75,6 +79,7 @@ func StartHistoryWorkers(super *supervisor.Supervisor) {
 		downtimeHistoryWorker,
 		commentHistoryWorker,
 		flappingHistoryWorker,
+		acknowledgementHistoryWorker,
 	}
 
 	for workerId := range workers {
@@ -446,6 +451,58 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 	}
 
 	historyWorker(super, "flapping", statements, dataFunctions, mysqlObservers.flapping, &historyCounter.flapping)
+}
+
+func acknowledgementHistoryWorker(super *supervisor.Supervisor) {
+	statements := []string{
+		`REPLACE INTO acknowledgement_history (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time,` +
+			`author, comment, expire_time, is_sticky, is_persistent)` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id,` +
+			` acknowledgement_history_id, event_type, event_time)` +
+			`VALUES (?,?,?,?,?,?,?,?,?)`,
+	}
+
+	dataFunctions := []func(values map[string]interface{}) []interface{}{
+		func(values map[string]interface{}) []interface{} {
+			id := uuid.MustParse(values["id"].(string))
+			data := []interface{}{
+				id[:],
+				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
+				values["object_type"].(string),
+				utils.EncodeChecksum(values["host_id"].(string)),
+				utils.DecodeHexIfNotNil(values["service_id"]),
+				values["event_time"],
+				values["author"],
+				values["comment"],
+				values["expire_time"],
+				utils.RedisIntToDBBoolean(values["is_sticky"]),
+				utils.RedisIntToDBBoolean(values["is_persistent"]),
+			}
+
+			return data
+		},
+		func(values map[string]interface{}) []interface{} {
+			id := uuid.MustParse(values["id"].(string))
+
+			data := []interface{}{
+				id[:],
+				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
+				values["object_type"].(string),
+				utils.EncodeChecksum(values["host_id"].(string)),
+				utils.DecodeHexIfNotNil(values["service_id"]),
+				id[:],
+				values["event_type"],
+				values["event_time"],
+			}
+
+			return data
+		},
+	}
+
+	historyWorker(super, "acknowledgement", statements, dataFunctions, mysqlObservers.acknowledgement, &historyCounter.acknowledgement)
 }
 
 func historyWorker(super *supervisor.Supervisor, historyType string, preparedStatements []string, dataFunctions []func(map[string]interface{}) []interface{}, observer prometheus.Observer, counter *int) {
