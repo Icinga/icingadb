@@ -7,6 +7,7 @@ import (
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
+	"github.com/Icinga/icingadb/utils"
 	"github.com/go-redis/redis"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -130,13 +131,35 @@ func TestHA_waitForEnvironment(t *testing.T) {
 	wg.Add(1)
 
 	go func() {
-		ha.waitForEnvironment(chEnv)
-		assert.Equal(t, []byte("my.env"), ha.super.EnvId)
+		env := ha.waitForEnvironment(chEnv)
+		assert.Equal(t, []byte("my.env"), env.ID)
 		wg.Done()
 	}()
 
 	chEnv <- &Environment{ID: []byte("my.env")}
 	wg.Wait()
+}
+
+func TestHA_setAndInsertEnvironment(t *testing.T) {
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
+
+	env := Environment{
+		ID: utils.EncodeChecksum(utils.Checksum("herp")),
+		Name: "herp",
+	}
+
+	err := ha.setAndInsertEnvironment(&env)
+	require.NoError(t, err, "setAndInsertEnvironment should not return an error")
+
+	rows, err := ha.super.Dbw.SqlFetchAll(
+		mysqlTestObserver,
+		"SELECT name from environment where id = ? LIMIT 1",
+		ha.super.EnvId,
+	)
+
+	require.NoError(t, err, "There was an unexpected SQL error")
+	assert.Equal(t, 1, len(rows), "There should be a row inserted")
+	assert.Equal(t, env.Name, rows[0][0], "name must match")
 }
 
 func TestHA_runHA(t *testing.T) {
