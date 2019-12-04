@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/go-redis/redis"
@@ -53,11 +54,13 @@ var mysqlObservers = struct {
 	updateIcingadbInstanceById                           prometheus.Observer
 	updateIcingadbInstanceByEnvironmentId                prometheus.Observer
 	insertIntoIcingadbInstance                           prometheus.Observer
+	insertIntoEnvironment                                prometheus.Observer
 	selectIdHeartbeatFromIcingadbInstanceByEnvironmentId prometheus.Observer
 }{
 	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by id"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by environment_id"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "insert into icingadb_instance"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "insert into environment"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "select id, heartbeat from icingadb_instance where environment_id = ourEnvID"),
 }
 
@@ -109,6 +112,10 @@ func (h *HA) getInstance() (bool, uuid.UUID, int64, error) {
 
 func (h *HA) StartHA(chEnv chan *Environment) {
 	env := h.waitForEnvironment(chEnv)
+	err := h.setAndInsertEnvironment(env)
+	if err != nil {
+		h.super.ChErr <- fmt.Errorf("Could not insert environment into MySQL: %s", err.Error())
+	}
 
 	h.logger = log.WithFields(log.Fields{
 		"context":     "HA",
@@ -138,8 +145,19 @@ func (h *HA) waitForEnvironment(chEnv chan *Environment) *Environment {
 		return &Environment{}
 	}
 
-	h.super.EnvId = env.ID
 	return env
+}
+
+func (h *HA) setAndInsertEnvironment(env *Environment) error {
+	h.super.EnvId = env.ID
+
+	_, err := h.super.Dbw.SqlExec(
+		mysqlObservers.insertIntoEnvironment,
+		"REPLACE INTO environment(id, name) VALUES (?, ?)",
+		env.ID, env.Name,
+	)
+
+	return err
 }
 
 func (h *HA) checkResponsibility(env *Environment) {
