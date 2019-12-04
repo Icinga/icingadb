@@ -231,7 +231,8 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 
 // InsertPrepWorker fetches config for IDs(chInsert) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
 func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsert <-chan []string, chInsertBack chan<- []connection.Row) {
-	defer log.Infof("%s: Insert preparation routine stopped", objectInformation.ObjectType)
+	log.Debugf("%s: Insert preparation worker started", objectInformation.ObjectType)
+	defer log.Debugf("%s: Insert preparation worker stopped", objectInformation.ObjectType)
 
 	prep := func(chunk *connection.ConfigChunk) {
 		pkgs := jsondecoder.JsonDecodePackages{
@@ -279,6 +280,9 @@ func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 
 // InsertExecWorker gets decoded connection.Row objects from the JsonDecodePool and inserts them into MySQL
 func InsertExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsertBack <-chan []connection.Row, wg *sync.WaitGroup) {
+	log.Debugf("%s: Insert execution worker started", objectInformation.ObjectType)
+	defer log.Debugf("%s: Insert execution worker stopped", objectInformation.ObjectType)
+
 	for rows := range chInsertBack {
 		select {
 		case _, ok := <-done:
@@ -299,6 +303,9 @@ func InsertExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 
 // DeleteExecWorker deletes IDs(chDelete) from MySQL
 func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chDelete <-chan []string, wg *sync.WaitGroup) {
+	log.Debugf("%s: Delete execution worker started", objectInformation.ObjectType)
+	defer log.Debugf("%s: Delete execution worker stopped", objectInformation.ObjectType)
+
 	for keys := range chDelete {
 		select {
 		case _, ok := <-done:
@@ -320,6 +327,9 @@ func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 // UpdateCompWorker gets IDs(chUpdateComp) that might need an update, fetches the corresponding checksums for Redis and MySQL,
 // compares them and inserts changed IDs into chUpdate.
 func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdateComp <-chan []string, chUpdate chan<- []string, wg *sync.WaitGroup) {
+	log.Debugf("%s: Update comparison worker started", objectInformation.ObjectType)
+	defer log.Debugf("%s: Update comparison worker stopped", objectInformation.ObjectType)
+
 	prep := func(chunk *connection.ChecksumChunk, mysqlChecksums map[string]map[string]string) {
 		changed := make([]string, 0)
 		for i, key := range chunk.Keys {
@@ -368,6 +378,9 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 
 // UpdatePrepWorker fetches config for IDs(chUpdate) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
 func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdate <-chan []string, chUpdateBack chan<- []connection.Row) {
+	log.Debugf("%s: Update preparation worker started", objectInformation.ObjectType)
+	defer log.Debugf("%s: Update preparation worker stopped", objectInformation.ObjectType)
+
 	prep := func(chunk *connection.ConfigChunk) {
 		pkgs := jsondecoder.JsonDecodePackages{
 			ChBack: chUpdateBack,
@@ -409,6 +422,9 @@ func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 
 // UpdateExecWorker gets decoded connection.Row objects from the JsonDecodePool and updates them in MySQL
 func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdateBack <-chan []connection.Row, wg *sync.WaitGroup, updateCounter *uint32) {
+	log.Debugf("%s: Update execution worker started", objectInformation.ObjectType)
+	defer log.Debugf("%s: Update execution worker stopped", objectInformation.ObjectType)
+
 	for rows := range chUpdateBack {
 		select {
 		case _, ok := <-done:
