@@ -306,8 +306,12 @@ CREATE TABLE environment (
 CREATE TABLE icingadb_instance (
   id binary(16) NOT NULL COMMENT 'UUIDv4',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
   heartbeat bigint(20) unsigned NOT NULL COMMENT '*nix timestamp',
   responsible enum('y','n') NOT NULL,
+
+  icinga2_version varchar(255) NOT NULL,
+  icinga2_start_time bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;

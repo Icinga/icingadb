@@ -61,23 +61,30 @@ var mysqlObservers = struct {
 	connection.DbIoSeconds.WithLabelValues("mysql", "select id, heartbeat from icingadb_instance where environment_id = ourEnvID"),
 }
 
-func (h *HA) updateOwnInstance() error {
+func (h *HA) updateOwnInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(mysqlObservers.updateIcingadbInstanceById,
-		"UPDATE icingadb_instance SET heartbeat = ? WHERE id = ?", h.lastHeartbeat, h.uid[:])
+		"UPDATE icingadb_instance SET endpoint_id = ?, heartbeat = ?,"+
+			" icinga2_version = ?, icinga2_start_time = ? WHERE id = ?",
+		env.Icinga2.EndpointId, h.lastHeartbeat, env.Icinga2.Version,
+		int64(env.Icinga2.ProgramStart*1000), h.uid[:])
 	return err
 }
 
-func (h *HA) takeOverInstance() error {
+func (h *HA) takeOverInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(mysqlObservers.updateIcingadbInstanceByEnvironmentId,
-		"UPDATE icingadb_instance SET id = ?, heartbeat = ? WHERE environment_id = ?",
-		h.uid[:], h.lastHeartbeat, h.super.EnvId)
+		"UPDATE icingadb_instance SET id = ?, endpoint_id = ?, heartbeat = ?,"+
+			" icinga2_version = ?, icinga2_start_time = ? WHERE environment_id = ?",
+		h.uid[:], env.Icinga2.EndpointId, h.lastHeartbeat, env.Icinga2.Version,
+		int64(env.Icinga2.ProgramStart*1000), h.super.EnvId)
 	return err
 }
 
-func (h *HA) insertInstance() error {
+func (h *HA) insertInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
-		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible) VALUES (?, ?, ?, 'y')",
-		h.uid[:], h.super.EnvId, h.lastHeartbeat)
+		"INSERT INTO icingadb_instance(id, environment_id, endpoint_id, heartbeat, responsible,"+
+			" icinga2_version, icinga2_start_time) VALUES (?, ?, ?, ?, 'y', ?, ?)",
+		h.uid[:], h.super.EnvId, env.Icinga2.EndpointId,
+		h.lastHeartbeat, env.Icinga2.Version, int64(env.Icinga2.ProgramStart*1000))
 	return err
 }
 
@@ -101,7 +108,7 @@ func (h *HA) getInstance() (bool, uuid.UUID, int64, error) {
 }
 
 func (h *HA) StartHA(chEnv chan *Environment) {
-	h.waitForEnvironment(chEnv)
+	env := h.waitForEnvironment(chEnv)
 
 	h.logger = log.WithFields(log.Fields{
 		"context":     "HA",
@@ -111,7 +118,7 @@ func (h *HA) StartHA(chEnv chan *Environment) {
 
 	h.logger.Info("Got initial environment.")
 
-	h.checkResponsibility()
+	h.checkResponsibility(env)
 
 	h.heartbeatTimer = time.NewTimer(time.Second * 15)
 
@@ -120,7 +127,7 @@ func (h *HA) StartHA(chEnv chan *Environment) {
 	}
 }
 
-func (h *HA) waitForEnvironment(chEnv chan *Environment) {
+func (h *HA) waitForEnvironment(chEnv chan *Environment) *Environment {
 	// Wait for first heartbeat
 	env := <-chEnv
 	if env == nil {
@@ -128,12 +135,14 @@ func (h *HA) waitForEnvironment(chEnv chan *Environment) {
 			"context": "HA",
 		}).Error("Received empty environment.")
 		h.super.ChErr <- errors.New("received empty environment")
-		return
+		return &Environment{}
 	}
+
 	h.super.EnvId = env.ID
+	return env
 }
 
-func (h *HA) checkResponsibility() {
+func (h *HA) checkResponsibility(env *Environment) {
 	found, _, beat, err := h.getInstance()
 	if err != nil {
 		h.logger.Errorf("Failed to fetch instance: %v", err)
@@ -146,9 +155,9 @@ func (h *HA) checkResponsibility() {
 
 		// This means there was no instance row match, insert
 		if !found {
-			err = h.insertInstance()
+			err = h.insertInstance(env)
 		} else {
-			err = h.takeOverInstance()
+			err = h.takeOverInstance(env)
 		}
 
 		if err != nil {
@@ -179,7 +188,7 @@ func (h *HA) runHA(chEnv chan *Environment) {
 		h.lastHeartbeat = time.Now().Unix()
 
 		if h.lastHeartbeat-previous < 10 && h.isActive {
-			err := h.updateOwnInstance()
+			err := h.updateOwnInstance(env)
 
 			if err != nil {
 				h.logger.Errorf("Failed to update instance: %v", err)
@@ -200,14 +209,14 @@ func (h *HA) runHA(chEnv chan *Environment) {
 					h.isActive = true
 				}
 
-				if err := h.updateOwnInstance(); err != nil {
+				if err := h.updateOwnInstance(env); err != nil {
 					h.logger.Errorf("Failed to update instance: %v", err)
 					h.super.ChErr <- errors.New("failed to update instance")
 					return
 				}
 			} else if h.lastHeartbeat-beat > 15 {
 				h.logger.Info("Taking over.")
-				if err := h.takeOverInstance(); err != nil {
+				if err := h.takeOverInstance(env); err != nil {
 					h.logger.Errorf("Failed to update instance: %v", err)
 					h.super.ChErr <- errors.New("failed to update instance")
 				}
