@@ -11,7 +11,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"strconv"
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -34,23 +34,20 @@ var mysqlObservers = struct {
 }
 
 var historyCounter = struct {
-	state            int
-	notification     int
-	usernotification int
-	downtime         int
-	comment          int
-	flapping         int
-	acknowledgement  int
+	state            uint64
+	notification     uint64
+	usernotification uint64
+	downtime         uint64
+	comment          uint64
+	flapping         uint64
+	acknowledgement  uint64
 }{}
 
-var historyCounterLock = sync.Mutex{}
+func printAndResetHistoryCounter(counter *uint64, historyType string) {
+	amount := atomic.SwapUint64(counter, 0)
 
-func printAndResetHistoryCounter(counter *int, historyType string) {
-	if *counter > 0 {
-		log.Infof("Added %d %s history entries in the last 20 seconds", *counter, historyType)
-		historyCounterLock.Lock()
-		*counter = 0
-		historyCounterLock.Unlock()
+	if amount > 0 {
+		log.Infof("Added %d %s history entries in the last 20 seconds", amount, historyType)
 	}
 }
 
@@ -505,7 +502,7 @@ func acknowledgementHistoryWorker(super *supervisor.Supervisor) {
 	historyWorker(super, "acknowledgement", statements, dataFunctions, mysqlObservers.acknowledgement, &historyCounter.acknowledgement)
 }
 
-func historyWorker(super *supervisor.Supervisor, historyType string, preparedStatements []string, dataFunctions []func(map[string]interface{}) []interface{}, observer prometheus.Observer, counter *int) {
+func historyWorker(super *supervisor.Supervisor, historyType string, preparedStatements []string, dataFunctions []func(map[string]interface{}) []interface{}, observer prometheus.Observer, counter *uint64) {
 	if super.EnvId == nil {
 		log.Debug(historyType + "History: Waiting for EnvId to be set")
 		time.Sleep(time.Second)
@@ -574,10 +571,7 @@ func historyWorker(super *supervisor.Supervisor, historyType string, preparedSta
 	super.Rdbw.XDel("icinga:history:stream:"+historyType, storedEntryIds...)
 
 	count := len(storedEntryIds) - brokenEntries
-
-	historyCounterLock.Lock()
-	*counter++
-	historyCounterLock.Unlock()
+	atomic.AddUint64(counter, 1)
 
 	log.Debugf("%d %s history entries synced", count, historyType)
 	log.Debugf("%d %s history entries broken", brokenEntries, historyType)
