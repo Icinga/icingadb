@@ -12,13 +12,14 @@ import (
 	log "github.com/sirupsen/logrus"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // syncCounter counts on how many host/service states have synced since the last logSyncCounters().
 var syncCounter = struct {
-	host    int
-	service int
+	host    uint64
+	service uint64
 }{}
 
 var syncCounterLock = sync.Mutex{}
@@ -57,18 +58,18 @@ func logSyncCounters() {
 
 	for {
 		<-every20s.C
-		if syncCounter.host > 0 || syncCounter.service > 0 {
-			log.Infof("Synced %d host and %d service states in the last 20 seconds", syncCounter.host, syncCounter.service)
-			syncCounterLock.Lock()
-			syncCounter.host = 0
-			syncCounter.service = 0
-			syncCounterLock.Unlock()
+
+		host := atomic.SwapUint64(&syncCounter.host, 0)
+		service := atomic.SwapUint64(&syncCounter.service, 0)
+
+		if host > 0 || service > 0 {
+			log.Infof("Synced %d host and %d service states in the last 20 seconds", host, service)
 		}
 	}
 }
 
 // syncStates tries to sync the states of given object type every second.
-func syncStates(super *supervisor.Supervisor, objectType string, counter *int, observer prometheus.Observer) {
+func syncStates(super *supervisor.Supervisor, objectType string, counter *uint64, observer prometheus.Observer) {
 	if super.EnvId == nil {
 		log.Debug("StateSync: Waiting for EnvId to be set")
 		time.Sleep(time.Second)
@@ -182,7 +183,7 @@ func syncStates(super *supervisor.Supervisor, objectType string, counter *int, o
 	log.Debugf("%d %s state synced", len(storedStateIds)-brokenStates, objectType)
 	log.Debugf("%d %s state broken", brokenStates, objectType)
 	syncCounterLock.Lock()
-	*counter += len(storedStateIds)
+	atomic.AddUint64(counter, uint64(len(storedStateIds)))
 	syncCounterLock.Unlock()
 	StateSyncsTotal.WithLabelValues(objectType).Add(float64(len(storedStateIds)))
 }
