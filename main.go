@@ -32,6 +32,7 @@ import (
 	"github.com/Icinga/icingadb/configobject/objecttypes/notesurl"
 	"github.com/Icinga/icingadb/configobject/objecttypes/notification"
 	"github.com/Icinga/icingadb/configobject/objecttypes/notification/notificationcustomvar"
+	"github.com/Icinga/icingadb/configobject/objecttypes/notification/notificationrecipient"
 	"github.com/Icinga/icingadb/configobject/objecttypes/notification/notificationuser"
 	"github.com/Icinga/icingadb/configobject/objecttypes/notification/notificationusergroup"
 	"github.com/Icinga/icingadb/configobject/objecttypes/notificationcommand"
@@ -169,6 +170,7 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&notificationcustomvar.ObjectInformation,
 		&notificationuser.ObjectInformation,
 		&notificationusergroup.ObjectInformation,
+		&notificationrecipient.ObjectInformation,
 
 		&customvar.ObjectInformation,
 		&customvarflat.ObjectInformation,

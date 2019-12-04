@@ -585,6 +585,16 @@ CREATE TABLE notification_usergroup (
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
+CREATE TABLE notification_recipient (
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + (user_id | usergroup_id))',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  notification_id binary(20) NOT NULL COMMENT 'notification.id',
+  user_id binary(20) NULL COMMENT 'user.id',
+  usergroup_id binary(20) NULL COMMENT 'usergroup.id',
+
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
 CREATE TABLE notification_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + customvar_id)',
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
