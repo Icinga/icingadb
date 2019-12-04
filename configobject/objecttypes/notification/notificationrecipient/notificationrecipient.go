@@ -6,7 +6,6 @@ import (
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -41,9 +40,6 @@ func (n *NotificationRecipient) InsertValues() []interface{} {
 
 func (n *NotificationRecipient) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
-
-	logrus.Info(n.UserId)
-	logrus.Info(n.UserGroupId)
 
 	v = append(
 		v,
