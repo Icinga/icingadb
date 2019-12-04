@@ -58,7 +58,8 @@ func TestHA_InsertInstance(t *testing.T) {
 	err := ha.insertInstance(&Environment{})
 	require.NoError(t, err, "insertInstance should not return an error")
 
-	rows, err := ha.super.Dbw.SqlFetchAll(mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
+	rows, err := ha.super.Dbw.SqlFetchAll(
+		mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		ha.super.EnvId,
 	)
@@ -81,9 +82,11 @@ func TestHA_checkResponsibility(t *testing.T) {
 	_, err := ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
-	_, err = ha.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
+	_, err = ha.super.Dbw.SqlExec(
+		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible, icinga2_version, icinga2_start_time) VALUES (?, ?, ?, 'y', '', 0)",
-		ha.uid[:], ha.super.EnvId, 0)
+		ha.uid[:], ha.super.EnvId, 0,
+	)
 
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
@@ -95,9 +98,11 @@ func TestHA_checkResponsibility(t *testing.T) {
 	_, err = ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
-	_, err = ha.super.Dbw.SqlExec(mysqlObservers.insertIntoIcingadbInstance,
+	_, err = ha.super.Dbw.SqlExec(
+		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible, icinga2_version, icinga2_start_time) VALUES (?, ?, ?, 'y', '', 0)",
-		ha.uid[:], ha.super.EnvId, time.Now().Unix())
+		ha.uid[:], ha.super.EnvId, time.Now().Unix(),
+	)
 
 	ha.isActive = false
 	ha.checkResponsibility(&Environment{})
