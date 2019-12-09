@@ -925,10 +925,11 @@ CREATE TABLE acknowledgement_history (
   set_time bigint(20) unsigned NOT NULL,
   clear_time bigint(20) unsigned NULL DEFAULT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
+  cleared_by varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   comment text DEFAULT NULL,
   expire_time bigint(20) unsigned DEFAULT NULL,
-  is_sticky enum('y','n') DEFAULT NULL,
-  is_persistent enum('y','n') DEFAULT NULL,
+  is_sticky enum('y','n') NOT NULL,
+  is_persistent enum('y','n') NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;

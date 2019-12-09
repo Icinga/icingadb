@@ -144,3 +144,12 @@ func TimeToFloat(t time.Time) float64 {
 	secs := t.Unix()
 	return float64(secs) + float64(t.Sub(time.Unix(secs, 0)))/float64(time.Second)
 }
+
+// DefaultIfNil returns a defaultValue, if the given value is nil
+func DefaultIfNil(value, defaultValue interface{}) interface{} {
+	if value != nil {
+		return value
+	} else {
+		return defaultValue
+	}
+}
