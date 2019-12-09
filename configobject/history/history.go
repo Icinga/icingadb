@@ -243,8 +243,8 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 func downtimeHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
 		`REPLACE INTO downtime_history (downtime_id, environment_id, endpoint_id, triggered_by_id, object_type, host_id, service_id, entry_time,` +
-			`author, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, start_time, end_time, has_been_cancelled, trigger_time, cancel_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`author, cancelled_by, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, start_time, end_time, has_been_cancelled, trigger_time, cancel_time)` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -267,6 +267,7 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 				utils.DecodeHexIfNotNil(values["service_id"]),
 				values["entry_time"],
 				values["author"],
+				values["cancelled_by"],
 				values["comment"],
 				utils.RedisIntToDBBoolean(values["is_flexible"]),
 				values["flexible_duration"],
@@ -319,8 +320,8 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 func commentHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
 		`REPLACE INTO comment_history (comment_id, environment_id, endpoint_id, object_type, host_id, service_id, entry_time, author,` +
-			`comment, entry_type, is_persistent, is_sticky, expire_time, remove_time, has_been_removed)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+			`removed_by, comment, entry_type, is_persistent, is_sticky, expire_time, remove_time, has_been_removed)` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -337,6 +338,7 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 				utils.DecodeHexIfNotNil(values["service_id"]),
 				values["entry_time"],
 				values["author"],
+				values["removed_by"],
 				values["comment"],
 				utils.CommentEntryTypes[values["entry_type"].(string)],
 				utils.RedisIntToDBBoolean(values["is_persistent"]),

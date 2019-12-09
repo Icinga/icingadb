@@ -874,6 +874,7 @@ CREATE TABLE downtime_history (
 
   entry_time bigint(20) unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
+  cancelled_by varchar(255) NULL DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,
   is_flexible enum('y', 'n') NOT NULL,
   flexible_duration bigint(20) unsigned NOT NULL,
@@ -898,6 +899,7 @@ CREATE TABLE comment_history (
 
   entry_time bigint(20) unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
+  removed_by varchar(255) NULL DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,
   entry_type enum('comment','ack') NOT NULL,
   is_persistent enum('y','n') NOT NULL,
