@@ -136,46 +136,52 @@ func syncOverdue(super *supervisor.Supervisor, objectType string, counter *uint6
 // and updates icingadb:overdue:objectType respectively.
 func updateOverdue(super *supervisor.Supervisor, objectType string, counter *uint64, observer prometheus.Observer, ids []interface{}, overdue bool) {
 	if len(ids) > 0 {
-		placeholders := make([]string, 0, len(ids))
-		for len(placeholders) < cap(placeholders) {
-			placeholders = append(placeholders, "?")
-		}
-
-		args := make([]interface{}, 0, len(ids))
-		for _, hexId := range ids {
-			id, errHD := hex.DecodeString(hexId.(string))
-			if errHD != nil {
-				super.ChErr <- errHD
-				return
+		if overdue {
+			if _, errOp := super.Rdbw.SAdd("icingadb:overdue:"+objectType, ids...).Result(); errOp != nil {
+				super.ChErr <- errOp
 			}
-
-			args = append(args, id)
 		}
 
-		_, errSE := super.Dbw.SqlExec(
-			observer,
-			fmt.Sprintf(
-				"UPDATE %s_state SET is_overdue='%s' WHERE %s_id IN (%s)",
-				objectType, utils.Bool[overdue], objectType, strings.Join(placeholders, ","),
-			),
-			args...,
-		)
-		if errSE != nil {
-			super.ChErr <- errSE
-			return
-		}
+		updateOverdueInDb(super, objectType, observer, ids, overdue)
 
 		atomic.AddUint64(counter, uint64(len(ids)))
 
-		var op func(key string, members ...interface{}) *redis.IntCmd
-		if overdue {
-			op = super.Rdbw.SAdd
-		} else {
-			op = super.Rdbw.SRem
+		if !overdue {
+			if _, errOp := super.Rdbw.SRem("icingadb:overdue:"+objectType, ids...).Result(); errOp != nil {
+				super.ChErr <- errOp
+			}
+		}
+	}
+}
+
+// updateOverdueInDb sets objectType_state#is_overdue for ids to overdue.
+func updateOverdueInDb(super *supervisor.Supervisor, objectType string, observer prometheus.Observer, ids []interface{}, overdue bool) {
+	placeholders := make([]string, 0, len(ids))
+	for len(placeholders) < cap(placeholders) {
+		placeholders = append(placeholders, "?")
+	}
+
+	args := make([]interface{}, 0, len(ids))
+	for _, hexId := range ids {
+		id, errHD := hex.DecodeString(hexId.(string))
+		if errHD != nil {
+			super.ChErr <- errHD
+			return
 		}
 
-		if _, errOp := op("icingadb:overdue:"+objectType, ids...).Result(); errOp != nil {
-			super.ChErr <- errSE
-		}
+		args = append(args, id)
+	}
+
+	_, errSE := super.Dbw.SqlExec(
+		observer,
+		fmt.Sprintf(
+			"UPDATE %s_state SET is_overdue='%s' WHERE %s_id IN (%s)",
+			objectType, utils.Bool[overdue], objectType, strings.Join(placeholders, ","),
+		),
+		args...,
+	)
+	if errSE != nil {
+		super.ChErr <- errSE
+		return
 	}
 }
