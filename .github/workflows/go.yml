@@ -12,11 +12,18 @@ jobs:
 
     strategy:
       matrix:
-        go: [ '1.11', '1.12', '1.13' ]
+        go: [ '1.11', '1.12', '1' ]
+        redis: [ '5' ]
+        rdbms:
+          - mysql:5.7
+          - mysql:8
+          - mariadb:10.2
+          - mariadb:10.3
+          - mariadb:10
 
     services:
       mysql:
-        image: mysql:8.0
+        image: ${{ matrix.rdbms }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: icingadb
@@ -26,7 +33,7 @@ jobs:
           - 3800:3306
 
       redis:
-        image: redis:5
+        image: redis:${{ matrix.redis }}
         ports:
           - 6379:6379
 
@@ -59,7 +66,13 @@ jobs:
           ICINGADB_TEST_MYSQL_PASSWORD: icingadb
         timeout-minutes: 10
         run: |
+          while ! mysql -h ${ICINGADB_TEST_MYSQL_HOST} -P ${ICINGADB_TEST_MYSQL_PORT} \
+            -u${ICINGADB_TEST_MYSQL_USER} -p${ICINGADB_TEST_MYSQL_PASSWORD} ${ICINGADB_TEST_MYSQL_DATABASE}
+          do sleep 1
+          done
+
           mysql -h ${ICINGADB_TEST_MYSQL_HOST} -P ${ICINGADB_TEST_MYSQL_PORT} \
             -u${ICINGADB_TEST_MYSQL_USER} -p${ICINGADB_TEST_MYSQL_PASSWORD} ${ICINGADB_TEST_MYSQL_DATABASE} \
             <etc/schema/mysql/mysql.schema.sql
+
           go test -v -race ./...
