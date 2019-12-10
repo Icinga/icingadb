@@ -391,9 +391,15 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 
 func flappingHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO flapping_history (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time,` +
+		`INSERT INTO flapping_history (id, environment_id, endpoint_id, object_type, host_id, service_id, start_time, end_time, ` +
 			`percent_state_change, flapping_threshold_low, flapping_threshold_high)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?)`,
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?)` +
+			`ON DUPLICATE KEY UPDATE ` +
+			`start_time=IFNULL(NULLIF(start_time, 0), VALUES(start_time)),` +
+			`end_time=IFNULL(NULLIF(end_time, 0), VALUES(end_time)),` +
+			`percent_state_change=IFNULL(NULLIF(percent_state_change, 0), VALUES(percent_state_change)),` +
+			`flapping_threshold_low=IFNULL(NULLIF(flapping_threshold_low, 0), VALUES(flapping_threshold_low)),` +
+			`flapping_threshold_high=IFNULL(NULLIF(flapping_threshold_high, 0), VALUES(flapping_threshold_high))`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -401,15 +407,15 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
 		func(values map[string]interface{}) []interface{} {
-			id := uuid.MustParse(values["id"].(string))
 			data := []interface{}{
-				id[:],
+				utils.EncodeChecksum(values["id"].(string)),
 				super.EnvId,
 				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.EncodeChecksum(values["host_id"].(string)),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				values["event_time"],
+				values["start_time"],
+				values["end_time"],
 				values["percent_state_change"],
 				values["flapping_threshold_low"],
 				values["flapping_threshold_high"],
@@ -419,7 +425,6 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 		},
 		func(values map[string]interface{}) []interface{} {
 			eventId := uuid.MustParse(values["event_id"].(string))
-			flappingHistoryId := uuid.MustParse(values["id"].(string))
 
 			var eventTime string
 			switch values["event_type"] {
@@ -440,7 +445,7 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 				nil,
 				nil,
 				nil,
-				flappingHistoryId[:],
+				utils.EncodeChecksum(values["id"].(string)),
 				values["event_type"],
 				eventTime,
 			}
@@ -454,9 +459,18 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 
 func acknowledgementHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO acknowledgement_history (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time,` +
-			`author, comment, expire_time, is_sticky, is_persistent)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`INSERT INTO acknowledgement_history (id, environment_id, endpoint_id, object_type, host_id, service_id, set_time, clear_time,` +
+			`author, cleared_by, comment, expire_time, is_sticky, is_persistent)` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)` +
+			`ON DUPLICATE KEY UPDATE ` +
+			`set_time=IFNULL(NULLIF(set_time, 0), VALUES(set_time)),` +
+			`clear_time=IFNULL(NULLIF(clear_time, 0), VALUES(clear_time)),` +
+			`author=IFNULL(NULLIF(author, ''), VALUES(author)),` +
+			`cleared_by=IFNULL(NULLIF(cleared_by, ''), VALUES(cleared_by)),` +
+			`comment=IFNULL(NULLIF(comment, ''), VALUES(comment)),` +
+			`expire_time=IFNULL(NULLIF(expire_time, 0), VALUES(expire_time)),` +
+			`is_sticky=IFNULL(NULLIF(is_sticky, 'n'), VALUES(is_sticky)),` +
+			`is_persistent=IFNULL(NULLIF(is_persistent, 'n'), VALUES(is_persistent))`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id,` +
 			` acknowledgement_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?)`,
@@ -464,17 +478,18 @@ func acknowledgementHistoryWorker(super *supervisor.Supervisor) {
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
 		func(values map[string]interface{}) []interface{} {
-			id := uuid.MustParse(values["id"].(string))
 			data := []interface{}{
-				id[:],
+				utils.EncodeChecksum(values["id"].(string)),
 				super.EnvId,
 				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.EncodeChecksum(values["host_id"].(string)),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				values["event_time"],
-				values["author"],
-				values["comment"],
+				values["set_time"],
+				values["clear_time"],
+				utils.DefaultIfNil(values["author"], ""),
+				values["cleared_by"],
+				utils.DefaultIfNil(values["comment"], ""),
 				values["expire_time"],
 				utils.RedisIntToDBBoolean(values["is_sticky"]),
 				utils.RedisIntToDBBoolean(values["is_persistent"]),
@@ -483,18 +498,26 @@ func acknowledgementHistoryWorker(super *supervisor.Supervisor) {
 			return data
 		},
 		func(values map[string]interface{}) []interface{} {
-			id := uuid.MustParse(values["id"].(string))
+			eventId := uuid.MustParse(values["event_id"].(string))
+
+			var eventTime string
+			switch values["event_type"] {
+			case "ack_set":
+				eventTime = values["set_time"].(string)
+			case "ack_clear":
+				eventTime = values["clear_time"].(string)
+			}
 
 			data := []interface{}{
-				id[:],
+				eventId[:],
 				super.EnvId,
 				utils.DecodeHexIfNotNil(values["endpoint_id"]),
 				values["object_type"].(string),
 				utils.EncodeChecksum(values["host_id"].(string)),
 				utils.DecodeHexIfNotNil(values["service_id"]),
-				id[:],
+				utils.EncodeChecksum(values["id"].(string)),
 				values["event_type"],
-				values["event_time"],
+				eventTime,
 			}
 
 			return data
