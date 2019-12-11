@@ -207,9 +207,9 @@ func (h *HA) runHA(chEnv chan *Environment) {
 
 		h.heartbeatTimer.Reset(time.Second * 15)
 		previous := h.lastHeartbeat
-		h.lastHeartbeat = time.Now().Unix()
+		h.lastHeartbeat = time.Now().Unix() * 1000
 
-		if h.lastHeartbeat-previous < 10 && h.isActive {
+		if h.lastHeartbeat-previous < 10 * 1000 && h.isActive {
 			err := h.updateOwnInstance(env)
 
 			if err != nil {
@@ -236,7 +236,7 @@ func (h *HA) runHA(chEnv chan *Environment) {
 					h.super.ChErr <- errors.New("failed to update instance")
 					return
 				}
-			} else if h.lastHeartbeat-beat > 15 {
+			} else if h.lastHeartbeat-beat > 15 * 1000 {
 				h.logger.Info("Taking over.")
 				if err := h.takeOverInstance(env); err != nil {
 					h.logger.Errorf("Failed to update instance: %v", err)
