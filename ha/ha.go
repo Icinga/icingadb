@@ -69,9 +69,22 @@ func (h *HA) updateOwnInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(
 		mysqlObservers.updateIcingadbInstanceById,
 		"UPDATE icingadb_instance SET endpoint_id = ?, heartbeat = ?,"+
-			" icinga2_version = ?, icinga2_start_time = ? WHERE id = ?",
-		env.Icinga2.EndpointId, h.lastHeartbeat, env.Icinga2.Version,
-		int64(env.Icinga2.ProgramStart*1000), h.uid[:])
+			" icinga2_version = ?, icinga2_start_time = ?, icinga2_notifications_enabled = ?,"+
+			" icinga2_active_service_checks_enabled = ?, icinga2_active_host_checks_enabled = ?,"+
+			" icinga2_event_handlers_enabled = ?, icinga2_flap_detection_enabled = ?,"+
+			" icinga2_performance_data_enabled = ? WHERE id = ?",
+		env.Icinga2.EndpointId,
+		h.lastHeartbeat,
+		env.Icinga2.Version,
+		int64(env.Icinga2.ProgramStart*1000),
+		utils.Bool[env.Icinga2.NotificationsEnabled],
+		utils.Bool[env.Icinga2.ActiveServiceChecksEnabled],
+		utils.Bool[env.Icinga2.ActiveHostChecksEnabled],
+		utils.Bool[env.Icinga2.EventHandlersEnabled],
+		utils.Bool[env.Icinga2.FlapDetectionEnabled],
+		utils.Bool[env.Icinga2.PerformanceDataEnabled],
+		h.uid[:],
+	)
 	return err
 }
 
@@ -79,9 +92,23 @@ func (h *HA) takeOverInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(
 		mysqlObservers.updateIcingadbInstanceByEnvironmentId,
 		"UPDATE icingadb_instance SET id = ?, endpoint_id = ?, heartbeat = ?,"+
-			" icinga2_version = ?, icinga2_start_time = ? WHERE environment_id = ?",
-		h.uid[:], env.Icinga2.EndpointId, h.lastHeartbeat, env.Icinga2.Version,
-		int64(env.Icinga2.ProgramStart*1000), h.super.EnvId)
+			" icinga2_version = ?, icinga2_start_time = ?, icinga2_notifications_enabled = ?,"+
+			" icinga2_active_service_checks_enabled = ?, icinga2_active_host_checks_enabled = ?,"+
+			" icinga2_event_handlers_enabled = ?, icinga2_flap_detection_enabled = ?,"+
+			" icinga2_performance_data_enabled = ? WHERE environment_id = ?",
+		h.uid[:],
+		env.Icinga2.EndpointId,
+		h.lastHeartbeat,
+		env.Icinga2.Version,
+		int64(env.Icinga2.ProgramStart*1000),
+		utils.Bool[env.Icinga2.NotificationsEnabled],
+		utils.Bool[env.Icinga2.ActiveServiceChecksEnabled],
+		utils.Bool[env.Icinga2.ActiveHostChecksEnabled],
+		utils.Bool[env.Icinga2.EventHandlersEnabled],
+		utils.Bool[env.Icinga2.FlapDetectionEnabled],
+		utils.Bool[env.Icinga2.PerformanceDataEnabled],
+		h.super.EnvId,
+	)
 	return err
 }
 
@@ -89,9 +116,23 @@ func (h *HA) insertInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(
 		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, endpoint_id, heartbeat, responsible,"+
-			" icinga2_version, icinga2_start_time) VALUES (?, ?, ?, ?, 'y', ?, ?)",
-		h.uid[:], h.super.EnvId, env.Icinga2.EndpointId,
-		h.lastHeartbeat, env.Icinga2.Version, int64(env.Icinga2.ProgramStart*1000))
+			" icinga2_version, icinga2_start_time, icinga2_notifications_enabled,"+
+			" icinga2_active_service_checks_enabled, icinga2_active_host_checks_enabled,"+
+			" icinga2_event_handlers_enabled, icinga2_flap_detection_enabled,"+
+			" icinga2_performance_data_enabled) VALUES (?, ?, ?, ?, 'y', ?, ?, ?, ?, ?, ?, ?, ?)",
+		h.uid[:],
+		h.super.EnvId,
+		env.Icinga2.EndpointId,
+		h.lastHeartbeat,
+		env.Icinga2.Version,
+		int64(env.Icinga2.ProgramStart*1000),
+		utils.Bool[env.Icinga2.NotificationsEnabled],
+		utils.Bool[env.Icinga2.ActiveServiceChecksEnabled],
+		utils.Bool[env.Icinga2.ActiveHostChecksEnabled],
+		utils.Bool[env.Icinga2.EventHandlersEnabled],
+		utils.Bool[env.Icinga2.FlapDetectionEnabled],
+		utils.Bool[env.Icinga2.PerformanceDataEnabled],
+	)
 	return err
 }
 
