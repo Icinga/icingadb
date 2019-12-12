@@ -104,7 +104,7 @@ CREATE TABLE hostgroup_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE host_state (
   host_id binary(20) NOT NULL COMMENT 'host.id',
@@ -144,7 +144,7 @@ CREATE TABLE host_state (
   next_update bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (host_id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -240,7 +240,7 @@ CREATE TABLE servicegroup_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service_state (
   service_id binary(20) NOT NULL COMMENT 'service.id',
@@ -280,7 +280,7 @@ CREATE TABLE service_state (
   next_update bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (service_id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE endpoint (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -306,7 +306,7 @@ CREATE TABLE environment (
 CREATE TABLE icingadb_instance (
   id binary(16) NOT NULL COMMENT 'UUIDv4',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   heartbeat bigint(20) unsigned NOT NULL COMMENT '*nix timestamp',
   responsible enum('y','n') NOT NULL,
 
@@ -389,7 +389,7 @@ CREATE TABLE checkcommand_customvar (
   command_id binary(20) NOT NULL COMMENT 'command.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 
 CREATE TABLE eventcommand (
@@ -448,7 +448,7 @@ CREATE TABLE eventcommand_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + type + name)',
@@ -506,7 +506,7 @@ CREATE TABLE notificationcommand_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE comment (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -537,7 +537,7 @@ CREATE TABLE downtime (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
 
-  triggered_by_id binary(20) NULL DEFAULT NULL COMMENT 'downtime.id',
+  triggered_by_id binary(20) DEFAULT NULL COMMENT 'downtime.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) DEFAULT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
@@ -624,7 +624,7 @@ CREATE TABLE notification_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icon_image (
   id binary(20) NOT NULL COMMENT 'sha1(icon_image)',
@@ -706,7 +706,7 @@ CREATE TABLE timeperiod_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name + value)',
@@ -717,7 +717,7 @@ CREATE TABLE customvar (
   value text NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=COMPRESSED DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE customvar_flat (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + flatname + flatvalue)',
@@ -729,7 +729,7 @@ CREATE TABLE customvar_flat (
   flatvalue text NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=COMPRESSED DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -787,7 +787,7 @@ CREATE TABLE user_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE usergroup_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + usergroup_id + customvar_id)',
@@ -796,7 +796,7 @@ CREATE TABLE usergroup_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE zone (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -820,10 +820,10 @@ CREATE TABLE zone (
 CREATE TABLE notification_history (
   id binary(16) NOT NULL COMMENT 'UUID',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
+  service_id binary(20) DEFAULT NULL COMMENT 'service.id',
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
 
   type enum('downtime_start', 'downtime_end', 'downtime_removed', 'custom', 'acknowledgement', 'problem', 'recovery', 'flapping_start', 'flapping_end') NOT NULL,
@@ -835,7 +835,7 @@ CREATE TABLE notification_history (
   users_notified smallint(5) unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_notification_history (
   id binary(16) NOT NULL COMMENT 'UUID',
@@ -844,15 +844,15 @@ CREATE TABLE user_notification_history (
   user_id binary(20) NOT NULL COMMENT 'user.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE state_history (
   id binary(16) NOT NULL COMMENT 'UUID',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
+  service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
   event_time bigint(20) unsigned NOT NULL,
   state_type enum('hard', 'soft') NOT NULL,
@@ -867,20 +867,20 @@ CREATE TABLE state_history (
   check_source text DEFAULT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE downtime_history (
   downtime_id binary(20) NOT NULL COMMENT 'downtime.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
-  triggered_by_id binary(20) NULL DEFAULT NULL COMMENT 'downtime.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
+  triggered_by_id binary(20) DEFAULT NULL COMMENT 'downtime.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
+  service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
   entry_time bigint(20) unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
-  cancelled_by varchar(255) NULL DEFAULT NULL COLLATE utf8mb4_unicode_ci,
+  cancelled_by varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,
   is_flexible enum('y', 'n') NOT NULL,
   flexible_duration bigint(20) unsigned NOT NULL,
@@ -890,60 +890,60 @@ CREATE TABLE downtime_history (
   end_time bigint(20) unsigned NOT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + duration otherwise',
   has_been_cancelled enum('y', 'n') NOT NULL,
   trigger_time bigint(20) unsigned NOT NULL,
-  cancel_time bigint(20) unsigned NULL DEFAULT NULL,
+  cancel_time bigint(20) unsigned DEFAULT NULL,
 
   PRIMARY KEY (downtime_id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE comment_history (
   comment_id binary(20) NOT NULL COMMENT 'comment.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
+  service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
   entry_time bigint(20) unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
-  removed_by varchar(255) NULL DEFAULT NULL COLLATE utf8mb4_unicode_ci,
+  removed_by varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,
   entry_type enum('comment','ack') NOT NULL,
   is_persistent enum('y','n') NOT NULL,
   is_sticky enum('y','n') NOT NULL,
   expire_time bigint(20) unsigned DEFAULT NULL,
-  remove_time bigint(20) unsigned NULL DEFAULT NULL,
+  remove_time bigint(20) unsigned DEFAULT NULL,
   has_been_removed enum('y','n') NOT NULL,
 
   PRIMARY KEY (comment_id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE flapping_history (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + "host"|"service" + host|service.name + start_time)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
+  service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
   start_time bigint(20) unsigned NOT NULL,
-  end_time bigint(20) unsigned NULL DEFAULT NULL,
+  end_time bigint(20) unsigned DEFAULT NULL,
   percent_state_change float unsigned NOT NULL,
   flapping_threshold_low float unsigned NOT NULL,
   flapping_threshold_high float unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE acknowledgement_history (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + "host"|"service" + host|service.name + set_time)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
+  service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
   set_time bigint(20) unsigned NOT NULL,
-  clear_time bigint(20) unsigned NULL DEFAULT NULL,
+  clear_time bigint(20) unsigned DEFAULT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   cleared_by varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   comment text DEFAULT NULL,
@@ -952,24 +952,24 @@ CREATE TABLE acknowledgement_history (
   is_persistent enum('y','n') NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE history (
   id binary(16) NOT NULL COMMENT 'notification_history_id, state_history_id or UUID',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  endpoint_id binary(20) NULL DEFAULT NULL COMMENT 'endpoint.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
-  service_id binary(20) NULL DEFAULT NULL COMMENT 'service.id',
-  notification_history_id binary(16) NULL DEFAULT NULL COMMENT 'notification_history.id',
-  state_history_id binary(16) NULL DEFAULT NULL COMMENT 'state_history.id',
-  downtime_history_id binary(20) NULL DEFAULT NULL COMMENT 'downtime_history.downtime_id',
-  comment_history_id binary(20) NULL DEFAULT NULL COMMENT 'comment_history.comment_id',
-  flapping_history_id binary(20) NULL DEFAULT NULL COMMENT 'flapping_history.id',
-  acknowledgement_history_id binary(20) NULL DEFAULT NULL COMMENT 'acknowledgement_history.id',
+  service_id binary(20) DEFAULT NULL COMMENT 'service.id',
+  notification_history_id binary(16) DEFAULT NULL COMMENT 'notification_history.id',
+  state_history_id binary(16) DEFAULT NULL COMMENT 'state_history.id',
+  downtime_history_id binary(20) DEFAULT NULL COMMENT 'downtime_history.downtime_id',
+  comment_history_id binary(20) DEFAULT NULL COMMENT 'comment_history.comment_id',
+  flapping_history_id binary(20) DEFAULT NULL COMMENT 'flapping_history.id',
+  acknowledgement_history_id binary(20) DEFAULT NULL COMMENT 'acknowledgement_history.id',
 
   event_type enum('notification','state_change','downtime_schedule','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end','ack_set','ack_clear') NOT NULL,
   event_time bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDb ROW_FORMAT=DYNAMIC DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
