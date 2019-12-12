@@ -101,7 +101,7 @@ func TestHA_checkResponsibility(t *testing.T) {
 	_, err = ha.super.Dbw.SqlExec(
 		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible, icinga2_version, icinga2_start_time) VALUES (?, ?, ?, 'y', '', 0)",
-		ha.uid[:], ha.super.EnvId, time.Now().Unix(),
+		ha.uid[:], ha.super.EnvId, utils.TimeToMillisecs(time.Now()),
 	)
 
 	ha.isActive = false
