@@ -173,7 +173,7 @@ func (h *HA) checkResponsibility(env *Environment) {
 		return
 	}
 
-	if time.Now().Unix()-beat > 15*1000 {
+	if utils.TimeToMillisecs(time.Now())-beat > 15*1000 {
 		h.logger.Info("Taking over.")
 
 		// This means there was no instance row match, insert
