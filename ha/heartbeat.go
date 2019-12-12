@@ -22,9 +22,15 @@ type Environment struct {
 }
 
 type Icinga2Info struct {
-	Version      string
-	ProgramStart float64
-	EndpointId   []byte
+	Version                    string
+	ProgramStart               float64
+	EndpointId                 []byte
+	NotificationsEnabled       bool
+	ActiveServiceChecksEnabled bool
+	ActiveHostChecksEnabled    bool
+	EventHandlersEnabled       bool
+	FlapDetectionEnabled       bool
+	PerformanceDataEnabled     bool
 }
 
 // Sha1bytes computes SHA1.
@@ -61,11 +67,17 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 						Status struct {
 							IcingaApplication struct {
 								App struct {
-									Environment  string  `json:"environment"`
-									NodeName     string  `json:"node_name"`
-									Version      string  `json:"version"`
-									ProgramStart float64 `json:"program_start"`
-									EndpointId   string  `json:"endpoint_id"`
+									Environment                string  `json:"environment"`
+									NodeName                   string  `json:"node_name"`
+									Version                    string  `json:"version"`
+									ProgramStart               float64 `json:"program_start"`
+									EndpointId                 string  `json:"endpoint_id"`
+									NotificationsEnabled       bool    `json:"enable_notifications"`
+									ActiveServiceChecksEnabled bool    `json:"enable_service_checks"`
+									ActiveHostChecksEnabled    bool    `json:"enable_host_checks"`
+									EventHandlersEnabled       bool    `json:"enable_event_handlers"`
+									FlapDetectionEnabled       bool    `json:"enable_flapping"`
+									PerformanceDataEnabled     bool    `json:"enable_perfdata"`
 								} `json:"app"`
 							} `json:"icingaapplication"`
 						} `json:"status"`
@@ -82,7 +94,17 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 						Name:     app.Environment,
 						ID:       Sha1bytes([]byte(app.Environment)),
 						NodeName: app.NodeName,
-						Icinga2:  Icinga2Info{app.Version, app.ProgramStart, nil},
+						Icinga2: Icinga2Info{
+							app.Version,
+							app.ProgramStart,
+							nil,
+							app.NotificationsEnabled,
+							app.ActiveServiceChecksEnabled,
+							app.ActiveHostChecksEnabled,
+							app.EventHandlersEnabled,
+							app.FlapDetectionEnabled,
+							app.PerformanceDataEnabled,
+						},
 					}
 
 					if app.EndpointId != "" {

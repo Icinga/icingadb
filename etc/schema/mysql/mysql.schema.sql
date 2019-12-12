@@ -312,6 +312,12 @@ CREATE TABLE icingadb_instance (
 
   icinga2_version varchar(255) NOT NULL,
   icinga2_start_time bigint(20) unsigned NOT NULL,
+  icinga2_notifications_enabled enum('y','n') NOT NULL,
+  icinga2_active_service_checks_enabled enum('y','n') NOT NULL,
+  icinga2_active_host_checks_enabled enum('y','n') NOT NULL,
+  icinga2_event_handlers_enabled enum('y','n') NOT NULL,
+  icinga2_flap_detection_enabled enum('y','n') NOT NULL,
+  icinga2_performance_data_enabled enum('y','n') NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
