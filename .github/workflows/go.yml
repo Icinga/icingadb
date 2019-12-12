@@ -17,6 +17,7 @@ jobs:
         rdbms:
           - mysql:5.7
           - mysql:8
+          - mariadb:10.1
           - mariadb:10.2
           - mariadb:10.3
           - mariadb:10
