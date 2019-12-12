@@ -62,7 +62,7 @@ CREATE TABLE host (
   KEY idx_action_url_checksum (action_url_id) COMMENT 'cleanup',
   KEY idx_notes_url_checksum (notes_url_id) COMMENT 'cleanup',
   KEY idx_icon_image_checksum (icon_image_id) COMMENT 'cleanup'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -77,7 +77,7 @@ CREATE TABLE hostgroup (
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_member (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + host_id + hostgroup_id)',
@@ -86,7 +86,7 @@ CREATE TABLE hostgroup_member (
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE host_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + host_id + customvar_id)',
@@ -95,7 +95,7 @@ CREATE TABLE host_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + hostgroup_id + customvar_id)',
@@ -104,7 +104,7 @@ CREATE TABLE hostgroup_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE host_state (
   host_id binary(20) NOT NULL COMMENT 'host.id',
@@ -144,7 +144,7 @@ CREATE TABLE host_state (
   next_update bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (host_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -198,7 +198,7 @@ CREATE TABLE service (
   command_endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -213,7 +213,7 @@ CREATE TABLE servicegroup (
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup_member (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + service_id)',
@@ -222,7 +222,7 @@ CREATE TABLE servicegroup_member (
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + service_id + customvar_id)',
@@ -231,7 +231,7 @@ CREATE TABLE service_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + servicegroup_id + customvar_id)',
@@ -240,7 +240,7 @@ CREATE TABLE servicegroup_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service_state (
   service_id binary(20) NOT NULL COMMENT 'service.id',
@@ -280,7 +280,7 @@ CREATE TABLE service_state (
   next_update bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (service_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE endpoint (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -294,14 +294,14 @@ CREATE TABLE endpoint (
   zone_id binary(20) NOT NULL COMMENT 'zone.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE environment (
   id binary(20) NOT NULL COMMENT 'sha1(name)',
   name varchar(255) NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icingadb_instance (
   id binary(16) NOT NULL COMMENT 'UUIDv4',
@@ -320,7 +320,7 @@ CREATE TABLE icingadb_instance (
   icinga2_performance_data_enabled enum('y','n') NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icingadb_schema (
   id int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -328,7 +328,7 @@ CREATE TABLE icingadb_schema (
   timestamp bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 INSERT INTO icingadb_schema (version, timestamp)
   VALUES (1, CURRENT_TIMESTAMP() * 1000);
@@ -347,7 +347,7 @@ CREATE TABLE checkcommand (
   timeout int(10) unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE checkcommand_argument (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + argument_key)',
@@ -367,7 +367,7 @@ CREATE TABLE checkcommand_argument (
   skip_key enum('y','n') NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE checkcommand_envvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + envvar_key)',
@@ -380,7 +380,7 @@ CREATE TABLE checkcommand_envvar (
   envvar_value text NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE checkcommand_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + customvar_id)',
@@ -389,7 +389,7 @@ CREATE TABLE checkcommand_customvar (
   command_id binary(20) NOT NULL COMMENT 'command.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 
 CREATE TABLE eventcommand (
@@ -406,7 +406,7 @@ CREATE TABLE eventcommand (
   timeout smallint(5) unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE eventcommand_argument (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + argument_key)',
@@ -426,7 +426,7 @@ CREATE TABLE eventcommand_argument (
   skip_key enum('y','n') NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE eventcommand_envvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + envvar_key)',
@@ -439,7 +439,7 @@ CREATE TABLE eventcommand_envvar (
   envvar_value text NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE eventcommand_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + customvar_id)',
@@ -448,7 +448,7 @@ CREATE TABLE eventcommand_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + type + name)',
@@ -464,7 +464,7 @@ CREATE TABLE notificationcommand (
   timeout smallint(5) unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand_argument (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + argument_key)',
@@ -484,7 +484,7 @@ CREATE TABLE notificationcommand_argument (
   skip_key enum('y','n') NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand_envvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + envvar_key)',
@@ -497,7 +497,7 @@ CREATE TABLE notificationcommand_envvar (
   envvar_value text NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + command_id + customvar_id)',
@@ -506,7 +506,7 @@ CREATE TABLE notificationcommand_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE comment (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -531,7 +531,7 @@ CREATE TABLE comment (
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE downtime (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -561,7 +561,7 @@ CREATE TABLE downtime (
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -587,7 +587,7 @@ CREATE TABLE notification (
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_user (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + user_id)',
@@ -596,7 +596,7 @@ CREATE TABLE notification_user (
   user_id binary(20) NOT NULL COMMENT 'user.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_usergroup (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + usergroup_id)',
@@ -605,7 +605,7 @@ CREATE TABLE notification_usergroup (
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_recipient (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + (user_id | usergroup_id))',
@@ -615,7 +615,7 @@ CREATE TABLE notification_recipient (
   usergroup_id binary(20) NULL COMMENT 'usergroup.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification_id + customvar_id)',
@@ -624,7 +624,7 @@ CREATE TABLE notification_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icon_image (
   id binary(20) NOT NULL COMMENT 'sha1(icon_image)',
@@ -633,7 +633,7 @@ CREATE TABLE icon_image (
 
   PRIMARY KEY (environment_id, id),
   KEY idx_icon_image (icon_image(255))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE action_url (
   id binary(20) NOT NULL COMMENT 'sha1(action_url)',
@@ -642,7 +642,7 @@ CREATE TABLE action_url (
 
   PRIMARY KEY (environment_id, id),
   KEY idx_action_url (action_url(255))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notes_url (
   id binary(20) NOT NULL COMMENT 'sha1(notes_url)',
@@ -651,7 +651,7 @@ CREATE TABLE notes_url (
 
   PRIMARY KEY (environment_id, id),
   KEY idx_notes_url (notes_url(255))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE timeperiod (
   id binary(20) NOT NULL COMMENT 'sha1(env.name + name)',
@@ -668,7 +668,7 @@ CREATE TABLE timeperiod (
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE timeperiod_range (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + range_id + timeperiod_id)',
@@ -679,7 +679,7 @@ CREATE TABLE timeperiod_range (
   range_value varchar(255) NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE timeperiod_override_include (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + include_id + timeperiod_id)',
@@ -688,7 +688,7 @@ CREATE TABLE timeperiod_override_include (
   override_id binary(20) NOT NULL COMMENT 'timeperiod.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE timeperiod_override_exclude (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + exclude_id + timeperiod_id)',
@@ -697,7 +697,7 @@ CREATE TABLE timeperiod_override_exclude (
   override_id binary(20) NOT NULL COMMENT 'timeperiod.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE timeperiod_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + timeperiod_id + customvar_id)',
@@ -706,7 +706,7 @@ CREATE TABLE timeperiod_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name + value)',
@@ -717,7 +717,7 @@ CREATE TABLE customvar (
   value text NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE customvar_flat (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + flatname + flatvalue)',
@@ -729,7 +729,7 @@ CREATE TABLE customvar_flat (
   flatvalue text NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -754,7 +754,7 @@ CREATE TABLE user (
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE usergroup (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -769,7 +769,7 @@ CREATE TABLE usergroup (
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE usergroup_member (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + usergroup_id + user_id)',
@@ -778,7 +778,7 @@ CREATE TABLE usergroup_member (
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + user_id + customvar_id)',
@@ -787,7 +787,7 @@ CREATE TABLE user_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE usergroup_customvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + usergroup_id + customvar_id)',
@@ -796,7 +796,7 @@ CREATE TABLE usergroup_customvar (
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE zone (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
@@ -815,7 +815,7 @@ CREATE TABLE zone (
   PRIMARY KEY (id),
   INDEX idx_parent_id (parent_id),
   UNIQUE INDEX idx_environment_id_id (environment_id,id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_history (
   id binary(16) NOT NULL COMMENT 'UUID',
@@ -835,7 +835,7 @@ CREATE TABLE notification_history (
   users_notified smallint(5) unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_notification_history (
   id binary(16) NOT NULL COMMENT 'UUID',
@@ -844,7 +844,7 @@ CREATE TABLE user_notification_history (
   user_id binary(20) NOT NULL COMMENT 'user.id',
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE state_history (
   id binary(16) NOT NULL COMMENT 'UUID',
@@ -867,7 +867,7 @@ CREATE TABLE state_history (
   check_source text DEFAULT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE downtime_history (
   downtime_id binary(20) NOT NULL COMMENT 'downtime.id',
@@ -893,7 +893,7 @@ CREATE TABLE downtime_history (
   cancel_time bigint(20) unsigned DEFAULT NULL,
 
   PRIMARY KEY (downtime_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE comment_history (
   comment_id binary(20) NOT NULL COMMENT 'comment.id',
@@ -915,7 +915,7 @@ CREATE TABLE comment_history (
   has_been_removed enum('y','n') NOT NULL,
 
   PRIMARY KEY (comment_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE flapping_history (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + "host"|"service" + host|service.name + start_time)',
@@ -932,7 +932,7 @@ CREATE TABLE flapping_history (
   flapping_threshold_high float unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE acknowledgement_history (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + "host"|"service" + host|service.name + set_time)',
@@ -952,7 +952,7 @@ CREATE TABLE acknowledgement_history (
   is_persistent enum('y','n') NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE history (
   id binary(16) NOT NULL COMMENT 'notification_history_id, state_history_id or UUID',
@@ -972,4 +972,4 @@ CREATE TABLE history (
   event_time bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
