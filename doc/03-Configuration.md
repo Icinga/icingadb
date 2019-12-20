@@ -12,8 +12,8 @@ Data resource where Icinga 2 is writing monitoring data.
 
 Option                   | Description
 -------------------------|-----------------------------------------------
-host                     | **Optional.** Redis host, defaults to `127.0.0.1`.
-port                     | **Optional.** Redis port, defaults to `6379`.
+host                     | **Optional.** Redis host. Defaults to `127.0.0.1`.
+port                     | **Optional.** Redis port. Defaults to `6380`.
 pool\_size               | **Optional.** Maximum number of socket connections. Defaults to `64`.
 
 ### MySQL Configuration <a id="configuration-general-mysql"></a>
@@ -34,3 +34,10 @@ max\_open\_conns         | **Optional.** Maximum number of open connections. Def
 Option                   | Description
 -------------------------|-----------------------------------------------
 level                    | **Optional.** Specifies the logging level. Can be set to `error`, `warn`, `info` or `debug`. See the [logrus spec](https://github.com/sirupsen/logrus#level-logging).
+
+### Prometheus Metrics Configuration <a id="configuration-general-metrics"></a>
+
+Option                   | Description
+-------------------------|-----------------------------------------------
+host                     | **Optional.** Prometheus metrics endpoint host.
+port                     | **Optional.** Prometheus metrics endpoint port.

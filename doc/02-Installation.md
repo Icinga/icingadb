@@ -2,34 +2,28 @@
 
 ## Requirements <a id="installation-requirements"></a>
 
-* Local Redis instance
+* Local Redis instance (Will be installed during this documentation)
+* MySQL/MariaDB server with `icingadb` database, user and schema imports (Will be installed during this documentation)
 * [Icinga 2 Core](https://icinga.com/docs/icinga2/latest/) with the `icingadb` feature enabled
-* MySQL/MariaDB server with `icingadb` database, user and schema imports
 
 Supported enterprise distributions:
 
-* RHEL/CentOS 7
+* RHEL/CentOS 7/8
 * Debian 10 Buster
 * Ubuntu 18 Bionic
-* SLES 15
+* SLES 15.1
 
 ## Setting up Icinga DB <a id="setting-up-icingadb"></a>
-
-> TODO: More details.
 
 ### Package Repositories <a id="package-repositories"></a>
 
 #### RHEL/CentOS Repositories <a id="package-repositories-rhel-centos"></a>
-
-RHEL/CentOS 7:
 
 ```
 yum install https://packages.icinga.com/epel/icinga-rpm-release-7-latest.noarch.rpm
 ```
 
 #### SLES/OpenSUSE Repositories <a id="package-repositories-sles-opensuse"></a>
-
-SLES 15:
 
 ```
 rpm --import https://packages.icinga.com/icinga.key
@@ -77,9 +71,7 @@ apt-get update
 
 ### Installing Icinga DB <a id="installing-icingadb"></a>
 
-> TODO: More details and packages.
-
-RHEL/CentOS 7:
+RHEL/CentOS 7/8:
 
 ```
 yum install icingadb
@@ -87,7 +79,7 @@ systemctl enable icingadb
 systemctl start icingadb
 ```
 
-SLES:
+SUSE:
 
 ```
 zypper install icingadb
@@ -99,17 +91,44 @@ Debian/Ubuntu:
 apt-get install icingadb
 ```
 
+### Installing Icinga DB Redis <a id="configuring-icingadb-mysql"></a>
 
-### Configuring Icinga DB with MySQL <a id="configuring-icingadb-mysql"></a>
+RHEL/CentOS 7/8:
+
+```
+yum install icingadb-redis
+
+systemctl enable icingadb-redis
+systemctl start icingadb-redis
+```
+
+SUSE:
+
+```
+zypper install icingadb-redis
+
+systemctl enable icingadb-redis
+systemctl start icingadb-redis
+```
+
+Debian/Ubuntu:
+
+```
+apt-get install icingadb-redis
+```
+
+### Configuring MySQL <a id="configuring-icingadb-mysql"></a>
 
 #### Installing MySQL/MariaDB database server <a id="installing-database-mysql-server"></a>
 
-RHEL/CentOS 7:
+RHEL/CentOS 7/8:
 
 ```
 yum install mariadb-server mariadb
+
 systemctl enable mariadb
 systemctl start mariadb
+
 mysql_secure_installation
 ```
 
@@ -117,8 +136,9 @@ SUSE:
 
 ```
 zypper install mysql mysql-client
-chkconfig mysqld on
-service mysqld start
+
+systemctl enable mariadb
+systemctl start mariadb
 ```
 
 Debian/Ubuntu:
@@ -130,6 +150,14 @@ mysql_secure_installation
 ```
 
 #### Setting up the MySQL database <a id="setting-up-mysql-db"></a>
+
+Note that if you're using a version of MySQL < 5.7 or MariaDB < 10.2, the following server options must be set:
+
+```
+innodb_file_format=barracuda	
+innodb_file_per_table=1	
+innodb_large_prefix=1
+```
 
 Set up a MySQL database for Icinga DB:
 
@@ -146,20 +174,25 @@ After creating the database you can import the Icinga DB schema using the
 following command. Enter the root password into the prompt when asked.
 
 ```
-cat etc/schema/mysql/{,helper/}*.sql | mysql -uroot icingadb
+cat /usr/share/icingadb/schema/mysql/mysql.schema.sql | mysql -uroot icingadb
 ```
 
-### Running Icinga DB
+### Running Icinga DB <a id="running-icingadb"></a>
 
 Foreground:
 
 ```
-groupadd -r icingadb
-useradd -r -g icingadb -d / -s /sbin/nologin -c 'Icinga DB' icingadb
-
-sudo -u icingadb ./icingadb -config icingadb.ini
+icingadb -config /etc/icingadb/icingadb.ini
 ```
 
 Systemd service:
 
-> TODO.
+```
+systemctl start icingadb
+```
+
+### Enable remote Redis connections <a id="remote-redis"></a>
+
+By default `icingadb-redis` listens only on `127.0.0.1`. If you want to change that (e.g. Icinga Web 2), just change `bind 127.0.0.1 ::1` in `/etc/icinga-redis/icingadb-redis.conf` to the interface you want to use.
+
+> WARNING: Make sure your host is secured by some kind of firewall, if you open Redis to an external interface. Redis, by default, does not have any authentication that prevent others from accessing it.
