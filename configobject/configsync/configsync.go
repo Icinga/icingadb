@@ -101,7 +101,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 			go UpdatePrepWorker(super, objectInformation, done, chUpdate, chUpdateBack)
 			go UpdateExecWorker(super, objectInformation, done, chUpdateBack, wgUpdate, updateCounter)
 
-			go RuntimeUpdateWorker(super, objectInformation, done, chUpdate, chDelete, wgUpdate, wgDelete)
+			go RuntimeUpdateWorker(super, objectInformation, done, chInsert, chUpdate, chDelete, wgInsert, wgUpdate, wgDelete)
 
 			waitOrKill := func(wg *sync.WaitGroup, done chan struct{}) (kill bool) {
 				waitDone := make(chan bool)
@@ -443,7 +443,7 @@ func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 	}
 }
 
-func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdate chan []string, chDelete chan []string, wgUpdate *sync.WaitGroup, wgDelete *sync.WaitGroup) {
+func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsert chan []string, chUpdate chan []string, chDelete chan []string, wgInsert *sync.WaitGroup, wgUpdate *sync.WaitGroup, wgDelete *sync.WaitGroup) {
 	subscription := super.Rdbw.Subscribe()
 	defer subscription.Close()
 
@@ -461,8 +461,15 @@ func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *config
 
 	insertCurrentUpdatePackage := func() {
 		updateLen := len(currentUpdatePackage)
-		chUpdate <- currentUpdatePackage
-		wgUpdate.Add(updateLen)
+
+		if objectInformation.HasChecksum {
+			chUpdate <- currentUpdatePackage
+			wgUpdate.Add(updateLen)
+		} else {
+			chInsert <- currentUpdatePackage
+			wgInsert.Add(updateLen)
+		}
+
 		currentUpdatePackage = []string{}
 
 		log.WithFields(log.Fields{
