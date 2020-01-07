@@ -8,10 +8,12 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
 
     strategy:
       matrix:
+        os:
+          - macos-latest
+          - ubuntu-latest
         go: [ '1.11', '1.12', '1' ]
         redis: [ '5' ]
         rdbms:
@@ -20,6 +22,8 @@ jobs:
           - mariadb:10.2
           - mariadb:10.3
           - mariadb:10
+
+    runs-on: ${{ matrix.os }}
 
     services:
       mysql:
