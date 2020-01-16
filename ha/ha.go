@@ -67,12 +67,14 @@ var mysqlObservers = struct {
 
 func (h *HA) updateOwnInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(
-		mysqlObservers.updateIcingadbInstanceById,
-		"UPDATE icingadb_instance SET endpoint_id = ?, heartbeat = ?,"+
-			" icinga2_version = ?, icinga2_start_time = ?, icinga2_notifications_enabled = ?,"+
-			" icinga2_active_service_checks_enabled = ?, icinga2_active_host_checks_enabled = ?,"+
-			" icinga2_event_handlers_enabled = ?, icinga2_flap_detection_enabled = ?,"+
-			" icinga2_performance_data_enabled = ? WHERE id = ?",
+		mysqlObservers.insertIntoIcingadbInstance,
+		"REPLACE INTO icingadb_instance(id, environment_id, endpoint_id, heartbeat, responsible,"+
+			" icinga2_version, icinga2_start_time, icinga2_notifications_enabled,"+
+			" icinga2_active_service_checks_enabled, icinga2_active_host_checks_enabled,"+
+			" icinga2_event_handlers_enabled, icinga2_flap_detection_enabled,"+
+			" icinga2_performance_data_enabled) VALUES (?, ?, ?, ?, 'y', ?, ?, ?, ?, ?, ?, ?, ?)",
+		h.uid[:],
+		h.super.EnvId,
 		env.Icinga2.EndpointId,
 		h.lastHeartbeat,
 		env.Icinga2.Version,
@@ -83,7 +85,6 @@ func (h *HA) updateOwnInstance(env *Environment) error {
 		utils.Bool[env.Icinga2.EventHandlersEnabled],
 		utils.Bool[env.Icinga2.FlapDetectionEnabled],
 		utils.Bool[env.Icinga2.PerformanceDataEnabled],
-		h.uid[:],
 	)
 	return err
 }
