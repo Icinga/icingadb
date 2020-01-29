@@ -138,7 +138,7 @@ CREATE TABLE host_state (
   timeout int(10) unsigned DEFAULT NULL,
   check_source text DEFAULT NULL,
 
-  last_update bigint(20) unsigned NOT NULL,
+  last_update bigint(20) unsigned DEFAULT NULL,
   last_state_change bigint(20) unsigned NOT NULL,
   next_check bigint(20) unsigned NOT NULL,
   next_update bigint(20) unsigned NOT NULL,
@@ -274,7 +274,7 @@ CREATE TABLE service_state (
   timeout int(10) unsigned DEFAULT NULL,
   check_source text DEFAULT NULL,
 
-  last_update bigint(20) unsigned NOT NULL,
+  last_update bigint(20) unsigned DEFAULT NULL,
   last_state_change bigint(20) unsigned NOT NULL,
   next_check bigint(20) unsigned NOT NULL,
   next_update bigint(20) unsigned NOT NULL,
