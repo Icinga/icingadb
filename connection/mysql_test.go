@@ -10,6 +10,7 @@ import (
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/go-sql-driver/mysql"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -292,10 +293,18 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 11)
 	assert.Equal(t, 60*time.Second, dbw.getConnectionCheckInterval())
 
-	//Should panic, if not connected and counter > 13
+	//Should exit, if not connected and counter > 13
 	dbw.CompareAndSetConnected(false)
 	atomic.StoreUint32(dbw.ConnectionLostCounterAtomic, 14)
-	assert.Panics(t, func() { dbw.getConnectionCheckInterval() }, "Should panic")
+
+	exited := false
+	defer func() { logrus.StandardLogger().ExitFunc = nil }()
+	logrus.StandardLogger().ExitFunc = func(i int) {
+		exited = true
+	}
+
+	dbw.getConnectionCheckInterval()
+	assert.Equal(t, true, exited, "Should have exited")
 }
 
 func TestDBWrapper_SqlFetchAll(t *testing.T) {
