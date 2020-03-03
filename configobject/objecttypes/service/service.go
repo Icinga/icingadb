@@ -64,9 +64,9 @@ type Service struct {
 	MaxCheckAttempts      float32 `json:"max_check_attempts"`
 	CheckPeriod           string  `json:"check_timeperiod"`
 	CheckPeriodId         string  `json:"check_timeperiod_id"`
-	CheckTimeout          float32 `json:"check_timeout"`
-	CheckInterval         float32 `json:"check_interval"`
-	CheckRetryInterval    float32 `json:"check_retry_interval"`
+	CheckTimeout          float64 `json:"check_timeout"`
+	CheckInterval         float64 `json:"check_interval"`
+	CheckRetryInterval    float64 `json:"check_retry_interval"`
 	ActiveChecksEnabled   bool    `json:"active_checks_enabled"`
 	PassiveChecksEnabled  bool    `json:"passive_checks_enabled"`
 	EventHandlerEnabled   bool    `json:"event_handler_enabled"`
