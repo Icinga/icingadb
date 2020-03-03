@@ -168,7 +168,7 @@ func (rdbw *RDBWrapper) getConnectionCheckInterval() time.Duration {
 		} else if v < 14 {
 			return 60 * time.Second
 		} else {
-			log.Panic("Could not connect to Redis for over 5 minutes. Shutting down...")
+			log.Fatal("Could not connect to Redis for over 5 minutes. Shutting down...")
 		}
 	}
 
