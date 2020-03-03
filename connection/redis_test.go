@@ -5,6 +5,7 @@ package connection
 import (
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/go-redis/redis"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"sync"
 	"sync/atomic"
@@ -54,10 +55,18 @@ func TestRDBWrapper_GetConnectionCheckInterval(t *testing.T) {
 	atomic.StoreUint32(rdbw.ConnectionLostCounterAtomic, 11)
 	assert.Equal(t, 60*time.Second, rdbw.getConnectionCheckInterval())
 
-	//Should panic, if not connected and counter > 13
+	//Should exit, if not connected and counter > 13
 	rdbw.CompareAndSetConnected(false)
 	atomic.StoreUint32(rdbw.ConnectionLostCounterAtomic, 14)
-	assert.Panics(t, func() { rdbw.getConnectionCheckInterval() }, "Should panic")
+
+	exited := false
+	defer func() { logrus.StandardLogger().ExitFunc = nil }()
+	logrus.StandardLogger().ExitFunc = func(i int) {
+		exited = true
+	}
+
+	rdbw.getConnectionCheckInterval()
+	assert.Equal(t, true, exited, "Should have exited")
 }
 
 func TestRDBWrapper_CheckConnection(t *testing.T) {
