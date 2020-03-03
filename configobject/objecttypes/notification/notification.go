@@ -40,9 +40,9 @@ type Notification struct {
 	HostId               string   `json:"host_id"`
 	ServiceId            string   `json:"service_id"`
 	CommandId            string   `json:"command_id"`
-	TimesBegin           float32  `json:"times_begin"`
-	TimesEnd             float32  `json:"times_end"`
-	NotificationInterval float32  `json:"notification_interval"`
+	TimesBegin           float64  `json:"times_begin"`
+	TimesEnd             float64  `json:"times_end"`
+	NotificationInterval float64  `json:"notification_interval"`
 	PeriodId             string   `json:"timeperiod_id"`
 	States               []string `json:"states"`
 	Types                []string `json:"types"`

@@ -32,7 +32,7 @@ type EventCommand struct {
 	NameCi             *string `json:"name_ci"`
 	ZoneId             string  `json:"zone_id"`
 	Command            string  `json:"command"`
-	Timeout            float32 `json:"timeout"`
+	Timeout            float64 `json:"timeout"`
 }
 
 func NewEventCommand() connection.Row {

@@ -63,14 +63,14 @@ type ServiceState struct {
 	IsAcknowledged           bool    `json:"is_acknowledged"`
 	AcknowledgementCommentId string  `json:"acknowledgement_comment_id"`
 	InDowntime               bool    `json:"in_downtime"`
-	ExecutionTime            float32 `json:"execution_time"`
-	Latency                  float32 `json:"latency"`
-	Timeout                  float32 `json:"check_timeout"`
+	ExecutionTime            float64 `json:"execution_time"`
+	Latency                  float64 `json:"latency"`
+	Timeout                  float64 `json:"check_timeout"`
 	CheckSource              string  `json:"check_source"`
-	LastUpdate               float32 `json:"last_update"`
-	LastStateChange          float32 `json:"last_state_change"`
-	NextCheck                float32 `json:"next_check"`
-	NextUpdate               float32 `json:"next_update"`
+	LastUpdate               float64 `json:"last_update"`
+	LastStateChange          float64 `json:"last_state_change"`
+	NextCheck                float64 `json:"next_check"`
+	NextUpdate               float64 `json:"next_update"`
 }
 
 func NewServiceState() connection.Row {
