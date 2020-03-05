@@ -4,7 +4,6 @@
 
 * Local Redis instance (Will be installed during this documentation)
 * MySQL/MariaDB server with `icingadb` database, user and schema imports (Will be installed during this documentation)
-* [Icinga 2 Core](https://icinga.com/docs/icinga2/latest/) with the `icingadb` feature enabled
 
 Supported enterprise distributions:
 
