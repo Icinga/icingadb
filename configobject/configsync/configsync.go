@@ -72,6 +72,8 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				continue
 			}
 
+			super.WgConfigSync.Add(3)
+
 			log.Debugf("%s: Got responsibility", objectInformation.ObjectType)
 
 			//TODO: This should only be done, if HA was taken over from another instance
@@ -119,6 +121,8 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 			}
 
 			go func() {
+				defer super.WgConfigSync.Done()
+
 				benchmarc := utils.NewBenchmark()
 				wgInsert.Add(len(insert))
 
@@ -139,6 +143,8 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 			}()
 
 			go func() {
+				defer super.WgConfigSync.Done()
+
 				benchmarc := utils.NewBenchmark()
 				wgDelete.Add(len(delete))
 
@@ -160,6 +166,8 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 
 			if objectInformation.HasChecksum {
 				go func() {
+					defer super.WgConfigSync.Done()
+
 					benchmarc := utils.NewBenchmark()
 					wgUpdate.Add(len(update))
 
@@ -178,6 +186,8 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 						}).Infof("Updated %v %ss in %v", atomic.LoadUint32(updateCounter), objectInformation.ObjectType, benchmarc.String())
 					}
 				}()
+			} else {
+				super.WgConfigSync.Done()
 			}
 		}
 	}

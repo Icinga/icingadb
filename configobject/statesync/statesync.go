@@ -70,6 +70,9 @@ func logSyncCounters() {
 
 // syncStates tries to sync the states of given object type every second.
 func syncStates(super *supervisor.Supervisor, objectType string, counter *uint64, observer prometheus.Observer) {
+	// Do not sync states during initial config sync
+	super.WgConfigSync.Wait()
+
 	if super.EnvId == nil {
 		log.Debug("StateSync: Waiting for EnvId to be set")
 		time.Sleep(time.Second)
