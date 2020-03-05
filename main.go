@@ -115,11 +115,12 @@ func main() {
 	}
 
 	super := supervisor.Supervisor{
-		ChErr:    make(chan error),
-		ChDecode: make(chan *jsondecoder.JsonDecodePackages),
-		Rdbw:     redisConn,
-		Dbw:      mysqlConn,
-		EnvLock:  &sync.Mutex{},
+		ChErr:        make(chan error),
+		ChDecode:     make(chan *jsondecoder.JsonDecodePackages),
+		Rdbw:         redisConn,
+		Dbw:          mysqlConn,
+		EnvLock:      &sync.Mutex{},
+		WgConfigSync: &sync.WaitGroup{},
 	}
 
 	chEnv := make(chan *ha.Environment)

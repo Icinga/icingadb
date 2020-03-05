@@ -26,12 +26,13 @@ func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation
 	require.NoError(t, err, "Is the MySQL server running?")
 
 	super := supervisor.Supervisor{
-		ChErr:    make(chan error),
-		ChDecode: make(chan *jsondecoder.JsonDecodePackages),
-		Rdbw:     rdbw,
-		Dbw:      dbw,
-		EnvLock:  &sync.Mutex{},
-		EnvId:    utils.EncodeChecksum("e057d4ea363fbab414a874371da253dba3d713bc"),
+		ChErr:        make(chan error),
+		ChDecode:     make(chan *jsondecoder.JsonDecodePackages),
+		Rdbw:         rdbw,
+		Dbw:          dbw,
+		EnvLock:      &sync.Mutex{},
+		EnvId:        utils.EncodeChecksum("e057d4ea363fbab414a874371da253dba3d713bc"),
+		WgConfigSync: &sync.WaitGroup{},
 	}
 
 	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)
