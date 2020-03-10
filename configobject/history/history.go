@@ -392,12 +392,13 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 func flappingHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
 		`INSERT INTO flapping_history (id, environment_id, endpoint_id, object_type, host_id, service_id, start_time, end_time, ` +
-			`percent_state_change, flapping_threshold_low, flapping_threshold_high)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?)` +
+			`percent_state_change_start, percent_state_change_end, flapping_threshold_low, flapping_threshold_high)` +
+			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)` +
 			`ON DUPLICATE KEY UPDATE ` +
 			`start_time=IFNULL(NULLIF(start_time, 0), VALUES(start_time)),` +
 			`end_time=IFNULL(NULLIF(end_time, 0), VALUES(end_time)),` +
-			`percent_state_change=IFNULL(NULLIF(percent_state_change, 0), VALUES(percent_state_change)),` +
+			`percent_state_change_start=IFNULL(NULLIF(percent_state_change_start, 0), VALUES(percent_state_change_start)),` +
+			`percent_state_change_end=IFNULL(NULLIF(percent_state_change_end, 0), VALUES(percent_state_change_end)),` +
 			`flapping_threshold_low=IFNULL(NULLIF(flapping_threshold_low, 0), VALUES(flapping_threshold_low)),` +
 			`flapping_threshold_high=IFNULL(NULLIF(flapping_threshold_high, 0), VALUES(flapping_threshold_high))`,
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
@@ -416,7 +417,8 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 				utils.DecodeHexIfNotNil(values["service_id"]),
 				values["start_time"],
 				values["end_time"],
-				values["percent_state_change"],
+				values["percent_state_change_start"],
+				values["percent_state_change_end"],
 				values["flapping_threshold_low"],
 				values["flapping_threshold_high"],
 			}

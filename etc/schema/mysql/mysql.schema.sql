@@ -927,7 +927,8 @@ CREATE TABLE flapping_history (
 
   start_time bigint(20) unsigned NOT NULL,
   end_time bigint(20) unsigned DEFAULT NULL,
-  percent_state_change float unsigned NOT NULL,
+  percent_state_change_start float unsigned DEFAULT NULL,
+  percent_state_change_end float unsigned DEFAULT NULL,
   flapping_threshold_low float unsigned NOT NULL,
   flapping_threshold_high float unsigned NOT NULL,
 
