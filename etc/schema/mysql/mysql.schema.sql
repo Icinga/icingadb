@@ -968,7 +968,7 @@ CREATE TABLE history (
   flapping_history_id binary(20) DEFAULT NULL COMMENT 'flapping_history.id',
   acknowledgement_history_id binary(20) DEFAULT NULL COMMENT 'acknowledgement_history.id',
 
-  event_type enum('notification','state_change','downtime_schedule','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end','ack_set','ack_clear') NOT NULL,
+  event_type enum('notification','state_change','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end','ack_set','ack_clear') NOT NULL,
   event_time bigint(20) unsigned NOT NULL,
 
   PRIMARY KEY (id)
