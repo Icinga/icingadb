@@ -513,7 +513,7 @@ CREATE TABLE comment (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
 
   object_type enum('host', 'service') NOT NULL,
-  host_id binary(20) DEFAULT NULL COMMENT 'host.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
@@ -539,7 +539,7 @@ CREATE TABLE downtime (
 
   triggered_by_id binary(20) DEFAULT NULL COMMENT 'downtime.id',
   object_type enum('host', 'service') NOT NULL,
-  host_id binary(20) DEFAULT NULL COMMENT 'host.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
