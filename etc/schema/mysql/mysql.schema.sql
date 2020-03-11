@@ -21,14 +21,14 @@ CREATE TABLE host (
   checkcommand varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'checkcommand.name',
   checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
 
-  max_check_attempts int(10) unsigned NOT NULL,
+  max_check_attempts int unsigned NOT NULL,
 
   check_timeperiod varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
   check_timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
-  check_timeout int(10) unsigned DEFAULT NULL,
-  check_interval int(10) unsigned NOT NULL,
-  check_retry_interval int(10) unsigned NOT NULL,
+  check_timeout int unsigned DEFAULT NULL,
+  check_interval int unsigned NOT NULL,
+  check_retry_interval int unsigned NOT NULL,
 
   active_checks_enabled enum('y','n') NOT NULL,
   passive_checks_enabled enum('y','n') NOT NULL,
@@ -36,8 +36,8 @@ CREATE TABLE host (
   notifications_enabled enum('y','n') NOT NULL,
 
   flapping_enabled enum('y','n') NOT NULL,
-  flapping_threshold_low float unsigned NOT NULL,
-  flapping_threshold_high float unsigned NOT NULL,
+  flapping_threshold_low float NOT NULL,
+  flapping_threshold_high float NOT NULL,
 
   perfdata_enabled enum('y','n') NOT NULL,
 
@@ -111,10 +111,10 @@ CREATE TABLE host_state (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   state_type enum('hard', 'soft') NOT NULL,
-  soft_state tinyint(1) unsigned NOT NULL,
-  hard_state tinyint(1) unsigned NOT NULL,
-  previous_hard_state tinyint(1) unsigned NOT NULL,
-  attempt tinyint(1) unsigned NOT NULL,
+  soft_state tinyint unsigned NOT NULL,
+  hard_state tinyint unsigned NOT NULL,
+  previous_hard_state tinyint unsigned NOT NULL,
+  attempt tinyint unsigned NOT NULL,
   severity smallint unsigned NOT NULL,
 
   output text DEFAULT NULL,
@@ -133,15 +133,15 @@ CREATE TABLE host_state (
 
   in_downtime enum('y', 'n') NOT NULL,
 
-  execution_time int(10) unsigned DEFAULT NULL,
-  latency int(10) unsigned DEFAULT NULL,
-  timeout int(10) unsigned DEFAULT NULL,
+  execution_time int unsigned DEFAULT NULL,
+  latency int unsigned DEFAULT NULL,
+  timeout int unsigned DEFAULT NULL,
   check_source text DEFAULT NULL,
 
-  last_update bigint(20) unsigned DEFAULT NULL,
-  last_state_change bigint(20) unsigned NOT NULL,
-  next_check bigint(20) unsigned NOT NULL,
-  next_update bigint(20) unsigned NOT NULL,
+  last_update bigint unsigned DEFAULT NULL,
+  last_state_change bigint unsigned NOT NULL,
+  next_check bigint unsigned NOT NULL,
+  next_update bigint unsigned NOT NULL,
 
   PRIMARY KEY (host_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -160,14 +160,14 @@ CREATE TABLE service (
   checkcommand varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'checkcommand.name',
   checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
 
-  max_check_attempts int(10) unsigned NOT NULL,
+  max_check_attempts int unsigned NOT NULL,
 
   check_timeperiod varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
   check_timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
-  check_timeout int(10) unsigned DEFAULT NULL,
-  check_interval int(10) unsigned NOT NULL,
-  check_retry_interval int(10) unsigned NOT NULL,
+  check_timeout int unsigned DEFAULT NULL,
+  check_interval int unsigned NOT NULL,
+  check_retry_interval int unsigned NOT NULL,
 
   active_checks_enabled enum('y','n') NOT NULL,
   passive_checks_enabled enum('y','n') NOT NULL,
@@ -175,8 +175,8 @@ CREATE TABLE service (
   notifications_enabled enum('y','n') NOT NULL,
 
   flapping_enabled enum('y','n') NOT NULL,
-  flapping_threshold_low float unsigned NOT NULL,
-  flapping_threshold_high float unsigned NOT NULL,
+  flapping_threshold_low float NOT NULL,
+  flapping_threshold_high float NOT NULL,
 
   perfdata_enabled enum('y','n') NOT NULL,
 
@@ -247,10 +247,10 @@ CREATE TABLE service_state (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
 
   state_type enum('hard', 'soft') NOT NULL,
-  soft_state tinyint(1) unsigned NOT NULL,
-  hard_state tinyint(1) unsigned NOT NULL,
-  previous_hard_state tinyint(1) unsigned NOT NULL,
-  attempt tinyint(1) unsigned NOT NULL,
+  soft_state tinyint unsigned NOT NULL,
+  hard_state tinyint unsigned NOT NULL,
+  previous_hard_state tinyint unsigned NOT NULL,
+  attempt tinyint unsigned NOT NULL,
   severity smallint unsigned NOT NULL,
 
   output text DEFAULT NULL,
@@ -269,15 +269,15 @@ CREATE TABLE service_state (
 
   in_downtime enum('y', 'n') NOT NULL,
 
-  execution_time int(10) unsigned DEFAULT NULL,
-  latency int(10) unsigned DEFAULT NULL,
-  timeout int(10) unsigned DEFAULT NULL,
+  execution_time int unsigned DEFAULT NULL,
+  latency int unsigned DEFAULT NULL,
+  timeout int unsigned DEFAULT NULL,
   check_source text DEFAULT NULL,
 
-  last_update bigint(20) unsigned DEFAULT NULL,
-  last_state_change bigint(20) unsigned NOT NULL,
-  next_check bigint(20) unsigned NOT NULL,
-  next_update bigint(20) unsigned NOT NULL,
+  last_update bigint unsigned DEFAULT NULL,
+  last_state_change bigint unsigned NOT NULL,
+  next_check bigint unsigned NOT NULL,
+  next_update bigint unsigned NOT NULL,
 
   PRIMARY KEY (service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -307,11 +307,11 @@ CREATE TABLE icingadb_instance (
   id binary(16) NOT NULL COMMENT 'UUIDv4',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
-  heartbeat bigint(20) unsigned NOT NULL COMMENT '*nix timestamp',
+  heartbeat bigint unsigned NOT NULL COMMENT '*nix timestamp',
   responsible enum('y','n') NOT NULL,
 
   icinga2_version varchar(255) NOT NULL,
-  icinga2_start_time bigint(20) unsigned NOT NULL,
+  icinga2_start_time bigint unsigned NOT NULL,
   icinga2_notifications_enabled enum('y','n') NOT NULL,
   icinga2_active_service_checks_enabled enum('y','n') NOT NULL,
   icinga2_active_host_checks_enabled enum('y','n') NOT NULL,
@@ -323,9 +323,9 @@ CREATE TABLE icingadb_instance (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icingadb_schema (
-  id int(10) unsigned NOT NULL AUTO_INCREMENT,
-  version smallint(5) unsigned NOT NULL,
-  timestamp bigint(20) unsigned NOT NULL,
+  id int unsigned NOT NULL AUTO_INCREMENT,
+  version smallint unsigned NOT NULL,
+  timestamp bigint unsigned NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -344,7 +344,7 @@ CREATE TABLE checkcommand (
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   command text NOT NULL,
-  timeout int(10) unsigned NOT NULL,
+  timeout int unsigned NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -358,7 +358,7 @@ CREATE TABLE checkcommand_argument (
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   argument_value text DEFAULT NULL,
-  argument_order tinyint(3) DEFAULT NULL,
+  argument_order tinyint DEFAULT NULL,
   description text DEFAULT NULL,
   argument_key_override varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   repeat_key enum('y','n') NOT NULL,
@@ -403,7 +403,7 @@ CREATE TABLE eventcommand (
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   command text NOT NULL,
-  timeout smallint(5) unsigned NOT NULL,
+  timeout smallint unsigned NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -417,7 +417,7 @@ CREATE TABLE eventcommand_argument (
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   argument_value text DEFAULT NULL,
-  argument_order tinyint(3) DEFAULT NULL,
+  argument_order tinyint DEFAULT NULL,
   description text DEFAULT NULL,
   argument_key_override varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   repeat_key enum('y','n') NOT NULL,
@@ -461,7 +461,7 @@ CREATE TABLE notificationcommand (
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   command text NOT NULL,
-  timeout smallint(5) unsigned NOT NULL,
+  timeout smallint unsigned NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -475,7 +475,7 @@ CREATE TABLE notificationcommand_argument (
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   argument_value text DEFAULT NULL,
-  argument_order tinyint(3) DEFAULT NULL,
+  argument_order tinyint DEFAULT NULL,
   description text DEFAULT NULL,
   argument_key_override varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   repeat_key enum('y','n') NOT NULL,
@@ -523,10 +523,10 @@ CREATE TABLE comment (
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   text text NOT NULL,
   entry_type enum('comment','ack') NOT NULL,
-  entry_time bigint(20) unsigned NOT NULL,
+  entry_time bigint unsigned NOT NULL,
   is_persistent enum('y','n') NOT NULL,
   is_sticky enum('y','n') NOT NULL,
-  expire_time bigint(20) unsigned DEFAULT NULL,
+  expire_time bigint unsigned DEFAULT NULL,
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
@@ -548,15 +548,15 @@ CREATE TABLE downtime (
 
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,
-  entry_time bigint(20) unsigned NOT NULL,
-  scheduled_start_time bigint(20) unsigned NOT NULL,
-  scheduled_end_time bigint(20) unsigned NOT NULL,
-  flexible_duration bigint(20) unsigned NOT NULL,
+  entry_time bigint unsigned NOT NULL,
+  scheduled_start_time bigint unsigned NOT NULL,
+  scheduled_end_time bigint unsigned NOT NULL,
+  flexible_duration bigint unsigned NOT NULL,
   is_flexible enum('y', 'n') NOT NULL,
 
   is_in_effect enum('y', 'n') NOT NULL,
-  start_time bigint(20) unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
-  end_time bigint(20) unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + flexible_duration otherwise',
+  start_time bigint unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
+  end_time bigint unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + flexible_duration otherwise',
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
@@ -576,13 +576,13 @@ CREATE TABLE notification (
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
   command_id binary(20) NOT NULL COMMENT 'command.id',
 
-  times_begin int(10) unsigned DEFAULT NULL,
-  times_end int(10) unsigned DEFAULT NULL,
-  notification_interval int(10) unsigned NOT NULL,
+  times_begin int unsigned DEFAULT NULL,
+  times_end int unsigned DEFAULT NULL,
+  notification_interval int unsigned NOT NULL,
   timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
-  states tinyint(2) unsigned NOT NULL,
-  types smallint(3) unsigned NOT NULL,
+  states tinyint unsigned NOT NULL,
+  types smallint unsigned NOT NULL,
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
@@ -713,7 +713,7 @@ CREATE TABLE customvar (
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
 
-  name varchar(255) NOT NULL COLLATE utf8_bin,
+  name varchar(255) NOT NULL,
   value text NOT NULL,
 
   PRIMARY KEY (id)
@@ -725,7 +725,7 @@ CREATE TABLE customvar_flat (
   customvar_id binary(20) NOT NULL COMMENT 'sha1(customvar.id)',
   flatname_checksum binary(20) NOT NULL COMMENT 'sha1(flatname after conversion)',
 
-  flatname varchar(512) NOT NULL COLLATE utf8_bin COMMENT 'Path converted with `.` and `[ ]`',
+  flatname varchar(512) NOT NULL COMMENT 'Path converted with `.` and `[ ]`',
   flatvalue text NOT NULL,
 
   PRIMARY KEY (id)
@@ -748,8 +748,8 @@ CREATE TABLE user (
 
   timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
-  states tinyint(2) unsigned NOT NULL,
-  types smallint(3) unsigned NOT NULL,
+  states tinyint unsigned NOT NULL,
+  types smallint unsigned NOT NULL,
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
@@ -810,7 +810,7 @@ CREATE TABLE zone (
   is_global enum('y','n') NOT NULL,
   parent_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  depth tinyint(3) unsigned NOT NULL,
+  depth tinyint unsigned NOT NULL,
 
   PRIMARY KEY (id),
   INDEX idx_parent_id (parent_id),
@@ -827,12 +827,12 @@ CREATE TABLE notification_history (
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
 
   type enum('downtime_start', 'downtime_end', 'downtime_removed', 'custom', 'acknowledgement', 'problem', 'recovery', 'flapping_start', 'flapping_end') NOT NULL,
-  send_time bigint(20) unsigned NOT NULL,
-  state tinyint(1) unsigned NOT NULL,
-  previous_hard_state tinyint(1) unsigned NOT NULL,
+  send_time bigint unsigned NOT NULL,
+  state tinyint unsigned NOT NULL,
+  previous_hard_state tinyint unsigned NOT NULL,
   author text NOT NULL,
   `text` text NOT NULL,
-  users_notified smallint(5) unsigned NOT NULL,
+  users_notified smallint unsigned NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -854,16 +854,16 @@ CREATE TABLE state_history (
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
-  event_time bigint(20) unsigned NOT NULL,
+  event_time bigint unsigned NOT NULL,
   state_type enum('hard', 'soft') NOT NULL,
-  soft_state tinyint(1) unsigned NOT NULL,
-  hard_state tinyint(1) unsigned NOT NULL,
-  previous_soft_state tinyint(1) unsigned NOT NULL,
-  previous_hard_state tinyint(1) unsigned NOT NULL,
-  attempt tinyint(1) unsigned NOT NULL,
+  soft_state tinyint unsigned NOT NULL,
+  hard_state tinyint unsigned NOT NULL,
+  previous_soft_state tinyint unsigned NOT NULL,
+  previous_hard_state tinyint unsigned NOT NULL,
+  attempt tinyint unsigned NOT NULL,
   output text DEFAULT NULL,
   long_output text DEFAULT NULL,
-  max_check_attempts int(10) unsigned NOT NULL,
+  max_check_attempts int unsigned NOT NULL,
   check_source text DEFAULT NULL,
 
   PRIMARY KEY (id)
@@ -878,19 +878,19 @@ CREATE TABLE downtime_history (
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
-  entry_time bigint(20) unsigned NOT NULL,
+  entry_time bigint unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   cancelled_by varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,
   is_flexible enum('y', 'n') NOT NULL,
-  flexible_duration bigint(20) unsigned NOT NULL,
-  scheduled_start_time bigint(20) unsigned NOT NULL,
-  scheduled_end_time bigint(20) unsigned NOT NULL,
-  start_time bigint(20) unsigned NOT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
-  end_time bigint(20) unsigned NOT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + duration otherwise',
+  flexible_duration bigint unsigned NOT NULL,
+  scheduled_start_time bigint unsigned NOT NULL,
+  scheduled_end_time bigint unsigned NOT NULL,
+  start_time bigint unsigned NOT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
+  end_time bigint unsigned NOT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + duration otherwise',
   has_been_cancelled enum('y', 'n') NOT NULL,
-  trigger_time bigint(20) unsigned NOT NULL,
-  cancel_time bigint(20) unsigned DEFAULT NULL,
+  trigger_time bigint unsigned NOT NULL,
+  cancel_time bigint unsigned DEFAULT NULL,
 
   PRIMARY KEY (downtime_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -903,15 +903,15 @@ CREATE TABLE comment_history (
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
-  entry_time bigint(20) unsigned NOT NULL,
+  entry_time bigint unsigned NOT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   removed_by varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,
   entry_type enum('comment','ack') NOT NULL,
   is_persistent enum('y','n') NOT NULL,
   is_sticky enum('y','n') NOT NULL,
-  expire_time bigint(20) unsigned DEFAULT NULL,
-  remove_time bigint(20) unsigned DEFAULT NULL,
+  expire_time bigint unsigned DEFAULT NULL,
+  remove_time bigint unsigned DEFAULT NULL,
   has_been_removed enum('y','n') NOT NULL,
 
   PRIMARY KEY (comment_id)
@@ -925,12 +925,12 @@ CREATE TABLE flapping_history (
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
-  start_time bigint(20) unsigned NOT NULL,
-  end_time bigint(20) unsigned DEFAULT NULL,
-  percent_state_change_start float unsigned DEFAULT NULL,
-  percent_state_change_end float unsigned DEFAULT NULL,
-  flapping_threshold_low float unsigned NOT NULL,
-  flapping_threshold_high float unsigned NOT NULL,
+  start_time bigint unsigned NOT NULL,
+  end_time bigint unsigned DEFAULT NULL,
+  percent_state_change_start float DEFAULT NULL,
+  percent_state_change_end float DEFAULT NULL,
+  flapping_threshold_low float NOT NULL,
+  flapping_threshold_high float NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -943,12 +943,12 @@ CREATE TABLE acknowledgement_history (
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
-  set_time bigint(20) unsigned NOT NULL,
-  clear_time bigint(20) unsigned DEFAULT NULL,
+  set_time bigint unsigned NOT NULL,
+  clear_time bigint unsigned DEFAULT NULL,
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   cleared_by varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   comment text DEFAULT NULL,
-  expire_time bigint(20) unsigned DEFAULT NULL,
+  expire_time bigint unsigned DEFAULT NULL,
   is_sticky enum('y','n') NOT NULL,
   is_persistent enum('y','n') NOT NULL,
 
@@ -970,7 +970,7 @@ CREATE TABLE history (
   acknowledgement_history_id binary(20) DEFAULT NULL COMMENT 'acknowledgement_history.id',
 
   event_type enum('notification','state_change','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end','ack_set','ack_clear') NOT NULL,
-  event_time bigint(20) unsigned NOT NULL,
+  event_time bigint unsigned NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
