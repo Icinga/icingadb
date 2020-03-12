@@ -3,6 +3,8 @@
 # Exclude all hidden files
 .*
 
-# Except those related to git(lab)
+# Except those related to git(lab) and .mailmap
 !.git*
 !.gitlab-ci.yml
+!.mailmap
+
