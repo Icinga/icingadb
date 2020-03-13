@@ -61,7 +61,10 @@ CREATE TABLE host (
   PRIMARY KEY (id),
   KEY idx_action_url_checksum (action_url_id) COMMENT 'cleanup',
   KEY idx_notes_url_checksum (notes_url_id) COMMENT 'cleanup',
-  KEY idx_icon_image_checksum (icon_image_id) COMMENT 'cleanup'
+  KEY idx_icon_image_checksum (icon_image_id) COMMENT 'cleanup',
+
+  INDEX idx_host_display_name (display_name) COMMENT 'Host list filtered/ordered by display_name',
+  INDEX idx_host_name (name) COMMENT 'Host list filtered/ordered by name; Host detail filter'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup (
@@ -85,7 +88,10 @@ CREATE TABLE hostgroup_member (
   host_id binary(20) NOT NULL COMMENT 'host.id',
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_hostgroup_member_host_id (host_id, hostgroup_id),
+  INDEX idx_hostgroup_member_hostgroup_id (hostgroup_id, host_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE host_customvar (
@@ -94,7 +100,10 @@ CREATE TABLE host_customvar (
   host_id binary(20) NOT NULL COMMENT 'host.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_host_customvar_host_id (host_id, customvar_id),
+  INDEX idx_host_customvar_customvar_id (customvar_id, host_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_customvar (
@@ -197,7 +206,11 @@ CREATE TABLE service (
   command_endpoint varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'endpoint.name',
   command_endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_service_display_name (display_name) COMMENT 'Service list filtered/ordered by display_name',
+  INDEX idx_service_host_id (host_id, display_name) COMMENT 'Service list filtered by host and ordered by display_name',
+  INDEX idx_service_name (name) COMMENT 'Service list filtered/ordered by name; Service detail filter'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup (
@@ -221,7 +234,10 @@ CREATE TABLE servicegroup_member (
   service_id binary(20) NOT NULL COMMENT 'service.id',
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_servicegroup_member_service_id (service_id, servicegroup_id),
+  INDEX idx_servicegroup_member_servicegroup_id (servicegroup_id, service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service_customvar (
@@ -230,7 +246,11 @@ CREATE TABLE service_customvar (
   service_id binary(20) NOT NULL COMMENT 'service.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+
+  INDEX idx_service_customvar_service_id (service_id, customvar_id),
+  INDEX idx_service_customvar_customvar_id (customvar_id, service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup_customvar (
@@ -530,7 +550,10 @@ CREATE TABLE comment (
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_comment_name (name) COMMENT 'Comment detail filter',
+  INDEX idx_comment_entry_time (entry_time) COMMENT 'Comment list fileted/ordered by entry_time'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE downtime (
@@ -560,7 +583,10 @@ CREATE TABLE downtime (
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_downtime_is_in_effect (is_in_effect, start_time) COMMENT 'Downtime list filtered/ordered by severity',
+  INDEX idx_downtime_name (name) COMMENT 'Downtime detail filter'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification (
@@ -586,7 +612,10 @@ CREATE TABLE notification (
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_host_id (host_id),
+  INDEX idx_service_id (service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_user (
@@ -595,7 +624,10 @@ CREATE TABLE notification_user (
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   user_id binary(20) NOT NULL COMMENT 'user.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_notification_user_user_id (user_id, notification_id),
+  INDEX idx_notification_user_notification_id (notification_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_usergroup (
@@ -604,7 +636,10 @@ CREATE TABLE notification_usergroup (
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_notification_usergroup_usergroup_id (usergroup_id, notification_id),
+  INDEX idx_notification_usergroup_notification_id (notification_id, usergroup_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_recipient (
@@ -614,7 +649,12 @@ CREATE TABLE notification_recipient (
   user_id binary(20) NULL COMMENT 'user.id',
   usergroup_id binary(20) NULL COMMENT 'usergroup.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_notification_recipient_user_id (user_id, notification_id),
+  INDEX idx_notification_recipient_notification_id_user (notification_id, user_id),
+  INDEX idx_notification_recipient_usergroup_id (usergroup_id, notification_id),
+  INDEX idx_notification_recipient_notification_id_usergroup (notification_id, usergroup_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_customvar (
@@ -728,7 +768,9 @@ CREATE TABLE customvar_flat (
   flatname varchar(512) NOT NULL COMMENT 'Path converted with `.` and `[ ]`',
   flatvalue text NOT NULL,
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_customvar_flat_customvar_id (customvar_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user (
@@ -753,7 +795,9 @@ CREATE TABLE user (
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_user_display_name (display_name) COMMENT 'User list filtered/ordered by display_name'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE usergroup (
@@ -777,7 +821,10 @@ CREATE TABLE usergroup_member (
   user_id binary(20) NOT NULL COMMENT 'user.id',
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_usergroup_member_user_id (user_id, usergroup_id),
+  INDEX idx_usergroup_member_usergroup_id (usergroup_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_customvar (
@@ -834,7 +881,9 @@ CREATE TABLE notification_history (
   `text` text NOT NULL,
   users_notified smallint unsigned NOT NULL,
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_notification_history_event_time (send_time DESC) COMMENT 'Notification list filtered/ordered by entry_time'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_notification_history (
@@ -972,5 +1021,13 @@ CREATE TABLE history (
   event_type enum('notification','state_change','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end','ack_set','ack_clear') NOT NULL,
   event_time bigint unsigned NOT NULL,
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_history_event_time (event_time) COMMENT 'History filtered/ordered by event_time',
+  INDEX idx_history_acknowledgement (acknowledgement_history_id),
+  INDEX idx_history_comment (comment_history_id),
+  INDEX idx_history_downtime (downtime_history_id),
+  INDEX idx_history_flapping (flapping_history_id),
+  INDEX idx_history_notification (notification_history_id),
+  INDEX idx_history_state (state_history_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
