@@ -16,10 +16,16 @@ Supported enterprise distributions:
 
 ### Package Repositories <a id="package-repositories"></a>
 
+In order to install the latest release candidate, you have to add our `testing` repository as shown below.
+
+> INFO: On order to install Icinga DB's Redis dependency, you also have to add the Icinga release repository: http://packages.icinga.com/
+
 #### RHEL/CentOS Repositories <a id="package-repositories-rhel-centos"></a>
 
 ```
-yum install https://packages.icinga.com/epel/icinga-rpm-release-7-latest.noarch.rpm
+rpm --import https://packages.icinga.com/icinga.key
+
+wget https://packages.icinga.com/epel/ICINGA-testing.repo -O /etc/yum.repos.d/ICINGA-testing.repo
 ```
 
 #### SLES/OpenSUSE Repositories <a id="package-repositories-sles-opensuse"></a>
@@ -27,7 +33,7 @@ yum install https://packages.icinga.com/epel/icinga-rpm-release-7-latest.noarch.
 ```
 rpm --import https://packages.icinga.com/icinga.key
 
-zypper ar https://packages.icinga.com/SUSE/ICINGA-release.repo
+zypper ar https://packages.icinga.com/SUSE/ICINGA-testing.repo
 zypper ref
 ```
 
@@ -42,10 +48,10 @@ apt-get -y install apt-transport-https wget gnupg
 wget -O - https://packages.icinga.com/icinga.key | apt-key add -
 
 DIST=$(awk -F"[)(]+" '/VERSION=/ {print $2}' /etc/os-release); \
- echo "deb https://packages.icinga.com/debian icinga-${DIST} main" > \
- /etc/apt/sources.list.d/${DIST}-icinga.list
- echo "deb-src https://packages.icinga.com/debian icinga-${DIST} main" >> \
- /etc/apt/sources.list.d/${DIST}-icinga.list
+ echo "deb https://packages.icinga.com/debian icinga-${DIST}-testing main" > \
+ /etc/apt/sources.list.d/${DIST}-icinga-testing.list
+ echo "deb-src https://packages.icinga.com/debian icinga-${DIST}-testing main" >> \
+ /etc/apt/sources.list.d/${DIST}-icinga-testing.list
 
 apt-get update
 ```
@@ -59,10 +65,10 @@ apt-get -y install apt-transport-https wget gnupg
 wget -O - https://packages.icinga.com/icinga.key | apt-key add -
 
 . /etc/os-release; if [ ! -z ${UBUNTU_CODENAME+x} ]; then DIST="${UBUNTU_CODENAME}"; else DIST="$(lsb_release -c| awk '{print $2}')"; fi; \
- echo "deb https://packages.icinga.com/ubuntu icinga-${DIST} main" > \
- /etc/apt/sources.list.d/${DIST}-icinga.list
- echo "deb-src https://packages.icinga.com/ubuntu icinga-${DIST} main" >> \
- /etc/apt/sources.list.d/${DIST}-icinga.list
+ echo "deb https://packages.icinga.com/ubuntu icinga-${DIST}-testing main" > \
+ /etc/apt/sources.list.d/${DIST}-icinga-testing.list
+ echo "deb-src https://packages.icinga.com/ubuntu icinga-${DIST}-testing main" >> \
+ /etc/apt/sources.list.d/${DIST}-icinga-testing.list
 
 apt-get update
 ```
