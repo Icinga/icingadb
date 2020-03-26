@@ -18,8 +18,6 @@ Supported enterprise distributions:
 
 In order to install the latest release candidate, you have to add our `testing` repository as shown below.
 
-> INFO: On order to install Icinga DB's Redis dependency, you also have to add the Icinga release repository: http://packages.icinga.com/
-
 #### RHEL/CentOS Repositories <a id="package-repositories-rhel-centos"></a>
 
 ```
