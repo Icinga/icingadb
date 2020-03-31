@@ -1,6 +1,6 @@
 [Unit]
 Description=Icinga DB
-After=syslog.target network-online.target icinga-redis.service mariadb.service
+After=syslog.target network-online.target icingadb-redis.service mariadb.service
 
 [Service]
 Type=simple
