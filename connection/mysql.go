@@ -680,6 +680,8 @@ func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]
 		if err != nil {
 			return nil, err
 		}
+
+		rows.Close()
 	}
 
 	return checksums, nil
