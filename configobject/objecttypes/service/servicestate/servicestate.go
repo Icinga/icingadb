@@ -60,7 +60,7 @@ type ServiceState struct {
 	IsHandled                bool    `json:"is_handled"`
 	IsReachable              bool    `json:"is_reachable"`
 	IsFlapping               bool    `json:"is_flapping"`
-	IsAcknowledged           bool    `json:"is_acknowledged"`
+	Acknowledgement          float32 `json:"acknowledgement"`
 	AcknowledgementCommentId string  `json:"acknowledgement_comment_id"`
 	InDowntime               bool    `json:"in_downtime"`
 	ExecutionTime            float64 `json:"execution_time"`
@@ -106,7 +106,7 @@ func (s *ServiceState) UpdateValues() []interface{} {
 		utils.Bool[s.IsReachable],
 		utils.Bool[s.IsFlapping],
 		utils.Bool[time.Now().After(utils.MillisecsToTime(float64(s.NextUpdate)))],
-		utils.Bool[s.IsAcknowledged],
+		utils.IsAcknowledged[s.Acknowledgement],
 		utils.EncodeChecksum(s.AcknowledgementCommentId),
 		utils.Bool[s.InDowntime],
 		s.ExecutionTime,

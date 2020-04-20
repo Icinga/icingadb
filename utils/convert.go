@@ -15,6 +15,11 @@ var (
 		true:  "y",
 		false: "n",
 	}
+	IsAcknowledged = map[float32]string{
+		0: "n",
+		1: "y",
+		2: "sticky",
+	}
 	NotificationStatesToInt = map[string]int{
 		"OK":       1,
 		"Warning":  2,

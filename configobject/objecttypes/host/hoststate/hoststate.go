@@ -60,7 +60,7 @@ type HostState struct {
 	IsHandled                bool        `json:"is_handled"`
 	IsReachable              bool        `json:"is_reachable"`
 	IsFlapping               bool        `json:"is_flapping"`
-	IsAcknowledged           bool        `json:"is_acknowledged"`
+	Acknowledgement          float32     `json:"acknowledgement"`
 	AcknowledgementCommentId string      `json:"acknowledgement_comment_id"`
 	InDowntime               bool        `json:"in_downtime"`
 	ExecutionTime            float64     `json:"execution_time"`
@@ -106,7 +106,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		utils.Bool[h.IsReachable],
 		utils.Bool[h.IsFlapping],
 		utils.Bool[time.Now().After(utils.MillisecsToTime(float64(h.NextUpdate)))],
-		utils.Bool[h.IsAcknowledged],
+		utils.IsAcknowledged[h.Acknowledgement],
 		utils.EncodeChecksum(h.AcknowledgementCommentId),
 		utils.Bool[h.InDowntime],
 		h.ExecutionTime,

@@ -140,7 +140,7 @@ func syncStates(super *supervisor.Supervisor, objectType string, counter *uint64
 					utils.JSONBooleanToDBBoolean(values["is_reachable"]),
 					utils.JSONBooleanToDBBoolean(values["is_flapping"]),
 					utils.Bool[isOverdue],
-					utils.JSONBooleanToDBBoolean(values["is_acknowledged"]),
+					redisAckToDBAck(values["acknowledgement"]),
 					acknowledgementCommentId,
 					utils.JSONBooleanToDBBoolean(values["in_downtime"]),
 					values["execution_time"],
@@ -212,5 +212,17 @@ func redisIntToDBInt(value interface{}) string {
 		return "0"
 	} else {
 		return value.(string)
+	}
+}
+
+// redisAckToDBAck converts an acknowledgement type we got from Redis to a DB acknowledgement type.
+func redisAckToDBAck(value interface{}) string {
+	switch value {
+	case "2":
+		return "sticky"
+	case "1":
+		return "y"
+	default:
+		return "n"
 	}
 }
