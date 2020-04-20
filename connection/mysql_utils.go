@@ -40,7 +40,7 @@ func mkMysql(dbType string, dbDsn string, maxOpenConns int) (*sql.DB, error) {
 	mysql.SetLogger(oldlog.New(ioutil.Discard, "", 0))
 
 	db.SetMaxOpenConns(maxOpenConns)
-	db.SetMaxIdleConns(0)
+	db.SetMaxIdleConns(maxOpenConns)
 
 	return db, nil
 }
