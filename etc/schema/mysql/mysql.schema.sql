@@ -378,7 +378,7 @@ CREATE TABLE checkcommand_argument (
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   argument_value text DEFAULT NULL,
-  argument_order tinyint DEFAULT NULL,
+  argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
   argument_key_override varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   repeat_key enum('y','n') NOT NULL,
@@ -437,7 +437,7 @@ CREATE TABLE eventcommand_argument (
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   argument_value text DEFAULT NULL,
-  argument_order tinyint DEFAULT NULL,
+  argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
   argument_key_override varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   repeat_key enum('y','n') NOT NULL,
@@ -495,7 +495,7 @@ CREATE TABLE notificationcommand_argument (
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   argument_value text DEFAULT NULL,
-  argument_order tinyint DEFAULT NULL,
+  argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
   argument_key_override varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   repeat_key enum('y','n') NOT NULL,
