@@ -175,6 +175,10 @@ func (dbw *DBWrapper) checkConnection(isTicker bool) bool {
 }
 
 func (dbw *DBWrapper) isConnectionError(err error) bool {
+	if isSerializationFailure(err) {
+		return true
+	}
+
 	errString := err.Error()
 	for _, str := range connectionErrors {
 		if strings.Contains(errString, str) {
