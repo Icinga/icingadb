@@ -71,7 +71,7 @@ func (u *User) UpdateValues() []interface{} {
 		u.DisplayName,
 		u.EMail,
 		u.Pager,
-		u.NotificationsEnabled,
+		utils.Bool[u.NotificationsEnabled],
 		utils.EncodeChecksum(u.PeriodId),
 		utils.NotificationStatesToBitMask(u.States),
 		utils.NotificationTypesToBitMask(u.Types),
