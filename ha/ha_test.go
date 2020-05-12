@@ -8,7 +8,7 @@ import (
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"

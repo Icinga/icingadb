@@ -2,7 +2,7 @@
 
 package connection
 
-import "github.com/go-redis/redis"
+import "github.com/go-redis/redis/v7"
 
 type PipelinerWrapper struct {
 	pipeliner redis.Pipeliner

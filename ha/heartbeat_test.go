@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/connection"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
