@@ -10,7 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -95,22 +94,7 @@ type StatusCmd interface {
 
 // RDBWrapper is a redis wrapper including helper functions.
 type RDBWrapper struct {
-	Rdb                         RedisClient
-	ConnectedAtomic             *uint32 //uint32 to be able to use atomic operations
-	ConnectionUpCondition       *sync.Cond
-	ConnectionLostCounterAtomic *uint32 //uint32 to be able to use atomic operations
-}
-
-func (rdbw *RDBWrapper) IsConnected() bool {
-	return atomic.LoadUint32(rdbw.ConnectedAtomic) != 0
-}
-
-func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
-	if connected {
-		return atomic.CompareAndSwapUint32(rdbw.ConnectedAtomic, 0, 1)
-	} else {
-		return atomic.CompareAndSwapUint32(rdbw.ConnectedAtomic, 1, 0)
-	}
+	Rdb RedisClient
 }
 
 func NewRDBWrapper(address string, poolSize int) *RDBWrapper {
@@ -123,8 +107,17 @@ func NewRDBWrapper(address string, poolSize int) *RDBWrapper {
 	}
 
 	rdb := redis.NewClient(&redis.Options{
-		Network:      net,
-		Addr:         address,
+		Network: net,
+		Addr:    address,
+
+		// Should be 12, i.e. effectively 5m (consult the lib's internals) as in our MySQL connection,
+		// but seems to have to be just 8 for our tests not to time out.
+		MaxRetries: 8,
+
+		// As in our MySQL connection
+		MinRetryBackoff: 5 * time.Second,
+		MaxRetryBackoff: 60 * time.Second,
+
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
@@ -132,11 +125,7 @@ func NewRDBWrapper(address string, poolSize int) *RDBWrapper {
 		PoolSize:     poolSize,
 	})
 
-	rdbw := RDBWrapper{
-		Rdb: rdb, ConnectedAtomic: new(uint32),
-		ConnectionLostCounterAtomic: new(uint32),
-		ConnectionUpCondition:       sync.NewCond(&sync.Mutex{}),
-	}
+	rdbw := RDBWrapper{rdb}
 
 	_, err := rdbw.Rdb.Ping().Result()
 	if err != nil {
@@ -146,394 +135,115 @@ func NewRDBWrapper(address string, poolSize int) *RDBWrapper {
 		}).Error("Could not connect to Redis. Trying again")
 	}
 
-	go func() {
-		for {
-			rdbw.CheckConnection(true)
-			time.Sleep(rdbw.getConnectionCheckInterval())
-		}
-	}()
-
 	return &rdbw
 }
 
-func (rdbw *RDBWrapper) getConnectionCheckInterval() time.Duration {
-	if !rdbw.IsConnected() {
-		v := atomic.LoadUint32(rdbw.ConnectionLostCounterAtomic)
-		if v < 4 {
-			return 5 * time.Second
-		} else if v < 8 {
-			return 10 * time.Second
-		} else if v < 11 {
-			return 30 * time.Second
-		} else if v < 14 {
-			return 60 * time.Second
-		} else {
-			log.Fatal("Could not connect to Redis for over 5 minutes. Shutting down...")
-		}
-	}
-
-	return 15 * time.Second
-}
-
-func (rdbw *RDBWrapper) CheckConnection(isTicker bool) bool {
+func (rdbw *RDBWrapper) CheckConnection() bool {
 	_, err := rdbw.Rdb.Ping().Result()
-	if err != nil {
-		if rdbw.CompareAndSetConnected(false) {
-			log.WithFields(log.Fields{
-				"context": "redis",
-				"error":   err,
-			}).Error("Redis connection lost. Trying to reconnect")
-		} else if isTicker {
-			atomic.AddUint32(rdbw.ConnectionLostCounterAtomic, 1)
-
-			log.WithFields(log.Fields{
-				"context": "redis",
-				"error":   err,
-			}).Debugf("Redis connection lost. Trying again in %s", rdbw.getConnectionCheckInterval())
-		}
-
-		return false
-	} else {
-		if rdbw.CompareAndSetConnected(true) {
-			log.Info("Redis connection established")
-			atomic.StoreUint32(rdbw.ConnectionLostCounterAtomic, 0)
-			rdbw.ConnectionUpCondition.Broadcast()
-		}
-
-		return true
-	}
-}
-
-func (rdbw *RDBWrapper) WaitForConnection() {
-	rdbw.ConnectionUpCondition.L.Lock()
-	rdbw.ConnectionUpCondition.Wait()
-	rdbw.ConnectionUpCondition.L.Unlock()
+	return err == nil
 }
 
 // Publish is a wrapper for connection handling.
 func (rdbw *RDBWrapper) Publish(channel string, message interface{}) *redis.IntCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.Publish(channel, message)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.Publish(channel, message)
 }
 
 // XRead is a wrapper for connection handling.
 func (rdbw *RDBWrapper) XRead(args *redis.XReadArgs) *redis.XStreamSliceCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.XRead(args)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.XRead(args)
 }
 
 // XDel is a wrapper for connection handling.
 func (rdbw *RDBWrapper) XDel(stream string, ids ...string) *redis.IntCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.XDel(stream, ids...)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.XDel(stream, ids...)
 }
 
 // XAdd is a wrapper for connection handling.
 func (rdbw *RDBWrapper) XAdd(a *redis.XAddArgs) *redis.StringCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.XAdd(a)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.XAdd(a)
 }
 
 // HKeys is a wrapper for connection handling.
 func (rdbw *RDBWrapper) HKeys(key string) *redis.StringSliceCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.HKeys(key)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.HKeys(key)
 }
 
 func (rdbw *RDBWrapper) HMGet(key string, fields ...string) *redis.SliceCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.HMGet(key, fields...)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.HMGet(key, fields...)
 }
 
 // HGetAll is a wrapper for auto-logging and connection handling.
 func (rdbw *RDBWrapper) HGetAll(key string) *redis.StringStringMapCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
+	benchmarc := utils.NewBenchmark()
+	res := rdbw.Rdb.HGetAll(key)
+	_, _ = res.Result()
+	benchmarc.Stop()
 
-		benchmarc := utils.NewBenchmark()
-		res := rdbw.Rdb.HGetAll(key)
+	redisObservers.hgetall.Observe(benchmarc.Seconds())
 
-		if _, err := res.Result(); err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
+	log.WithFields(log.Fields{
+		"context":   "redis",
+		"benchmark": benchmarc,
+		"query":     "HGETALL " + key,
+		"result":    res.Val(),
+	}).Debug("Ran Query")
 
-		benchmarc.Stop()
-
-		redisObservers.hgetall.Observe(benchmarc.Seconds())
-
-		log.WithFields(log.Fields{
-			"context":   "redis",
-			"benchmark": benchmarc,
-			"query":     "HGETALL " + key,
-			"result":    res.Val(),
-		}).Debug("Ran Query")
-
-		return res
-	}
+	return res
 }
 
 // Eval is a wrapper for connection handling.
 func (rdbw *RDBWrapper) Eval(script string, keys []string, args ...interface{}) *redis.Cmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.Eval(script, keys, args...)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.Eval(script, keys, args...)
 }
 
 // EvalSha is a wrapper for connection handling.
 func (rdbw *RDBWrapper) EvalSha(sha1 string, keys []string, args ...interface{}) *redis.Cmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.EvalSha(sha1, keys, args...)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.EvalSha(sha1, keys, args...)
 }
 
 // ScriptExists is a wrapper for connection handling.
 func (rdbw *RDBWrapper) ScriptExists(hashes ...string) *redis.BoolSliceCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.ScriptExists(hashes...)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.ScriptExists(hashes...)
 }
 
 // ScriptLoad is a wrapper for connection handling.
 func (rdbw *RDBWrapper) ScriptLoad(script string) *redis.StringCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.ScriptLoad(script)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.ScriptLoad(script)
 }
 
 // SAdd is a wrapper for connection handling.
 func (rdbw *RDBWrapper) SAdd(key string, members ...interface{}) *redis.IntCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.SAdd(key, members...)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.SAdd(key, members...)
 }
 
 // SRem is a wrapper for connection handling.
 func (rdbw *RDBWrapper) SRem(key string, members ...interface{}) *redis.IntCmd {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
-
-		cmd := rdbw.Rdb.SRem(key, members...)
-		_, err := cmd.Result()
-
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
-
-		return cmd
-	}
+	return rdbw.Rdb.SRem(key, members...)
 }
 
 // TxPipelined is a wrapper for auto-logging and connection handling.
 func (rdbw *RDBWrapper) TxPipelined(fn func(pipeliner redis.Pipeliner) error) ([]redis.Cmder, error) {
-	for {
-		if !rdbw.IsConnected() {
-			rdbw.WaitForConnection()
-			continue
-		}
+	benchmarc := utils.NewBenchmark()
+	cmd, err := rdbw.Rdb.TxPipelined(fn)
+	benchmarc.Stop()
 
-		benchmarc := utils.NewBenchmark()
-		cmd, err := rdbw.Rdb.TxPipelined(fn)
+	redisObservers.multi.Observe(benchmarc.Seconds())
 
-		if err != nil {
-			if !rdbw.CheckConnection(false) {
-				continue
-			}
-		}
+	log.WithFields(log.Fields{
+		"context":   "redis",
+		"benchmark": benchmarc,
+		"query":     "MULTI/EXEC",
+	}).Debug("Ran pipelined transaction")
 
-		benchmarc.Stop()
-
-		redisObservers.multi.Observe(benchmarc.Seconds())
-
-		log.WithFields(log.Fields{
-			"context":   "redis",
-			"benchmark": benchmarc,
-			"query":     "MULTI/EXEC",
-		}).Debug("Ran pipelined transaction")
-
-		return cmd, err
-	}
+	return cmd, err
 }
 
-func (rdbw *RDBWrapper) Pipeline() PipelinerWrapper {
-	pipeliner := rdbw.Rdb.Pipeline()
-	plw := PipelinerWrapper{pipeliner: pipeliner, rdbw: rdbw}
-	return plw
+func (rdbw *RDBWrapper) Pipeline() redis.Pipeliner {
+	return rdbw.Rdb.Pipeline()
 }
 
-func (rdbw *RDBWrapper) Subscribe() PubSubWrapper {
-	ps := rdbw.Rdb.Subscribe()
-	psw := PubSubWrapper{ps: ps, rdbw: rdbw}
-	return psw
+func (rdbw *RDBWrapper) Subscribe() *redis.PubSub {
+	return rdbw.Rdb.Subscribe()
 }
 
 type ConfigChunk struct {
