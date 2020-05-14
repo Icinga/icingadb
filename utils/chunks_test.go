@@ -51,3 +51,38 @@ func TestChunkKeys(t *testing.T) {
 
 	assert.Equal(t, want, chunks)
 }
+
+func TestChunkInterfaces(t *testing.T) {
+	interfaces := []interface{}{
+		"herp",
+		"derp",
+		"merp",
+		"berp",
+	}
+
+	chunks := ChunkInterfaces(interfaces, 2)
+	want := [][]interface{}{
+		{
+			"herp",
+			"derp",
+		},
+		{
+			"merp",
+			"berp",
+		},
+	}
+
+	assert.Equal(t, want, chunks)
+
+	chunks = ChunkInterfaces(interfaces, 5)
+	want = [][]interface{}{
+		{
+			"herp",
+			"derp",
+			"merp",
+			"berp",
+		},
+	}
+
+	assert.Equal(t, want, chunks)
+}

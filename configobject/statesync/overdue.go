@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -156,32 +157,46 @@ func updateOverdue(super *supervisor.Supervisor, objectType string, counter *uin
 
 // updateOverdueInDb sets objectType_state#is_overdue for ids to overdue.
 func updateOverdueInDb(super *supervisor.Supervisor, objectType string, observer prometheus.Observer, ids []interface{}, overdue bool) {
-	placeholders := make([]string, 0, len(ids))
-	for len(placeholders) < cap(placeholders) {
-		placeholders = append(placeholders, "?")
+	group := errgroup.Group{}
+	for _, c := range utils.ChunkInterfaces(ids, 1000) {
+		chunk := c
+		group.Go(func() error {
+			placeholders := make([]string, 0, len(chunk))
+			for len(placeholders) < cap(placeholders) {
+				placeholders = append(placeholders, "?")
+			}
+
+			args := make([]interface{}, 0, len(chunk))
+			for _, hexId := range chunk {
+				id, errHD := hex.DecodeString(hexId.(string))
+				if errHD != nil {
+					return errHD
+				}
+
+				args = append(args, id)
+			}
+
+			log.WithFields(log.Fields{
+				"amount":  len(chunk),
+				"type":    objectType,
+				"overdue": overdue,
+			}).Debug("Syncing overdue indicators to database")
+
+			_, errSE := super.Dbw.SqlExec(
+				observer,
+				fmt.Sprintf(
+					"UPDATE %s_state SET is_overdue='%s' WHERE %s_id IN (%s)",
+					objectType, utils.Bool[overdue], objectType, strings.Join(placeholders, ","),
+				),
+				args...,
+			)
+
+			return errSE
+		})
 	}
 
-	args := make([]interface{}, 0, len(ids))
-	for _, hexId := range ids {
-		id, errHD := hex.DecodeString(hexId.(string))
-		if errHD != nil {
-			super.ChErr <- errHD
-			return
-		}
-
-		args = append(args, id)
-	}
-
-	_, errSE := super.Dbw.SqlExec(
-		observer,
-		fmt.Sprintf(
-			"UPDATE %s_state SET is_overdue='%s' WHERE %s_id IN (%s)",
-			objectType, utils.Bool[overdue], objectType, strings.Join(placeholders, ","),
-		),
-		args...,
-	)
-	if errSE != nil {
-		super.ChErr <- errSE
-		return
+	err := group.Wait()
+	if err != nil {
+		super.ChErr <- err
 	}
 }
