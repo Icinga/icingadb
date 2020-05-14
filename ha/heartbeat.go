@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	log "github.com/sirupsen/logrus"
 	"time"
 )

@@ -11,7 +11,7 @@ import (
 	"github.com/Icinga/icingadb/jsondecoder"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"sync/atomic"

@@ -6,7 +6,7 @@ import (
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v7"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
