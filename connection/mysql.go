@@ -10,6 +10,7 @@ import (
 	"github.com/Icinga/icingadb/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -702,30 +703,35 @@ func (dbw *DBWrapper) SqlBulkInsert(rows []Row, stmt *BulkInsertStmt) error {
 
 	DbBulkInserts.Inc()
 
-	placeholders := make([]string, len(rows))
-	values := make([]interface{}, len(rows)*stmt.NumField)
-	j := 0
+	group := errgroup.Group{}
 
-	for i, r := range rows {
-		placeholders[i] = stmt.Placeholder
+	for _, c := range ChunkRows(rows, 500) {
+		chunk := c
+		group.Go(func() error {
+			placeholders := make([]string, len(chunk))
+			values := make([]interface{}, len(chunk)*stmt.NumField)
+			j := 0
 
-		for _, v := range r.InsertValues() {
-			values[j] = v
-			j++
-		}
+			for i, r := range chunk {
+				placeholders[i] = stmt.Placeholder
+
+				for _, v := range r.InsertValues() {
+					values[j] = v
+					j++
+				}
+			}
+
+			query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
+
+			_, err := dbw.WithRetry(func() (result sql.Result, e error) {
+				return dbw.SqlExec(mysqlObservers.bulkInsert, query, values...)
+			})
+
+			return err
+		})
 	}
 
-	query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
-
-	_, err := dbw.WithRetry(func() (result sql.Result, e error) {
-		return dbw.SqlExec(mysqlObservers.bulkInsert, query, values...)
-	})
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return group.Wait()
 }
 
 func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
@@ -766,27 +772,33 @@ func (dbw *DBWrapper) SqlBulkUpdate(rows []Row, stmt *BulkUpdateStmt) error {
 
 	DbBulkUpdates.Inc()
 
-	placeholders := make([]string, len(rows))
-	values := make([]interface{}, len(rows)*stmt.NumField)
-	j := 0
+	group := errgroup.Group{}
 
-	for i, r := range rows {
-		placeholders[i] = stmt.Placeholder
+	for _, c := range ChunkRows(rows, 500) {
+		chunk := c
+		group.Go(func() error {
+			placeholders := make([]string, len(chunk))
+			values := make([]interface{}, len(chunk)*stmt.NumField)
+			j := 0
 
-		for _, v := range r.InsertValues() {
-			values[j] = v
-			j++
-		}
+			for i, r := range chunk {
+				placeholders[i] = stmt.Placeholder
+
+				for _, v := range r.InsertValues() {
+					values[j] = v
+					j++
+				}
+			}
+
+			query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
+
+			_, err := dbw.WithRetry(func() (result sql.Result, e error) {
+				return dbw.SqlExec(mysqlObservers.bulkUpdate, query, values...)
+			})
+
+			return err
+		})
 	}
 
-	query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
-
-	_, err := dbw.WithRetry(func() (result sql.Result, e error) {
-		return dbw.SqlExec(mysqlObservers.bulkUpdate, query, values...)
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return group.Wait()
 }

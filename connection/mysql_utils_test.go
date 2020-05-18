@@ -9,6 +9,29 @@ import (
 	"testing"
 )
 
+type TestRow struct {
+	Name string
+}
+
+func (*TestRow) InsertValues() []interface{} {
+	return nil
+}
+
+func (*TestRow) UpdateValues() []interface{} {
+	return nil
+}
+
+func (*TestRow) GetId() string {
+	return ""
+}
+
+func (*TestRow) SetId(id string) {
+}
+
+func (*TestRow) GetFinalRows() ([]Row, error) {
+	return nil, nil
+}
+
 func TestMakePlaceholderList(t *testing.T) {
 	assert.Equal(t, "(?)", MakePlaceholderList(1))
 	assert.Equal(t, "(?,?,?,?,?)", MakePlaceholderList(5))
@@ -103,4 +126,74 @@ func TestMysqlConnectionError_Error(t *testing.T) {
 
 func TestFormatLogQuery(t *testing.T) {
 	assert.Equal(t, "This is my string", formatLogQuery("\tThis is\nmy string\n"))
+}
+
+func TestChunkRows(t *testing.T) {
+	rows := []Row{
+		&TestRow{"herp"},
+		&TestRow{"derp"},
+		&TestRow{"merp"},
+		&TestRow{"lerp"},
+		&TestRow{"perp"},
+	}
+
+	want := [][]Row{
+		{
+			rows[0],
+			rows[1],
+			rows[2],
+			rows[3],
+			rows[4],
+		},
+	}
+	chunks := ChunkRows(rows, 5)
+	assert.Equal(t, want, chunks)
+
+	want = [][]Row{
+		{
+			rows[0],
+			rows[1],
+			rows[2],
+			rows[3],
+			rows[4],
+		},
+	}
+	chunks = ChunkRows(rows, 10)
+	assert.Equal(t, want, chunks)
+
+	want = [][]Row{
+		{
+			rows[0],
+		},
+		{
+			rows[1],
+		},
+		{
+			rows[2],
+		},
+		{
+			rows[3],
+		},
+		{
+			rows[4],
+		},
+	}
+	chunks = ChunkRows(rows, 1)
+	assert.Equal(t, want, chunks)
+
+	want = [][]Row{
+		{
+			rows[0],
+			rows[1],
+		},
+		{
+			rows[2],
+			rows[3],
+		},
+		{
+			rows[4],
+		},
+	}
+	chunks = ChunkRows(rows, 2)
+	assert.Equal(t, want, chunks)
 }
