@@ -137,26 +137,24 @@ func syncOverdue(super *supervisor.Supervisor, objectType string, counter *uint6
 // and updates icingadb:overdue:objectType respectively.
 func updateOverdue(super *supervisor.Supervisor, objectType string, counter *uint64, observer prometheus.Observer, ids []interface{}, overdue bool) {
 	if len(ids) > 0 {
-		if overdue {
-			if _, errOp := super.Rdbw.SAdd("icingadb:overdue:"+objectType, ids...).Result(); errOp != nil {
-				super.ChErr <- errOp
-			}
-		}
+		if updateOverdueInDb(super, objectType, observer, ids, overdue) {
+			atomic.AddUint64(counter, uint64(len(ids)))
 
-		updateOverdueInDb(super, objectType, observer, ids, overdue)
-
-		atomic.AddUint64(counter, uint64(len(ids)))
-
-		if !overdue {
-			if _, errOp := super.Rdbw.SRem("icingadb:overdue:"+objectType, ids...).Result(); errOp != nil {
-				super.ChErr <- errOp
+			if overdue {
+				if _, errOp := super.Rdbw.SAdd("icingadb:overdue:"+objectType, ids...).Result(); errOp != nil {
+					super.ChErr <- errOp
+				}
+			} else {
+				if _, errOp := super.Rdbw.SRem("icingadb:overdue:"+objectType, ids...).Result(); errOp != nil {
+					super.ChErr <- errOp
+				}
 			}
 		}
 	}
 }
 
 // updateOverdueInDb sets objectType_state#is_overdue for ids to overdue.
-func updateOverdueInDb(super *supervisor.Supervisor, objectType string, observer prometheus.Observer, ids []interface{}, overdue bool) {
+func updateOverdueInDb(super *supervisor.Supervisor, objectType string, observer prometheus.Observer, ids []interface{}, overdue bool) bool {
 	group := errgroup.Group{}
 	for _, c := range utils.ChunkInterfaces(ids, 1000) {
 		chunk := c
@@ -198,5 +196,8 @@ func updateOverdueInDb(super *supervisor.Supervisor, objectType string, observer
 	err := group.Wait()
 	if err != nil {
 		super.ChErr <- err
+		return false
 	}
+
+	return true
 }
