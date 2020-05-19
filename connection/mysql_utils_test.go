@@ -40,75 +40,54 @@ func TestMakePlaceholderList(t *testing.T) {
 
 func TestConvertValueForDb(t *testing.T) {
 	var v interface{}
-	var err error
 
-	v, err = ConvertValueForDb(nil)
+	v = ConvertValueForDb(nil)
 	assert.IsType(t, nil, v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb([]byte{100})
+	v = ConvertValueForDb([]byte{100})
 	assert.IsType(t, []byte{100}, v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb("this-is-a-string")
+	v = ConvertValueForDb("this-is-a-string")
 	assert.IsType(t, "this-is-a-string", v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(float32(123.456))
+	v = ConvertValueForDb(float32(123.456))
 	assert.IsType(t, float64(123.456), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(float64(123.456))
+	v = ConvertValueForDb(float64(123.456))
 	assert.IsType(t, float64(123.456), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(uint(20))
+	v = ConvertValueForDb(uint(20))
 	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(uint8(30))
+	v = ConvertValueForDb(uint8(30))
 	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(uint16(40))
+	v = ConvertValueForDb(uint16(40))
 	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(uint32(50))
+	v = ConvertValueForDb(uint32(50))
 	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(uint64(60))
+	v = ConvertValueForDb(uint64(60))
 	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(int(70))
+	v = ConvertValueForDb(int(70))
 	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(int8(80))
+	v = ConvertValueForDb(int8(80))
 	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(int16(90))
+	v = ConvertValueForDb(int16(90))
 	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(int32(100))
+	v = ConvertValueForDb(int32(100))
 	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
 
-	v, err = ConvertValueForDb(int64(10))
-	assert.IsType(t, int64(10), v)
-	assert.Nil(t, err)
+	v = ConvertValueForDb([][]string{{"123123"}, {"aosndkajsd"}, {"97z1h28idnaks", "asdnjaksdj", "h9iu2rh39nu2"}})
+	assert.Equal(t, "[[123123] [aosndkajsd] [97z1h28idnaks asdnjaksdj h9iu2rh39nu2]]", v)
 
-	v, err = ConvertValueForDb(true)
-	assert.IsType(t, "y/n-string", v)
-	assert.Nil(t, err)
-
-	//Should not be possible
-	v, err = ConvertValueForDb(errors.New("test"))
-	assert.NotNil(t, err)
+	v = ConvertValueForDb(true)
+	assert.Equal(t, "y", v)
 }
 
 func TestIsSerializationFailure(t *testing.T) {
