@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	oldlog "log"
 	"math"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -308,43 +307,35 @@ var yesNo = map[bool]string{
 	false: "n",
 }
 
-func ConvertValueForDb(in interface{}) (interface{}, error) {
+func ConvertValueForDb(in interface{}) interface{} {
 	switch value := in.(type) {
-	case []byte:
-	case string:
-	case float64:
-	case int64:
-	case nil:
+	case []byte, string, float64, int64, nil:
+		return in
 	case float32:
-		return float64(value), nil
+		return float64(value)
 	case uint:
-		return int64(value), nil
+		return int64(value)
 	case uint8:
-		return int64(value), nil
+		return int64(value)
 	case uint16:
-		return int64(value), nil
+		return int64(value)
 	case uint32:
-		return int64(value), nil
+		return int64(value)
 	case uint64:
-		return int64(value), nil
+		return int64(value)
 	case int:
-		return int64(value), nil
+		return int64(value)
 	case int8:
-		return int64(value), nil
+		return int64(value)
 	case int16:
-		return int64(value), nil
+		return int64(value)
 	case int32:
-		return int64(value), nil
+		return int64(value)
 	case bool:
-		return yesNo[value], nil
+		return yesNo[value]
 	default:
-		return nil, errors.New(fmt.Sprintf(
-			"bad type %s, expected one of []byte, string, float{32,64}, {,u}int{,8,16,32,64}, bool, nil",
-			reflect.TypeOf(in).Name(),
-		))
+		return fmt.Sprintf("%s", in)
 	}
-
-	return in, nil
 }
 
 func MakePlaceholderList(x int) string {

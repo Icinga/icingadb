@@ -28,19 +28,19 @@ var (
 )
 
 type NotificationCommandArgument struct {
-	Id                  string  `json:"id"`
-	CommandId           string  `json:"command_id"`
-	ArgumentKey         string  `json:"argument_key"`
-	EnvId               string  `json:"environment_id"`
-	PropertiesChecksum  string  `json:"checksum"`
-	ArgumentValue       string  `json:"value"`
-	ArgumentOrder       float32 `json:"order"`
-	Description         string  `json:"description"`
-	ArgumentKeyOverride string  `json:"key"`
-	RepeatKey           bool    `json:"repeat_key"`
-	Required            bool    `json:"required"`
-	SetIf               string  `json:"set_if"`
-	SkipKey             bool    `json:"skip_key"`
+	Id                  string      `json:"id"`
+	CommandId           string      `json:"command_id"`
+	ArgumentKey         string      `json:"argument_key"`
+	EnvId               string      `json:"environment_id"`
+	PropertiesChecksum  string      `json:"checksum"`
+	ArgumentValue       string      `json:"value"`
+	ArgumentOrder       float32     `json:"order"`
+	Description         string      `json:"description"`
+	ArgumentKeyOverride string      `json:"key"`
+	RepeatKey           bool        `json:"repeat_key"`
+	Required            bool        `json:"required"`
+	SetIf               interface{} `json:"set_if"`
+	SkipKey             bool        `json:"skip_key"`
 }
 
 func NewNotificationCommandArgument() connection.Row {
@@ -69,7 +69,7 @@ func (c *NotificationCommandArgument) UpdateValues() []interface{} {
 		c.ArgumentKeyOverride,
 		utils.Bool[c.RepeatKey],
 		utils.Bool[c.Required],
-		c.SetIf,
+		connection.ConvertValueForDb(c.SetIf),
 		utils.Bool[c.SkipKey],
 	)
 
