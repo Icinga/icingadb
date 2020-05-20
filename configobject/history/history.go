@@ -291,7 +291,11 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 			case "downtime_start":
 				eventTime = values["start_time"].(string)
 			case "downtime_end":
-				eventTime = values["end_time"].(string)
+				if values["has_been_cancelled"].(string) == "1" {
+					eventTime = values["cancel_time"].(string)
+				} else {
+					eventTime = values["end_time"].(string)
+				}
 			}
 
 			data := []interface{}{
