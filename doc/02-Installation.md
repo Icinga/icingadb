@@ -169,6 +169,7 @@ Set up a MySQL database for Icinga DB:
 
 CREATE DATABASE icingadb;
 GRANT ALL ON icingadb.* TO 'icingadb'@'127.0.0.1' IDENTIFIED BY 'icingadb';
+FLUSH PRIVILEGES;
 
 quit
 ```
@@ -177,7 +178,7 @@ After creating the database you can import the Icinga DB schema using the
 following command. Enter the root password into the prompt when asked.
 
 ```
-cat /usr/share/icingadb/schema/mysql/mysql.schema.sql | mysql -uroot icingadb
+cat /usr/share/icingadb/schema/mysql/mysql.schema.sql | mysql -uroot icingadb -p
 ```
 
 ### Running Icinga DB <a id="running-icingadb"></a>
@@ -191,6 +192,7 @@ icingadb -config /etc/icingadb/icingadb.ini
 Systemd service:
 
 ```
+systemctl enable icingadb
 systemctl start icingadb
 ```
 
