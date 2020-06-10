@@ -3,7 +3,6 @@
 package configsync
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/connection"
@@ -12,6 +11,7 @@ import (
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/go-redis/redis/v7"
+	"github.com/intel-go/fastjson"
 	log "github.com/sirupsen/logrus"
 	"sync"
 	"sync/atomic"
@@ -348,7 +348,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 
 			//TODO: Check if this can be done better (json should not be processed in this func)
 			redisChecksums := &Checksums{}
-			err := json.Unmarshal([]byte(chunk.Checksums[i].(string)), redisChecksums)
+			err := fastjson.Unmarshal([]byte(chunk.Checksums[i].(string)), redisChecksums)
 			if err != nil {
 				super.ChErr <- err
 			}

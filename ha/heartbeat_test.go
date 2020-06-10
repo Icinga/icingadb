@@ -3,10 +3,10 @@
 package ha
 
 import (
-	"encoding/json"
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/go-redis/redis/v7"
+	"github.com/intel-go/fastjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -37,8 +37,8 @@ func TestIcingaHeartbeatListener(t *testing.T) {
 	time.Sleep(time.Second * 2)
 
 	var uj interface{} = nil
-	assert.Nil(t, json.Unmarshal([]byte(app), &uj))
-	assert.Nil(t, json.Unmarshal([]byte(dump), &uj))
+	assert.Nil(t, fastjson.Unmarshal([]byte(app), &uj))
+	assert.Nil(t, fastjson.Unmarshal([]byte(dump), &uj))
 
 	rdb.Rdb.XAdd(&redis.XAddArgs{
 		Stream: "icinga:stats",

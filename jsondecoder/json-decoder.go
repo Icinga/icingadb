@@ -4,6 +4,7 @@ package jsondecoder
 
 import (
 	"github.com/Icinga/icingadb/connection"
+	"github.com/intel-go/fastjson"
 	"github.com/json-iterator/go"
 )
 
@@ -32,7 +33,7 @@ type JsonDecodePackages struct {
 // decodeString unmarshals the string toDecode using the json package. The decoded json will be written to row.
 // Returns error, if not successful.
 func decodeString(toDecode string, row connection.Row) error {
-	return json.Unmarshal([]byte(toDecode), row)
+	return fastjson.Unmarshal([]byte(toDecode), row)
 }
 
 // decodePool takes a channel it receives JsonDecodePackages from and an error channel to forward errors.

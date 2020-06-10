@@ -5,11 +5,11 @@ package ha
 import (
 	"crypto/sha1"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/go-redis/redis/v7"
+	"github.com/intel-go/fastjson"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
@@ -83,7 +83,7 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 						} `json:"status"`
 					}
 
-					if errJU := json.Unmarshal([]byte(appJson), &unJson); errJU != nil {
+					if errJU := fastjson.Unmarshal([]byte(appJson), &unJson); errJU != nil {
 						chErr <- errJU
 						return
 					}

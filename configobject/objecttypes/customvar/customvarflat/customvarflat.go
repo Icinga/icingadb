@@ -3,11 +3,11 @@
 package customvarflat
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
+	"github.com/intel-go/fastjson"
 	"strconv"
 )
 
@@ -55,7 +55,7 @@ func (c *CustomvarFlat) SetId(id string) {
 
 func (c *CustomvarFlat) GetFinalRows() ([]connection.Row, error) {
 	var values interface{} = nil
-	if err := json.Unmarshal([]byte(c.Value), &values); err != nil {
+	if err := fastjson.Unmarshal([]byte(c.Value), &values); err != nil {
 		return nil, err
 	}
 
