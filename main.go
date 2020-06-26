@@ -143,7 +143,7 @@ func main() {
 	go haInstance.StartEventListener()
 
 	if metricsInfo.Host != "" {
-		go prometheus.HandleHttp(metricsInfo.Host+":"+metricsInfo.Port, super.ChErr)
+		go prometheus.HandleHttp("["+metricsInfo.Host+"]:"+metricsInfo.Port, super.ChErr)
 	}
 
 	for {
