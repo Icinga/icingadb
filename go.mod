@@ -3,7 +3,7 @@ module github.com/Icinga/icingadb
 go 1.13
 
 require (
-	github.com/go-ini/ini v1.57.0
+	github.com/go-ini/ini v1.60.0
 	github.com/go-redis/redis/v7 v7.4.0
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/google/uuid v1.1.1
