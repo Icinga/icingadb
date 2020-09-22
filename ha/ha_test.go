@@ -19,7 +19,7 @@ import (
 )
 
 func createTestingHA(t *testing.T, redisAddr string) *HA {
-	redisConn := connection.NewRDBWrapper(redisAddr, "",64)
+	redisConn := connection.NewRDBWrapper(redisAddr, "", 64)
 
 	mysqlConn, err := connection.NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	if err != nil {
@@ -149,7 +149,7 @@ func TestHA_setAndInsertEnvironment(t *testing.T) {
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
 	env := Environment{
-		ID: utils.EncodeChecksum(utils.Checksum("herp")),
+		ID:   utils.EncodeChecksum(utils.Checksum("herp")),
 		Name: "herp",
 	}
 
