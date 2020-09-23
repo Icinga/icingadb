@@ -5,12 +5,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"os"
-	"os/signal"
-	"regexp"
-	"sync"
-	"syscall"
-
 	"github.com/Icinga/icingadb/config"
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/configobject/configsync"
@@ -70,6 +64,11 @@ import (
 	"github.com/Icinga/icingadb/prometheus"
 	"github.com/Icinga/icingadb/supervisor"
 	log "github.com/sirupsen/logrus"
+	"os"
+	"os/signal"
+	"regexp"
+	"sync"
+	"syscall"
 )
 
 var gitVersion = regexp.MustCompile(`\A(.+)-\d+-g([A-Fa-f0-9]+)\z`)
