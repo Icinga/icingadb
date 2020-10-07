@@ -40,6 +40,34 @@ ALTER TABLE usergroup ADD INDEX `idx_usergroup_display_name` (`display_name`) CO
 ALTER TABLE usergroup ADD INDEX idx_usergroup_name_ci (name_ci) COMMENT 'Usergroup list filtered using quick search';
 ALTER TABLE usergroup ADD INDEX idx_usergroup_name (name) COMMENT 'Usergroup list filtered/ordered by name; Usergroup detail filter';
 
+ALTER TABLE hostgroup_customvar
+    ADD INDEX idx_hostgroup_customvar_hostgroup_id (hostgroup_id, customvar_id),
+    ADD INDEX idx_hostgroup_customvar_customvar_id (customvar_id, hostgroup_id);
+ALTER TABLE servicegroup_customvar
+    ADD INDEX idx_servicegroup_customvar_servicegroup_id (servicegroup_id, customvar_id),
+    ADD INDEX idx_servicegroup_customvar_customvar_id (customvar_id, servicegroup_id);
+ALTER TABLE checkcommand_customvar
+    ADD INDEX idx_checkcommand_customvar_command_id (command_id, customvar_id),
+    ADD INDEX idx_checkcommand_customvar_customvar_id (customvar_id, command_id);
+ALTER TABLE eventcommand_customvar
+    ADD INDEX idx_eventcommand_customvar_command_id (command_id, customvar_id),
+    ADD INDEX idx_eventcommand_customvar_customvar_id (customvar_id, command_id);
+ALTER TABLE notificationcommand_customvar
+    ADD INDEX idx_notificationcommand_customvar_command_id (command_id, customvar_id),
+    ADD INDEX idx_notificationcommand_customvar_customvar_id (customvar_id, command_id);
+ALTER TABLE notification_customvar
+    ADD INDEX idx_notification_customvar_notification_id (notification_id, customvar_id),
+    ADD INDEX idx_notification_customvar_customvar_id (customvar_id, notification_id);
+ALTER TABLE timeperiod_customvar
+    ADD INDEX idx_timeperiod_customvar_timeperiod_id (timeperiod_id, customvar_id),
+    ADD INDEX idx_timeperiod_customvar_customvar_id (customvar_id, timeperiod_id);
+ALTER TABLE user_customvar
+    ADD INDEX idx_user_customvar_user_id (user_id, customvar_id),
+    ADD INDEX idx_user_customvar_customvar_id (customvar_id, user_id);
+ALTER TABLE usergroup_customvar
+    ADD INDEX idx_usergroup_customvar_usergroup_id (usergroup_id, customvar_id),
+    ADD INDEX idx_usergroup_customvar_customvar_id (customvar_id, usergroup_id);
+
 ALTER TABLE host
     MODIFY active_checks_enabled enum('n','y') NOT NULL,
     MODIFY passive_checks_enabled enum('n','y') NOT NULL,
