@@ -66,7 +66,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 "timeperiod:override:exclude",
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewTimeperiodOverrideExclude,
 		HasChecksum:              false,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

@@ -32,12 +32,6 @@ func (*TestRow) GetFinalRows() ([]Row, error) {
 	return nil, nil
 }
 
-func TestMakePlaceholderList(t *testing.T) {
-	assert.Equal(t, "(?)", MakePlaceholderList(1))
-	assert.Equal(t, "(?,?,?,?,?)", MakePlaceholderList(5))
-	assert.Equal(t, "(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", MakePlaceholderList(20))
-}
-
 func TestConvertValueForDb(t *testing.T) {
 	var v interface{}
 
@@ -98,8 +92,8 @@ func TestIsSerializationFailure(t *testing.T) {
 	assert.False(t, isSerializationFailure(errors.New("random error")))
 }
 
-func TestMysqlConnectionError_Error(t *testing.T) {
-	err := MysqlConnectionError{"The chicken has left the database!"}
+func TestDbConnectionError_Error(t *testing.T) {
+	err := DbConnectionError{"The chicken has left the database!"}
 	assert.Equal(t, "The chicken has left the database!", err.Error())
 }
 

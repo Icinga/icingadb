@@ -129,7 +129,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				// Provide the InsertPrepWorker with IDs to insert
 				chInsert <- insert
 
-				// Wait for all IDs to be inserted into MySQL
+				// Wait for all IDs to be inserted into the database
 				kill := waitOrKill(wgInsert, done)
 				benchmarc.Stop()
 				if !kill && len(insert) > 0 {
@@ -151,7 +151,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				// Provide the DeleteExecWorker with IDs to delete
 				chDelete <- delete
 
-				// Wait for all IDs to be deleted from MySQL
+				// Wait for all IDs to be deleted from the database
 				kill := waitOrKill(wgDelete, done)
 				benchmarc.Stop()
 				if !kill && len(delete) > 0 {
@@ -174,7 +174,7 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 					// Provide the UpdateCompWorker with IDs to compare
 					chUpdateComp <- update
 
-					// Wait for all IDs to be update in MySQL
+					// Wait for all IDs to be updated in the database
 					kill := waitOrKill(wgUpdate, done)
 					benchmarc.Stop()
 					if !kill && atomic.LoadUint32(updateCounter) > 0 {
@@ -195,15 +195,15 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 	return nil
 }
 
-// GetDelta takes the ObjectInformation (host, service, checkcommand, etc.) and fetches the ids from MySQL and Redis. It
-// returns three string slices:
-// 1. IDs which are in the Redis but not in the MySQL (to insert)
+// GetDelta takes the ObjectInformation (host, service, checkcommand, etc.)
+// and fetches the ids from the database and Redis. It returns three string slices:
+// 1. IDs which are in the Redis but not in the database (to insert)
 // 2. IDs which are in both (to possibly update)
-// 3. IDs which are in the MySQL but not the Redis (to delete)
+// 3. IDs which are in the database but not the Redis (to delete)
 func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation) ([]string, []string, []string) {
 	var (
 		redisIds []string
-		mysqlIds []string
+		dbIds    []string
 		wg       = sync.WaitGroup{}
 	)
 
@@ -220,13 +220,13 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 		redisIds = res
 	}()
 
-	//get ids from mysql
+	//get ids from the database
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		var err error
 		super.EnvLock.Lock()
-		mysqlIds, err = super.Dbw.SqlFetchIds(super.EnvId, objectInformation.ObjectType, objectInformation.PrimaryMySqlField)
+		dbIds, err = super.Dbw.SqlFetchIds(super.EnvId, objectInformation.ObjectType, objectInformation.PrimarySqlField)
 		super.EnvLock.Unlock()
 		if err != nil {
 			super.ChErr <- err
@@ -235,7 +235,7 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 	}()
 
 	wg.Wait()
-	return utils.Delta(redisIds, mysqlIds)
+	return utils.Delta(redisIds, dbIds)
 }
 
 // InsertPrepWorker fetches config for IDs(chInsert) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
@@ -287,7 +287,7 @@ func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 	}
 }
 
-// InsertExecWorker gets decoded connection.Row objects from the JsonDecodePool and inserts them into MySQL
+// InsertExecWorker gets decoded connection.Row objects from the JsonDecodePool and inserts them into the database
 func InsertExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsertBack <-chan []connection.Row, wg *sync.WaitGroup) {
 	log.Debugf("%s: Insert execution worker started", objectInformation.ObjectType)
 	defer log.Debugf("%s: Insert execution worker stopped", objectInformation.ObjectType)
@@ -310,7 +310,7 @@ func InsertExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 	}
 }
 
-// DeleteExecWorker deletes IDs(chDelete) from MySQL
+// DeleteExecWorker deletes IDs(chDelete) from the database
 func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chDelete <-chan []string, wg *sync.WaitGroup) {
 	log.Debugf("%s: Delete execution worker started", objectInformation.ObjectType)
 	defer log.Debugf("%s: Delete execution worker stopped", objectInformation.ObjectType)
@@ -333,13 +333,13 @@ func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 	}
 }
 
-// UpdateCompWorker gets IDs(chUpdateComp) that might need an update, fetches the corresponding checksums for Redis and MySQL,
-// compares them and inserts changed IDs into chUpdate.
+// UpdateCompWorker gets IDs(chUpdateComp) that might need an update, fetches the corresponding checksums
+// for Redis and the database, compares them and inserts changed IDs into chUpdate.
 func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdateComp <-chan []string, chUpdate chan<- []string, wg *sync.WaitGroup) {
 	log.Debugf("%s: Update comparison worker started", objectInformation.ObjectType)
 	defer log.Debugf("%s: Update comparison worker stopped", objectInformation.ObjectType)
 
-	prep := func(chunk *connection.ChecksumChunk, mysqlChecksums map[string]map[string]string) {
+	prep := func(chunk *connection.ChecksumChunk, dbChecksums map[string]map[string]string) {
 		changed := make([]string, 0)
 		for i, key := range chunk.Keys {
 			if chunk.Checksums[i] == nil {
@@ -353,7 +353,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 				super.ChErr <- err
 			}
 
-			if redisChecksums.PropertiesChecksum != mysqlChecksums[key]["properties_checksum"] {
+			if redisChecksums.PropertiesChecksum != dbChecksums[key]["properties_checksum"] {
 				changed = append(changed, key)
 			} else {
 				wg.Done()
@@ -429,7 +429,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 	}
 }
 
-// UpdateExecWorker gets decoded connection.Row objects from the JsonDecodePool and updates them in MySQL
+// UpdateExecWorker gets decoded connection.Row objects from the JsonDecodePool and updates them in the database
 func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdateBack <-chan []connection.Row, wg *sync.WaitGroup, updateCounter *uint32) {
 	log.Debugf("%s: Update execution worker started", objectInformation.ObjectType)
 	defer log.Debugf("%s: Update execution worker stopped", objectInformation.ObjectType)

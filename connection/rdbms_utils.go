@@ -7,41 +7,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
-	"io/ioutil"
-	oldlog "log"
+	"github.com/lib/pq"
 	"math"
 	"strconv"
 	"strings"
 )
-
-// mkMysql creates a new MySQL client.
-func mkMysql(dbType string, dbDsn string, maxOpenConns int) (*sql.DB, error) {
-	sep := "?"
-
-	if dbDsn == "" {
-		dbDsn = "/"
-	} else {
-		dsnParts := strings.Split(dbDsn, "/")
-		if strings.Contains(dsnParts[len(dsnParts)-1], "?") {
-			sep = "&"
-		}
-	}
-
-	dbDsn = dbDsn + sep +
-		"innodb_strict_mode=1&sql_mode='STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION,PIPES_AS_CONCAT,ANSI_QUOTES,ERROR_FOR_DIVISION_BY_ZERO'"
-
-	db, errConn := sql.Open(dbType, dbDsn)
-	if errConn != nil {
-		return nil, errConn
-	}
-
-	mysql.SetLogger(oldlog.New(ioutil.Discard, "", 0))
-
-	db.SetMaxOpenConns(maxOpenConns)
-	db.SetMaxIdleConns(maxOpenConns)
-
-	return db, nil
-}
 
 var prettyPrintedSqlReplacer = strings.NewReplacer("\n", " ", "\t", "")
 
@@ -103,16 +73,17 @@ func (d prettyPrintedRowsAffected) MarshalText() (text []byte, err error) {
 	return []byte(d.String()), nil
 }
 
-type MysqlConnectionError struct {
+type DbConnectionError struct {
 	err string
 }
 
-func (e MysqlConnectionError) Error() string {
+func (e DbConnectionError) Error() string {
 	return e.err
 }
 
 // isSerializationFailure returns whether the given error signals serialization failure.
 // https://dev.mysql.com/doc/refman/5.5/en/error-messages-server.html#error_er_lock_deadlock
+// https://www.postgresql.org/docs/9.5/transaction-iso.html
 func isSerializationFailure(e error) bool {
 	switch err := e.(type) {
 	case *mysql.MySQLError:
@@ -121,6 +92,8 @@ func isSerializationFailure(e error) bool {
 		case 1205, 1213:
 			return true
 		}
+	case *pq.Error:
+		return err.Code == "40001"
 	}
 
 	return false
@@ -168,81 +141,40 @@ func ConvertValueForDb(in interface{}) interface{} {
 	}
 }
 
-func MakePlaceholderList(x int) string {
-	runes := make([]rune, 1+x*2)
-
-	i := 1
-	for j := 0; j < x; j++ {
-		runes[i] = '?'
-		i++
-
-		runes[i] = ','
-		i++
-	}
-
-	runes[0] = '('
-	runes[len(runes)-1] = ')'
-
-	return string(runes)
-}
-
-func isRetryableError(err error) bool {
-	if strings.Contains(err.Error(), "Deadlock found when trying to get lock") {
-		return true
-	}
-	return false
-}
-
 type BulkInsertStmt struct {
-	Format      string
-	Fields      []string
-	Placeholder string
-	NumField    int
+	Table  string
+	Fields []string
 }
 
 func NewBulkInsertStmt(table string, fields []string) *BulkInsertStmt {
-	numField := len(fields)
-	placeholder := fmt.Sprintf("(%s)", strings.TrimSuffix(strings.Repeat("?, ", numField), ", "))
-	stmt := BulkInsertStmt{
-		Format:      fmt.Sprintf("REPLACE INTO %s (%s) VALUES %s", table, strings.Join(fields, ", "), "%s"),
-		Fields:      fields,
-		Placeholder: placeholder,
-		NumField:    numField,
+	return &BulkInsertStmt{
+		Table:  table,
+		Fields: fields,
 	}
-
-	return &stmt
 }
 
 type BulkDeleteStmt struct {
-	Format string
+	Table      string
+	PrimaryKey string
 }
 
 func NewBulkDeleteStmt(table string, primaryKey string) *BulkDeleteStmt {
-	stmt := BulkDeleteStmt{
-		Format: fmt.Sprintf("DELETE FROM %s WHERE %s IN (%s)", table, primaryKey, "%s"),
+	return &BulkDeleteStmt{
+		Table:      table,
+		PrimaryKey: primaryKey,
 	}
-
-	return &stmt
 }
 
 type BulkUpdateStmt struct {
-	Format      string
-	Fields      []string
-	Placeholder string
-	NumField    int
+	Table  string
+	Fields []string
 }
 
 func NewBulkUpdateStmt(table string, fields []string) *BulkUpdateStmt {
-	numField := len(fields)
-	placeholder := fmt.Sprintf("(%s)", strings.TrimSuffix(strings.Repeat("?, ", numField), ", "))
-	stmt := BulkUpdateStmt{
-		Format:      fmt.Sprintf("REPLACE INTO %s (%s) VALUES %s", table, strings.Join(fields, ", "), "%s"),
-		Fields:      fields,
-		Placeholder: placeholder,
-		NumField:    numField,
+	return &BulkUpdateStmt{
+		Table:  table,
+		Fields: fields,
 	}
-
-	return &stmt
 }
 
 type Row interface {

@@ -18,12 +18,17 @@ import (
 	"time"
 )
 
-var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
+var dbTestObserver = connection.DbIoSeconds.WithLabelValues("rdbms", "test")
 
 func SetupConfigSync(t *testing.T, objectTypes []*configobject.ObjectInformation) (*supervisor.Supervisor, []chan int) {
+	driver, info, errDI := testbackends.GetDbInfo()
+	if errDI != nil {
+		t.Fatal(errDI)
+	}
+
 	rdbw := connection.NewRDBWrapper(testbackends.RedisTestAddr, 64)
-	dbw, err := connection.NewDBWrapper(testbackends.MysqlTestDsn, 50)
-	require.NoError(t, err, "Is the MySQL server running?")
+	dbw, err := connection.NewDBWrapper(driver, info)
+	require.NoError(t, err, "Is the database server running?")
 
 	super := supervisor.Supervisor{
 		ChErr:        make(chan error),
@@ -78,7 +83,7 @@ func TestOperator_InsertHost(t *testing.T) {
 		}
 
 		rawObjects, err := super.Dbw.SqlFetchAll(
-			mysqlTestObserver, row{},
+			dbTestObserver, row{},
 			"SELECT properties_checksum, display_name, address, checkcommand FROM host",
 		)
 		require.NoError(t, err)
@@ -109,7 +114,16 @@ func TestOperator_DeleteHost(t *testing.T) {
 	someChecksum := utils.EncodeChecksum(utils.Checksum("some_checksum"))
 
 	_, err = super.Dbw.Db.Exec(
-		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		connection.Insert(
+			super.Dbw.Db, "host",
+			"id", "environment_id", "name_checksum", "properties_checksum", "name", "name_ci", "display_name",
+			"address", "address6", "address_bin", "address6_bin", "checkcommand", "checkcommand_id",
+			"max_check_attempts", "check_timeperiod", "check_timeperiod_id", "check_timeout", "check_interval",
+			"check_retry_interval", "active_checks_enabled", "passive_checks_enabled", "event_handler_enabled",
+			"notifications_enabled", "flapping_enabled", "flapping_threshold_low", "flapping_threshold_high",
+			"perfdata_enabled", "eventcommand", "eventcommand_id", "is_volatile", "action_url_id", "notes_url_id",
+			"notes", "icon_image_id", "icon_image_alt", "zone", "zone_id", "command_endpoint", "command_endpoint_id",
+		),
 		someChecksum,
 		super.EnvId,
 		someChecksum,
@@ -161,7 +175,7 @@ func TestOperator_DeleteHost(t *testing.T) {
 			One uint8
 		}
 
-		rawObjects, err := super.Dbw.SqlFetchAll(mysqlTestObserver, row{}, "SELECT 1 FROM host")
+		rawObjects, err := super.Dbw.SqlFetchAll(dbTestObserver, row{}, "SELECT 1 FROM host")
 		require.NoError(t, err)
 
 		return len(rawObjects.([]row)) == 0
@@ -185,7 +199,16 @@ func TestOperator_UpdateHost(t *testing.T) {
 	someChecksum := utils.EncodeChecksum(utils.Checksum("some_checksum"))
 
 	_, err = super.Dbw.Db.Exec(
-		"INSERT INTO host(id, environment_id, name_checksum, properties_checksum, name, name_ci, display_name, address, address6, address_bin, address6_bin, checkcommand, checkcommand_id, max_check_attempts, check_timeperiod, check_timeperiod_id, check_timeout, check_interval, check_retry_interval, active_checks_enabled, passive_checks_enabled, event_handler_enabled, notifications_enabled, flapping_enabled, flapping_threshold_low, flapping_threshold_high, perfdata_enabled, eventcommand, eventcommand_id, is_volatile, action_url_id, notes_url_id, notes, icon_image_id, icon_image_alt, zone, zone_id, command_endpoint, command_endpoint_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+		connection.Insert(
+			super.Dbw.Db, "host",
+			"id", "environment_id", "name_checksum", "properties_checksum", "name", "name_ci", "display_name",
+			"address", "address6", "address_bin", "address6_bin", "checkcommand", "checkcommand_id",
+			"max_check_attempts", "check_timeperiod", "check_timeperiod_id", "check_timeout", "check_interval",
+			"check_retry_interval", "active_checks_enabled", "passive_checks_enabled", "event_handler_enabled",
+			"notifications_enabled", "flapping_enabled", "flapping_threshold_low", "flapping_threshold_high",
+			"perfdata_enabled", "eventcommand", "eventcommand_id", "is_volatile", "action_url_id", "notes_url_id",
+			"notes", "icon_image_id", "icon_image_alt", "zone", "zone_id", "command_endpoint", "command_endpoint_id",
+		),
 		utils.EncodeChecksum("a9ef44eb69fda8fbc32bee33322b6518057f559f"),
 		super.EnvId,
 		someChecksum,
@@ -241,7 +264,7 @@ func TestOperator_UpdateHost(t *testing.T) {
 		}
 
 		rawObjects, err := super.Dbw.SqlFetchAll(
-			mysqlTestObserver, row{},
+			dbTestObserver, row{},
 			"SELECT properties_checksum, display_name, address, checkcommand FROM host",
 		)
 		require.NoError(t, err)

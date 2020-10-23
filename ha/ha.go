@@ -51,32 +51,35 @@ func NewHA(super *supervisor.Supervisor) (*HA, error) {
 	return &ho, nil
 }
 
-var mysqlObservers = struct {
+var dbObservers = struct {
 	updateIcingadbInstanceById                           prometheus.Observer
 	updateIcingadbInstanceByEnvironmentId                prometheus.Observer
 	insertIntoIcingadbInstance                           prometheus.Observer
 	insertIntoEnvironment                                prometheus.Observer
 	selectIdHeartbeatFromIcingadbInstanceByEnvironmentId prometheus.Observer
 }{
-	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by id"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by environment_id"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "insert into icingadb_instance"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "insert into environment"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "select id, heartbeat from icingadb_instance where environment_id = ourEnvID"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "update icingadb_instance by id"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "update icingadb_instance by environment_id"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "insert into icingadb_instance"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "insert into environment"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "select id, heartbeat from icingadb_instance where environment_id = ourEnvID"),
 }
 
 func (h *HA) updateOwnInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(
-		mysqlObservers.insertIntoIcingadbInstance,
-		"REPLACE INTO icingadb_instance(id, environment_id, endpoint_id, heartbeat, responsible,"+
-			" icinga2_version, icinga2_start_time, icinga2_notifications_enabled,"+
-			" icinga2_active_service_checks_enabled, icinga2_active_host_checks_enabled,"+
-			" icinga2_event_handlers_enabled, icinga2_flap_detection_enabled,"+
-			" icinga2_performance_data_enabled) VALUES (?, ?, ?, ?, 'y', ?, ?, ?, ?, ?, ?, ?, ?)",
+		dbObservers.insertIntoIcingadbInstance,
+		connection.Replace(
+			h.super.Dbw.Db, "icingadb_instance",
+			"id", "environment_id", "endpoint_id", "heartbeat", "responsible", "icinga2_version", "icinga2_start_time",
+			"icinga2_notifications_enabled", "icinga2_active_service_checks_enabled",
+			"icinga2_active_host_checks_enabled", "icinga2_event_handlers_enabled", "icinga2_flap_detection_enabled",
+			"icinga2_performance_data_enabled",
+		),
 		h.uid[:],
 		h.super.EnvId,
 		env.Icinga2.EndpointId,
 		h.lastHeartbeat,
+		"y",
 		env.Icinga2.Version,
 		int64(env.Icinga2.ProgramStart*1000),
 		utils.Bool[env.Icinga2.NotificationsEnabled],
@@ -91,12 +94,13 @@ func (h *HA) updateOwnInstance(env *Environment) error {
 
 func (h *HA) takeOverInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(
-		mysqlObservers.updateIcingadbInstanceByEnvironmentId,
-		"UPDATE icingadb_instance SET id = ?, endpoint_id = ?, heartbeat = ?,"+
-			" icinga2_version = ?, icinga2_start_time = ?, icinga2_notifications_enabled = ?,"+
-			" icinga2_active_service_checks_enabled = ?, icinga2_active_host_checks_enabled = ?,"+
-			" icinga2_event_handlers_enabled = ?, icinga2_flap_detection_enabled = ?,"+
-			" icinga2_performance_data_enabled = ? WHERE environment_id = ?",
+		dbObservers.updateIcingadbInstanceByEnvironmentId,
+		connection.Update(
+			h.super.Dbw.Db, "icingadb_instance", []string{"environment_id"},
+			"id", "endpoint_id", "heartbeat", "icinga2_version", "icinga2_start_time", "icinga2_notifications_enabled",
+			"icinga2_active_service_checks_enabled", "icinga2_active_host_checks_enabled",
+			"icinga2_event_handlers_enabled", "icinga2_flap_detection_enabled", "icinga2_performance_data_enabled",
+		),
 		h.uid[:],
 		env.Icinga2.EndpointId,
 		h.lastHeartbeat,
@@ -115,16 +119,19 @@ func (h *HA) takeOverInstance(env *Environment) error {
 
 func (h *HA) insertInstance(env *Environment) error {
 	_, err := h.super.Dbw.SqlExec(
-		mysqlObservers.insertIntoIcingadbInstance,
-		"INSERT INTO icingadb_instance(id, environment_id, endpoint_id, heartbeat, responsible,"+
-			" icinga2_version, icinga2_start_time, icinga2_notifications_enabled,"+
-			" icinga2_active_service_checks_enabled, icinga2_active_host_checks_enabled,"+
-			" icinga2_event_handlers_enabled, icinga2_flap_detection_enabled,"+
-			" icinga2_performance_data_enabled) VALUES (?, ?, ?, ?, 'y', ?, ?, ?, ?, ?, ?, ?, ?)",
+		dbObservers.insertIntoIcingadbInstance,
+		connection.Insert(
+			h.super.Dbw.Db, "icingadb_instance",
+			"id", "environment_id", "endpoint_id", "heartbeat", "responsible", "icinga2_version", "icinga2_start_time",
+			"icinga2_notifications_enabled", "icinga2_active_service_checks_enabled",
+			"icinga2_active_host_checks_enabled", "icinga2_event_handlers_enabled", "icinga2_flap_detection_enabled",
+			"icinga2_performance_data_enabled",
+		),
 		h.uid[:],
 		h.super.EnvId,
 		env.Icinga2.EndpointId,
 		h.lastHeartbeat,
+		"y",
 		env.Icinga2.Version,
 		int64(env.Icinga2.ProgramStart*1000),
 		utils.Bool[env.Icinga2.NotificationsEnabled],
@@ -144,8 +151,9 @@ func (h *HA) getInstance() (bool, uuid.UUID, int64, error) {
 	}
 
 	rawRows, err := h.super.Dbw.SqlFetchAll(
-		mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId, row{},
-		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
+		dbObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId, row{},
+		"SELECT id, heartbeat from icingadb_instance where environment_id = "+
+			connection.Placeholders(h.super.Dbw.Db, 0, 1)+" LIMIT 1",
 		h.super.EnvId,
 	)
 	if err != nil {
@@ -164,7 +172,7 @@ func (h *HA) StartHA(chEnv chan *Environment) {
 	env := h.waitForEnvironment(chEnv)
 	err := h.setAndInsertEnvironment(env)
 	if err != nil {
-		h.super.ChErr <- fmt.Errorf("Could not insert environment into MySQL: %s", err.Error())
+		h.super.ChErr <- fmt.Errorf("Could not insert environment into the database: %s", err.Error())
 	}
 
 	h.logger = log.WithFields(log.Fields{
@@ -202,8 +210,8 @@ func (h *HA) setAndInsertEnvironment(env *Environment) error {
 	h.super.EnvId = env.ID
 
 	_, err := h.super.Dbw.SqlExec(
-		mysqlObservers.insertIntoEnvironment,
-		"REPLACE INTO environment(id, name) VALUES (?, ?)",
+		dbObservers.insertIntoEnvironment,
+		connection.Replace(h.super.Dbw.Db, "environment", "id", "name"),
 		env.ID, env.Name,
 	)
 

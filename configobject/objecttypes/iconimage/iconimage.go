@@ -62,13 +62,13 @@ func (a *IconImage) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "icon_image"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType:        name,
-		RedisKey:          name,
-		PrimaryMySqlField: "id",
-		Factory:           NewIconImage,
-		HasChecksum:       false,
-		BulkInsertStmt:    connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt:    connection.NewBulkDeleteStmt(name, "id"),
-		BulkUpdateStmt:    connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:      name,
+		RedisKey:        name,
+		PrimarySqlField: "id",
+		Factory:         NewIconImage,
+		HasChecksum:     false,
+		BulkInsertStmt:  connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:  connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:  connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

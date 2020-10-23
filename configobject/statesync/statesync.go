@@ -24,12 +24,12 @@ var syncCounter = struct {
 
 var syncCounterLock = sync.Mutex{}
 
-var mysqlObservers = struct {
+var dbObservers = struct {
 	host    prometheus.Observer
 	service prometheus.Observer
 }{
-	connection.DbIoSeconds.WithLabelValues("mysql", "replace into host_state"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "replace into service_state"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "replace into host_state"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "replace into service_state"),
 }
 
 // StartStateSync starts the sync goroutines for hosts and services.
@@ -38,13 +38,13 @@ func StartStateSync(super *supervisor.Supervisor) {
 
 	go func() {
 		for {
-			syncStates(super, "host", &syncCounter.host, mysqlObservers.host)
+			syncStates(super, "host", &syncCounter.host, dbObservers.host)
 		}
 	}()
 
 	go func() {
 		for {
-			syncStates(super, "service", &syncCounter.service, mysqlObservers.service)
+			syncStates(super, "service", &syncCounter.service, dbObservers.service)
 		}
 	}()
 
@@ -120,9 +120,14 @@ func syncStates(super *supervisor.Supervisor, objectType string, counter *uint64
 				_, errExec := super.Dbw.SqlExecTx(
 					tx,
 					observer,
-					`REPLACE INTO `+objectType+`_state (`+objectType+`_id, environment_id, state_type, soft_state, hard_state, previous_hard_state, attempt, severity, output, long_output, performance_data,`+
-						`check_commandline, is_problem, is_handled, is_reachable, is_flapping, is_overdue, is_acknowledged, acknowledgement_comment_id,`+
-						`in_downtime, execution_time, latency, timeout, check_source, last_update, last_state_change, next_check, next_update) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+					connection.Replace(
+						super.Dbw.Db, objectType+"_state",
+						objectType+"_id", "environment_id", "state_type", "soft_state", "hard_state",
+						"previous_hard_state", "attempt", "severity", "output", "long_output", "performance_data",
+						"check_commandline", "is_problem", "is_handled", "is_reachable", "is_flapping", "is_overdue",
+						"is_acknowledged", "acknowledgement_comment_id", "in_downtime", "execution_time", "latency",
+						"timeout", "check_source", "last_update", "last_state_change", "next_check", "next_update",
+					),
 					id,
 					super.EnvId,
 					redisStateTypeToDBStateType(values["state_type"]),

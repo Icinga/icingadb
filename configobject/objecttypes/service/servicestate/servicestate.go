@@ -139,7 +139,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 "state:service",
-		PrimaryMySqlField:        "service_id",
+		PrimarySqlField:          "service_id",
 		Factory:                  NewServiceState,
 		HasChecksum:              false,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

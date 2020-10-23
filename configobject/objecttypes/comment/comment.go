@@ -104,7 +104,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 "comment",
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewComment,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

@@ -5,12 +5,19 @@ package connection
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	icingaSql "github.com/Icinga/go-libs/sql"
+	"github.com/Icinga/icingadb/config"
 	"github.com/Icinga/icingadb/utils"
+	"github.com/go-sql-driver/mysql"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"io/ioutil"
+	oldlog "log"
+	"net"
+	"net/url"
 	"reflect"
 	"strings"
 	"sync"
@@ -18,7 +25,7 @@ import (
 	"time"
 )
 
-var mysqlObservers = struct {
+var dbObservers = struct {
 	begin       prometheus.Observer
 	commit      prometheus.Observer
 	rollback    prometheus.Observer
@@ -27,13 +34,13 @@ var mysqlObservers = struct {
 	bulkDelete  prometheus.Observer
 	bulkUpdate  prometheus.Observer
 }{
-	DbIoSeconds.WithLabelValues("mysql", "begin"),
-	DbIoSeconds.WithLabelValues("mysql", "commit"),
-	DbIoSeconds.WithLabelValues("mysql", "rollback"),
-	DbIoSeconds.WithLabelValues("mysql", "transaction"),
-	DbIoSeconds.WithLabelValues("mysql", "Bulk insert"),
-	DbIoSeconds.WithLabelValues("mysql", "Bulk delete"),
-	DbIoSeconds.WithLabelValues("mysql", "Bulk update"),
+	DbIoSeconds.WithLabelValues("rdbms", "begin"),
+	DbIoSeconds.WithLabelValues("rdbms", "commit"),
+	DbIoSeconds.WithLabelValues("rdbms", "rollback"),
+	DbIoSeconds.WithLabelValues("rdbms", "transaction"),
+	DbIoSeconds.WithLabelValues("rdbms", "Bulk insert"),
+	DbIoSeconds.WithLabelValues("rdbms", "Bulk delete"),
+	DbIoSeconds.WithLabelValues("rdbms", "Bulk update"),
 }
 
 var connectionErrors = []string{
@@ -71,21 +78,48 @@ type DbClient interface {
 	DbClientOrTransaction
 	Ping() error
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
+	Driver() driver.Driver
 }
 
 type DbTransaction interface {
 	DbClientOrTransaction
 	Commit() error
 	Rollback() error
+	Prepare(query string) (*sql.Stmt, error)
 }
 
-func NewDBWrapper(dbDsn string, maxOpenConns int) (*DBWrapper, error) {
-	log.Info("Connecting to MySQL")
-	db, err := mkMysql("mysql", dbDsn, maxOpenConns)
+func NewDBWrapper(driver string, info *config.DbInfo) (*DBWrapper, error) {
+	var dsn *url.URL
+	if driver == "postgres" {
+		dsn = &url.URL{
+			Scheme: "postgres",
+			User:   url.UserPassword(info.User, info.Password),
+			Host:   net.JoinHostPort(info.Host, info.Port),
+			Path:   "/" + info.Database,
+			RawQuery: "sslmode=disable&" + // https://github.com/lib/pq/issues/1006
+				"binary_parameters=yes", // https://github.com/lib/pq/issues/678
+		}
+	} else {
+		dsn = &url.URL{
+			User: url.UserPassword(info.User, info.Password),
+			Host: "tcp(" + net.JoinHostPort(info.Host, info.Port) + ")",
+			Path: "/" + info.Database,
+			RawQuery: "innodb_strict_mode=1&sql_mode='STRICT_ALL_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE," +
+				"NO_ENGINE_SUBSTITUTION,PIPES_AS_CONCAT,ANSI_QUOTES,ERROR_FOR_DIVISION_BY_ZERO'",
+		}
+	}
 
+	log.Info("Connecting to database")
+
+	db, err := sql.Open(driver, strings.TrimPrefix(dsn.String(), "//"))
 	if err != nil {
 		return nil, err
 	}
+
+	mysql.SetLogger(oldlog.New(ioutil.Discard, "", 0))
+
+	db.SetMaxOpenConns(info.MaxOpenConns)
+	db.SetMaxIdleConns(info.MaxOpenConns)
 
 	dbw := DBWrapper{Db: db, ConnectedAtomic: new(uint32), ConnectionLostCounterAtomic: new(uint32)}
 	dbw.ConnectionUpCondition = sync.NewCond(&sync.Mutex{})
@@ -202,7 +236,7 @@ func (dbw *DBWrapper) WithRetry(f func() (sql.Result, error)) (sql.Result, error
 		res, err := f()
 
 		if err != nil {
-			if isRetryableError(err) {
+			if isSerializationFailure(err) {
 				continue
 			} else {
 				return nil, err
@@ -258,7 +292,7 @@ func (dbw *DBWrapper) SqlBegin(concurrencySafety bool, quiet bool) (DbTransactio
 			tx, err = dbw.Db.BeginTx(context.Background(), &sql.TxOptions{Isolation: isoLvl})
 			benchmarc.Stop()
 
-			mysqlObservers.begin.Observe(benchmarc.Seconds())
+			dbObservers.begin.Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -293,7 +327,7 @@ func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 			err = tx.Commit()
 			benchmarc.Stop()
 
-			mysqlObservers.commit.Observe(benchmarc.Seconds())
+			dbObservers.commit.Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -326,7 +360,7 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 			err = tx.Rollback()
 			benchmarc.Stop()
 
-			mysqlObservers.rollback.Observe(benchmarc.Seconds())
+			dbObservers.rollback.Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -368,6 +402,37 @@ func (dbw *DBWrapper) SqlExecTxQuiet(tx DbTransaction, opObserver prometheus.Obs
 
 func (dbw *DBWrapper) SqlFetchAll(queryObserver prometheus.Observer, rowType interface{}, query string, args ...interface{}) (interface{}, error) {
 	return dbw.sqlFetchAllInternal(dbw.Db, queryObserver, query, rowType, false, args...)
+}
+
+// SqlExecStmt is a wrapper around stmt.Exec() for auto-logging. sql is just for logging.
+func (dbw *DBWrapper) SqlExecStmt(stmt *sql.Stmt, opObserver prometheus.Observer, sql string, args ...interface{}) (sql.Result, error) {
+	return dbw.sqlExecInternal(sqlStmtRunner{stmt}, opObserver, sql, false, args...)
+}
+
+type sqlStmtRunner struct {
+	stmt *sql.Stmt
+}
+
+var _ DbTransaction = sqlStmtRunner{}
+
+func (ssr sqlStmtRunner) Query(string, ...interface{}) (*sql.Rows, error) {
+	panic("don't call me")
+}
+
+func (ssr sqlStmtRunner) Exec(_ string, args ...interface{}) (sql.Result, error) {
+	return ssr.stmt.Exec(args...)
+}
+
+func (ssr sqlStmtRunner) Commit() error {
+	panic("don't call me")
+}
+
+func (ssr sqlStmtRunner) Rollback() error {
+	panic("don't call me")
+}
+
+func (ssr sqlStmtRunner) Prepare(string) (*sql.Stmt, error) {
+	panic("don't call me")
 }
 
 // sqlExecInternal is a wrapper around sql.Exec() for auto-logging.
@@ -490,7 +555,7 @@ func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFai
 		errTx := dbw.sqlTryTransaction(f, concurrencySafety, false)
 		if !quiet {
 			benchmarc.Stop()
-			mysqlObservers.transaction.Observe(benchmarc.Seconds())
+			dbObservers.transaction.Observe(benchmarc.Seconds())
 
 			log.WithFields(log.Fields{
 				"context":   "sql",
@@ -514,7 +579,7 @@ func (dbw DBWrapper) SqlTransaction(concurrencySafety bool, retryOnConnectionFai
 				if retryOnConnectionFailure {
 					continue
 				} else {
-					return MysqlConnectionError{"Transaction failed duo to a connection error"}
+					return DbConnectionError{"Transaction failed duo to a connection error"}
 				}
 			}
 
@@ -554,8 +619,11 @@ func (dbw *DBWrapper) SqlFetchIds(envId []byte, table string, field string) ([]s
 		}
 
 		rows, err := dbw.SqlQuery(
-			fmt.Sprintf("SELECT %s FROM %s WHERE environment_id=(X'%s') AND NOT %s=?", field, table, utils.DecodeChecksum(envId), field),
-			[]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+			fmt.Sprintf(
+				"SELECT %s FROM %s WHERE environment_id=%s AND NOT %s=%s",
+				field, EscapeName(dbw.Db, table), Placeholders(dbw.Db, 0, 1), field, Placeholders(dbw.Db, 1, 1),
+			),
+			envId, []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		)
 
 		if err != nil {
@@ -595,9 +663,19 @@ func (dbw *DBWrapper) SqlFetchChecksums(table string, ids []string) (map[string]
 	//TODO: Don't do this hardcoded - Chunksize
 	for bulk := range utils.ChunkKeys(done, ids, 1000) {
 		//TODO: This should be done in parallel
-		query := fmt.Sprintf("SELECT id, properties_checksum FROM %s WHERE id IN (X'%s')", table, strings.Join(bulk, "', X'"))
-		rows, err := dbw.SqlQuery(query)
 
+		ids := make([]interface{}, 0, len(bulk))
+		for _, id := range bulk {
+			ids = append(ids, utils.EncodeChecksum(id))
+		}
+
+		rows, err := dbw.SqlQuery(
+			fmt.Sprintf(
+				"SELECT id, properties_checksum FROM %s WHERE id IN (%s)",
+				EscapeName(dbw.Db, table), Placeholders(dbw.Db, 0, len(bulk)),
+			),
+			ids...,
+		)
 		if err != nil {
 			if dbw.isConnectionError(err) {
 				continue
@@ -653,26 +731,24 @@ func (dbw *DBWrapper) SqlBulkInsert(rows []Row, stmt *BulkInsertStmt) error {
 	for _, c := range ChunkRows(rows, 500) {
 		chunk := c
 		group.Go(func() error {
-			placeholders := make([]string, len(chunk))
-			values := make([]interface{}, len(chunk)*stmt.NumField)
-			j := 0
+			return dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
+				query := Replace(dbw.Db, stmt.Table, stmt.Fields...)
+				smt, errPp := tx.Prepare(query)
 
-			for i, r := range chunk {
-				placeholders[i] = stmt.Placeholder
-
-				for _, v := range r.InsertValues() {
-					values[j] = v
-					j++
+				if errPp != nil {
+					return errPp
 				}
-			}
 
-			query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
+				defer smt.Close()
 
-			_, err := dbw.WithRetry(func() (result sql.Result, e error) {
-				return dbw.SqlExec(mysqlObservers.bulkInsert, query, values...)
+				for _, row := range chunk {
+					if _, errEx := dbw.SqlExecStmt(smt, dbObservers.bulkInsert, query, row.InsertValues()...); errEx != nil {
+						return errEx
+					}
+				}
+
+				return nil
 			})
-
-			return err
 		})
 	}
 
@@ -691,16 +767,19 @@ func (dbw *DBWrapper) SqlBulkDelete(keys []string, stmt *BulkDeleteStmt) error {
 
 	//TODO: Don't do this hardcoded - Chunksize
 	for bulk := range utils.ChunkKeys(done, keys, 1000) {
-		placeholders := strings.TrimSuffix(strings.Repeat("?, ", len(bulk)), ", ")
 		values := make([]interface{}, len(bulk))
 
 		for i, key := range bulk {
 			values[i] = utils.EncodeChecksum(key)
 		}
-		query := fmt.Sprintf(stmt.Format, placeholders)
+
+		query := fmt.Sprintf(
+			"DELETE FROM %s WHERE %s IN (%s)",
+			EscapeName(dbw.Db, stmt.Table), EscapeName(dbw.Db, stmt.PrimaryKey), Placeholders(dbw.Db, 0, len(bulk)),
+		)
 
 		_, err := dbw.WithRetry(func() (result sql.Result, e error) {
-			return dbw.SqlExec(mysqlObservers.bulkDelete, query, values...)
+			return dbw.SqlExec(dbObservers.bulkDelete, query, values...)
 		})
 		if err != nil {
 			return err
@@ -722,26 +801,25 @@ func (dbw *DBWrapper) SqlBulkUpdate(rows []Row, stmt *BulkUpdateStmt) error {
 	for _, c := range ChunkRows(rows, 500) {
 		chunk := c
 		group.Go(func() error {
-			placeholders := make([]string, len(chunk))
-			values := make([]interface{}, len(chunk)*stmt.NumField)
-			j := 0
+			return dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
+				query := Replace(dbw.Db, stmt.Table, stmt.Fields...)
+				smt, errPp := tx.Prepare(query)
 
-			for i, r := range chunk {
-				placeholders[i] = stmt.Placeholder
-
-				for _, v := range r.InsertValues() {
-					values[j] = v
-					j++
+				if errPp != nil {
+					return errPp
 				}
-			}
 
-			query := fmt.Sprintf(stmt.Format, strings.Join(placeholders, ", "))
+				defer smt.Close()
 
-			_, err := dbw.WithRetry(func() (result sql.Result, e error) {
-				return dbw.SqlExec(mysqlObservers.bulkUpdate, query, values...)
+				for _, row := range chunk {
+					_, errEx := dbw.SqlExecStmt(smt, dbObservers.bulkUpdate, query, row.InsertValues()...)
+					if errEx != nil {
+						return errEx
+					}
+				}
+
+				return nil
 			})
-
-			return err
 		})
 	}
 

@@ -115,7 +115,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 "downtime",
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewDowntime,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

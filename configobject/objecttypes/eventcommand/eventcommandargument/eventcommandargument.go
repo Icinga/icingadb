@@ -93,7 +93,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 "eventcommand:argument",
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewEventCommandArgument,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

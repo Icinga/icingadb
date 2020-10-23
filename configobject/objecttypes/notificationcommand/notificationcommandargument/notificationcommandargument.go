@@ -93,7 +93,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 "notificationcommand:argument",
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewNotificationCommandArgument,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

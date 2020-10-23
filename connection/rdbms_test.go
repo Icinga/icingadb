@@ -6,10 +6,14 @@ import (
 	"context"
 	"crypto/sha1"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
+	"fmt"
+	"github.com/Icinga/icingadb/config"
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/go-sql-driver/mysql"
+	"github.com/lib/pq"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -48,6 +52,10 @@ func (m *TransactionMock) Rollback() error {
 	return args.Error(0)
 }
 
+func (m *TransactionMock) Prepare(query string) (*sql.Stmt, error) {
+	return nil, nil
+}
+
 type DbMock struct {
 	mock.Mock
 }
@@ -72,6 +80,10 @@ func (m *DbMock) Exec(query string, args ...interface{}) (sql.Result, error) {
 	return args2.Get(0).(sql.Result), args2.Error(1)
 }
 
+func (m *DbMock) Driver() driver.Driver {
+	return nil
+}
+
 func NewTestDBW(db DbClient) DBWrapper {
 	dbw := DBWrapper{Db: db, ConnectedAtomic: new(uint32), ConnectionLostCounterAtomic: new(uint32)}
 	dbw.ConnectionUpCondition = sync.NewCond(&sync.Mutex{})
@@ -79,7 +91,7 @@ func NewTestDBW(db DbClient) DBWrapper {
 }
 
 func TestNewDBWrapper(t *testing.T) {
-	dbw, err := NewDBWrapper("asdasd", 50)
+	dbw, err := NewDBWrapper("asdasd", &config.DbInfo{})
 	if err == nil {
 		assert.False(t, dbw.checkConnection(false), "DBWrapper should not be connected")
 	}
@@ -166,8 +178,13 @@ func TestDBWrapper_SqlBegin(t *testing.T) {
 }
 
 func TestDBWrapper_SqlTransaction(t *testing.T) {
-	dbw, err := NewDBWrapper(testbackends.MysqlTestDsn, 50)
-	require.NoError(t, err, "Is the MySQL server running?")
+	driver, info, errDI := testbackends.GetDbInfo()
+	if errDI != nil {
+		t.Fatal(errDI)
+	}
+
+	dbw, err := NewDBWrapper(driver, info)
+	require.NoError(t, err, "Is the database server running?")
 
 	err = dbw.SqlTransaction(false, true, false, func(tx DbTransaction) error {
 		return nil
@@ -194,7 +211,7 @@ func TestDBWrapper_WithRetry(t *testing.T) {
 			return nil, nil
 		} else {
 			tries++
-			return nil, errors.New("Deadlock found when trying to get lock")
+			return nil, &pq.Error{Code: "40001"}
 		}
 	})
 
@@ -236,7 +253,7 @@ func TestDBWrapper_SqlQuery(t *testing.T) {
 	mockDb.AssertExpectations(t)
 }
 
-var mysqlTestObserver = DbIoSeconds.WithLabelValues("mysql", "test")
+var dbTestObserver = DbIoSeconds.WithLabelValues("rdbms", "test")
 
 func TestDBWrapper_SqlExec(t *testing.T) {
 	mockDb := new(DbMock)
@@ -251,7 +268,7 @@ func TestDBWrapper_SqlExec(t *testing.T) {
 
 	dbw.CompareAndSetConnected(true)
 	go func() {
-		_, err = dbw.SqlExec(mysqlTestObserver, "test")
+		_, err = dbw.SqlExec(dbTestObserver, "test")
 		done <- true
 	}()
 
@@ -313,10 +330,19 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 		Name string
 	}
 
-	dbw, err := NewDBWrapper(testbackends.MysqlTestDsn, 50)
-	require.NoError(t, err, "Is the MySQL server running?")
+	driver, info, errDI := testbackends.GetDbInfo()
+	if errDI != nil {
+		t.Fatal(errDI)
+	}
 
-	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name varchar(255) NOT NULL)")
+	dbw, err := NewDBWrapper(driver, info)
+	require.NoError(t, err, "Is the database server running?")
+
+	if driver == "postgres" {
+		_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id SERIAL NOT NULL PRIMARY KEY, name varchar(255) NOT NULL)")
+	} else {
+		_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, name varchar(255) NOT NULL)")
+	}
 	require.NoError(t, err)
 
 	_, err = dbw.Db.Exec("INSERT INTO testing0815 (name) VALUES ('horst'), ('test')")
@@ -326,7 +352,7 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 	done := make(chan bool)
 	dbw.CompareAndSetConnected(false)
 	go func() {
-		res, err = dbw.SqlFetchAll(mysqlTestObserver, row{}, "SELECT id, name FROM testing0815")
+		res, err = dbw.SqlFetchAll(dbTestObserver, row{}, "SELECT id, name FROM testing0815")
 		done <- true
 	}()
 
@@ -344,14 +370,24 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 }
 
 func TestDBWrapper_SqlFetchIds(t *testing.T) {
-	dbw, err := NewDBWrapper(testbackends.MysqlTestDsn, 50)
-	require.NoError(t, err, "Is the MySQL server running?")
+	driver, info, errDI := testbackends.GetDbInfo()
+	if errDI != nil {
+		t.Fatal(errDI)
+	}
+
+	dbw, err := NewDBWrapper(driver, info)
+	require.NoError(t, err, "Is the database server running?")
 
 	hash := sha1.New()
 	hash.Write([]byte("derp"))
 	envId := hash.Sum(nil)
 
-	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id binary(20) NOT NULL PRIMARY KEY, environment_id binary(20) NOT NULL)")
+	if driver == "postgres" {
+		_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id bytea NOT NULL PRIMARY KEY, environment_id bytea NOT NULL)")
+	} else {
+		_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id binary(20) NOT NULL PRIMARY KEY, environment_id binary(20) NOT NULL)")
+	}
+
 	assert.NoError(t, err)
 
 	hashHorst := sha1.New()
@@ -362,7 +398,13 @@ func TestDBWrapper_SqlFetchIds(t *testing.T) {
 	hashPeter.Write([]byte("peter"))
 	peter := hashPeter.Sum(nil)
 
-	_, err = dbw.Db.Exec("INSERT INTO testing0815 (id, environment_id) VALUES (?, ?), (?, ?)", horst, envId, peter, envId)
+	_, err = dbw.Db.Exec(
+		fmt.Sprintf(
+			"INSERT INTO testing0815 (id, environment_id) VALUES (%s), (%s)",
+			Placeholders(dbw.Db, 0, 2), Placeholders(dbw.Db, 2, 2),
+		),
+		horst, envId, peter, envId,
+	)
 	assert.NoError(t, err)
 
 	ids, err := dbw.SqlFetchIds(envId, "testing0815", "id")
@@ -375,18 +417,35 @@ func TestDBWrapper_SqlFetchIds(t *testing.T) {
 }
 
 func TestDBWrapper_SqlFetchChecksums(t *testing.T) {
-	dbw, err := NewDBWrapper(testbackends.MysqlTestDsn, 50)
-	require.NoError(t, err, "Is the MySQL server running?")
+	driver, info, errDI := testbackends.GetDbInfo()
+	if errDI != nil {
+		t.Fatal(errDI)
+	}
+
+	dbw, err := NewDBWrapper(driver, info)
+	require.NoError(t, err, "Is the database server running?")
 
 	envId := utils.Checksum("derp")
 
-	_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id binary(20) NOT NULL PRIMARY KEY, environment_id binary(20) NOT NULL, properties_checksum binary(20) NOT NULL)")
+	if driver == "postgres" {
+		_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id bytea NOT NULL PRIMARY KEY, environment_id bytea NOT NULL, properties_checksum bytea NOT NULL)")
+	} else {
+		_, err = dbw.Db.Exec("CREATE TABLE testing0815 (id binary(20) NOT NULL PRIMARY KEY, environment_id binary(20) NOT NULL, properties_checksum binary(20) NOT NULL)")
+	}
+
 	assert.NoError(t, err)
 
 	horst := utils.Checksum("horst")
 	peter := utils.Checksum("peter")
 
-	_, err = dbw.Db.Exec("INSERT INTO testing0815 (id, environment_id, properties_checksum) VALUES (?, ?, ?), (?, ?, ?)", utils.EncodeChecksum(horst), utils.EncodeChecksum(envId), utils.EncodeChecksum(utils.Checksum("hans wurst")), utils.EncodeChecksum(peter), utils.EncodeChecksum(envId), utils.EncodeChecksum(utils.Checksum("peter wurst")))
+	_, err = dbw.Db.Exec(
+		fmt.Sprintf(
+			"INSERT INTO testing0815 (id, environment_id, properties_checksum) VALUES (%s), (%s)",
+			Placeholders(dbw.Db, 0, 3), Placeholders(dbw.Db, 3, 3),
+		),
+		utils.EncodeChecksum(horst), utils.EncodeChecksum(envId), utils.EncodeChecksum(utils.Checksum("hans wurst")),
+		utils.EncodeChecksum(peter), utils.EncodeChecksum(envId), utils.EncodeChecksum(utils.Checksum("peter wurst")),
+	)
 	assert.NoError(t, err)
 
 	checksums, err := dbw.SqlFetchChecksums("testing0815", []string{horst, peter})

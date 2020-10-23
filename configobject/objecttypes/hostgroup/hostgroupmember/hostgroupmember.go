@@ -66,7 +66,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 "host:groupmember",
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewHostgroupMember,
 		HasChecksum:              false,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

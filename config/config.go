@@ -29,7 +29,7 @@ var redisInfo = &RedisInfo{
 	PoolSize: 64,
 }
 
-type MysqlInfo struct {
+type DbInfo struct {
 	Host         string `ini:"host"`
 	Port         string `ini:"port"`
 	Database     string `ini:"database"`
@@ -38,7 +38,9 @@ type MysqlInfo struct {
 	MaxOpenConns int    `ini:"max_open_conns"`
 }
 
-var mysqlInfo = &MysqlInfo{
+var dbDriver string
+
+var dbInfo = &DbInfo{
 	Port:         "3306",
 	Database:     "icingadb",
 	MaxOpenConns: 50,
@@ -76,7 +78,23 @@ func ParseConfig(path string) error {
 		return errors.New("missing redis host")
 	}
 
-	if err = cfg.Section("mysql").MapTo(mysqlInfo); err != nil {
+	var db *ini.Section
+
+	if db, err = cfg.GetSection("mysql"); err == nil {
+		if _, err = cfg.GetSection("pgsql"); err == nil {
+			return errors.New("too many databases")
+		} else {
+			dbDriver = "mysql"
+		}
+	} else {
+		if db, err = cfg.GetSection("pgsql"); err == nil {
+			dbDriver = "postgres"
+		} else {
+			return errors.New("missing database")
+		}
+	}
+
+	if err = db.MapTo(dbInfo); err != nil {
 		return err
 	}
 
@@ -84,11 +102,11 @@ func ParseConfig(path string) error {
 		return err
 	}
 
-	if mysqlInfo.Host == "" {
-		return errors.New("missing mysql host")
+	if dbInfo.Host == "" {
+		return errors.New("missing database host")
 	}
-	if mysqlInfo.User == "" || mysqlInfo.Password == "" {
-		return errors.New("missing mysql credentials")
+	if dbInfo.User == "" || dbInfo.Password == "" {
+		return errors.New("missing database credentials")
 	}
 
 	return nil
@@ -98,8 +116,8 @@ func GetLogging() *Logging {
 	return logging
 }
 
-func GetMysqlInfo() *MysqlInfo {
-	return mysqlInfo
+func GetDbInfo() (driver string, info *DbInfo) {
+	return dbDriver, dbInfo
 }
 
 func GetRedisInfo() *RedisInfo {

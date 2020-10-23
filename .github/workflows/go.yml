@@ -15,26 +15,51 @@ jobs:
         go: [ '1.11', '1.12', '1.13', '1.14', '1' ]
         redis: [ '5', 'latest' ]
         rdbms:
-          - icinga/icingadb-mysql:5.5
-          - icinga/icingadb-mysql:5.6
-          - mysql:5.7
-          - mysql:8
-          - mariadb:10.1
-          - mariadb:10.2
-          - mariadb:10.3
-          - mariadb:10.4
-          - mariadb:10
+          - type: mysql
+            image: icinga/icingadb-mysql:5.5
+          - type: mysql
+            image: icinga/icingadb-mysql:5.6
+          - type: mysql
+            image: mysql:5.7
+          - type: mysql
+            image: mysql:8
+          - type: mysql
+            image: mariadb:10.1
+          - type: mysql
+            image: mariadb:10.2
+          - type: mysql
+            image: mariadb:10.3
+          - type: mysql
+            image: mariadb:10.4
+          - type: mysql
+            image: mariadb:10
+          - type: pgsql
+            image: postgres:9.5
+          - type: pgsql
+            image: postgres:9.6
+          - type: pgsql
+            image: postgres:10
+          - type: pgsql
+            image: postgres:11
+          - type: pgsql
+            image: postgres:12
+          - type: pgsql
+            image: postgres
 
     services:
-      mysql:
-        image: ${{ matrix.rdbms }}
+      rdbms:
+        image: ${{ matrix.rdbms.image }}
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: icingadb
           MYSQL_USER: icingadb
           MYSQL_PASSWORD: icingadb
+          POSTGRES_DB: icingadb
+          POSTGRES_USER: icingadb
+          POSTGRES_PASSWORD: icingadb
         ports:
           - 3800:3306
+          - 5800:5432
 
       redis:
         image: redis:${{ matrix.redis }}
@@ -63,20 +88,39 @@ jobs:
           ICINGADB_TEST_REDIS_HOST: 127.0.0.1
           ICINGADB_TEST_REDIS_PORT: 6379
 
-          ICINGADB_TEST_MYSQL_HOST: 127.0.0.1
-          ICINGADB_TEST_MYSQL_PORT: 3800
-          ICINGADB_TEST_MYSQL_DATABASE: icingadb
-          ICINGADB_TEST_MYSQL_USER: icingadb
-          ICINGADB_TEST_MYSQL_PASSWORD: icingadb
+          ICINGADB_TEST_DB_TYPE: ${{ matrix.rdbms.type }}
+          ICINGADB_TEST_DB_HOST: 127.0.0.1
+          ICINGADB_TEST_DB_DATABASE: icingadb
+          ICINGADB_TEST_DB_USER: icingadb
+          ICINGADB_TEST_DB_PASSWORD: icingadb
+          PGPASSWORD: icingadb
         timeout-minutes: 10
         run: |
-          while ! mysql -h ${ICINGADB_TEST_MYSQL_HOST} -P ${ICINGADB_TEST_MYSQL_PORT} \
-            -u${ICINGADB_TEST_MYSQL_USER} -p${ICINGADB_TEST_MYSQL_PASSWORD} ${ICINGADB_TEST_MYSQL_DATABASE}
-          do sleep 1
-          done
+          case "$ICINGADB_TEST_DB_TYPE" in
+            mysql)
+              export ICINGADB_TEST_DB_PORT=3800
 
-          mysql -h ${ICINGADB_TEST_MYSQL_HOST} -P ${ICINGADB_TEST_MYSQL_PORT} \
-            -u${ICINGADB_TEST_MYSQL_USER} -p${ICINGADB_TEST_MYSQL_PASSWORD} ${ICINGADB_TEST_MYSQL_DATABASE} \
-            <etc/schema/mysql/mysql.schema.sql
+              while ! mysql -h "$ICINGADB_TEST_DB_HOST" -P "$ICINGADB_TEST_DB_PORT" \
+                -u"$ICINGADB_TEST_DB_USER" -p"$ICINGADB_TEST_DB_PASSWORD" "$ICINGADB_TEST_DB_DATABASE"
+              do sleep 1
+              done
+
+              mysql -h "$ICINGADB_TEST_DB_HOST" -P "$ICINGADB_TEST_DB_PORT" \
+                -u"$ICINGADB_TEST_DB_USER" -p"$ICINGADB_TEST_DB_PASSWORD" "$ICINGADB_TEST_DB_DATABASE" \
+                < etc/schema/mysql/mysql.schema.sql
+              ;;
+            pgsql)
+              export ICINGADB_TEST_DB_PORT=5800
+
+              while ! psql -h "$ICINGADB_TEST_DB_HOST" -p "$ICINGADB_TEST_DB_PORT" \
+                -U "$ICINGADB_TEST_DB_USER" "$ICINGADB_TEST_DB_DATABASE"
+              do sleep 1
+              done
+
+              psql -q -h "$ICINGADB_TEST_DB_HOST" -p "$ICINGADB_TEST_DB_PORT" \
+                -U "$ICINGADB_TEST_DB_USER" "$ICINGADB_TEST_DB_DATABASE" \
+                < etc/schema/pgsql/pgsql.schema.sql
+              ;;
+          esac
 
           go test -v -race ./...
