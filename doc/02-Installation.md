@@ -196,6 +196,18 @@ systemctl enable icingadb
 systemctl start icingadb
 ```
 
+### Enable icingadb feature
+
+```
+icinga2 feature enable icingadb
+```
+
+### Restart icinga2 service
+
+```
+systemctl restart icinga2
+```
+
 ### Enable remote Redis connections <a id="remote-redis"></a>
 
 By default `icingadb-redis` listens only on `127.0.0.1`. If you want to change that (e.g. Icinga Web 2), just change `bind 127.0.0.1 ::1` and `protected-mode yes` in `/etc/icinga-redis/icingadb-redis.conf` to the interface you want to use and `protected-mode no`.
