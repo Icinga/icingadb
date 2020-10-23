@@ -231,7 +231,11 @@ func updateOverdueInDb(super *supervisor.Supervisor, objectType string, observer
 }
 
 func syncOverdueToRedis(super *supervisor.Supervisor, objectType string, observer prometheus.Observer) (error) {
-	overdueRows, err := super.Dbw.SqlFetchAll(observer,
+	type row struct {
+		Id []byte
+	}
+
+	overdueRows, err := super.Dbw.SqlFetchAll(observer, row{},
 		fmt.Sprintf("SELECT %s_id FROM %s_state WHERE is_overdue = ?", objectType, objectType),
 		utils.Bool[true])
 	if err != nil {
@@ -242,8 +246,8 @@ func syncOverdueToRedis(super *supervisor.Supervisor, objectType string, observe
 		return err
 	}
 
-	for _, row := range overdueRows {
-		if _, err := super.Rdbw.SAdd("icingadb:overdue:"+objectType, hex.EncodeToString(row[0].([]byte))).Result(); err != nil {
+	for _, row := range overdueRows.([]row) {
+		if _, err := super.Rdbw.SAdd("icingadb:overdue:"+objectType, hex.EncodeToString(row.Id)).Result(); err != nil {
 			return err
 		}
 	}

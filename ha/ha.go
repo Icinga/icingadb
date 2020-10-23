@@ -131,8 +131,13 @@ func (h *HA) upsertInstance(tx connection.DbTransaction, env *Environment, isAct
 }
 
 func (h *HA) getActiveInstance(tx connection.DbTransaction) (bool, uuid.UUID, error) {
-	rows, err := h.dbw.SqlFetchAllTx(
-		tx, mysqlObservers.selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId,
+	type row struct {
+		Id        uuid.UUID
+		Heartbeat int64
+	}
+
+	rawRows, err := h.dbw.SqlFetchAllTx(
+		tx, mysqlObservers.selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId, row{},
 		"SELECT id, heartbeat FROM icingadb_instance"+
 			" WHERE environment_id = ? AND responsible = ? AND heartbeat > ?",
 		h.super.EnvId, utils.Bool[true], utils.TimeToMillisecs(time.Now())-heartbeatTimeoutMillisecs,
@@ -140,6 +145,8 @@ func (h *HA) getActiveInstance(tx connection.DbTransaction) (bool, uuid.UUID, er
 	if err != nil {
 		return false, uuid.UUID{}, err
 	}
+
+	rows := rawRows.([]row)
 	if len(rows) > 1 {
 		return false, uuid.UUID{}, errors.New("there is more than one active IcingaDB instance")
 	}
@@ -149,15 +156,8 @@ func (h *HA) getActiveInstance(tx connection.DbTransaction) (bool, uuid.UUID, er
 		return false, uuid.UUID{}, nil
 	}
 
-	idBytes := rows[0][0].([]byte)
-	icinga2Heartbeat := rows[0][1].(int64)
-
-	activeId, err := uuid.FromBytes(idBytes)
-	if err != nil {
-		return false, uuid.UUID{}, fmt.Errorf("invalid active UUID in database: %s", err.Error())
-	}
-
-	icinga2HeartbeatAge := utils.TimeToMillisecs(time.Now()) - icinga2Heartbeat
+	activeId := rows[0].Id
+	icinga2HeartbeatAge := utils.TimeToMillisecs(time.Now()) - rows[0].Heartbeat
 
 	if activeId == h.uid && icinga2HeartbeatAge > heartbeatValidMillisecs {
 		// Our heartbeat is too old to be considered valid, no longer consider ourselves to be active.
