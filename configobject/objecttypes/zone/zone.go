@@ -59,7 +59,7 @@ func (z *Zone) UpdateValues() []interface{} {
 		z.Name,
 		z.NameCi,
 		utils.Bool[z.IsGlobal],
-		utils.EncodeChecksum(z.ParentId),
+		utils.EncodeChecksumOrNil(z.ParentId),
 		z.Depth,
 	)
 
@@ -83,7 +83,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 name,
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewZone,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

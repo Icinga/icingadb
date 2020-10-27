@@ -14,7 +14,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -58,8 +57,8 @@ var overdueSyncCounters = struct {
 	host, service uint64
 }{}
 
-var updateHostOverdue = connection.DbIoSeconds.WithLabelValues("mysql", "update host_state by host_id")
-var updateServiceOverdue = connection.DbIoSeconds.WithLabelValues("mysql", "update service_state by service_id")
+var updateHostOverdue = connection.DbIoSeconds.WithLabelValues("rdbms", "update host_state by host_id")
+var updateServiceOverdue = connection.DbIoSeconds.WithLabelValues("rdbms", "update service_state by service_id")
 
 // startOverdueSync starts the sync goroutines for hosts and services.
 func startOverdueSync(super *supervisor.Supervisor) {
@@ -159,11 +158,6 @@ func updateOverdueInDb(super *supervisor.Supervisor, objectType string, observer
 	for _, c := range utils.ChunkInterfaces(ids, 1000) {
 		chunk := c
 		group.Go(func() error {
-			placeholders := make([]string, 0, len(chunk))
-			for len(placeholders) < cap(placeholders) {
-				placeholders = append(placeholders, "?")
-			}
-
 			args := make([]interface{}, 0, len(chunk))
 			for _, hexId := range chunk {
 				id, errHD := hex.DecodeString(hexId.(string))
@@ -184,7 +178,7 @@ func updateOverdueInDb(super *supervisor.Supervisor, objectType string, observer
 				observer,
 				fmt.Sprintf(
 					"UPDATE %s_state SET is_overdue='%s' WHERE %s_id IN (%s)",
-					objectType, utils.Bool[overdue], objectType, strings.Join(placeholders, ","),
+					objectType, utils.Bool[overdue], objectType, connection.Placeholders(super.Dbw.Db, 0, len(args)),
 				),
 				args...,
 			)

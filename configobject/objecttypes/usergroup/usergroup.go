@@ -57,7 +57,7 @@ func (u *Usergroup) UpdateValues() []interface{} {
 		u.Name,
 		u.NameCi,
 		u.DisplayName,
-		utils.EncodeChecksum(u.ZoneId),
+		utils.EncodeChecksumOrNil(u.ZoneId),
 	)
 
 	return v
@@ -80,7 +80,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 name,
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewUsergroup,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

@@ -57,7 +57,7 @@ func (h *Hostgroup) UpdateValues() []interface{} {
 		h.Name,
 		h.NameCi,
 		h.DisplayName,
-		utils.EncodeChecksum(h.ZoneId),
+		utils.EncodeChecksumOrNil(h.ZoneId),
 	)
 
 	return v
@@ -80,7 +80,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 name,
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewHostgroup,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

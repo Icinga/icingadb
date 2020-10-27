@@ -60,7 +60,7 @@ func (t *Timeperiod) UpdateValues() []interface{} {
 		t.NameCi,
 		t.DisplayName,
 		utils.Bool[t.PreferIncludes],
-		utils.EncodeChecksum(t.ZoneId),
+		utils.EncodeChecksumOrNil(t.ZoneId),
 	)
 
 	return v
@@ -83,7 +83,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 name,
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewTimeperiod,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

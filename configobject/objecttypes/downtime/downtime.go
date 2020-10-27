@@ -75,10 +75,10 @@ func (d *Downtime) UpdateValues() []interface{} {
 	v = append(
 		v,
 		utils.EncodeChecksum(d.EnvId),
-		utils.EncodeChecksum(d.TriggeredById),
+		utils.EncodeChecksumOrNil(d.TriggeredById),
 		d.ObjectType,
 		utils.EncodeChecksum(d.HostId),
-		utils.EncodeChecksum(d.ServiceId),
+		utils.EncodeChecksumOrNil(d.ServiceId),
 		utils.EncodeChecksum(d.NameChecksum),
 		utils.EncodeChecksum(d.PropertiesChecksum),
 		d.Name,
@@ -92,7 +92,7 @@ func (d *Downtime) UpdateValues() []interface{} {
 		utils.Bool[d.IsInEffect],
 		d.StartTime,
 		d.EndTime,
-		utils.EncodeChecksum(d.ZoneId),
+		utils.EncodeChecksumOrNil(d.ZoneId),
 	)
 
 	return v
@@ -115,7 +115,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 "downtime",
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewDowntime,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

@@ -107,7 +107,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		utils.Bool[h.IsFlapping],
 		utils.Bool[time.Now().After(utils.MillisecsToTime(float64(h.NextUpdate)))],
 		utils.IsAcknowledged[h.Acknowledgement],
-		utils.EncodeChecksum(h.AcknowledgementCommentId),
+		utils.EncodeChecksumOrNil(h.AcknowledgementCommentId),
 		utils.Bool[h.InDowntime],
 		h.ExecutionTime,
 		h.Latency,
@@ -139,7 +139,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 "state:host",
-		PrimaryMySqlField:        "host_id",
+		PrimarySqlField:          "host_id",
 		Factory:                  NewHostState,
 		HasChecksum:              false,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

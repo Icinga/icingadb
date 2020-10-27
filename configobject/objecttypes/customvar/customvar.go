@@ -68,13 +68,13 @@ func (c *Customvar) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "customvar"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType:        name,
-		RedisKey:          name,
-		PrimaryMySqlField: "id",
-		Factory:           NewCustomvar,
-		HasChecksum:       false,
-		BulkInsertStmt:    connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt:    connection.NewBulkDeleteStmt(name, "id"),
-		BulkUpdateStmt:    connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:      name,
+		RedisKey:        name,
+		PrimarySqlField: "id",
+		Factory:         NewCustomvar,
+		HasChecksum:     false,
+		BulkInsertStmt:  connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:  connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:  connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

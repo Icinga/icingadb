@@ -58,7 +58,7 @@ func (c *EventCommand) UpdateValues() []interface{} {
 		utils.EncodeChecksum(c.PropertiesChecksum),
 		c.Name,
 		c.NameCi,
-		utils.EncodeChecksum(c.ZoneId),
+		utils.EncodeChecksumOrNil(c.ZoneId),
 		c.Command,
 		c.Timeout,
 	)
@@ -83,7 +83,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 name,
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewEventCommand,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),

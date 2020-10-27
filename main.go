@@ -101,15 +101,12 @@ func main() {
 	log.SetLevel(level)
 
 	redisInfo := config.GetRedisInfo()
-	mysqlInfo := config.GetMysqlInfo()
+	dbDriver, dbInfo := config.GetDbInfo()
 	metricsInfo := config.GetMetricsInfo()
 
 	redisConn := connection.NewRDBWrapper(redisInfo.Host+":"+redisInfo.Port, redisInfo.PoolSize)
 
-	mysqlConn, err := connection.NewDBWrapper(
-		mysqlInfo.User+":"+mysqlInfo.Password+"@tcp("+mysqlInfo.Host+":"+mysqlInfo.Port+")/"+mysqlInfo.Database,
-		mysqlInfo.MaxOpenConns,
-	)
+	dbConn, err := connection.NewDBWrapper(dbDriver, dbInfo)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -118,7 +115,7 @@ func main() {
 		ChErr:        make(chan error),
 		ChDecode:     make(chan *jsondecoder.JsonDecodePackages),
 		Rdbw:         redisConn,
-		Dbw:          mysqlConn,
+		Dbw:          dbConn,
 		EnvLock:      &sync.Mutex{},
 		WgConfigSync: &sync.WaitGroup{},
 	}

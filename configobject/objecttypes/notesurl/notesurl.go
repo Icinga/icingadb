@@ -62,13 +62,13 @@ func (a *NotesUrl) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "notes_url"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType:        name,
-		RedisKey:          name,
-		PrimaryMySqlField: "id",
-		Factory:           NewNotesUrl,
-		HasChecksum:       false,
-		BulkInsertStmt:    connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt:    connection.NewBulkDeleteStmt(name, "id"),
-		BulkUpdateStmt:    connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:      name,
+		RedisKey:        name,
+		PrimarySqlField: "id",
+		Factory:         NewNotesUrl,
+		HasChecksum:     false,
+		BulkInsertStmt:  connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:  connection.NewBulkDeleteStmt(name, "id"),
+		BulkUpdateStmt:  connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

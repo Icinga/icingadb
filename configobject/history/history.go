@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-var mysqlObservers = struct {
+var dbObservers = struct {
 	state            prometheus.Observer
 	notification     prometheus.Observer
 	usernotification prometheus.Observer
@@ -24,13 +24,13 @@ var mysqlObservers = struct {
 	flapping         prometheus.Observer
 	acknowledgement  prometheus.Observer
 }{
-	connection.DbIoSeconds.WithLabelValues("mysql", "replace into state_history"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "replace into notification_history"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "replace into usernotification_history"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "replace into downtime_history"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "replace into comment_history"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "replace into flapping_history"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "replace into acknowledgement_history"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "replace into state_history"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "replace into notification_history"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "replace into usernotification_history"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "replace into downtime_history"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "replace into comment_history"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "replace into flapping_history"),
+	connection.DbIoSeconds.WithLabelValues("rdbms", "replace into acknowledgement_history"),
 }
 
 var historyCounter = struct {
@@ -93,12 +93,17 @@ func StartHistoryWorkers(super *supervisor.Supervisor) {
 
 func notificationHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO notification_history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_id, type,` +
-			"send_time, state, previous_hard_state, author, `text`, users_notified)" +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
-			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		connection.Replace(
+			super.Dbw.Db, "notification_history",
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id", "notification_id", "type",
+			"send_time", "state", "previous_hard_state", "author", "text", "users_notified",
+		),
+		connection.Replace(
+			super.Dbw.Db, "history",
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id", "notification_history_id",
+			"state_history_id", "downtime_history_id", "comment_history_id", "flapping_history_id", "event_type",
+			"event_time",
+		),
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -146,13 +151,15 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "notification", statements, dataFunctions, mysqlObservers.notification, &historyCounter.notification)
+	historyWorker(super, "notification", statements, dataFunctions, dbObservers.notification, &historyCounter.notification)
 }
 
 func userNotificationHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO user_notification_history (id, environment_id, notification_history_id, user_id)` +
-			`VALUES (?,?,?,?)`,
+		connection.Replace(
+			super.Dbw.Db, "user_notification_history",
+			"id", "environment_id", "notification_history_id", "user_id",
+		),
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -170,17 +177,23 @@ func userNotificationHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "usernotification", statements, dataFunctions, mysqlObservers.usernotification, &historyCounter.usernotification)
+	historyWorker(super, "usernotification", statements, dataFunctions, dbObservers.usernotification, &historyCounter.usernotification)
 }
 
 func stateHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO state_history (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time, state_type,` +
-			`soft_state, hard_state, previous_soft_state, previous_hard_state, attempt, output, long_output, max_check_attempts, check_source)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
-			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		connection.Replace(
+			super.Dbw.Db, "state_history",
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id", "event_time", "state_type",
+			"soft_state", "hard_state", "previous_soft_state", "previous_hard_state", "attempt", "output",
+			"long_output", "max_check_attempts", "check_source",
+		),
+		connection.Replace(
+			super.Dbw.Db, "history",
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id", "notification_history_id",
+			"state_history_id", "downtime_history_id", "comment_history_id", "flapping_history_id", "event_type",
+			"event_time",
+		),
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -237,22 +250,29 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "state", statements, dataFunctions, mysqlObservers.state, &historyCounter.state)
+	historyWorker(super, "state", statements, dataFunctions, dbObservers.state, &historyCounter.state)
 }
 
 func downtimeHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO downtime_history (downtime_id, environment_id, endpoint_id, triggered_by_id, object_type, host_id, service_id, entry_time,` +
-			`author, cancelled_by, comment, is_flexible, flexible_duration, scheduled_start_time, scheduled_end_time, start_time, end_time, has_been_cancelled, trigger_time, cancel_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
-			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		connection.Replace(
+			super.Dbw.Db, "downtime_history",
+			"downtime_id", "environment_id", "endpoint_id", "triggered_by_id", "object_type", "host_id", "service_id",
+			"entry_time", "author", "cancelled_by", "comment", "is_flexible", "flexible_duration",
+			"scheduled_start_time", "scheduled_end_time", "start_time", "end_time", "has_been_cancelled",
+			"trigger_time", "cancel_time",
+		),
+		connection.Replace(
+			super.Dbw.Db, "history",
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id", "notification_history_id",
+			"state_history_id", "downtime_history_id", "comment_history_id", "flapping_history_id", "event_type",
+			"event_time",
+		),
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
 		func(values map[string]interface{}) []interface{} {
-			var triggeredById []byte
+			var triggeredById interface{}
 			if values["triggered_by_id"] != nil {
 				triggeredById = utils.EncodeChecksum(values["triggered_by_id"].(string))
 			}
@@ -318,17 +338,23 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "downtime", statements, dataFunctions, mysqlObservers.downtime, &historyCounter.downtime)
+	historyWorker(super, "downtime", statements, dataFunctions, dbObservers.downtime, &historyCounter.downtime)
 }
 
 func commentHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`REPLACE INTO comment_history (comment_id, environment_id, endpoint_id, object_type, host_id, service_id, entry_time, author,` +
-			`removed_by, comment, entry_type, is_persistent, is_sticky, expire_time, remove_time, has_been_removed)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
-			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		connection.Replace(
+			super.Dbw.Db, "comment_history",
+			"comment_id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id", "entry_time",
+			"author", "removed_by", "comment", "entry_type", "is_persistent", "is_sticky", "expire_time", "remove_time",
+			"has_been_removed",
+		),
+		connection.Replace(
+			super.Dbw.Db, "history",
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id", "notification_history_id",
+			"state_history_id", "downtime_history_id", "comment_history_id", "flapping_history_id", "event_type",
+			"event_time",
+		),
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -390,41 +416,42 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "comment", statements, dataFunctions, mysqlObservers.comment, &historyCounter.comment)
+	historyWorker(super, "comment", statements, dataFunctions, dbObservers.comment, &historyCounter.comment)
 }
 
 func flappingHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`INSERT INTO flapping_history (id, environment_id, endpoint_id, object_type, host_id, service_id, start_time, end_time, ` +
-			`percent_state_change_start, percent_state_change_end, flapping_threshold_low, flapping_threshold_high)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?)` +
-			`ON DUPLICATE KEY UPDATE ` +
-			`start_time=IFNULL(NULLIF(start_time, 0), VALUES(start_time)),` +
-			`end_time=IFNULL(NULLIF(end_time, 0), VALUES(end_time)),` +
-			`percent_state_change_start=IFNULL(NULLIF(percent_state_change_start, 0), VALUES(percent_state_change_start)),` +
-			`percent_state_change_end=IFNULL(NULLIF(percent_state_change_end, 0), VALUES(percent_state_change_end)),` +
-			`flapping_threshold_low=IFNULL(NULLIF(flapping_threshold_low, 0), VALUES(flapping_threshold_low)),` +
-			`flapping_threshold_high=IFNULL(NULLIF(flapping_threshold_high, 0), VALUES(flapping_threshold_high))`,
-		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
-			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		connection.ReplaceSomeIfZero(
+			super.Dbw.Db, "flapping_history",
+			[]connection.ReplacableColumn{
+				{"start_time", "0"}, {"end_time", "0"}, {"percent_state_change_start", "0"},
+				{"percent_state_change_end", "0"}, {"flapping_threshold_low", "0"}, {"flapping_threshold_high", "0"},
+			},
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id",
+		),
+		connection.Replace(
+			super.Dbw.Db, "history",
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id", "notification_history_id",
+			"state_history_id", "downtime_history_id", "comment_history_id", "flapping_history_id", "event_type",
+			"event_time",
+		),
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
 		func(values map[string]interface{}) []interface{} {
 			data := []interface{}{
-				utils.EncodeChecksum(values["id"].(string)),
-				super.EnvId,
-				utils.DecodeHexIfNotNil(values["endpoint_id"]),
-				values["object_type"].(string),
-				utils.EncodeChecksum(values["host_id"].(string)),
-				utils.DecodeHexIfNotNil(values["service_id"]),
 				values["start_time"],
 				values["end_time"],
 				values["percent_state_change_start"],
 				values["percent_state_change_end"],
 				values["flapping_threshold_low"],
 				values["flapping_threshold_high"],
+				utils.EncodeChecksum(values["id"].(string)),
+				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
+				values["object_type"].(string),
+				utils.EncodeChecksum(values["host_id"].(string)),
+				utils.DecodeHexIfNotNil(values["service_id"]),
 			}
 
 			return data
@@ -460,37 +487,29 @@ func flappingHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "flapping", statements, dataFunctions, mysqlObservers.flapping, &historyCounter.flapping)
+	historyWorker(super, "flapping", statements, dataFunctions, dbObservers.flapping, &historyCounter.flapping)
 }
 
 func acknowledgementHistoryWorker(super *supervisor.Supervisor) {
 	statements := []string{
-		`INSERT INTO acknowledgement_history (id, environment_id, endpoint_id, object_type, host_id, service_id, set_time, clear_time,` +
-			`author, cleared_by, comment, expire_time, is_sticky, is_persistent)` +
-			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)` +
-			`ON DUPLICATE KEY UPDATE ` +
-			`set_time=IFNULL(NULLIF(set_time, 0), VALUES(set_time)),` +
-			`clear_time=IFNULL(NULLIF(clear_time, 0), VALUES(clear_time)),` +
-			`author=IFNULL(NULLIF(author, ''), VALUES(author)),` +
-			`cleared_by=IFNULL(NULLIF(cleared_by, ''), VALUES(cleared_by)),` +
-			`comment=IFNULL(NULLIF(comment, ''), VALUES(comment)),` +
-			`expire_time=IFNULL(NULLIF(expire_time, 0), VALUES(expire_time)),` +
-			`is_sticky=IFNULL(NULLIF(is_sticky, 'n'), VALUES(is_sticky)),` +
-			`is_persistent=IFNULL(NULLIF(is_persistent, 'n'), VALUES(is_persistent))`,
-		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id,` +
-			` acknowledgement_history_id, event_type, event_time)` +
-			`VALUES (?,?,?,?,?,?,?,?,?)`,
+		connection.ReplaceSomeIfZero(
+			super.Dbw.Db, "acknowledgement_history",
+			[]connection.ReplacableColumn{
+				{"set_time", "0"}, {"clear_time", "0"}, {"author", "''"}, {"cleared_by", "''"},
+				{"comment", "''"}, {"expire_time", "0"}, {"is_sticky", "'n'"}, {"is_persistent", "'n'"},
+			},
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id",
+		),
+		connection.Replace(
+			super.Dbw.Db, "history",
+			"id", "environment_id", "endpoint_id", "object_type", "host_id", "service_id", "acknowledgement_history_id",
+			"event_type", "event_time",
+		),
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
 		func(values map[string]interface{}) []interface{} {
 			data := []interface{}{
-				utils.EncodeChecksum(values["id"].(string)),
-				super.EnvId,
-				utils.DecodeHexIfNotNil(values["endpoint_id"]),
-				values["object_type"].(string),
-				utils.EncodeChecksum(values["host_id"].(string)),
-				utils.DecodeHexIfNotNil(values["service_id"]),
 				values["set_time"],
 				values["clear_time"],
 				utils.DefaultIfNil(values["author"], ""),
@@ -499,6 +518,12 @@ func acknowledgementHistoryWorker(super *supervisor.Supervisor) {
 				values["expire_time"],
 				utils.RedisIntToDBBoolean(values["is_sticky"]),
 				utils.RedisIntToDBBoolean(values["is_persistent"]),
+				utils.EncodeChecksum(values["id"].(string)),
+				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
+				values["object_type"].(string),
+				utils.EncodeChecksum(values["host_id"].(string)),
+				utils.DecodeHexIfNotNil(values["service_id"]),
 			}
 
 			return data
@@ -530,7 +555,7 @@ func acknowledgementHistoryWorker(super *supervisor.Supervisor) {
 		},
 	}
 
-	historyWorker(super, "acknowledgement", statements, dataFunctions, mysqlObservers.acknowledgement, &historyCounter.acknowledgement)
+	historyWorker(super, "acknowledgement", statements, dataFunctions, dbObservers.acknowledgement, &historyCounter.acknowledgement)
 }
 
 func historyWorker(super *supervisor.Supervisor, historyType string, preparedStatements []string, dataFunctions []func(map[string]interface{}) []interface{}, observer prometheus.Observer, counter *uint64) {

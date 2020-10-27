@@ -151,13 +151,13 @@ func (c *CustomvarFlatFinal) GetFinalRows() ([]connection.Row, error) {
 func init() {
 	name := "customvar_flat"
 	ObjectInformation = configobject.ObjectInformation{
-		ObjectType:        name,
-		RedisKey:          "customvar",
-		PrimaryMySqlField: "customvar_id",
-		Factory:           NewCustomvarFlat,
-		HasChecksum:       false,
-		BulkInsertStmt:    connection.NewBulkInsertStmt(name, Fields),
-		BulkDeleteStmt:    connection.NewBulkDeleteStmt(name, "customvar_id"),
-		BulkUpdateStmt:    connection.NewBulkUpdateStmt(name, Fields),
+		ObjectType:      name,
+		RedisKey:        "customvar",
+		PrimarySqlField: "customvar_id",
+		Factory:         NewCustomvarFlat,
+		HasChecksum:     false,
+		BulkInsertStmt:  connection.NewBulkInsertStmt(name, Fields),
+		BulkDeleteStmt:  connection.NewBulkDeleteStmt(name, "customvar_id"),
+		BulkUpdateStmt:  connection.NewBulkUpdateStmt(name, Fields),
 	}
 }

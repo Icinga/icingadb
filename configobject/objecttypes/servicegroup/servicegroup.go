@@ -57,7 +57,7 @@ func (s *Servicegroup) UpdateValues() []interface{} {
 		s.Name,
 		s.NameCi,
 		s.DisplayName,
-		utils.EncodeChecksum(s.ZoneId),
+		utils.EncodeChecksumOrNil(s.ZoneId),
 	)
 
 	return v
@@ -80,7 +80,7 @@ func init() {
 	ObjectInformation = configobject.ObjectInformation{
 		ObjectType:               name,
 		RedisKey:                 name,
-		PrimaryMySqlField:        "id",
+		PrimarySqlField:          "id",
 		Factory:                  NewServicegroup,
 		HasChecksum:              true,
 		BulkInsertStmt:           connection.NewBulkInsertStmt(name, Fields),
