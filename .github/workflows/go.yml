@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         go: [ '1.11', '1.12', '1.13', '1.14', '1' ]
-        redis: [ '5' ]
+        redis: [ '5', 'latest' ]
         rdbms:
           - icinga/icingadb-mysql:5.5
           - icinga/icingadb-mysql:5.6
