@@ -4,7 +4,6 @@ package ha
 
 import (
 	"crypto/sha1"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/Icinga/icingadb/connection"
@@ -24,7 +23,7 @@ type Environment struct {
 type Icinga2Info struct {
 	Version                    string
 	ProgramStart               float64
-	EndpointId                 []byte
+	EndpointId                 interface{}
 	NotificationsEnabled       bool
 	ActiveServiceChecksEnabled bool
 	ActiveHostChecksEnabled    bool
@@ -107,11 +106,7 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 						},
 					}
 
-					if app.EndpointId != "" {
-						if unHex, errHD := hex.DecodeString(app.EndpointId); errHD == nil {
-							env.Icinga2.EndpointId = unHex
-						}
-					}
+					env.Icinga2.EndpointId = utils.EncodeChecksumOrNil(app.EndpointId)
 
 					chEnv <- env
 				}

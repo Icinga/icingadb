@@ -60,7 +60,7 @@ func (t *Timeperiod) UpdateValues() []interface{} {
 		t.NameCi,
 		t.DisplayName,
 		utils.Bool[t.PreferIncludes],
-		utils.EncodeChecksum(t.ZoneId),
+		utils.EncodeChecksumOrNil(t.ZoneId),
 	)
 
 	return v

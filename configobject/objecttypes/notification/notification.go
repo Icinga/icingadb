@@ -73,15 +73,15 @@ func (n *Notification) UpdateValues() []interface{} {
 		n.Name,
 		n.NameCi,
 		utils.EncodeChecksum(n.HostId),
-		utils.EncodeChecksum(n.ServiceId),
+		utils.EncodeChecksumOrNil(n.ServiceId),
 		utils.EncodeChecksum(n.CommandId),
 		n.TimesBegin,
 		n.TimesEnd,
 		n.NotificationInterval,
-		utils.EncodeChecksum(n.PeriodId),
+		utils.EncodeChecksumOrNil(n.PeriodId),
 		utils.NotificationStatesToBitMask(n.States),
 		utils.NotificationTypesToBitMask(n.Types),
-		utils.EncodeChecksum(n.ZoneId),
+		utils.EncodeChecksumOrNil(n.ZoneId),
 	)
 
 	return v

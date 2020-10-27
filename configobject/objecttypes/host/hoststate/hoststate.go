@@ -107,7 +107,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		utils.Bool[h.IsFlapping],
 		utils.Bool[time.Now().After(utils.MillisecsToTime(float64(h.NextUpdate)))],
 		utils.IsAcknowledged[h.Acknowledgement],
-		utils.EncodeChecksum(h.AcknowledgementCommentId),
+		utils.EncodeChecksumOrNil(h.AcknowledgementCommentId),
 		utils.Bool[h.InDowntime],
 		h.ExecutionTime,
 		h.Latency,

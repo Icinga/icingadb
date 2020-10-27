@@ -107,7 +107,7 @@ func (s *ServiceState) UpdateValues() []interface{} {
 		utils.Bool[s.IsFlapping],
 		utils.Bool[time.Now().After(utils.MillisecsToTime(float64(s.NextUpdate)))],
 		utils.IsAcknowledged[s.Acknowledgement],
-		utils.EncodeChecksum(s.AcknowledgementCommentId),
+		utils.EncodeChecksumOrNil(s.AcknowledgementCommentId),
 		utils.Bool[s.InDowntime],
 		s.ExecutionTime,
 		s.Latency,

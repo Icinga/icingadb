@@ -57,7 +57,7 @@ func (u *Usergroup) UpdateValues() []interface{} {
 		u.Name,
 		u.NameCi,
 		u.DisplayName,
-		utils.EncodeChecksum(u.ZoneId),
+		utils.EncodeChecksumOrNil(u.ZoneId),
 	)
 
 	return v

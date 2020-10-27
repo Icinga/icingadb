@@ -107,6 +107,15 @@ func (h *Host) InsertValues() []interface{} {
 	return append([]interface{}{utils.EncodeChecksum(h.Id)}, v...)
 }
 
+// ipOrNil converts net.IP(nil) to interface{}(nil) – which are not the same.
+func ipOrNil(ip net.IP) interface{} {
+	if ip == nil {
+		return nil
+	}
+
+	return ip
+}
+
 func (h *Host) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
@@ -120,13 +129,13 @@ func (h *Host) UpdateValues() []interface{} {
 		h.DisplayName,
 		h.Address,
 		h.Address6,
-		net.ParseIP(h.Address).To4(),
-		net.ParseIP(h.Address6).To16(),
+		ipOrNil(net.ParseIP(h.Address).To4()),
+		ipOrNil(net.ParseIP(h.Address6).To16()),
 		h.Checkcommand,
 		utils.EncodeChecksum(h.CheckcommandId),
 		h.MaxCheckAttempts,
 		h.CheckPeriod,
-		utils.EncodeChecksum(h.CheckPeriodId),
+		utils.EncodeChecksumOrNil(h.CheckPeriodId),
 		h.CheckTimeout,
 		h.CheckInterval,
 		h.CheckRetryInterval,
@@ -139,17 +148,17 @@ func (h *Host) UpdateValues() []interface{} {
 		h.FlappingThresholdHigh,
 		utils.Bool[h.PerfdataEnabled],
 		h.Eventcommand,
-		utils.EncodeChecksum(h.EventcommandId),
+		utils.EncodeChecksumOrNil(h.EventcommandId),
 		utils.Bool[h.IsVolatile],
-		utils.EncodeChecksum(h.ActionUrlId),
-		utils.EncodeChecksum(h.NotesUrlId),
+		utils.EncodeChecksumOrNil(h.ActionUrlId),
+		utils.EncodeChecksumOrNil(h.NotesUrlId),
 		h.Notes,
-		utils.EncodeChecksum(h.IconImageId),
+		utils.EncodeChecksumOrNil(h.IconImageId),
 		h.IconImageAlt,
 		h.Zone,
-		utils.EncodeChecksum(h.ZoneId),
+		utils.EncodeChecksumOrNil(h.ZoneId),
 		h.CommandEndpoint,
-		utils.EncodeChecksum(h.CommandEndpointId),
+		utils.EncodeChecksumOrNil(h.CommandEndpointId),
 	)
 
 	return v

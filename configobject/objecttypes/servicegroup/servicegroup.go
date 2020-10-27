@@ -57,7 +57,7 @@ func (s *Servicegroup) UpdateValues() []interface{} {
 		s.Name,
 		s.NameCi,
 		s.DisplayName,
-		utils.EncodeChecksum(s.ZoneId),
+		utils.EncodeChecksumOrNil(s.ZoneId),
 	)
 
 	return v
