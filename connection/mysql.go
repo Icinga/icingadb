@@ -3,14 +3,15 @@
 package connection
 
 import (
-	"container/list"
 	"context"
 	"database/sql"
 	"fmt"
+	icingaSql "github.com/Icinga/go-libs/sql"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -365,20 +366,8 @@ func (dbw *DBWrapper) SqlExecTxQuiet(tx DbTransaction, opObserver prometheus.Obs
 	return dbw.sqlExecInternal(tx, opObserver, sql, true, args...)
 }
 
-func (dbw *DBWrapper) SqlFetchAll(queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(dbw.Db, queryObserver, query, false, args...)
-}
-
-func (dbw *DBWrapper) SqlFetchAllQuiet(queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(dbw.Db, queryObserver, query, true, args...)
-}
-
-func (dbw *DBWrapper) SqlFetchAllTx(tx DbTransaction, queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(tx, queryObserver, query, false, args...)
-}
-
-func (dbw *DBWrapper) SqlFetchAllTxQuiet(tx DbTransaction, queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(tx, queryObserver, query, true, args...)
+func (dbw *DBWrapper) SqlFetchAll(queryObserver prometheus.Observer, rowType interface{}, query string, args ...interface{}) (interface{}, error) {
+	return dbw.sqlFetchAllInternal(dbw.Db, queryObserver, query, rowType, false, args...)
 }
 
 // sqlExecInternal is a wrapper around sql.Exec() for auto-logging.
@@ -423,14 +412,14 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prome
 }
 
 // sqlFetchAllInternal is a wrapper around Db.SqlQuery() for auto-logging.
-func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryObserver prometheus.Observer, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
+func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryObserver prometheus.Observer, query string, rowType interface{}, quiet bool, args ...interface{}) (interface{}, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
 			continue
 		}
 
-		res, err := sqlTryFetchAll(db, queryObserver, query, quiet, args...)
+		res, err := sqlTryFetchAll(db, queryObserver, query, rowType, quiet, args...)
 
 		if err != nil {
 			if _, isDb := db.(*sql.DB); isDb {
@@ -444,7 +433,7 @@ func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryObserve
 	}
 }
 
-func sqlTryFetchAll(db DbClientOrTransaction, queryObserver prometheus.Observer, query string, quiet bool, args ...interface{}) ([][]interface{}, error) {
+func sqlTryFetchAll(db DbClientOrTransaction, queryObserver prometheus.Observer, query string, rowType interface{}, quiet bool, args ...interface{}) (interface{}, error) {
 	var benchmarc *utils.Benchmark
 	if !quiet {
 		benchmarc = utils.NewBenchmark()
@@ -475,58 +464,14 @@ func sqlTryFetchAll(db DbClientOrTransaction, queryObserver prometheus.Observer,
 
 	defer rows.Close()
 
-	columnTypes, errCT := rows.ColumnTypes()
-	if errCT != nil {
-		return [][]interface{}{}, errCT
+	res, errFR := icingaSql.FetchRowsAsStructSlice(rows, rowType, -1)
+	if errFR == nil {
+		rowsCount = reflect.ValueOf(res).Len()
+	} else {
+		rowsCount = 0
 	}
 
-	colsPerRow := len(columnTypes)
-	buf := list.New()
-	bridges := make([]dbTypeBridge, colsPerRow)
-	scanDest := make([]interface{}, colsPerRow)
-
-	for i, columnType := range columnTypes {
-		typ := columnType.DatabaseTypeName()
-		factory, hasFactory := dbTypeBridgeFactories[typ]
-		if hasFactory {
-			bridges[i] = factory()
-		} else {
-			bridges[i] = &dbBrokenBridge{typ: typ}
-		}
-
-		scanDest[i] = bridges[i]
-	}
-
-	for {
-		if rows.Next() {
-			if errScan := rows.Scan(scanDest...); errScan != nil {
-				return [][]interface{}{}, errScan
-			}
-
-			row := make([]interface{}, colsPerRow)
-
-			for i, bridge := range bridges {
-				row[i] = bridge.Result()
-			}
-
-			buf.PushBack(row)
-		} else if errNx := rows.Err(); errNx == nil {
-			break
-		} else {
-			return nil, errNx
-		}
-	}
-
-	res := make([][]interface{}, buf.Len())
-
-	for current, i := buf.Front(), 0; current != nil; current = current.Next() {
-		res[i] = current.Value.([]interface{})
-		i++
-	}
-
-	rowsCount = len(res)
-
-	return res, nil
+	return res, errFR
 }
 
 // sqlTransaction executes the given function inside a transaction.

@@ -53,24 +53,28 @@ func createTestingHA(t *testing.T, redisAddr string) *HA {
 var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
 
 func TestHA_InsertInstance(t *testing.T) {
+	type row struct {
+		Id        uuid.UUID
+		Heartbeat uint64
+	}
+
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
 	err := ha.insertInstance(&Environment{})
 	require.NoError(t, err, "insertInstance should not return an error")
 
-	rows, err := ha.super.Dbw.SqlFetchAll(
-		mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
+	rawRows, err := ha.super.Dbw.SqlFetchAll(
+		mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId, row{},
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		ha.super.EnvId,
 	)
 
 	require.NoError(t, err, "There was an unexpected SQL error")
+
+	rows := rawRows.([]row)
+
 	assert.Equal(t, 1, len(rows), "There should be a row inserted")
-
-	var theirUUID uuid.UUID
-	copy(theirUUID[:], rows[0][0].([]byte))
-
-	assert.Equal(t, ha.uid, theirUUID, "UUID must match")
+	assert.Equal(t, ha.uid, rows[0].Id, "UUID must match")
 }
 
 func TestHA_checkResponsibility(t *testing.T) {
@@ -146,6 +150,10 @@ func TestHA_waitForEnvironment(t *testing.T) {
 }
 
 func TestHA_setAndInsertEnvironment(t *testing.T) {
+	type row struct {
+		Name string
+	}
+
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
 	env := Environment{
@@ -156,15 +164,18 @@ func TestHA_setAndInsertEnvironment(t *testing.T) {
 	err := ha.setAndInsertEnvironment(&env)
 	require.NoError(t, err, "setAndInsertEnvironment should not return an error")
 
-	rows, err := ha.super.Dbw.SqlFetchAll(
-		mysqlTestObserver,
+	rawRows, err := ha.super.Dbw.SqlFetchAll(
+		mysqlTestObserver, row{},
 		"SELECT name from environment where id = ? LIMIT 1",
 		ha.super.EnvId,
 	)
 
 	require.NoError(t, err, "There was an unexpected SQL error")
+
+	rows := rawRows.([]row)
+
 	assert.Equal(t, 1, len(rows), "There should be a row inserted")
-	assert.Equal(t, env.Name, rows[0][0], "name must match")
+	assert.Equal(t, env.Name, rows[0].Name, "name must match")
 }
 
 func TestHA_runHA(t *testing.T) {

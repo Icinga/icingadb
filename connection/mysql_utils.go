@@ -5,13 +5,11 @@ package connection
 import (
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"io/ioutil"
 	oldlog "log"
 	"math"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -43,174 +41,6 @@ func mkMysql(dbType string, dbDsn string, maxOpenConns int) (*sql.DB, error) {
 	db.SetMaxIdleConns(maxOpenConns)
 
 	return db, nil
-}
-
-type dbTypeBridge interface {
-	sql.Scanner
-	Result() interface{}
-}
-
-type dbIntBridge struct {
-	result interface{}
-}
-
-func (d *dbIntBridge) Scan(src interface{}) (err error) {
-	baseScanner := sql.NullInt64{}
-	err = baseScanner.Scan(src)
-
-	if err == nil {
-		if baseScanner.Valid {
-			d.result = baseScanner.Int64
-		} else {
-			d.result = nil
-		}
-	}
-
-	return
-}
-
-func (d *dbIntBridge) Result() interface{} {
-	return d.result
-}
-
-type dbFloatBridge struct {
-	result interface{}
-}
-
-func (d *dbFloatBridge) Scan(src interface{}) (err error) {
-	baseScanner := sql.NullFloat64{}
-	err = baseScanner.Scan(src)
-
-	if err == nil {
-		if baseScanner.Valid {
-			d.result = baseScanner.Float64
-		} else {
-			d.result = nil
-		}
-	}
-
-	return
-}
-
-func (d *dbFloatBridge) Result() interface{} {
-	return d.result
-}
-
-type dbStringBridge struct {
-	result interface{}
-}
-
-func (d *dbStringBridge) Scan(src interface{}) (err error) {
-	baseScanner := sql.NullString{}
-	err = baseScanner.Scan(src)
-
-	if err == nil {
-		if baseScanner.Valid {
-			d.result = baseScanner.String
-		} else {
-			d.result = nil
-		}
-	}
-
-	return
-}
-
-func (d *dbStringBridge) Result() interface{} {
-	return d.result
-}
-
-type dbBytesBridge struct {
-	result interface{}
-}
-
-func (d *dbBytesBridge) Scan(src interface{}) (err error) {
-	baseScanner := sql.NullString{}
-	err = baseScanner.Scan(src)
-
-	if err == nil {
-		if baseScanner.Valid {
-			d.result = []byte(baseScanner.String)
-		} else {
-			d.result = nil
-		}
-	}
-
-	return
-}
-
-func (d *dbBytesBridge) Result() interface{} {
-	return d.result
-}
-
-var dbTypeBridgeFactories = map[string]func() dbTypeBridge{
-	// MySQL
-	"TINYINT": func() dbTypeBridge {
-		return &dbIntBridge{}
-	},
-	"SMALLINT": func() dbTypeBridge {
-		return &dbIntBridge{}
-	},
-	"INT": func() dbTypeBridge {
-		return &dbIntBridge{}
-	},
-	"BIGINT": func() dbTypeBridge {
-		return &dbIntBridge{}
-	},
-	"FLOAT": func() dbTypeBridge {
-		return &dbFloatBridge{}
-	},
-	"CHAR": func() dbTypeBridge {
-		return &dbStringBridge{}
-	},
-	"VARCHAR": func() dbTypeBridge {
-		return &dbStringBridge{}
-	},
-	"ENUM": func() dbTypeBridge {
-		return &dbStringBridge{}
-	},
-	"BINARY": func() dbTypeBridge {
-		return &dbBytesBridge{}
-	},
-
-	// SQLite
-	"INTEGER": func() dbTypeBridge {
-		return &dbIntBridge{}
-	},
-	"REAL": func() dbTypeBridge {
-		return &dbFloatBridge{}
-	},
-	"TEXT": func() dbTypeBridge {
-		return &dbStringBridge{}
-	},
-	"BLOB": func() dbTypeBridge {
-		return &dbBytesBridge{}
-	},
-	// SELECT 1 FROM ...
-	"": func() dbTypeBridge {
-		return &dbIntBridge{}
-	},
-}
-
-type dbBrokenBridge struct {
-	typ string
-}
-
-func (d *dbBrokenBridge) Scan(src interface{}) error {
-	types := make([]string, len(dbTypeBridgeFactories))
-	typeIdx := 0
-
-	for typ := range dbTypeBridgeFactories {
-		types[typeIdx] = typ
-		typeIdx++
-	}
-
-	sort.Strings(types)
-
-	return errors.New(fmt.Sprintf("bad column type %s, expected one of %s", d.typ, strings.Join(types, ", ")))
-}
-
-func (d *dbBrokenBridge) Result() interface{} {
-	return nil
 }
 
 var prettyPrintedSqlReplacer = strings.NewReplacer("\n", " ", "\t", "")

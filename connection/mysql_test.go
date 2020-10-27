@@ -308,6 +308,11 @@ func TestGetConnectionCheckInterval(t *testing.T) {
 }
 
 func TestDBWrapper_SqlFetchAll(t *testing.T) {
+	type row struct {
+		Id   int32
+		Name string
+	}
+
 	dbw, err := NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	require.NoError(t, err, "Is the MySQL server running?")
 
@@ -317,11 +322,11 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 	_, err = dbw.Db.Exec("INSERT INTO testing0815 (name) VALUES ('horst'), ('test')")
 	require.NoError(t, err)
 
-	var res [][]interface{}
+	var res interface{}
 	done := make(chan bool)
 	dbw.CompareAndSetConnected(false)
 	go func() {
-		res, err = dbw.SqlFetchAll(mysqlTestObserver, "SELECT * FROM testing0815")
+		res, err = dbw.SqlFetchAll(mysqlTestObserver, row{}, "SELECT id, name FROM testing0815")
 		done <- true
 	}()
 
@@ -332,7 +337,7 @@ func TestDBWrapper_SqlFetchAll(t *testing.T) {
 	<-done
 
 	assert.NoError(t, err)
-	assert.Equal(t, [][]interface{}([][]interface{}{{int64(1), "horst"}, {int64(2), "test"}}), res)
+	assert.Equal(t, []row{{1, "horst"}, {2, "test"}}, res)
 
 	_, err = dbw.Db.Exec("DROP TABLE testing0815")
 	assert.NoError(t, err)

@@ -70,13 +70,24 @@ func TestOperator_InsertHost(t *testing.T) {
 	}
 
 	assert.Eventually(t, func() bool {
-		objects, err := super.Dbw.SqlFetchAll(mysqlTestObserver, "SELECT * FROM host")
+		type row struct {
+			PropertiesChecksum []byte
+			DisplayName        string
+			Address            string
+			Checkcommand       string
+		}
+
+		rawObjects, err := super.Dbw.SqlFetchAll(
+			mysqlTestObserver, row{},
+			"SELECT properties_checksum, display_name, address, checkcommand FROM host",
+		)
 		require.NoError(t, err)
 
-		if len(objects) == 1 && utils.DecodeChecksum(objects[0][3].([]byte)) == "b6e87de3d4f31b3d4d35466171f4088693b46071" {
-			require.Equal(t, "TestHost - 603", objects[0][6], "display_name should be set to 'TestHost - 603'")
-			require.Equal(t, "localhost", objects[0][7], "address should be set to 'localhost'")
-			require.Equal(t, "dummy", objects[0][11], "check_command should be set to 'dummy'")
+		objects := rawObjects.([]row)
+		if len(objects) == 1 && utils.DecodeChecksum(objects[0].PropertiesChecksum) == "b6e87de3d4f31b3d4d35466171f4088693b46071" {
+			require.Equal(t, "TestHost - 603", objects[0].DisplayName, "display_name should be set to 'TestHost - 603'")
+			require.Equal(t, "localhost", objects[0].Address, "address should be set to 'localhost'")
+			require.Equal(t, "dummy", objects[0].Checkcommand, "check_command should be set to 'dummy'")
 			return true
 		} else {
 			return false
@@ -146,10 +157,14 @@ func TestOperator_DeleteHost(t *testing.T) {
 	}
 
 	assert.Eventually(t, func() bool {
-		objects, err := super.Dbw.SqlFetchAll(mysqlTestObserver, "SELECT * FROM host")
+		type row struct {
+			One uint8
+		}
+
+		rawObjects, err := super.Dbw.SqlFetchAll(mysqlTestObserver, row{}, "SELECT 1 FROM host")
 		require.NoError(t, err)
 
-		return len(objects) == 0
+		return len(rawObjects.([]row)) == 0
 	}, 3*time.Second, 1*time.Second, "Exactly 1 host should be deleted")
 }
 
@@ -218,13 +233,24 @@ func TestOperator_UpdateHost(t *testing.T) {
 	}
 
 	assert.Eventually(t, func() bool {
-		objects, err := super.Dbw.SqlFetchAll(mysqlTestObserver, "SELECT * FROM host")
+		type row struct {
+			PropertiesChecksum []byte
+			DisplayName        string
+			Address            string
+			Checkcommand       string
+		}
+
+		rawObjects, err := super.Dbw.SqlFetchAll(
+			mysqlTestObserver, row{},
+			"SELECT properties_checksum, display_name, address, checkcommand FROM host",
+		)
 		require.NoError(t, err)
 
-		if len(objects) > 0 && utils.DecodeChecksum(objects[0][3].([]byte)) == "b6e87de3d4f31b3d4d35466171f4088693b46071" {
-			require.Equal(t, "TestHost - 603", objects[0][6], "display_name should be set to 'TestHost - 603'")
-			require.Equal(t, "localhost", objects[0][7], "address should be set to 'localhost'")
-			require.Equal(t, "dummy", objects[0][11], "check_command should be set to 'dummy'")
+		objects := rawObjects.([]row)
+		if len(objects) > 0 && utils.DecodeChecksum(objects[0].PropertiesChecksum) == "b6e87de3d4f31b3d4d35466171f4088693b46071" {
+			require.Equal(t, "TestHost - 603", objects[0].DisplayName, "display_name should be set to 'TestHost - 603'")
+			require.Equal(t, "localhost", objects[0].Address, "address should be set to 'localhost'")
+			require.Equal(t, "dummy", objects[0].Checkcommand, "check_command should be set to 'dummy'")
 			require.Equal(t, 1, len(objects), "There should only be 1 host in the Database")
 			return true
 		} else {

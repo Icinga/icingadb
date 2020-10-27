@@ -138,23 +138,26 @@ func (h *HA) insertInstance(env *Environment) error {
 }
 
 func (h *HA) getInstance() (bool, uuid.UUID, int64, error) {
-	rows, err := h.super.Dbw.SqlFetchAll(
-		mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
+	type row struct {
+		Id        uuid.UUID
+		Heartbeat uint64
+	}
+
+	rawRows, err := h.super.Dbw.SqlFetchAll(
+		mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId, row{},
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		h.super.EnvId,
 	)
-
 	if err != nil {
 		return false, uuid.UUID{}, 0, err
 	}
+
+	rows := rawRows.([]row)
 	if len(rows) == 0 {
 		return false, uuid.UUID{}, 0, nil
 	}
 
-	var theirUUID uuid.UUID
-	copy(theirUUID[:], rows[0][0].([]byte))
-
-	return true, theirUUID, rows[0][1].(int64), nil
+	return true, rows[0].Id, int64(rows[0].Heartbeat), nil
 }
 
 func (h *HA) StartHA(chEnv chan *Environment) {
