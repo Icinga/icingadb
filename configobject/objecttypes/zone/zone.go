@@ -59,7 +59,7 @@ func (z *Zone) UpdateValues() []interface{} {
 		z.Name,
 		z.NameCi,
 		utils.Bool[z.IsGlobal],
-		utils.EncodeChecksum(z.ParentId),
+		utils.EncodeChecksumOrNil(z.ParentId),
 		z.Depth,
 	)
 

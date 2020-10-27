@@ -72,10 +72,10 @@ func (u *User) UpdateValues() []interface{} {
 		u.EMail,
 		u.Pager,
 		utils.Bool[u.NotificationsEnabled],
-		utils.EncodeChecksum(u.PeriodId),
+		utils.EncodeChecksumOrNil(u.PeriodId),
 		utils.NotificationStatesToBitMask(u.States),
 		utils.NotificationTypesToBitMask(u.Types),
-		utils.EncodeChecksum(u.ZoneId),
+		utils.EncodeChecksumOrNil(u.ZoneId),
 	)
 
 	return v
