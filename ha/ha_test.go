@@ -23,7 +23,7 @@ func createTestingHA(t *testing.T, redisAddr string) *HA {
 
 	mysqlConn, err := connection.NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	if err != nil {
-		assert.Fail(t, "This test needs a working Redis connection!")
+		assert.Fail(t, "This test needs a working MySQL connection!")
 	}
 
 	super := supervisor.Supervisor{
