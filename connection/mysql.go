@@ -300,12 +300,6 @@ func (dbw *DBWrapper) SqlCommit(tx DbTransaction, quiet bool) error {
 			}).Debug("COMMIT transaction")
 		}
 
-		if err != nil {
-			if dbw.isConnectionError(err) {
-				continue
-			}
-		}
-
 		return err
 	}
 }
@@ -333,12 +327,6 @@ func (dbw *DBWrapper) SqlRollback(tx DbTransaction, quiet bool) error {
 			}).Debug("ROLLBACK transaction")
 		} else {
 			err = tx.Rollback()
-		}
-
-		if err != nil {
-			if dbw.isConnectionError(err) {
-				continue
-			}
 		}
 
 		return err
@@ -382,7 +370,7 @@ func (dbw *DBWrapper) SqlFetchAllTxQuiet(tx DbTransaction, queryObserver prometh
 }
 
 // sqlExecInternal is a wrapper around sql.Exec() for auto-logging.
-func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prometheus.Observer, sql string, quiet bool, args ...interface{}) (sql.Result, error) {
+func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prometheus.Observer, query string, quiet bool, args ...interface{}) (sql.Result, error) {
 	for {
 		if !dbw.IsConnected() {
 			dbw.WaitForConnection()
@@ -394,7 +382,7 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prome
 			benchmarc = utils.NewBenchmark()
 		}
 
-		res, err := db.Exec(sql, args...)
+		res, err := db.Exec(query, args...)
 		DbOperationsExec.Inc()
 
 		if !quiet {
@@ -408,12 +396,12 @@ func (dbw *DBWrapper) sqlExecInternal(db DbClientOrTransaction, opObserver prome
 				"benchmark":     benchmarc,
 				"affected_rows": prettyPrintedRowsAffected{res},
 				"args":          prettyPrintedArgs{args},
-				"query":         prettyPrintedSql{sql},
+				"query":         prettyPrintedSql{query},
 			}).Debug("Finished Exec")
 		}
 
 		if err != nil {
-			if dbw.isConnectionError(err) {
+			if _, isTx := db.(DbTransaction); !isTx && dbw.isConnectionError(err) {
 				continue
 			}
 		}
@@ -433,10 +421,8 @@ func (dbw *DBWrapper) sqlFetchAllInternal(db DbClientOrTransaction, queryObserve
 		res, err := sqlTryFetchAll(db, queryObserver, query, quiet, args...)
 
 		if err != nil {
-			if _, isDb := db.(*sql.DB); isDb {
-				if dbw.isConnectionError(err) {
-					continue
-				}
+			if _, isTx := db.(DbTransaction); !isTx && dbw.isConnectionError(err) {
+				continue
 			}
 		}
 
