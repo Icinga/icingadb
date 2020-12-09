@@ -3,11 +3,16 @@
 package connection
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/go-redis/redis/v7"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -112,8 +117,50 @@ func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
 	}
 }
 
-func NewRDBWrapper(address string, poolSize int) *RDBWrapper {
+func NewRDBWrapper(address string, poolSize int, useTls bool, cert, key, ca string) *RDBWrapper {
 	log.Info("Connecting to Redis")
+
+	var tlsConfig *tls.Config
+
+	if useTls {
+		tlsConfig = &tls.Config{}
+
+		if ca == "" {
+			tlsConfig.InsecureSkipVerify = true
+		} else {
+			tlsConfig.RootCAs = x509.NewCertPool()
+			var err error
+
+			{
+				var raw []byte
+				if raw, err = ioutil.ReadFile(ca); err == nil {
+					if !tlsConfig.RootCAs.AppendCertsFromPEM(raw) {
+						err = errors.New("the specified file doesn't contain any valid PEM encoded certificates")
+					}
+				}
+			}
+
+			if err != nil {
+				log.WithFields(log.Fields{"path": ca, "error": err.Error()}).Error("Could not load Redis' root TLS CA")
+			}
+
+			if host, _, errSp := net.SplitHostPort(address); errSp == nil {
+				tlsConfig.ServerName = host
+			} else {
+				tlsConfig.ServerName = address
+			}
+		}
+
+		if cert != "" && key != "" {
+			if crt, errLd := tls.LoadX509KeyPair(cert, key); errLd == nil {
+				tlsConfig.Certificates = []tls.Certificate{crt}
+			} else {
+				log.WithFields(log.Fields{
+					"cert": cert, "key": key, "error": errLd.Error(),
+				}).Error("Could not load the client TLS certificate and key for Redis")
+			}
+		}
+	}
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         address,
@@ -122,6 +169,7 @@ func NewRDBWrapper(address string, poolSize int) *RDBWrapper {
 		WriteTimeout: time.Minute,
 		PoolTimeout:  time.Minute,
 		PoolSize:     poolSize,
+		TLSConfig:    tlsConfig,
 	})
 
 	rdbw := RDBWrapper{
