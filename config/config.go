@@ -22,6 +22,10 @@ type RedisInfo struct {
 	User     string `ini:"user"`
 	Password string `ini:"password"`
 	PoolSize int    `ini:"pool_size"`
+	Tls      bool   `ini:"tls"`
+	Cert     string `ini:"cert"`
+	Key      string `ini:"key"`
+	Ca       string `ini:"ca"`
 }
 
 var redisInfo = &RedisInfo{
@@ -89,6 +93,12 @@ func ParseConfig(path string) error {
 	}
 	if mysqlInfo.User == "" || mysqlInfo.Password == "" {
 		return errors.New("missing mysql credentials")
+	}
+
+	if redisInfo.Tls && (redisInfo.Cert == "") != (redisInfo.Key == "") {
+		return errors.New(
+			"either both a Redis client certificate and its private key or none of them must be specified",
+		)
 	}
 
 	return nil
