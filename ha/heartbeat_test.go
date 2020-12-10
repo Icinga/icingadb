@@ -23,7 +23,7 @@ const app = "{\"status\": " +
 const dump = "false"
 
 func TestIcingaHeartbeatListener(t *testing.T) {
-	rdb := connection.NewRDBWrapper(testbackends.RedisTestAddr, 64)
+	rdb := connection.NewRDBWrapper(testbackends.RedisTestAddr, "", 64)
 	assert.True(t, rdb.CheckConnection(false), "This test needs a working Redis connection")
 
 	chEnv := make(chan *Environment)

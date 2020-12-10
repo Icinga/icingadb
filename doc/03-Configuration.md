@@ -14,6 +14,7 @@ Option                   | Description
 -------------------------|-----------------------------------------------
 host                     | **Optional.** Redis host. Defaults to `127.0.0.1`.
 port                     | **Optional.** Redis port. Defaults to `6380`.
+password                 | **Optional.** Redis password. Not set by default.
 pool\_size               | **Optional.** Maximum number of socket connections. Defaults to `64`.
 
 ### MySQL Configuration <a id="configuration-general-mysql"></a>

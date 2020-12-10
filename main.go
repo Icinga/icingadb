@@ -104,7 +104,7 @@ func main() {
 	mysqlInfo := config.GetMysqlInfo()
 	metricsInfo := config.GetMetricsInfo()
 
-	redisConn := connection.NewRDBWrapper(redisInfo.Host+":"+redisInfo.Port, redisInfo.PoolSize)
+	redisConn := connection.NewRDBWrapper(redisInfo.Host+":"+redisInfo.Port, redisInfo.Password, redisInfo.PoolSize)
 
 	mysqlConn, err := connection.NewDBWrapper(
 		mysqlInfo.User+":"+mysqlInfo.Password+"@tcp("+mysqlInfo.Host+":"+mysqlInfo.Port+")/"+mysqlInfo.Database,

@@ -112,11 +112,12 @@ func (rdbw *RDBWrapper) CompareAndSetConnected(connected bool) (swapped bool) {
 	}
 }
 
-func NewRDBWrapper(address string, poolSize int) *RDBWrapper {
+func NewRDBWrapper(address string, password string, poolSize int) *RDBWrapper {
 	log.Info("Connecting to Redis")
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         address,
+		Password:     password,
 		DialTimeout:  time.Minute / 2,
 		ReadTimeout:  time.Minute,
 		WriteTimeout: time.Minute,
