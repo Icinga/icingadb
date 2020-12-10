@@ -252,7 +252,7 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
 		func(values map[string]interface{}) []interface{} {
-			var triggeredById []byte
+			var triggeredById interface{}
 			if values["triggered_by_id"] != nil {
 				triggeredById = utils.EncodeChecksum(values["triggered_by_id"].(string))
 			}

@@ -57,7 +57,7 @@ func (h *Hostgroup) UpdateValues() []interface{} {
 		h.Name,
 		h.NameCi,
 		h.DisplayName,
-		utils.EncodeChecksum(h.ZoneId),
+		utils.EncodeChecksumOrNil(h.ZoneId),
 	)
 
 	return v

@@ -58,7 +58,7 @@ func (c *CheckCommand) UpdateValues() []interface{} {
 		utils.EncodeChecksum(c.PropertiesChecksum),
 		c.Name,
 		c.NameCi,
-		utils.EncodeChecksum(c.ZoneId),
+		utils.EncodeChecksumOrNil(c.ZoneId),
 		c.Command,
 		c.Timeout,
 	)

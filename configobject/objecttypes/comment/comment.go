@@ -70,7 +70,7 @@ func (c *Comment) UpdateValues() []interface{} {
 		utils.EncodeChecksum(c.EnvId),
 		c.ObjectType,
 		utils.EncodeChecksum(c.HostId),
-		utils.EncodeChecksum(c.ServiceId),
+		utils.EncodeChecksumOrNil(c.ServiceId),
 		utils.EncodeChecksum(c.NameChecksum),
 		utils.EncodeChecksum(c.PropertiesChecksum),
 		c.Name,
@@ -81,7 +81,7 @@ func (c *Comment) UpdateValues() []interface{} {
 		utils.Bool[c.IsPersistent],
 		utils.Bool[c.IsSticky],
 		c.ExpireTime,
-		utils.EncodeChecksum(c.ZoneId),
+		utils.EncodeChecksumOrNil(c.ZoneId),
 	)
 
 	return v

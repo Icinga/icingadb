@@ -73,6 +73,15 @@ func EncodeChecksum(s string) []byte {
 	return c
 }
 
+// EncodeChecksumOrNil converts a hex string to a byte array – or to nil if empty.
+func EncodeChecksumOrNil(s string) interface{} {
+	if s == "" {
+		return nil
+	}
+
+	return EncodeChecksum(s)
+}
+
 // DecodeHexIfNotNil converts a hex string to a byte array.
 func DecodeHexIfNotNil(hexStr interface{}) interface{} {
 	if hexStr == nil {
