@@ -64,6 +64,7 @@ CREATE TABLE host (
   KEY idx_icon_image_checksum (icon_image_id) COMMENT 'cleanup',
 
   INDEX idx_host_display_name (display_name) COMMENT 'Host list filtered/ordered by display_name',
+  INDEX idx_host_name_ci (name_ci) COMMENT 'Host list filtered using quick search',
   INDEX idx_host_name (name) COMMENT 'Host list filtered/ordered by name; Host detail filter'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
@@ -210,6 +211,7 @@ CREATE TABLE service (
 
   INDEX idx_service_display_name (display_name) COMMENT 'Service list filtered/ordered by display_name',
   INDEX idx_service_host_id (host_id, display_name) COMMENT 'Service list filtered by host and ordered by display_name',
+  INDEX idx_service_name_ci (name_ci) COMMENT 'Service list filtered using quick search',
   INDEX idx_service_name (name) COMMENT 'Service list filtered/ordered by name; Service detail filter'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
@@ -797,7 +799,9 @@ CREATE TABLE user (
 
   PRIMARY KEY (id),
 
-  INDEX idx_user_display_name (display_name) COMMENT 'User list filtered/ordered by display_name'
+  INDEX idx_user_display_name (display_name) COMMENT 'User list filtered/ordered by display_name',
+  INDEX idx_user_name_ci (name_ci) COMMENT 'User list filtered using quick search',
+  INDEX idx_user_name (name) COMMENT 'User list filtered/ordered by name; User detail filter'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE usergroup (
@@ -812,7 +816,11 @@ CREATE TABLE usergroup (
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_usergroup_display_name (display_name) COMMENT 'Usergroup list filtered/ordered by display_name',
+  INDEX idx_usergroup_name_ci (name_ci) COMMENT 'Usergroup list filtered using quick search',
+  INDEX idx_usergroup_name (name) COMMENT 'Usergroup list filtered/ordered by name; Usergroup detail filter'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE usergroup_member (
