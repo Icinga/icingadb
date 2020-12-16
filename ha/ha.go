@@ -10,7 +10,6 @@ import (
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
-	"github.com/go-redis/redis/v7"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -18,30 +17,21 @@ import (
 	"time"
 )
 
-const (
-	Notify_StartSync = iota
-	Notify_StopSync
-)
-
 type HA struct {
-	isActive                   bool
-	lastHeartbeat              int64
-	uid                        uuid.UUID
-	super                      *supervisor.Supervisor
-	notificationListeners      map[string][]chan int
-	notificationListenersMutex sync.Mutex
-	lastEventId                string
-	logger                     *log.Entry
-	heartbeatTimer             *time.Timer
+	state                     State
+	stateChangeListeners      []chan State
+	stateChangeListenersMutex sync.Mutex
+	lastHeartbeat             int64
+	uid                       uuid.UUID
+	super                     *supervisor.Supervisor
+	logger                    *log.Entry
+	heartbeatTimer            *time.Timer
 }
 
 func NewHA(super *supervisor.Supervisor) (*HA, error) {
 	var err error
 	ho := HA{
-		super:                      super,
-		notificationListeners:      make(map[string][]chan int),
-		notificationListenersMutex: sync.Mutex{},
-		lastEventId:                "0-0",
+		super: super,
 	}
 
 	if ho.uid, err = uuid.NewRandom(); err != nil {
@@ -63,6 +53,33 @@ var mysqlObservers = struct {
 	connection.DbIoSeconds.WithLabelValues("mysql", "insert into icingadb_instance"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "insert into environment"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "select id, heartbeat from icingadb_instance where environment_id = ourEnvID"),
+}
+
+func (h *HA) setState(state State) {
+	switch state {
+	// valid new states (no action needed)
+	case StateActive:
+	case StateOtherActive:
+	case StateAllInactive:
+	case StateInactiveUnkown:
+
+	// invalid arguments
+	case StateInit:
+		log.Fatal("Must not set HA state to StateInit")
+	default:
+		log.Fatalf("Trying to change to invalid HA state %d", state)
+	}
+
+	if state != h.state {
+		if h.state != StateInit {
+			log.Infof("Changing HA state to %s (was %s)", state.String(), h.state.String())
+		} else {
+			log.Infof("Changing HA state to %s", state.String())
+		}
+
+		h.state = state
+		h.notifyStateChangeListeners(state)
+	}
 }
 
 func (h *HA) updateOwnInstance(env *Environment) error {
@@ -231,11 +248,10 @@ func (h *HA) checkResponsibility(env *Environment) {
 			return
 		}
 
-		h.isActive = true
+		h.setState(StateActive)
 	} else {
 		h.logger.Info("Other instance is active.")
-		h.isActive = false
-		h.lastEventId = "0-0"
+		h.setState(StateOtherActive)
 	}
 }
 
@@ -252,7 +268,7 @@ func (h *HA) runHA(chEnv chan *Environment) {
 		previous := h.lastHeartbeat
 		h.lastHeartbeat = utils.TimeToMillisecs(time.Now())
 
-		if h.lastHeartbeat-previous < 10*1000 && h.isActive {
+		if h.lastHeartbeat-previous < 10*1000 && h.state == StateActive {
 			err := h.updateOwnInstance(env)
 
 			if err != nil {
@@ -269,9 +285,9 @@ func (h *HA) runHA(chEnv chan *Environment) {
 			}
 			if they == h.uid {
 				h.logger.Debug("We are active.")
-				if !h.isActive {
+				if h.state != StateActive {
 					h.logger.Info("Icinga 2 sent heartbeat. Starting sync")
-					h.isActive = true
+					h.setState(StateActive)
 				}
 
 				if err := h.updateOwnInstance(env); err != nil {
@@ -285,73 +301,40 @@ func (h *HA) runHA(chEnv chan *Environment) {
 					h.logger.Errorf("Failed to update instance: %v", err)
 					h.super.ChErr <- errors.New("failed to update instance")
 				}
-				h.isActive = true
+				h.setState(StateActive)
 			} else {
 				h.logger.Debug("Other instance is active.")
 			}
 		}
 	case <-h.heartbeatTimer.C:
 		h.logger.Info("Icinga 2 sent no heartbeat for 15 seconds. Pausing sync")
-		h.isActive = false
-		h.lastEventId = "0-0"
-		h.notifyNotificationListener("*", Notify_StopSync)
+		h.setState(StateAllInactive)
 	}
 }
 
-func (h *HA) StartEventListener() {
-	every1s := time.NewTicker(time.Second)
+func (h *HA) RegisterStateChangeListener() <-chan State {
+	// The channel has a buffer of size so that it can hold the most recent state. If it is full when we try to write,
+	// we chan just drain it as the element it contains is outdated anyways.
+	ch := make(chan State, 1)
 
-	for {
-		<-every1s.C
-		h.runEventListener()
-	}
-}
+	h.stateChangeListenersMutex.Lock()
+	defer h.stateChangeListenersMutex.Unlock()
 
-func (h *HA) runEventListener() {
-	if !h.isActive {
-		return
-	}
-
-	result := h.super.Rdbw.XRead(&redis.XReadArgs{Block: -1, Streams: []string{"icinga:dump", h.lastEventId}})
-	streams, err := result.Result()
-	if err != nil {
-		if err.Error() != "redis: nil" {
-			h.super.ChErr <- err
-		}
-		return
-	}
-
-	events := streams[0].Messages
-	if len(events) == 0 {
-		return
-	}
-
-	for _, event := range events {
-		h.lastEventId = event.ID
-		values := event.Values
-
-		if values["state"] == "done" {
-			h.notifyNotificationListener(values["type"].(string), Notify_StartSync)
-		} else {
-			h.notifyNotificationListener(values["type"].(string), Notify_StopSync)
-		}
-	}
-}
-
-func (h *HA) RegisterNotificationListener(listenerType string) chan int {
-	ch := make(chan int, 10)
-	h.notificationListenersMutex.Lock()
-	h.notificationListeners[listenerType] = append(h.notificationListeners[listenerType], ch)
-	h.notificationListenersMutex.Unlock()
+	h.stateChangeListeners = append(h.stateChangeListeners, ch)
 	return ch
 }
 
-func (h *HA) notifyNotificationListener(listenerType string, msg int) {
-	for t, chs := range h.notificationListeners {
-		if t == listenerType || listenerType == "*" {
-			for _, c := range chs {
-				c <- msg
-			}
+func (h *HA) notifyStateChangeListeners(state State) {
+	h.stateChangeListenersMutex.Lock()
+	defer h.stateChangeListenersMutex.Unlock()
+
+	for _, ch := range h.stateChangeListeners {
+		// drain the channel
+		select {
+		case <-ch:
+		default:
 		}
+
+		ch <- state
 	}
 }

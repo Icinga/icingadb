@@ -8,7 +8,6 @@ import (
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
-	"github.com/go-redis/redis/v7"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -77,7 +76,7 @@ func TestHA_checkResponsibility(t *testing.T) {
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
 	ha.checkResponsibility(&Environment{})
 
-	assert.Equal(t, true, ha.isActive, "HA should be responsible, if no other instance is active")
+	assert.Equal(t, StateActive, ha.state, "HA should be responsible, if no other instance is active")
 
 	_, err := ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
 	require.NoError(t, err, "This test needs a working MySQL connection!")
@@ -90,10 +89,10 @@ func TestHA_checkResponsibility(t *testing.T) {
 
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
-	ha.isActive = false
+	ha.state = StateAllInactive
 	ha.checkResponsibility(&Environment{})
 
-	assert.Equal(t, true, ha.isActive, "HA should be responsible, if another instance was inactive for a long time")
+	assert.Equal(t, StateActive, ha.state, "HA should be responsible, if another instance was inactive for a long time")
 
 	_, err = ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
 	require.NoError(t, err, "This test needs a working MySQL connection!")
@@ -104,10 +103,10 @@ func TestHA_checkResponsibility(t *testing.T) {
 		ha.uid[:], ha.super.EnvId, utils.TimeToMillisecs(time.Now()),
 	)
 
-	ha.isActive = false
+	ha.state = StateAllInactive
 	ha.checkResponsibility(&Environment{})
 
-	assert.Equal(t, false, ha.isActive, "HA should not be responsible, if another instance is active")
+	assert.NotEqual(t, StateActive, ha.state, "HA should not be responsible, if another instance is active")
 }
 
 func TestHA_waitForEnvironment(t *testing.T) {
@@ -200,81 +199,6 @@ func TestHA_runHA(t *testing.T) {
 	}()
 
 	ha.runHA(chEnv)
-
-	wg.Wait()
-}
-
-func TestHA_NotificationListeners(t *testing.T) {
-	ha := createTestingHA(t, testbackends.RedisTestAddr)
-	chHost := ha.RegisterNotificationListener("host")
-
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		assert.Equal(t, Notify_StartSync, <-chHost)
-		wg.Done()
-	}()
-
-	ha.notifyNotificationListener("host", Notify_StartSync)
-	wg.Wait()
-
-	chService := ha.RegisterNotificationListener("service")
-	wg.Add(1)
-
-	go func() {
-		assert.Equal(t, Notify_StartSync, <-chService)
-		wg.Done()
-	}()
-
-	ha.notifyNotificationListener("service", Notify_StartSync)
-	wg.Wait()
-
-	wg.Add(1)
-
-	go func() {
-		assert.Equal(t, Notify_StartSync, <-chService)
-		assert.Equal(t, Notify_StartSync, <-chHost)
-		wg.Done()
-	}()
-
-	ha.notifyNotificationListener("*", Notify_StartSync)
-	wg.Wait()
-}
-
-func TestHA_EventListener(t *testing.T) {
-	ha := createTestingHA(t, testbackends.RedisTestAddr)
-	ha.isActive = true
-	go ha.StartEventListener()
-
-	testbackends.RedisTestClient.Del("icinga:dump")
-
-	chHost := ha.RegisterNotificationListener("host")
-	chService := ha.RegisterNotificationListener("service")
-
-	wg := sync.WaitGroup{}
-	wg.Add(2)
-
-	go func() {
-		assert.Equal(t, Notify_StartSync, <-chHost)
-		assert.Equal(t, Notify_StopSync, <-chHost)
-		assert.Equal(t, Notify_StartSync, <-chHost)
-		assert.Equal(t, Notify_StopSync, <-chHost)
-		wg.Done()
-	}()
-
-	go func() {
-		assert.Equal(t, Notify_StartSync, <-chService)
-		assert.Equal(t, Notify_StopSync, <-chService)
-		assert.Equal(t, Notify_StartSync, <-chService)
-		wg.Done()
-	}()
-
-	testbackends.RedisTestClient.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "host", "state": "done"}})
-	testbackends.RedisTestClient.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "host", "state": "wip"}})
-	testbackends.RedisTestClient.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "*", "state": "done"}})
-	testbackends.RedisTestClient.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "*", "state": "wip"}})
-	testbackends.RedisTestClient.XAdd(&redis.XAddArgs{Stream: "icinga:dump", Values: map[string]interface{}{"type": "service", "state": "done"}})
 
 	wg.Wait()
 }

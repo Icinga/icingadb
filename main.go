@@ -145,8 +145,6 @@ func main() {
 
 	history.StartHistoryWorkers(&super)
 
-	go haInstance.StartEventListener()
-
 	if metricsInfo.Host != "" {
 		go prometheus.HandleHttp("["+metricsInfo.Host+"]:"+metricsInfo.Port, super.ChErr)
 	}
@@ -228,9 +226,12 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&hoststate.ObjectInformation,
 	}
 
+	configSyncHA := configsync.NewConfigSyncHA(super, haInstance.RegisterStateChangeListener())
+	configSyncHA.Start()
+
 	for _, objectInformation := range objectTypes {
 		go func(information *configobject.ObjectInformation) {
-			super.ChErr <- configsync.Operator(super, haInstance.RegisterNotificationListener(information.NotificationListenerType), information)
+			super.ChErr <- configsync.Operator(super, configSyncHA.RegisterNotificationListener(information.NotificationListenerType), information)
 		}(objectInformation)
 	}
 }
