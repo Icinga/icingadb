@@ -25,8 +25,15 @@ type HA struct {
 	uid                       uuid.UUID
 	super                     *supervisor.Supervisor
 	logger                    *log.Entry
-	heartbeatTimer            *time.Timer
 }
+
+const (
+	// We consider heartbeats valid for 10 seconds
+	heartbeatValidMillisecs = 10 * 1000
+
+	// We consider the heartbeat of another instance to be expired 5 seconds after its validity ended
+	heartbeatTimeoutMillisecs = heartbeatValidMillisecs + 5*1000
+)
 
 func NewHA(super *supervisor.Supervisor) (*HA, error) {
 	var err error
@@ -42,17 +49,19 @@ func NewHA(super *supervisor.Supervisor) (*HA, error) {
 }
 
 var mysqlObservers = struct {
-	updateIcingadbInstanceById                           prometheus.Observer
-	updateIcingadbInstanceByEnvironmentId                prometheus.Observer
-	insertIntoIcingadbInstance                           prometheus.Observer
-	insertIntoEnvironment                                prometheus.Observer
-	selectIdHeartbeatFromIcingadbInstanceByEnvironmentId prometheus.Observer
+	updateIcingadbInstanceById                                      prometheus.Observer
+	updateIcingadbInstanceByEnvironmentId                           prometheus.Observer
+	insertIntoIcingadbInstance                                      prometheus.Observer
+	insertIntoEnvironment                                           prometheus.Observer
+	selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId prometheus.Observer
+	selectHeartbeatResponsibleFromIcingadbInstanceById              prometheus.Observer
 }{
 	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by id"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by environment_id"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "insert into icingadb_instance"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "insert into environment"),
-	connection.DbIoSeconds.WithLabelValues("mysql", "select id, heartbeat from icingadb_instance where environment_id = ourEnvID"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "select id, heartbeat, responsible from icingadb_instance where environment_id = ourEnvID"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "select heartbeat, responsible from icingadb_instance by id"),
 }
 
 func (h *HA) setState(state State) {
@@ -82,103 +91,87 @@ func (h *HA) setState(state State) {
 	}
 }
 
-func (h *HA) updateOwnInstance(env *Environment) error {
-	_, err := h.super.Dbw.SqlExec(
-		mysqlObservers.insertIntoIcingadbInstance,
-		"REPLACE INTO icingadb_instance(id, environment_id, endpoint_id, heartbeat, responsible,"+
+func (h *HA) upsertInstance(tx connection.DbTransaction, env *Environment, isActive bool) error {
+	if isActive {
+		// If we are active or become active, ensure that no other instance has the active flag set.
+		_, err := h.super.Dbw.SqlExecTx(tx, mysqlObservers.updateIcingadbInstanceByEnvironmentId,
+			"UPDATE icingadb_instance SET responsible = ? WHERE environment_id = ? AND responsible = ?",
+			utils.Bool[false], h.super.EnvId, utils.Bool[true])
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err := h.super.Dbw.SqlExecTx(
+		tx, mysqlObservers.insertIntoIcingadbInstance,
+		"REPLACE INTO icingadb_instance(id, environment_id, endpoint_id, responsible, heartbeat,"+
 			" icinga2_version, icinga2_start_time, icinga2_notifications_enabled,"+
 			" icinga2_active_service_checks_enabled, icinga2_active_host_checks_enabled,"+
 			" icinga2_event_handlers_enabled, icinga2_flap_detection_enabled,"+
-			" icinga2_performance_data_enabled) VALUES (?, ?, ?, ?, 'y', ?, ?, ?, ?, ?, ?, ?, ?)",
-		h.uid[:],
-		h.super.EnvId,
-		env.Icinga2.EndpointId,
-		h.lastHeartbeat,
-		env.Icinga2.Version,
-		int64(env.Icinga2.ProgramStart*1000),
-		utils.Bool[env.Icinga2.NotificationsEnabled],
-		utils.Bool[env.Icinga2.ActiveServiceChecksEnabled],
-		utils.Bool[env.Icinga2.ActiveHostChecksEnabled],
-		utils.Bool[env.Icinga2.EventHandlersEnabled],
-		utils.Bool[env.Icinga2.FlapDetectionEnabled],
-		utils.Bool[env.Icinga2.PerformanceDataEnabled],
+			" icinga2_performance_data_enabled) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		h.uid[:],                                           // id
+		h.super.EnvId,                                      // environment_id
+		env.Icinga2.EndpointId,                             // endpoint_id
+		utils.Bool[isActive],                               // responsible
+		h.lastHeartbeat,                                    // heartbeat
+		env.Icinga2.Version,                                // icinga2_version
+		int64(env.Icinga2.ProgramStart*1000),               // icinga2_start_time
+		utils.Bool[env.Icinga2.NotificationsEnabled],       // icinga2_notifications_enabled
+		utils.Bool[env.Icinga2.ActiveServiceChecksEnabled], // icinga2_active_service_checks_enabled
+		utils.Bool[env.Icinga2.ActiveHostChecksEnabled],    // icinga2_active_host_checks_enabled
+		utils.Bool[env.Icinga2.EventHandlersEnabled],       // icinga2_event_handlers_enabled
+		utils.Bool[env.Icinga2.FlapDetectionEnabled],       // icinga2_flap_detection_enabled
+		utils.Bool[env.Icinga2.PerformanceDataEnabled],     // icinga2_performance_data_enabled
 	)
 	return err
 }
 
-func (h *HA) takeOverInstance(env *Environment) error {
-	_, err := h.super.Dbw.SqlExec(
-		mysqlObservers.updateIcingadbInstanceByEnvironmentId,
-		"UPDATE icingadb_instance SET id = ?, endpoint_id = ?, heartbeat = ?,"+
-			" icinga2_version = ?, icinga2_start_time = ?, icinga2_notifications_enabled = ?,"+
-			" icinga2_active_service_checks_enabled = ?, icinga2_active_host_checks_enabled = ?,"+
-			" icinga2_event_handlers_enabled = ?, icinga2_flap_detection_enabled = ?,"+
-			" icinga2_performance_data_enabled = ? WHERE environment_id = ?",
-		h.uid[:],
-		env.Icinga2.EndpointId,
-		h.lastHeartbeat,
-		env.Icinga2.Version,
-		int64(env.Icinga2.ProgramStart*1000),
-		utils.Bool[env.Icinga2.NotificationsEnabled],
-		utils.Bool[env.Icinga2.ActiveServiceChecksEnabled],
-		utils.Bool[env.Icinga2.ActiveHostChecksEnabled],
-		utils.Bool[env.Icinga2.EventHandlersEnabled],
-		utils.Bool[env.Icinga2.FlapDetectionEnabled],
-		utils.Bool[env.Icinga2.PerformanceDataEnabled],
-		h.super.EnvId,
+func (h *HA) getActiveInstance(tx connection.DbTransaction) (bool, uuid.UUID, error) {
+	rows, err := h.super.Dbw.SqlFetchAllTx(
+		tx, mysqlObservers.selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId,
+		"SELECT id, heartbeat FROM icingadb_instance"+
+			" WHERE environment_id = ? AND responsible = ? AND heartbeat > ?",
+		h.super.EnvId, utils.Bool[true], utils.TimeToMillisecs(time.Now())-heartbeatTimeoutMillisecs,
 	)
-	return err
-}
-
-func (h *HA) insertInstance(env *Environment) error {
-	_, err := h.super.Dbw.SqlExec(
-		mysqlObservers.insertIntoIcingadbInstance,
-		"INSERT INTO icingadb_instance(id, environment_id, endpoint_id, heartbeat, responsible,"+
-			" icinga2_version, icinga2_start_time, icinga2_notifications_enabled,"+
-			" icinga2_active_service_checks_enabled, icinga2_active_host_checks_enabled,"+
-			" icinga2_event_handlers_enabled, icinga2_flap_detection_enabled,"+
-			" icinga2_performance_data_enabled) VALUES (?, ?, ?, ?, 'y', ?, ?, ?, ?, ?, ?, ?, ?)",
-		h.uid[:],
-		h.super.EnvId,
-		env.Icinga2.EndpointId,
-		h.lastHeartbeat,
-		env.Icinga2.Version,
-		int64(env.Icinga2.ProgramStart*1000),
-		utils.Bool[env.Icinga2.NotificationsEnabled],
-		utils.Bool[env.Icinga2.ActiveServiceChecksEnabled],
-		utils.Bool[env.Icinga2.ActiveHostChecksEnabled],
-		utils.Bool[env.Icinga2.EventHandlersEnabled],
-		utils.Bool[env.Icinga2.FlapDetectionEnabled],
-		utils.Bool[env.Icinga2.PerformanceDataEnabled],
-	)
-	return err
-}
-
-func (h *HA) getInstance() (bool, uuid.UUID, int64, error) {
-	rows, err := h.super.Dbw.SqlFetchAll(
-		mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
-		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
-		h.super.EnvId,
-	)
-
 	if err != nil {
-		return false, uuid.UUID{}, 0, err
+		return false, uuid.UUID{}, err
 	}
+	if len(rows) > 1 {
+		return false, uuid.UUID{}, errors.New("there is more than one active IcingaDB instance")
+	}
+
 	if len(rows) == 0 {
-		return false, uuid.UUID{}, 0, nil
+		// No active instance according to database.
+		return false, uuid.UUID{}, nil
 	}
 
-	var theirUUID uuid.UUID
-	copy(theirUUID[:], rows[0][0].([]byte))
+	idBytes := rows[0][0].([]byte)
+	icinga2Heartbeat := rows[0][1].(int64)
 
-	return true, theirUUID, rows[0][1].(int64), nil
+	activeId, err := uuid.FromBytes(idBytes)
+	if err != nil {
+		return false, uuid.UUID{}, fmt.Errorf("invalid active UUID in database: %s", err.Error())
+	}
+
+	icinga2HeartbeatAge := utils.TimeToMillisecs(time.Now()) - icinga2Heartbeat
+
+	if activeId == h.uid && icinga2HeartbeatAge > heartbeatValidMillisecs {
+		// Our heartbeat is too old to be considered valid, no longer consider ourselves to be active.
+		return false, uuid.UUID{}, nil
+	} else if activeId != h.uid && icinga2HeartbeatAge > heartbeatTimeoutMillisecs {
+		// Their heartbeat is old enough to be considered timed out, no longer consider them to be active.
+		return false, uuid.UUID{}, nil
+	}
+
+	return true, activeId, nil
 }
 
 func (h *HA) StartHA(chEnv chan *Environment) {
 	env := h.waitForEnvironment(chEnv)
+	h.lastHeartbeat = utils.TimeToMillisecs(time.Now())
 	err := h.setAndInsertEnvironment(env)
 	if err != nil {
-		h.super.ChErr <- fmt.Errorf("Could not insert environment into MySQL: %s", err.Error())
+		h.super.ChErr <- fmt.Errorf("could not insert environment into MySQL: %s", err.Error())
 	}
 
 	h.logger = log.WithFields(log.Fields{
@@ -189,13 +182,7 @@ func (h *HA) StartHA(chEnv chan *Environment) {
 
 	h.logger.Info("Got initial environment.")
 
-	h.checkResponsibility(env)
-
-	h.heartbeatTimer = time.NewTimer(time.Second * 15)
-
-	for {
-		h.runHA(chEnv)
-	}
+	h.runHA(chEnv, env)
 }
 
 func (h *HA) waitForEnvironment(chEnv chan *Environment) *Environment {
@@ -225,90 +212,81 @@ func (h *HA) setAndInsertEnvironment(env *Environment) error {
 }
 
 func (h *HA) checkResponsibility(env *Environment) {
-	found, _, beat, err := h.getInstance()
-	if err != nil {
-		h.logger.Errorf("Failed to fetch instance: %v", err)
-		h.super.ChErr <- errors.New("failed to fetch instance")
-		return
-	}
-
-	if utils.TimeToMillisecs(time.Now())-beat > 15*1000 {
-		h.logger.Info("Taking over.")
-
-		// This means there was no instance row match, insert
-		if !found {
-			err = h.insertInstance(env)
-		} else {
-			err = h.takeOverInstance(env)
-		}
-
+	var newState State
+	err := h.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
+		foundActive, activeId, err := h.getActiveInstance(tx)
 		if err != nil {
-			h.logger.Errorf("Failed to insert/update instance: %v", err)
-			h.super.ChErr <- errors.New("failed to insert/update instance")
-			return
+			return err
 		}
 
-		h.setState(StateActive)
-	} else {
-		h.logger.Info("Other instance is active.")
-		h.setState(StateOtherActive)
+		lastIcinga2HeartbeatAge := utils.TimeToMillisecs(time.Now()) - h.lastHeartbeat
+		lastIcinga2HeartbeatValid := lastIcinga2HeartbeatAge < heartbeatValidMillisecs
+
+		if foundActive {
+			if activeId == h.uid {
+				if lastIcinga2HeartbeatValid {
+					// We are active according to the DB and have a valid heartbeat, keep it that way.
+					newState = StateActive
+				} else {
+					// We are active according to the DB but our heartbeat from Icinga 2 is no longer valid.
+					// Give up active state so that another instance has a chance to take over.
+					newState = StateAllInactive
+				}
+			} else {
+				// Some other instance is active, remain passive
+				newState = StateOtherActive
+			}
+		} else {
+			// No instance is currently active. Try take over, but only
+			// if we are actively receiving heartbeats from Icinga 2.
+			if lastIcinga2HeartbeatValid {
+				h.logger.Info("No active instance, trying to take over.")
+				newState = StateActive
+			} else {
+				newState = StateAllInactive
+			}
+		}
+
+		err = h.upsertInstance(tx, env, newState == StateActive)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		// Transaction failed, we are not sure about the current global state.
+		// In any case, we ensure that we are no longer active.
+		h.super.ChErr <- errors.New("HA heartbeat failed")
+		h.logger.Errorf("HA heartbeat failed: %s", err.Error())
+		newState = StateInactiveUnkown
 	}
+	h.setState(newState)
 }
 
-func (h *HA) runHA(chEnv chan *Environment) {
-	select {
-	case env := <-chEnv:
-		if bytes.Compare(env.ID, h.super.EnvId) != 0 {
-			h.logger.Error("Received environment is not the one we expected. Panic.")
-			h.super.ChErr <- errors.New("received unexpected environment")
-			return
-		}
+func (h *HA) runHA(chEnv chan *Environment, env *Environment) {
+	// Force regular Icinga DB heartbeat writes to the database even if we receive no heartbeats from
+	// Icinga 2. Icinga 2 will send an heartbeat every second, so use two seconds here to avoid
+	// situations like forcing the update right before we receive the next heartbeat from Icinga 2.
+	const updateTimerDuration = 2 * time.Second
 
-		h.heartbeatTimer.Reset(time.Second * 15)
-		previous := h.lastHeartbeat
-		h.lastHeartbeat = utils.TimeToMillisecs(time.Now())
+	updateTimer := time.NewTimer(updateTimerDuration)
 
-		if h.lastHeartbeat-previous < 10*1000 && h.state == StateActive {
-			err := h.updateOwnInstance(env)
-
-			if err != nil {
-				h.logger.Errorf("Failed to update instance: %v", err)
-				h.super.ChErr <- errors.New("failed to update instance")
+	for {
+		select {
+		case env = <-chEnv:
+			if bytes.Compare(env.ID, h.super.EnvId) != 0 {
+				h.logger.Error("Received environment is not the one we expected. Panic.")
+				h.super.ChErr <- errors.New("received unexpected environment")
 				return
 			}
-		} else {
-			_, they, beat, err := h.getInstance()
-			if err != nil {
-				h.logger.Errorf("Failed to fetch instance: %v", err)
-				h.super.ChErr <- errors.New("failed to fetch instance")
-				return
-			}
-			if they == h.uid {
-				h.logger.Debug("We are active.")
-				if h.state != StateActive {
-					h.logger.Info("Icinga 2 sent heartbeat. Starting sync")
-					h.setState(StateActive)
-				}
-
-				if err := h.updateOwnInstance(env); err != nil {
-					h.logger.Errorf("Failed to update instance: %v", err)
-					h.super.ChErr <- errors.New("failed to update instance")
-					return
-				}
-			} else if h.lastHeartbeat-beat > 15*1000 {
-				h.logger.Info("Taking over.")
-				if err := h.takeOverInstance(env); err != nil {
-					h.logger.Errorf("Failed to update instance: %v", err)
-					h.super.ChErr <- errors.New("failed to update instance")
-				}
-				h.setState(StateActive)
-			} else {
-				h.logger.Debug("Other instance is active.")
-			}
+			h.lastHeartbeat = utils.TimeToMillisecs(time.Now())
+		case <-updateTimer.C: // force update
 		}
-	case <-h.heartbeatTimer.C:
-		h.logger.Info("Icinga 2 sent no heartbeat for 15 seconds. Pausing sync")
-		h.setState(StateAllInactive)
+
+		updateTimer.Reset(updateTimerDuration)
+
+		h.checkResponsibility(env)
 	}
 }
 

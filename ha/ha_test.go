@@ -88,14 +88,16 @@ func createTestingMultipleHA(t *testing.T, redisAddr string, numInstances int) (
 
 var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
 
-func TestHA_InsertInstance(t *testing.T) {
+func TestHA_UpsertInstance(t *testing.T) {
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
-	err := ha.insertInstance(&Environment{})
-	require.NoError(t, err, "insertInstance should not return an error")
+	err := ha.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
+		return ha.upsertInstance(tx, &Environment{}, false)
+	})
+	require.NoError(t, err, "transaction running upsertInstance should not return an error")
 
 	rows, err := ha.super.Dbw.SqlFetchAll(
-		mysqlObservers.selectIdHeartbeatFromIcingadbInstanceByEnvironmentId,
+		mysqlObservers.selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId,
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		ha.super.EnvId,
 	)
@@ -109,41 +111,139 @@ func TestHA_InsertInstance(t *testing.T) {
 	assert.Equal(t, ha.uid, theirUUID, "UUID must match")
 }
 
-func TestHA_checkResponsibility(t *testing.T) {
+func TestHA_checkResponsibility_NoOtherInstance(t *testing.T) {
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
+
+	now := utils.TimeToMillisecs(time.Now())
+	ha.lastHeartbeat = now
 	ha.checkResponsibility(&Environment{})
 
-	assert.Equal(t, StateActive, ha.state, "HA should be responsible, if no other instance is active")
+	assert.Equal(t, StateActive, ha.state, "HA should be active if no other instance exists")
+}
 
-	_, err := ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
-	require.NoError(t, err, "This test needs a working MySQL connection!")
+func TestHA_checkResponsibility_OtherInactiveInstance(t *testing.T) {
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
+
+	now := utils.TimeToMillisecs(time.Now())
+
+	otherUuid, err := uuid.NewRandom()
+	assert.NoError(t, err, "UUID generation failed")
 
 	_, err = ha.super.Dbw.SqlExec(
 		mysqlObservers.insertIntoIcingadbInstance,
-		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible, icinga2_version, icinga2_start_time) VALUES (?, ?, ?, 'y', '', 0)",
-		ha.uid[:], ha.super.EnvId, 0,
+		"INSERT INTO icingadb_instance(id, environment_id, responsible, heartbeat,"+
+			" icinga2_version, icinga2_start_time)"+
+			" VALUES (?, ?, ?, ?, ?, ?)",
+		otherUuid[:], ha.super.EnvId, utils.Bool[false], now, "", 0,
 	)
-
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
-	ha.state = StateAllInactive
+	ha.lastHeartbeat = now
 	ha.checkResponsibility(&Environment{})
 
-	assert.Equal(t, StateActive, ha.state, "HA should be responsible, if another instance was inactive for a long time")
+	assert.Equal(t, StateActive, ha.state, "HA should be active if there is only an inactive instance")
+}
 
-	_, err = ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
-	require.NoError(t, err, "This test needs a working MySQL connection!")
+func TestHA_checkResponsibility_OtherTimedOutInstance(t *testing.T) {
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
+
+	now := utils.TimeToMillisecs(time.Now())
+	timedOut := now - heartbeatTimeoutMillisecs
+
+	otherUuid, err := uuid.NewRandom()
+	assert.NoError(t, err, "UUID generation failed")
 
 	_, err = ha.super.Dbw.SqlExec(
 		mysqlObservers.insertIntoIcingadbInstance,
-		"INSERT INTO icingadb_instance(id, environment_id, heartbeat, responsible, icinga2_version, icinga2_start_time) VALUES (?, ?, ?, 'y', '', 0)",
-		ha.uid[:], ha.super.EnvId, utils.TimeToMillisecs(time.Now()),
+		"INSERT INTO icingadb_instance(id, environment_id, responsible, heartbeat,"+
+			" icinga2_version, icinga2_start_time)"+
+			" VALUES (?, ?, ?, ?, ?, ?)",
+		otherUuid[:], ha.super.EnvId, utils.Bool[true], timedOut, "", 0,
 	)
+	require.NoError(t, err, "This test needs a working MySQL connection!")
 
-	ha.state = StateAllInactive
+	ha.lastHeartbeat = now
 	ha.checkResponsibility(&Environment{})
 
-	assert.NotEqual(t, StateActive, ha.state, "HA should not be responsible, if another instance is active")
+	assert.Equal(t, StateActive, ha.state, "HA should be active if another instance is timed out")
+}
+
+func TestHA_checkResponsibility_OtherActiveInstance(t *testing.T) {
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
+
+	now := utils.TimeToMillisecs(time.Now())
+
+	otherUuid, err := uuid.NewRandom()
+	assert.NoError(t, err, "UUID generation failed")
+
+	_, err = ha.super.Dbw.SqlExec(
+		mysqlObservers.insertIntoIcingadbInstance,
+		"INSERT INTO icingadb_instance(id, environment_id, responsible, heartbeat,"+
+			" icinga2_version, icinga2_start_time)"+
+			" VALUES (?, ?, ?, ?, ?, ?)",
+		otherUuid[:], ha.super.EnvId, utils.Bool[true], now, "", 0,
+	)
+	require.NoError(t, err, "This test needs a working MySQL connection!")
+
+	ha.lastHeartbeat = now
+	ha.checkResponsibility(&Environment{})
+
+	assert.Equal(t, StateOtherActive, ha.state, "HA should not be active if another instance is active")
+}
+
+func TestHA_checkResponsibility_Concurrent(t *testing.T) {
+	numAttempts := 10
+	numConcurrentTakeovers := 2
+	failed := false
+
+	for attempt := 0; !failed && attempt < numAttempts; attempt++ {
+		wg := sync.WaitGroup{}
+		wg.Add(numConcurrentTakeovers)
+
+		haInstances, chErr := createTestingMultipleHA(t, testbackends.RedisTestAddr, numConcurrentTakeovers)
+		for _, ha := range haInstances {
+			ha.lastHeartbeat = utils.TimeToMillisecs(time.Now())
+		}
+
+		for _, ha := range haInstances {
+			ha := ha
+			go func() {
+				defer wg.Done()
+				ha.checkResponsibility(&Environment{})
+			}()
+		}
+
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+	loop:
+		for {
+			select {
+			case err := <-chErr:
+				assert.NoError(t, err, "checkResponsibility() should return no error")
+				if err != nil {
+					failed = true
+				}
+			case <-done:
+				break loop
+			}
+		}
+
+		numActive := 0
+		for _, ha := range haInstances {
+			if ha.state == StateActive {
+				numActive++
+			}
+		}
+
+		assert.Equal(t, 1, numActive, "exactly 1 instance must be active after checkResponsibility() but %d are active", numActive)
+		if numActive != 1 {
+			failed = true
+		}
+	}
 }
 
 func TestHA_waitForEnvironment(t *testing.T) {
@@ -205,7 +305,6 @@ func TestHA_setAndInsertEnvironment(t *testing.T) {
 
 func TestHA_runHA(t *testing.T) {
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
-	ha.heartbeatTimer = time.NewTimer(10 * time.Second)
 
 	chEnv := make(chan *Environment)
 
@@ -235,58 +334,7 @@ func TestHA_runHA(t *testing.T) {
 		wg.Done()
 	}()
 
-	ha.runHA(chEnv)
+	ha.runHA(chEnv, &Environment{})
 
 	wg.Wait()
-}
-
-func TestHA_ConcurrentCheckResponsibility(t *testing.T) {
-	numAttempts := 10
-	numConcurrentTakeovers := 2
-	failed := false
-
-	for attempt := 0; !failed && attempt < numAttempts; attempt++ {
-		wg := sync.WaitGroup{}
-		wg.Add(numConcurrentTakeovers)
-
-		haInstances, chErr := createTestingMultipleHA(t, testbackends.RedisTestAddr, numConcurrentTakeovers)
-		for _, ha := range haInstances {
-			ha := ha
-			go func() {
-				defer wg.Done()
-				ha.checkResponsibility(&Environment{})
-			}()
-		}
-
-		done := make(chan struct{})
-		go func() {
-			wg.Wait()
-			close(done)
-		}()
-
-	loop:
-		for {
-			select {
-			case err := <-chErr:
-				assert.NoError(t, err, "checkResponsibility() should return no error")
-				if err != nil {
-					failed = true
-				}
-			case <-done:
-				break loop
-			}
-		}
-
-		numActive := 0
-		for _, ha := range haInstances {
-			if ha.state == StateActive {
-				numActive++
-			}
-		}
-
-		assert.Equal(t, 1, numActive, "exactly 1 instance must be active after checkResponsibility() but %d are active", numActive)
-		if numActive != 1 {
-			failed = true
-		}
-	}
 }
