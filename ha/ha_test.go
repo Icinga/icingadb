@@ -338,3 +338,26 @@ func TestHA_runHA(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestHA_RegisterStateChangeListener(t *testing.T) {
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
+
+	assertNonBlockingState := func(expected State, ch <-chan State, msgAndArgs ...interface{}) {
+		select {
+		case actual := <-ch:
+			assert.Equal(t, expected, actual, msgAndArgs...)
+		default:
+			assert.Fail(t, "reading from channel should not block", msgAndArgs)
+		}
+	}
+
+	chHA := ha.RegisterStateChangeListener()
+
+	ha.lastHeartbeat = utils.TimeToMillisecs(time.Now())
+	ha.checkResponsibility(&Environment{})
+	assertNonBlockingState(StateActive, chHA, "HA should send StateActive to state change channel when becoming active")
+
+	ha.lastHeartbeat = 0
+	ha.checkResponsibility(&Environment{})
+	assertNonBlockingState(StateAllInactive, chHA, "HA should send StateAllInactive to state change channel when becoming inactive")
+}
