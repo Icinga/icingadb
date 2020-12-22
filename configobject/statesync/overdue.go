@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/Icinga/icingadb/connection"
+	"github.com/Icinga/icingadb/ha"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/go-redis/redis/v7"
@@ -62,9 +63,9 @@ var updateHostOverdue = connection.DbIoSeconds.WithLabelValues("mysql", "update 
 var updateServiceOverdue = connection.DbIoSeconds.WithLabelValues("mysql", "update service_state by service_id")
 
 // startOverdueSync starts the sync goroutines for hosts and services.
-func startOverdueSync(super *supervisor.Supervisor) {
-	go syncOverdue(super, "host", &overdueSyncCounters.host, updateHostOverdue)
-	go syncOverdue(super, "service", &overdueSyncCounters.service, updateServiceOverdue)
+func startOverdueSync(super *supervisor.Supervisor, haInstance *ha.HA) {
+	go syncOverdue(super, haInstance.RegisterStateChangeListener(), "host", &overdueSyncCounters.host, updateHostOverdue)
+	go syncOverdue(super, haInstance.RegisterStateChangeListener(), "service", &overdueSyncCounters.service, updateServiceOverdue)
 	go logOverdueSyncCounters()
 }
 
@@ -90,7 +91,7 @@ func logOverdueSyncCounters() {
 }
 
 // syncOverdue tries to sync is_overdue of given object type every second.
-func syncOverdue(super *supervisor.Supervisor, objectType string, counter *uint64, observer prometheus.Observer) {
+func syncOverdue(super *supervisor.Supervisor, chHA <-chan ha.State, objectType string, counter *uint64, observer prometheus.Observer) {
 	for super.EnvId == nil {
 		log.Debug("OverdueSync: Waiting for EnvId to be set")
 		time.Sleep(time.Second)
@@ -113,23 +114,50 @@ func syncOverdue(super *supervisor.Supervisor, objectType string, counter *uint6
 	}
 
 	for {
-		overdues, errRS := luaGetOverdues.Run(
-			super.Rdbw,
-			keys[:],
-			strconv.FormatFloat(utils.TimeToFloat(time.Now()), 'f', -1, 64),
-		).Result()
-		if errRS != nil {
-			super.ChErr <- errRS
-			time.Sleep(time.Second)
-			continue
+		log.Infof("Waiting for HA to become active before (re)starting %s overdue sync", objectType)
+		for <-chHA != ha.StateActive {
+			// do nothing and wait to become active
+		}
+		log.Infof("HA became active, starting %s overdue sync", objectType)
+
+		for {
+			if err := syncOverdueToRedis(super, objectType, observer); err != nil {
+				log.WithFields(log.Fields{"error": err}).Errorf("Couldn't fetch overdue %ss from database", objectType)
+				time.Sleep(time.Second)
+				continue
+			}
+
+			break
 		}
 
-		root := overdues.([]interface{})
+	syncLoop:
+		for {
+			overdues, errRS := luaGetOverdues.Run(
+				super.Rdbw,
+				keys[:],
+				strconv.FormatFloat(utils.TimeToFloat(time.Now()), 'f', -1, 64),
+			).Result()
+			if errRS != nil {
+				super.ChErr <- errRS
+				time.Sleep(time.Second)
+				continue
+			}
 
-		updateOverdue(super, objectType, counter, observer, root[0].([]interface{}), true)
-		updateOverdue(super, objectType, counter, observer, root[1].([]interface{}), false)
+			root := overdues.([]interface{})
 
-		<-every1s.C
+			updateOverdue(super, objectType, counter, observer, root[0].([]interface{}), true)
+			updateOverdue(super, objectType, counter, observer, root[1].([]interface{}), false)
+
+			select {
+			case <-every1s.C:
+				// continue syncing
+			case state := <-chHA:
+				if state != ha.StateActive {
+					log.Infof("HA became inactive, stopping %s overdue sync", objectType)
+					break syncLoop
+				}
+			}
+		}
 	}
 }
 
@@ -200,4 +228,25 @@ func updateOverdueInDb(super *supervisor.Supervisor, objectType string, observer
 	}
 
 	return true
+}
+
+func syncOverdueToRedis(super *supervisor.Supervisor, objectType string, observer prometheus.Observer) (error) {
+	overdueRows, err := super.Dbw.SqlFetchAll(observer,
+		fmt.Sprintf("SELECT %s_id FROM %s_state WHERE is_overdue = ?", objectType, objectType),
+		utils.Bool[true])
+	if err != nil {
+		return err
+	}
+
+	if _, err := super.Rdbw.Del("icingadb:overdue:"+objectType).Result(); err != nil {
+		return err
+	}
+
+	for _, row := range overdueRows {
+		if _, err := super.Rdbw.SAdd("icingadb:overdue:"+objectType, hex.EncodeToString(row[0].([]byte))).Result(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

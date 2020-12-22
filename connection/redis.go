@@ -88,6 +88,7 @@ type RedisClient interface {
 	ScriptLoad(script string) *redis.StringCmd
 	SAdd(key string, members ...interface{}) *redis.IntCmd
 	SRem(key string, members ...interface{}) *redis.IntCmd
+	Del(keys ...string) *redis.IntCmd
 }
 
 type StatusCmd interface {
@@ -496,6 +497,27 @@ func (rdbw *RDBWrapper) SRem(key string, members ...interface{}) *redis.IntCmd {
 		}
 
 		cmd := rdbw.Rdb.SRem(key, members...)
+		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// Del is a wrapper for connection handling.
+func (rdbw *RDBWrapper) Del(keys ...string) *redis.IntCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.Del(keys...)
 		_, err := cmd.Result()
 
 		if err != nil {
