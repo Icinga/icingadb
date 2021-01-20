@@ -23,7 +23,7 @@ Data resource where IcingaDB stores synced data and historical events.
 
 Option                   | Description
 -------------------------|-----------------------------------------------
-host                     | **Optional.** MySQL host. Defaults to `127.0.0.1`.
+host                     | **Optional.** MySQL host or absolute Unix socket path. Defaults to `127.0.0.1`.
 port                     | **Optional.** MySQL port. Defaults to `3306`.
 database                 | **Optional.** MySQL database. Defaults to `icingadb`.
 user                     | **Optional.** MySQL username.
