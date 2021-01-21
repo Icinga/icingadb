@@ -4,10 +4,12 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	icingaSql "github.com/Icinga/go-libs/sql"
 	_ "github.com/go-sql-driver/mysql"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 )
 
@@ -75,12 +77,56 @@ func (db *database) connect() {
 			"NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION,PIPES_AS_CONCAT,ANSI_QUOTES,ERROR_FOR_DIVISION_BY_ZERO'"
 
 		db.conn, errOp = sql.Open("mysql", dsn)
-		assert(errOp, "Couldn't connect to %s database", db.whichOne)
+		assert(errOp, "Couldn't connect to database", log.Fields{"backend": db.whichOne})
 	}
 
 	db.conn.SetMaxIdleConns(1)
 
-	assert(db.conn.Ping(), "Couldn't connect to %s database", db.whichOne)
+	assert(db.conn.Ping(), "Couldn't connect to database", log.Fields{"backend": db.whichOne})
+}
+
+// query performs query with args on db and calls onRow for each row.
+func (db *database) query(query string, args []interface{}, onRow interface{}) {
+	vOnRow := reflect.ValueOf(onRow)
+	tOnRow := vOnRow.Type()
+
+	if tOnRow.Kind() != reflect.Func {
+		panic("onRow must be a function")
+	}
+
+	if tOnRow.NumIn() != 1 {
+		panic("onRow must take exactly one argument")
+	}
+
+	tOnRowArg := tOnRow.In(0)
+	if tOnRowArg.Kind() != reflect.Struct {
+		panic("onRow must take a struct")
+	}
+
+	rows, errQr := db.conn.Query(query, args...)
+	assert(errQr, "Couldn't perform query", log.Fields{"backend": db.whichOne, "query": query, "args": args})
+	defer rows.Close()
+
+	iOnRowArg := reflect.Zero(tOnRowArg).Interface()
+	i := 0
+
+	for {
+		i++
+
+		res, errFR := icingaSql.FetchRowsAsStructSlice(rows, iOnRowArg, 1)
+		assert(
+			errFR,
+			"Couldn't fetch query result",
+			log.Fields{"backend": db.whichOne, "query": query, "args": args, "row": i},
+		)
+
+		vRes := reflect.ValueOf(res)
+		if vRes.Len() < 1 {
+			break
+		}
+
+		vOnRow.Call([]reflect.Value{vRes.Index(0)})
+	}
 }
 
 // newDb creates a new database.
@@ -110,9 +156,9 @@ func main() {
 	icingaDb.connect()
 }
 
-// assert logs messagef with messagea and terminates the program if err is not nil.
-func assert(err error, messagef string, messagea ...interface{}) {
+// assert logs message with fields and err and terminates the program if err is not nil.
+func assert(err error, message string, fields log.Fields) {
 	if err != nil {
-		log.WithFields(log.Fields{"error": err.Error()}).Fatalf(messagef, messagea...)
+		log.WithFields(fields).WithFields(log.Fields{"error": err.Error()}).Fatal(message)
 	}
 }
