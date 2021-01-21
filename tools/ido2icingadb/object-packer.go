@@ -1,4 +1,4 @@
-package ido2icingadb
+package main
 
 import (
 	"bytes"
