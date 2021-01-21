@@ -55,6 +55,7 @@ var mysqlObservers = struct {
 	insertIntoEnvironment                                           prometheus.Observer
 	selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId prometheus.Observer
 	selectHeartbeatResponsibleFromIcingadbInstanceById              prometheus.Observer
+	deleteIcingadbInstanceByEndpointId                              prometheus.Observer
 }{
 	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by id"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "update icingadb_instance by environment_id"),
@@ -62,6 +63,7 @@ var mysqlObservers = struct {
 	connection.DbIoSeconds.WithLabelValues("mysql", "insert into environment"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "select id, heartbeat, responsible from icingadb_instance where environment_id = ourEnvID"),
 	connection.DbIoSeconds.WithLabelValues("mysql", "select heartbeat, responsible from icingadb_instance by id"),
+	connection.DbIoSeconds.WithLabelValues("mysql", "delete from icingadb_instance by endpoint_id"),
 }
 
 func (h *HA) setState(state State) {
@@ -211,9 +213,26 @@ func (h *HA) setAndInsertEnvironment(env *Environment) error {
 	return err
 }
 
+// Remove rows from icingadb_instance that were created by previous startups of this instance.
+// A row is considered to be created by this instance if it shares the same environment_id and
+// endpoint_id. Rows with a recent heartbeat are never removed.
+func (h *HA) removePreviousInstances(tx connection.DbTransaction, env *Environment) error {
+	heartbeatTimeoutThreshold := utils.TimeToMillisecs(time.Now()) - heartbeatTimeoutMillisecs
+	_, err := h.super.Dbw.SqlExecTx(tx, mysqlObservers.deleteIcingadbInstanceByEndpointId,
+		"DELETE FROM icingadb_instance "+
+			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?",
+		h.uid[:], h.super.EnvId, env.Icinga2.EndpointId, heartbeatTimeoutThreshold)
+	return err
+}
+
 func (h *HA) checkResponsibility(env *Environment) {
 	var newState State
 	err := h.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
+		err := h.removePreviousInstances(tx, env)
+		if err != nil {
+			return err
+		}
+
 		foundActive, activeId, err := h.getActiveInstance(tx)
 		if err != nil {
 			return err

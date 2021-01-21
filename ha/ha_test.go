@@ -4,6 +4,7 @@ package ha
 
 import (
 	"crypto/sha1"
+	"encoding/hex"
 	"github.com/Icinga/icingadb/config/testbackends"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/supervisor"
@@ -360,4 +361,59 @@ func TestHA_RegisterStateChangeListener(t *testing.T) {
 	ha.lastHeartbeat = 0
 	ha.checkResponsibility(&Environment{})
 	assertNonBlockingState(StateAllInactive, chHA, "HA should send StateAllInactive to state change channel when becoming inactive")
+}
+
+func TestHA_removePreviousInstances(t *testing.T) {
+	env := &Environment{}
+	env.Name = "test"
+	env.ID = Sha1bytes([]byte(env.Name))
+	env.Icinga2.EndpointId = make([]byte, 20)
+
+	ha := createTestingHA(t, testbackends.RedisTestAddr)
+	err := ha.setAndInsertEnvironment(env)
+	require.NoError(t, err, "setAndInsertEnvironment should not return an error")
+
+	err = ha.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
+		return ha.upsertInstance(tx, &Environment{}, false)
+	})
+	require.NoError(t, err, "upsertInstance() should not return an error")
+
+	now := utils.TimeToMillisecs(time.Now())
+	activeUuid, err := uuid.NewRandom()
+	require.NoError(t, err, "UUID generation failed")
+	_, err = ha.super.Dbw.SqlExec(
+		mysqlObservers.insertIntoIcingadbInstance,
+		"INSERT INTO icingadb_instance(id, environment_id, endpoint_id, responsible, heartbeat,"+
+			" icinga2_version, icinga2_start_time)"+
+			" VALUES (?, ?, ?, ?, ?, ?, ?)",
+		activeUuid[:], ha.super.EnvId, env.Icinga2.EndpointId, utils.Bool[false], now, "", 0,
+	)
+	require.NoError(t, err, "This test needs a working MySQL connection!")
+
+	timedOut := now - heartbeatTimeoutMillisecs
+	timedOutUuid, err := uuid.NewRandom()
+	require.NoError(t, err, "UUID generation failed")
+	_, err = ha.super.Dbw.SqlExec(
+		mysqlObservers.insertIntoIcingadbInstance,
+		"INSERT INTO icingadb_instance(id, environment_id, endpoint_id, responsible, heartbeat,"+
+			" icinga2_version, icinga2_start_time)"+
+			" VALUES (?, ?, ?, ?, ?, ?, ?)",
+		timedOutUuid[:], ha.super.EnvId, env.Icinga2.EndpointId, utils.Bool[false], timedOut, "", 0,
+	)
+	require.NoError(t, err, "This test needs a working MySQL connection!")
+
+	err = ha.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
+		return ha.removePreviousInstances(tx, env)
+	})
+	assert.NoError(t, err, "removePreviousInstances() should not return an error")
+
+	rows, err := ha.super.Dbw.SqlFetchAll(mysqlTestObserver, "SELECT id FROM icingadb_instance")
+	var instanceIds []string
+	for _, row := range rows {
+		instanceIds = append(instanceIds, hex.EncodeToString(row[0].([]byte)))
+	}
+
+	assert.Contains(t, instanceIds, hex.EncodeToString(ha.uid[:]), "removePreviousInstance() should not remove its own row")
+	assert.Contains(t, instanceIds, hex.EncodeToString(activeUuid[:]), "removePreviousInstance() should not remove rows that are not timed out yet")
+	assert.NotContains(t, instanceIds, hex.EncodeToString(timedOutUuid[:]), "removePreviousInstances() should remove timed out instance")
 }
