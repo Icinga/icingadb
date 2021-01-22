@@ -21,6 +21,8 @@ type database struct {
 	cliPrefix string
 	// conn allows actually using the database.
 	conn *sql.DB
+	// stmts caches prepared SQL statements.
+	stmts map[string]*sql.Stmt
 
 	// host is either the RDBMS' host or *nix socket.
 	host *string
@@ -129,12 +131,31 @@ func (db *database) query(query string, args []interface{}, onRow interface{}) {
 	}
 }
 
+// exec prepares and executes query with args on db.
+func (db *database) exec(query string, args ...interface{}) {
+	stmt, ok := db.stmts[query]
+	if !ok {
+		var errPP error
+		stmt, errPP = db.conn.Prepare(query)
+		assert(errPP, "Couldn't prepare SQL statement", log.Fields{"backend": db.whichOne, "statement": query})
+
+		db.stmts[query] = stmt
+	}
+
+	_, errEx := stmt.Exec(args...)
+	assert(
+		errEx,
+		"Couldn't execute prepared SQL statement",
+		log.Fields{"backend": db.whichOne, "statement": query, "args": args},
+	)
+}
+
 // newDb creates a new database.
 func newDb(whichOne string) database {
 	cliPrefix := strings.ToLower(strings.ReplaceAll(whichOne, " ", "")) + "-"
 
 	return database{
-		whichOne, cliPrefix, nil,
+		whichOne, cliPrefix, nil, map[string]*sql.Stmt{},
 		flag.String(cliPrefix+"host", "", "HOST/SOCKET"),
 		flag.Int(cliPrefix+"port", 0, "PORT"),
 		flag.String(cliPrefix+"db", "", "DATABASE"),
