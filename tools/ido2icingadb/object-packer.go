@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -17,6 +18,34 @@ var _ io.Writer = nullWriter{}
 // Write never fails.
 func (nullWriter) Write(p []byte) (int, error) {
 	return len(p), nil
+}
+
+// hashStr hashes s via SHA1.
+func hashStr(s string) []byte {
+	hash := sha1.New()
+	_, _ = fmt.Fprint(hash, s)
+	return hash.Sum(nil)
+}
+
+// hashAny combines packAny and SHA1 hashing.
+func hashAny(in interface{}) []byte {
+	hash := sha1.New()
+	_ = packAny(in, hash)
+	return hash.Sum(nil)
+}
+
+// calcObjectId calculates the ID of the config object named name1 for Icinga DB.
+func calcObjectId(name1 string) []byte {
+	return hashAny([2]string{icingaEnv.value, name1})
+}
+
+// calcServiceId calculates the ID of the service name2 of the host name1 for Icinga DB.
+func calcServiceId(name1, name2 string) interface{} {
+	if name2 == "" {
+		return nil
+	}
+
+	return hashAny([2]string{icingaEnv.value, name1 + "!" + name2})
 }
 
 // packAny packs any JSON-encodable value (ex. structs, also ignores interfaces like encoding.TextMarshaler)

@@ -13,6 +13,70 @@ const (
 	stateHistory historyTable = 's'
 )
 
+var objectTypes = map[uint8]string{1: "host", 2: "service"}
+var stateTypes = map[uint8]string{0: "soft", 1: "hard"}
+
+func syncStates() {
+	ido.query(
+		"SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_time), sh.state_time_usec, "+
+			"sh.state_change, sh.state, sh.state_type, sh.current_check_attempt, sh.max_check_attempts, "+
+			"sh.last_state, sh.last_hard_state, sh.output, sh.long_output, sh.check_source, "+
+			"o.objecttype_id, o.name1, IFNULL(o.name2, ''), "+
+			"IFNULL((SELECT sh2.last_hard_state "+
+			"FROM icinga_statehistory sh2 "+
+			"WHERE sh2.object_id=sh.object_id AND sh2.statehistory_id < sh.statehistory_id AND "+
+			"sh2.last_hard_state<>sh.last_hard_state ORDER BY sh2.statehistory_id DESC LIMIT 1), 99) "+
+			"FROM icinga_statehistory sh "+
+			"INNER JOIN icinga_objects o ON o.object_id=sh.object_id",
+		nil,
+		func(row struct {
+			StatehistoryId uint64
+			StateTime      int64
+			StateTimeUsec  uint32
+
+			StateChange         uint8
+			State               uint8
+			StateType           uint8
+			CurrentCheckAttempt uint16
+			MaxCheckAttempts    uint16
+
+			LastState     uint8
+			LastHardState uint8
+			Output        string
+			LongOutput    string
+			CheckSource   string
+
+			ObjecttypeId uint8
+			Name1        string
+			Name2        string
+
+			PreviousHardState uint8
+		}) {
+			id := mkDeterministicUuid(stateHistory, row.StatehistoryId)
+			typ := objectTypes[row.ObjecttypeId]
+			hostId := calcObjectId(row.Name1)
+			serviceId := calcServiceId(row.Name1, row.Name2)
+			ts := convertTime(row.StateTime, row.StateTimeUsec)
+
+			icingaDb.exec(
+				"REPLACE INTO state_history(id, environment_id, endpoint_id, object_type, host_id, "+
+					"service_id, event_time, state_type, soft_state, hard_state, previous_soft_state, "+
+					"previous_hard_state, attempt, output, long_output, max_check_attempts, check_source) "+
+					"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+				id, envId, endpointId, typ, hostId, serviceId, ts, stateTypes[row.StateType], row.State,
+				row.LastHardState, row.LastState, row.PreviousHardState, row.CurrentCheckAttempt,
+				row.Output, row.LongOutput, row.MaxCheckAttempts, row.CheckSource,
+			)
+
+			icingaDb.exec(
+				"REPLACE INTO history(id, environment_id, endpoint_id, object_type, host_id, service_id, "+
+					"state_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, 'state_change', ?)",
+				id, envId, endpointId, typ, hostId, serviceId, id, ts,
+			)
+		},
+	)
+}
+
 // uuidTemplate is for mkDeterministicUuid.
 var uuidTemplate = func() uuid.UUID {
 	buf := &bytes.Buffer{}
@@ -36,7 +100,7 @@ var uuidTemplate = func() uuid.UUID {
 // 3: "h" (for "history")
 // 4: the new UUID's formal version (unused bits zeroed)
 // 5: the ID of the row the new UUID is for in the IDO (big endian)
-func mkDeterministicUuid(table historyTable, rowId uint64) uuid.UUID {
+func mkDeterministicUuid(table historyTable, rowId uint64) []byte {
 	uid := uuidTemplate
 	uid[3] = byte(table)
 
@@ -49,5 +113,10 @@ func mkDeterministicUuid(table historyTable, rowId uint64) uuid.UUID {
 	uid[7] = bEId[0]
 	copy(uid[9:], bEId[1:])
 
-	return uid
+	return uid[:]
+}
+
+// convertTime converts *nix timestamps from the IDO for Icinga DB.
+func convertTime(ts int64, tsUs uint32) uint64 {
+	return uint64(ts)*1000 + uint64(tsUs)/1000
 }

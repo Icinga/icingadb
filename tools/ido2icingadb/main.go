@@ -13,6 +13,29 @@ import (
 	"strings"
 )
 
+// stringValue allows to differ a string not passed via the CLI and an empty string passed via the CLI
+// w/o polluting the usage instructions.
+type stringValue struct {
+	// value is the string passed via the CLI if any.
+	value string
+	// isSet tells whether the string was passed.
+	isSet bool
+}
+
+var _ flag.Value = (*stringValue)(nil)
+
+// String implements flag.Value.
+func (sv *stringValue) String() string {
+	return sv.value
+}
+
+// Set implements flag.Value.
+func (sv *stringValue) Set(s string) error {
+	sv.value = s
+	sv.isSet = true
+	return nil
+}
+
 // database summarizes everything regarding a particular database.
 type database struct {
 	// whichOne is a human-readable description what's the database for.
@@ -164,17 +187,38 @@ func newDb(whichOne string) database {
 	}
 }
 
-func main() {
-	ido := newDb("IDO")
-	icingaDb := newDb("Icinga DB")
+var ido = newDb("IDO")
+var icingaDb = newDb("Icinga DB")
+var icingaEnv, icingaEndpoint stringValue
+var envId, endpointId []byte
 
+func main() {
+	flag.Var(&icingaEnv, "icinga-env", "ENVIRONMENT")
+	flag.Var(&icingaEndpoint, "icinga-endpoint", "ENDPOINT")
 	flag.Parse()
 
 	ido.validate()
 	icingaDb.validate()
 
+	if !icingaEnv.isSet {
+		fmt.Fprintln(os.Stderr, "-icinga-env missing")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	if !icingaEndpoint.isSet {
+		fmt.Fprintln(os.Stderr, "-icinga-endpoint missing")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	envId = hashStr(icingaEnv.value)
+	endpointId = hashAny([2]string{icingaEnv.value, icingaEndpoint.value})
+
 	ido.connect()
 	icingaDb.connect()
+
+	syncStates()
 }
 
 // assert logs message with fields and err and terminates the program if err is not nil.
