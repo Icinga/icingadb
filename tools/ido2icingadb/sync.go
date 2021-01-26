@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"fmt"
+	"github.com/cheggaaa/pb/v3"
 	"github.com/google/uuid"
 )
 
@@ -19,6 +20,11 @@ var objectTypes = map[uint8]string{1: "host", 2: "service"}
 var stateTypes = map[uint8]string{0: "soft", 1: "hard"}
 
 func syncStates() {
+	total, done, lsi := getProgress(stateHistory, "icinga_statehistory", "statehistory_id", "state_history")
+
+	bar := pb.StartNew(int(total))
+	bar.Add(int(done))
+
 	ido.query(
 		"SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_time), sh.state_time_usec, "+
 			"sh.state_change, sh.state, sh.state_type, sh.current_check_attempt, sh.max_check_attempts, "+
@@ -32,7 +38,7 @@ func syncStates() {
 			"INNER JOIN icinga_objects o ON o.object_id=sh.object_id "+
 			"WHERE sh.statehistory_id >= ? "+
 			"ORDER BY sh.statehistory_id",
-		[]interface{}{getLastSyncedId(stateHistory, "icinga_statehistory", "statehistory_id", "state_history")},
+		[]interface{}{lsi},
 		func(row struct {
 			StatehistoryId uint64
 			StateTime      int64
@@ -77,13 +83,17 @@ func syncStates() {
 					"state_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, 'state_change', ?)",
 				id, envId, endpointId, typ, hostId, serviceId, id, ts,
 			)
+
+			bar.Increment()
 		},
 	)
+
+	bar.Finish()
 }
 
-// getLastSyncedId bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable
-// and returns an idoIdColumn value to start/continue sync with.
-func getLastSyncedId(table historyTable, idoTable, idoIdColumn, icingadbTable string) uint64 {
+// getProgress bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable
+// and returns the current progress and an idoIdColumn value to start/continue sync with.
+func getProgress(table historyTable, idoTable, idoIdColumn, icingadbTable string) (total, done, lastSyncedId int64) {
 	var left, right sql.NullInt64
 
 	ido.query(
@@ -95,29 +105,31 @@ func getLastSyncedId(table historyTable, idoTable, idoIdColumn, icingadbTable st
 		},
 	)
 
-	// If there's nothing in the source...
 	if !left.Valid {
-		// ... everything of it is synced to the destination.
-		return ^uint64(0)
+		return
 	}
 
 	query := fmt.Sprintf("SELECT 1 FROM %s WHERE id=?", icingadbTable)
+	total = right.Int64 - left.Int64 + 1
+	firstId := left.Int64
 
 	for {
-		middle := left.Int64 + (right.Int64-left.Int64)/2
-		if middle == left.Int64 {
-			return uint64(middle)
+		if lastSyncedId = left.Int64 + (right.Int64-left.Int64)/2; lastSyncedId == left.Int64 {
+			done = lastSyncedId - firstId
+			return
 		}
 
 		has := false
-		icingaDb.query(query, []interface{}{mkDeterministicUuid(table, uint64(middle))}, func(struct{ One uint8 }) {
-			has = true
-		})
+		icingaDb.query(
+			query,
+			[]interface{}{mkDeterministicUuid(table, uint64(lastSyncedId))},
+			func(struct{ One uint8 }) { has = true },
+		)
 
 		if has {
-			left.Int64 = middle
+			left.Int64 = lastSyncedId
 		} else {
-			right.Int64 = middle
+			right.Int64 = lastSyncedId
 		}
 	}
 }

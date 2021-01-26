@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/Icinga/go-libs v0.0.0-20200701080830-606dded1d1ea
+	github.com/cheggaaa/pb/v3 v3.0.5
 	github.com/go-ini/ini v1.62.0
 	github.com/go-redis/redis/v7 v7.4.0
 	github.com/go-sql-driver/mysql v1.5.0

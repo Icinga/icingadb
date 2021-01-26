@@ -26,8 +26,9 @@ func TestGetLastSyncedId(t *testing.T) {
 	ido.conn = db
 	icingaDb.conn = db
 
-	if getLastSyncedId(stateHistory, "icinga_statehistory", "statehistory_id", "state_history") != ^uint64(0) {
-		t.Error("getLastSyncedId() must return 2^64-1 if the IDO table is empty")
+	total, done, lsi := getProgress(stateHistory, "icinga_statehistory", "statehistory_id", "state_history")
+	if total != 0 || done != 0 || lsi != 0 {
+		t.Error("getProgress() must return 0,0,0 if the IDO table is empty")
 	}
 
 	for start := 1; start < 3; start++ {
@@ -59,9 +60,18 @@ func TestGetLastSyncedId(t *testing.T) {
 					}
 				}
 
-				lsi := getLastSyncedId(stateHistory, "icinga_statehistory", "statehistory_id", "state_history")
-				if lsi > uint64(lastSynced) {
-					t.Error("getLastSyncedId()'s return value is too high")
+				total, done, lsi := getProgress(stateHistory, "icinga_statehistory", "statehistory_id", "state_history")
+
+				if total != int64(evenOdd)+11 {
+					t.Error("getProgress()'s total is wrong")
+				}
+
+				if done > int64(lastSynced-start) {
+					t.Error("getProgress()'s done is too high")
+				}
+
+				if lsi > int64(lastSynced) {
+					t.Error("getProgress()'s lastSyncedId is too high")
 				}
 			}
 		}
