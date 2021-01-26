@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/cheggaaa/pb/v3"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 )
 
 // historyTable represents Icinga DB history tables.
@@ -16,6 +17,12 @@ const (
 	stateHistory historyTable = 's'
 )
 
+// bulkInsert represents several rows to be inserted via stmt.
+type bulkInsert struct {
+	stmt string
+	rows [][]interface{}
+}
+
 var objectTypes = map[uint8]string{1: "host", 2: "service"}
 var stateTypes = map[uint8]string{0: "soft", 1: "hard"}
 
@@ -24,6 +31,18 @@ func syncStates() {
 
 	bar := pb.StartNew(int(total))
 	bar.Add(int(done))
+
+	sh := bulkInsert{
+		stmt: "REPLACE INTO state_history(id, environment_id, endpoint_id, object_type, host_id, " +
+			"service_id, event_time, state_type, soft_state, hard_state, previous_soft_state, " +
+			"previous_hard_state, attempt, output, long_output, max_check_attempts, check_source) " +
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	}
+
+	h := bulkInsert{
+		stmt: "REPLACE INTO history(id, environment_id, endpoint_id, object_type, host_id, service_id, " +
+			"state_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, 'state_change', ?)",
+	}
 
 	ido.query(
 		"SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_time), sh.state_time_usec, "+
@@ -68,27 +87,56 @@ func syncStates() {
 			serviceId := calcServiceId(row.Name1, row.Name2)
 			ts := convertTime(row.StateTime, row.StateTimeUsec)
 
-			icingaDb.exec(
-				"REPLACE INTO state_history(id, environment_id, endpoint_id, object_type, host_id, "+
-					"service_id, event_time, state_type, soft_state, hard_state, previous_soft_state, "+
-					"previous_hard_state, attempt, output, long_output, max_check_attempts, check_source) "+
-					"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			sh.rows = append(sh.rows, []interface{}{
 				id, envId, endpointId, typ, hostId, serviceId, ts, stateTypes[row.StateType], row.State,
 				row.LastHardState, row.LastState, row.PreviousHardState, row.CurrentCheckAttempt,
 				row.Output, row.LongOutput, row.MaxCheckAttempts, row.CheckSource,
-			)
+			})
 
-			icingaDb.exec(
-				"REPLACE INTO history(id, environment_id, endpoint_id, object_type, host_id, service_id, "+
-					"state_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, 'state_change', ?)",
-				id, envId, endpointId, typ, hostId, serviceId, id, ts,
-			)
+			h.rows = append(h.rows, []interface{}{id, envId, endpointId, typ, hostId, serviceId, id, ts})
+
+			if len(sh.rows) == *bulk {
+				flush(sh, h)
+
+				sh.rows = nil
+				h.rows = nil
+			}
 
 			bar.Increment()
 		},
 	)
 
+	if len(sh.rows) > 0 {
+		flush(sh, h)
+	}
+
 	bar.Finish()
+}
+
+// flush runs bulks on icingaDb in a single transaction.
+func flush(bulks ...bulkInsert) {
+	tx, errBg := icingaDb.conn.Begin()
+	assert(errBg, "Couldn't begin transaction", log.Fields{"backend": icingaDb.whichOne})
+
+	for _, b := range bulks {
+		stmt, errPp := tx.Prepare(b.stmt)
+		assert(errPp, "Couldn't prepare SQL statement", log.Fields{"backend": icingaDb.whichOne, "statement": b.stmt})
+
+		for _, r := range b.rows {
+			_, errEx := stmt.Exec(r...)
+			assert(
+				errEx, "Couldn't execute prepared SQL statement",
+				log.Fields{"backend": icingaDb.whichOne, "statement": b.stmt, "args": r},
+			)
+		}
+
+		assert(
+			stmt.Close(), "Couldn't close prepared SQL statement",
+			log.Fields{"backend": icingaDb.whichOne, "statement": b.stmt},
+		)
+	}
+
+	assert(tx.Commit(), "Couldn't commit transaction", log.Fields{"backend": icingaDb.whichOne})
 }
 
 // getProgress bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable

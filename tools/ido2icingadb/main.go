@@ -189,6 +189,8 @@ func newDb(whichOne string) database {
 
 var ido = newDb("IDO")
 var icingaDb = newDb("Icinga DB")
+var bulk = flag.Int("bulk", 200, "FACTOR")
+
 var icingaEnv, icingaEndpoint stringValue
 var envId, endpointId []byte
 
