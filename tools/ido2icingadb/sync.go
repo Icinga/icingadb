@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/binary"
+	"fmt"
 	"github.com/google/uuid"
 )
 
@@ -27,8 +29,10 @@ func syncStates() {
 			"WHERE sh2.object_id=sh.object_id AND sh2.statehistory_id < sh.statehistory_id AND "+
 			"sh2.last_hard_state<>sh.last_hard_state ORDER BY sh2.statehistory_id DESC LIMIT 1), 99) "+
 			"FROM icinga_statehistory sh "+
-			"INNER JOIN icinga_objects o ON o.object_id=sh.object_id",
-		nil,
+			"INNER JOIN icinga_objects o ON o.object_id=sh.object_id "+
+			"WHERE sh.statehistory_id >= ? "+
+			"ORDER BY sh.statehistory_id",
+		[]interface{}{getLastSyncedId(stateHistory, "icinga_statehistory", "statehistory_id", "state_history")},
 		func(row struct {
 			StatehistoryId uint64
 			StateTime      int64
@@ -75,6 +79,47 @@ func syncStates() {
 			)
 		},
 	)
+}
+
+// getLastSyncedId bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable
+// and returns an idoIdColumn value to start/continue sync with.
+func getLastSyncedId(table historyTable, idoTable, idoIdColumn, icingadbTable string) uint64 {
+	var left, right sql.NullInt64
+
+	ido.query(
+		fmt.Sprintf("SELECT MIN(%s), MAX(%s) FROM %s", idoIdColumn, idoIdColumn, idoTable),
+		nil,
+		func(row struct{ Min, Max sql.NullInt64 }) {
+			left = row.Min
+			right = row.Max
+		},
+	)
+
+	// If there's nothing in the source...
+	if !left.Valid {
+		// ... everything of it is synced to the destination.
+		return ^uint64(0)
+	}
+
+	query := fmt.Sprintf("SELECT 1 FROM %s WHERE id=?", icingadbTable)
+
+	for {
+		middle := left.Int64 + (right.Int64-left.Int64)/2
+		if middle == left.Int64 {
+			return uint64(middle)
+		}
+
+		has := false
+		icingaDb.query(query, []interface{}{mkDeterministicUuid(table, uint64(middle))}, func(struct{ One uint8 }) {
+			has = true
+		})
+
+		if has {
+			left.Int64 = middle
+		} else {
+			right.Int64 = middle
+		}
+	}
 }
 
 // uuidTemplate is for mkDeterministicUuid.
