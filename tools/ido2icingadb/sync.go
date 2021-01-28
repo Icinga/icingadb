@@ -26,7 +26,13 @@ type bulkInsert struct {
 var objectTypes = map[uint8]string{1: "host", 2: "service"}
 var stateTypes = map[uint8]string{0: "soft", 1: "hard"}
 
+// syncStates migrates IDO's icinga_statehistory table to Icinga DB's state_history table using the -cache FILE.
 func syncStates() {
+	// Icinga DB's state_history#previous_hard_state would need a subquery.
+	// That make the IDO reading even slower than the Icinga DB writing.
+	// Therefore: Stream IDO's icinga_statehistory once, compute state_history#previous_hard_state
+	// and cache it into an SQLite database. Then steam from that database and the IDO.
+
 	dbc, errOp := sql.Open("sqlite3", "file:"+cache.value)
 	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": cache.value})
 	defer dbc.Close()
@@ -36,16 +42,19 @@ func syncStates() {
 		conn:     dbc,
 	}
 
+	// Icinga DB's state_history#previous_hard_state per IDO's icinga_statehistory#statehistory_id.
 	cach.exec(`CREATE TABLE IF NOT EXISTS previous_hard_state (
 	statehistory_id INT PRIMARY KEY,
 	previous_hard_state INT NOT NULL
 )`)
 
+	// Helper table, the current last_hard_state per icinga_statehistory#object_id.
 	cach.exec(`CREATE TABLE IF NOT EXISTS next_hard_state (
 	object_id INT PRIMARY KEY,
 	next_hard_state INT NOT NULL
 )`)
 
+	// Helper table for stashing icinga_statehistory#statehistory_id until last_hard_state changes.
 	cach.exec(`CREATE TABLE IF NOT EXISTS next_ids (
 	object_id INT NOT NULL,
 	statehistory_id INT NOT NULL
@@ -77,15 +86,25 @@ func syncStates() {
 		if niCMShi[0].StatehistoryId.Valid {
 			checkpoint = niCMShi[0].StatehistoryId.Int64
 		} else {
+			// next_ids contains the most recently processed IDs and is only empty if...
 			if phsC[0].Count == 0 {
+				// ... we didn't actually start, yet...
 				checkpoint = 9223372036854775807
 			} else {
+				// ... or we already finished.
 				checkpoint = 0
 			}
 		}
 
 		bar.Add(int(phsC[0].Count + niCMShi[0].Count))
 		inTx := 0
+
+		// We continue where we finished before. As we build the cache in reverse chronological order:
+		// 1. If the history grows between two migration trials, we won't migrate the difference. Workarounds:
+		//    a. Start migration after Icinga DB is up and running.
+		//    b. Remove the -cache FILE before the next migration trial.
+		// 2. If the history gets cleaned up between two migration trials,
+		//    the difference either just doesn't appear in the cache or - if already there - will be ignored later.
 
 		snapshot.query(
 			"SELECT statehistory_id, object_id, last_hard_state FROM icinga_statehistory "+
@@ -162,6 +181,7 @@ func syncStates() {
 
 	previousHardStates := make(chan uint8, 64)
 
+	// Stream concurrently from two databases. Possible due to WHERE and ORDER BY.
 	go cach.query(
 		"SELECT previous_hard_state FROM previous_hard_state WHERE statehistory_id >= ? ORDER BY statehistory_id",
 		[]interface{}{lsi},
