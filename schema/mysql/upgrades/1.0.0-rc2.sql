@@ -110,3 +110,17 @@ ALTER TABLE acknowledgement_history
 
 INSERT INTO icingadb_schema (version, timestamp)
   VALUES (2, CURRENT_TIMESTAMP() * 1000);
+
+ALTER TABLE host_state
+    MODIFY output mediumtext DEFAULT NULL,
+    MODIFY long_output mediumtext DEFAULT NULL,
+    MODIFY performance_data mediumtext DEFAULT NULL;
+
+ALTER TABLE state_history
+    MODIFY output mediumtext DEFAULT NULL,
+    MODIFY long_output mediumtext DEFAULT NULL;
+
+ALTER TABLE service_state
+    MODIFY output mediumtext DEFAULT NULL,
+    MODIFY long_output mediumtext DEFAULT NULL,
+    MODIFY performance_data mediumtext DEFAULT NULL;
