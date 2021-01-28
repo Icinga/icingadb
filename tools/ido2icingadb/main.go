@@ -34,12 +34,13 @@ var ido = newDb("IDO")
 var icingaDb = newDb("Icinga DB")
 var bulk = flag.Int("bulk", 200, "FACTOR")
 
-var icingaEnv, icingaEndpoint stringValue
+var icingaEnv, icingaEndpoint, cache stringValue
 var envId, endpointId []byte
 
 func main() {
 	flag.Var(&icingaEnv, "icinga-env", "ENVIRONMENT")
 	flag.Var(&icingaEndpoint, "icinga-endpoint", "ENDPOINT")
+	flag.Var(&cache, "cache", "FILE")
 	flag.Parse()
 
 	ido.validate()
@@ -53,6 +54,12 @@ func main() {
 
 	if !icingaEndpoint.isSet {
 		fmt.Fprintln(os.Stderr, "-icinga-endpoint missing")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	if !cache.isSet {
+		fmt.Fprintln(os.Stderr, "-cache missing")
 		flag.Usage()
 		os.Exit(2)
 	}

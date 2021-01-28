@@ -7,6 +7,7 @@ import (
 	"fmt"
 	icingaSql "github.com/Icinga/go-libs/sql"
 	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/mattn/go-sqlite3"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"path/filepath"

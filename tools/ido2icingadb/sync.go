@@ -27,7 +27,148 @@ var objectTypes = map[uint8]string{1: "host", 2: "service"}
 var stateTypes = map[uint8]string{0: "soft", 1: "hard"}
 
 func syncStates() {
-	total, done, lsi := getProgress(stateHistory, "icinga_statehistory", "statehistory_id", "state_history")
+	dbc, errOp := sql.Open("sqlite3", "file:"+cache.value)
+	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": cache.value})
+	defer dbc.Close()
+
+	cach := &database{
+		whichOne: "cache",
+		conn:     dbc,
+	}
+
+	cach.exec(`CREATE TABLE IF NOT EXISTS previous_hard_state (
+	statehistory_id INT PRIMARY KEY,
+	previous_hard_state INT NOT NULL
+)`)
+
+	cach.exec(`CREATE TABLE IF NOT EXISTS next_hard_state (
+	object_id INT PRIMARY KEY,
+	next_hard_state INT NOT NULL
+)`)
+
+	cach.exec(`CREATE TABLE IF NOT EXISTS next_ids (
+	object_id INT NOT NULL,
+	statehistory_id INT NOT NULL
+)`)
+
+	cach.exec("CREATE INDEX IF NOT EXISTS next_ids_object_id ON next_ids(object_id)")
+	cach.exec("CREATE INDEX IF NOT EXISTS next_ids_statehistory_id ON next_ids(statehistory_id)")
+
+	snapshot := ido.begin(sql.LevelRepeatableRead, true)
+	defer snapshot.commit()
+
+	total, done, lsi := getProgress(snapshot, stateHistory, "icinga_statehistory", "statehistory_id", "state_history")
+	var limit []struct{ StatehistoryId sql.NullInt64 }
+
+	{
+		bar := pb.StartNew(int(total))
+		tx := cach.begin(sql.LevelSerializable, false)
+		var checkpoint int64
+
+		var niCMShi []struct {
+			Count          uint64
+			StatehistoryId sql.NullInt64
+		}
+		tx.fetchAll(&niCMShi, "SELECT COUNT(*), MIN(statehistory_id) FROM next_ids")
+
+		var phsC []struct{ Count uint64 }
+		tx.fetchAll(&phsC, "SELECT COUNT(*) FROM previous_hard_state")
+
+		if niCMShi[0].StatehistoryId.Valid {
+			checkpoint = niCMShi[0].StatehistoryId.Int64
+		} else {
+			if phsC[0].Count == 0 {
+				checkpoint = 9223372036854775807
+			} else {
+				checkpoint = 0
+			}
+		}
+
+		bar.Add(int(phsC[0].Count + niCMShi[0].Count))
+		inTx := 0
+
+		snapshot.query(
+			"SELECT statehistory_id, object_id, last_hard_state FROM icinga_statehistory "+
+				"WHERE statehistory_id < ? ORDER BY statehistory_id DESC",
+			[]interface{}{checkpoint},
+			func(row struct {
+				StatehistoryId uint64
+				ObjectId       uint64
+				LastHardState  uint8
+			}) {
+				var nhs []struct{ NextHardState uint8 }
+				tx.fetchAll(&nhs, "SELECT next_hard_state FROM next_hard_state WHERE object_id=?", row.ObjectId)
+
+				if len(nhs) < 1 {
+					tx.exec(
+						"INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
+						row.ObjectId, row.LastHardState,
+					)
+
+					tx.exec(
+						"INSERT INTO next_ids(statehistory_id, object_id) VALUES (?, ?)",
+						row.StatehistoryId, row.ObjectId,
+					)
+				} else if row.LastHardState == nhs[0].NextHardState {
+					tx.exec(
+						"INSERT INTO next_ids(statehistory_id, object_id) VALUES (?, ?)",
+						row.StatehistoryId, row.ObjectId,
+					)
+				} else {
+					tx.exec(
+						"INSERT INTO previous_hard_state(statehistory_id, previous_hard_state) "+
+							"SELECT statehistory_id, ? FROM next_ids WHERE object_id=?",
+						row.LastHardState, row.ObjectId,
+					)
+
+					tx.exec("DELETE FROM next_hard_state WHERE object_id=?", row.ObjectId)
+					tx.exec("DELETE FROM next_ids WHERE object_id=?", row.ObjectId)
+
+					tx.exec(
+						"INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
+						row.ObjectId, row.LastHardState,
+					)
+
+					tx.exec(
+						"INSERT INTO next_ids(statehistory_id, object_id) VALUES (?, ?)",
+						row.StatehistoryId, row.ObjectId,
+					)
+				}
+
+				inTx++
+				if inTx == *bulk {
+					tx.commit()
+					tx = cach.begin(sql.LevelSerializable, false)
+					inTx = 0
+				}
+
+				bar.Increment()
+			},
+		)
+
+		tx.exec(
+			"INSERT INTO previous_hard_state(statehistory_id, previous_hard_state) " +
+				"SELECT statehistory_id, 99 FROM next_ids",
+		)
+
+		tx.exec("DELETE FROM next_hard_state")
+		tx.exec("DELETE FROM next_ids")
+
+		tx.fetchAll(&limit, "SELECT MAX(statehistory_id) FROM previous_hard_state")
+
+		tx.commit()
+		bar.Finish()
+	}
+
+	previousHardStates := make(chan uint8, 64)
+
+	go cach.query(
+		"SELECT previous_hard_state FROM previous_hard_state WHERE statehistory_id >= ? ORDER BY statehistory_id",
+		[]interface{}{lsi},
+		func(row struct{ PreviousHardState uint8 }) {
+			previousHardStates <- row.PreviousHardState
+		},
+	)
 
 	bar := pb.StartNew(int(total))
 	bar.Add(int(done))
@@ -44,20 +185,16 @@ func syncStates() {
 			"state_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, 'state_change', ?)",
 	}
 
-	ido.query(
+	snapshot.query(
 		"SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_time), sh.state_time_usec, "+
 			"sh.state_change, sh.state, sh.state_type, sh.current_check_attempt, sh.max_check_attempts, "+
 			"sh.last_state, sh.last_hard_state, sh.output, sh.long_output, sh.check_source, "+
-			"o.objecttype_id, o.name1, IFNULL(o.name2, ''), "+
-			"IFNULL((SELECT sh2.last_hard_state "+
-			"FROM icinga_statehistory sh2 "+
-			"WHERE sh2.object_id=sh.object_id AND sh2.statehistory_id < sh.statehistory_id AND "+
-			"sh2.last_hard_state<>sh.last_hard_state ORDER BY sh2.statehistory_id DESC LIMIT 1), 99) "+
+			"o.objecttype_id, o.name1, IFNULL(o.name2, '') "+
 			"FROM icinga_statehistory sh "+
 			"INNER JOIN icinga_objects o ON o.object_id=sh.object_id "+
-			"WHERE sh.statehistory_id >= ? "+
+			"WHERE sh.statehistory_id BETWEEN ? AND ? "+
 			"ORDER BY sh.statehistory_id",
-		[]interface{}{lsi},
+		[]interface{}{lsi, limit[0].StatehistoryId},
 		func(row struct {
 			StatehistoryId uint64
 			StateTime      int64
@@ -78,8 +215,6 @@ func syncStates() {
 			ObjecttypeId uint8
 			Name1        string
 			Name2        string
-
-			PreviousHardState uint8
 		}) {
 			id := mkDeterministicUuid(stateHistory, row.StatehistoryId)
 			typ := objectTypes[row.ObjecttypeId]
@@ -89,7 +224,7 @@ func syncStates() {
 
 			sh.rows = append(sh.rows, []interface{}{
 				id, envId, endpointId, typ, hostId, serviceId, ts, stateTypes[row.StateType], row.State,
-				row.LastHardState, row.LastState, row.PreviousHardState, row.CurrentCheckAttempt,
+				row.LastHardState, row.LastState, <-previousHardStates, row.CurrentCheckAttempt,
 				row.Output, row.LongOutput, row.MaxCheckAttempts, row.CheckSource,
 			})
 
@@ -138,12 +273,14 @@ func flush(bulks ...bulkInsert) {
 	tx.commit()
 }
 
-// getProgress bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable
+// getProgress bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable using idoTx
 // and returns the current progress and an idoIdColumn value to start/continue sync with.
-func getProgress(table historyTable, idoTable, idoIdColumn, icingadbTable string) (total, done, lastSyncedId int64) {
+func getProgress(idoTx tx, table historyTable, idoTable, idoIdColumn, icingadbTable string) (
+	total, done, lastSyncedId int64,
+) {
 	var left, right sql.NullInt64
 
-	ido.query(
+	idoTx.query(
 		fmt.Sprintf("SELECT MIN(%s), MAX(%s) FROM %s", idoIdColumn, idoIdColumn, idoTable),
 		nil,
 		func(row struct{ Min, Max sql.NullInt64 }) {
