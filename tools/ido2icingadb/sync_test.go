@@ -7,12 +7,11 @@ import (
 )
 
 func TestGetLastSyncedId(t *testing.T) {
-	db, errOp := sql.Open("sqlite3", "file::memory:?cache=shared")
+	db, errOp := sql.Open("sqlite3", "file:TestGetLastSyncedId?mode=memory&cache=shared")
 	if errOp != nil {
 		t.Fatal(errOp)
 	}
 
-	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
 
 	if _, errEx := db.Exec("CREATE TABLE icinga_statehistory (statehistory_id INT)"); errEx != nil {

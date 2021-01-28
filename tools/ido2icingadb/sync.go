@@ -115,11 +115,10 @@ func syncStates() {
 
 // flush runs bulks on icingaDb in a single transaction.
 func flush(bulks ...bulkInsert) {
-	tx, errBg := icingaDb.conn.Begin()
-	assert(errBg, "Couldn't begin transaction", log.Fields{"backend": icingaDb.whichOne})
+	tx := icingaDb.begin(sql.LevelReadCommitted, false)
 
 	for _, b := range bulks {
-		stmt, errPp := tx.Prepare(b.stmt)
+		stmt, errPp := tx.tx.Prepare(b.stmt)
 		assert(errPp, "Couldn't prepare SQL statement", log.Fields{"backend": icingaDb.whichOne, "statement": b.stmt})
 
 		for _, r := range b.rows {
@@ -136,7 +135,7 @@ func flush(bulks ...bulkInsert) {
 		)
 	}
 
-	assert(tx.Commit(), "Couldn't commit transaction", log.Fields{"backend": icingaDb.whichOne})
+	tx.commit()
 }
 
 // getProgress bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable

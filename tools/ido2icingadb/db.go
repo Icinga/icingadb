@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"fmt"
@@ -139,6 +140,13 @@ func (db *database) exec(query string, args ...interface{}) {
 	)
 }
 
+// begin wraps db.conn.BeginTx for error handling.
+func (db *database) begin(isolation sql.IsolationLevel, readOnly bool) tx {
+	t, errBg := db.conn.BeginTx(context.Background(), &sql.TxOptions{Isolation: isolation, ReadOnly: readOnly})
+	assert(errBg, "Couldn't begin transaction", log.Fields{"backend": db.whichOne})
+	return tx{db, t}
+}
+
 // newDb creates a new database.
 func newDb(whichOne string) database {
 	cliPrefix := strings.ToLower(strings.ReplaceAll(whichOne, " ", "")) + "-"
@@ -151,4 +159,98 @@ func newDb(whichOne string) database {
 		flag.String(cliPrefix+"user", "", "USER"),
 		flag.String(cliPrefix+"pass", "", "PASSWORD"),
 	}
+}
+
+// tx wraps sql.Tx for error handling.
+type tx struct {
+	db *database
+	tx *sql.Tx
+}
+
+// fetchAll performs query with args and stores the result into *res.
+func (t tx) fetchAll(res interface{}, query string, args ...interface{}) {
+	vRes := reflect.ValueOf(res)
+	tRes := vRes.Type()
+
+	if tRes.Kind() != reflect.Ptr {
+		panic("res must be a pointer")
+	}
+
+	tResElem := tRes.Elem()
+	if tResElem.Kind() != reflect.Slice {
+		panic("res must point to a slice")
+	}
+
+	tResElemElem := tResElem.Elem()
+	if tResElemElem.Kind() != reflect.Struct {
+		panic("res must point to a slice of structs")
+	}
+
+	rows, errQr := t.tx.Query(query, args...)
+	assert(errQr, "Couldn't perform query", log.Fields{"backend": t.db.whichOne, "query": query, "args": args})
+	defer rows.Close()
+
+	iRes, errFR := icingaSql.FetchRowsAsStructSlice(rows, reflect.Zero(tResElemElem).Interface(), -1)
+	assert(
+		errFR, "Couldn't fetch query result",
+		log.Fields{"backend": t.db.whichOne, "query": query, "args": args},
+	)
+
+	vRes.Elem().Set(reflect.ValueOf(iRes))
+}
+
+// query performs query with args on t and calls onRow for each row.
+func (t tx) query(query string, args []interface{}, onRow interface{}) {
+	vOnRow := reflect.ValueOf(onRow)
+	tOnRow := vOnRow.Type()
+
+	if tOnRow.Kind() != reflect.Func {
+		panic("onRow must be a function")
+	}
+
+	if tOnRow.NumIn() != 1 {
+		panic("onRow must take exactly one argument")
+	}
+
+	tOnRowArg := tOnRow.In(0)
+	if tOnRowArg.Kind() != reflect.Struct {
+		panic("onRow must take a struct")
+	}
+
+	rows, errQr := t.db.conn.Query(query, args...)
+	assert(errQr, "Couldn't perform query", log.Fields{"backend": t.db.whichOne, "query": query, "args": args})
+	defer rows.Close()
+
+	iOnRowArg := reflect.Zero(tOnRowArg).Interface()
+	i := 0
+
+	for {
+		i++
+
+		res, errFR := icingaSql.FetchRowsAsStructSlice(rows, iOnRowArg, 1)
+		assert(
+			errFR,
+			"Couldn't fetch query result",
+			log.Fields{"backend": t.db.whichOne, "query": query, "args": args, "row": i},
+		)
+
+		vRes := reflect.ValueOf(res)
+		if vRes.Len() < 1 {
+			break
+		}
+
+		vOnRow.Call([]reflect.Value{vRes.Index(0)})
+	}
+}
+
+func (t tx) exec(query string, args ...interface{}) {
+	_, errEx := t.tx.Exec(query, args...)
+	assert(
+		errEx, "Couldn't execute SQL statement",
+		log.Fields{"backend": t.db.whichOne, "statement": query, "args": args},
+	)
+}
+
+func (t tx) commit() {
+	assert(t.tx.Commit(), "Couldn't commit transaction", log.Fields{"backend": t.db.whichOne})
 }
