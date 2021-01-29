@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
+	"crypto/rand"
 	"database/sql"
 	"encoding/binary"
 	"fmt"
@@ -13,7 +15,8 @@ import (
 type historyTable byte
 
 const (
-	stateHistory historyTable = 's'
+	notificationHistory historyTable = 'n'
+	stateHistory        historyTable = 's'
 )
 
 // bulkInsert represents several rows to be inserted via stmt.
@@ -25,19 +28,283 @@ type bulkInsert struct {
 var objectTypes = map[uint8]string{1: "host", 2: "service"}
 var stateTypes = map[uint8]string{0: "soft", 1: "hard"}
 
-// syncStates migrates IDO's icinga_statehistory table to Icinga DB's state_history table using the -cache FILE.
+var notificationTypes = map[uint8]string{
+	5: "downtime_start", 6: "downtime_end", 7: "downtime_removed",
+	8: "custom", 1: "acknowledgement", 2: "flapping_start", 3: "flapping_end",
+}
+
+// syncNotifications migrates IDO's icinga_notifications table
+// to Icinga DB's notification_history table using the -nh-cache FILE similar to syncStates.
+func syncNotifications() {
+	dbc, errOp := sql.Open("sqlite3", "file:"+nHcache.value)
+	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": nHcache.value})
+	defer dbc.Close()
+
+	cach := &database{
+		whichOne: "-nh-cache",
+		conn:     dbc,
+	}
+
+	cach.exec(`CREATE TABLE IF NOT EXISTS previous_hard_state (
+	notification_id INT PRIMARY KEY,
+	previous_hard_state INT NOT NULL
+)`)
+
+	cach.exec(`CREATE TABLE IF NOT EXISTS next_hard_state (
+	object_id INT PRIMARY KEY,
+	next_hard_state INT NOT NULL
+)`)
+
+	cach.exec(`CREATE TABLE IF NOT EXISTS next_ids (
+	object_id INT NOT NULL,
+	notification_id INT NOT NULL
+)`)
+
+	cach.exec("CREATE INDEX IF NOT EXISTS next_ids_object_id ON next_ids(object_id)")
+	cach.exec("CREATE INDEX IF NOT EXISTS next_ids_notification_id ON next_ids(notification_id)")
+
+	snapshot := ido.begin(sql.LevelRepeatableRead, true)
+	defer snapshot.commit()
+
+	total, done, lni := getProgress(
+		snapshot, notificationHistory, "icinga_notifications", "notification_id", "notification_history",
+	)
+
+	var limit []struct{ NotificationId sql.NullInt64 }
+
+	{
+		bar := cacheBar.startWorker(int(total))
+		tx := cach.begin(sql.LevelSerializable, false)
+		var checkpoint int64
+
+		var niCMNi []struct {
+			Count          uint64
+			NotificationId sql.NullInt64
+		}
+		tx.fetchAll(&niCMNi, "SELECT COUNT(*), MIN(notification_id) FROM next_ids")
+
+		var phsC []struct{ Count uint64 }
+		tx.fetchAll(&phsC, "SELECT COUNT(*) FROM previous_hard_state")
+
+		if niCMNi[0].NotificationId.Valid {
+			checkpoint = niCMNi[0].NotificationId.Int64
+		} else {
+			if phsC[0].Count == 0 {
+				checkpoint = 9223372036854775807
+			} else {
+				checkpoint = 0
+			}
+		}
+
+		bar.Add(int(phsC[0].Count + niCMNi[0].Count))
+		inTx := 0
+
+		snapshot.query(
+			"SELECT notification_id, object_id, state FROM icinga_notifications "+
+				"WHERE notification_id < ? ORDER BY notification_id DESC",
+			[]interface{}{checkpoint},
+			func(row struct {
+				NotificationId uint64
+				ObjectId       uint64
+				State          uint8
+			}) {
+				var nhs []struct{ NextHardState uint8 }
+				tx.fetchAll(&nhs, "SELECT next_hard_state FROM next_hard_state WHERE object_id=?", row.ObjectId)
+
+				if len(nhs) < 1 {
+					tx.exec(
+						"INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
+						row.ObjectId, row.State,
+					)
+
+					tx.exec(
+						"INSERT INTO next_ids(notification_id, object_id) VALUES (?, ?)",
+						row.NotificationId, row.ObjectId,
+					)
+				} else if row.State == nhs[0].NextHardState {
+					tx.exec(
+						"INSERT INTO next_ids(notification_id, object_id) VALUES (?, ?)",
+						row.NotificationId, row.ObjectId,
+					)
+				} else {
+					tx.exec(
+						"INSERT INTO previous_hard_state(notification_id, previous_hard_state) "+
+							"SELECT notification_id, ? FROM next_ids WHERE object_id=?",
+						row.State, row.ObjectId,
+					)
+
+					tx.exec("DELETE FROM next_hard_state WHERE object_id=?", row.ObjectId)
+					tx.exec("DELETE FROM next_ids WHERE object_id=?", row.ObjectId)
+
+					tx.exec(
+						"INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
+						row.ObjectId, row.State,
+					)
+
+					tx.exec(
+						"INSERT INTO next_ids(notification_id, object_id) VALUES (?, ?)",
+						row.NotificationId, row.ObjectId,
+					)
+				}
+
+				inTx++
+				if inTx == *bulk {
+					tx.commit()
+					tx = cach.begin(sql.LevelSerializable, false)
+					inTx = 0
+				}
+
+				bar.Increment()
+			},
+		)
+
+		tx.exec(
+			"INSERT INTO previous_hard_state(notification_id, previous_hard_state) " +
+				"SELECT notification_id, 99 FROM next_ids",
+		)
+
+		tx.exec("DELETE FROM next_hard_state")
+		tx.exec("DELETE FROM next_ids")
+
+		tx.fetchAll(&limit, "SELECT MAX(notification_id) FROM previous_hard_state")
+
+		tx.commit()
+		cacheBar.stopWorker()
+	}
+
+	bar := syncBar.startWorker(int(total))
+	bar.Add(int(done))
+
+	previousHardStates := make(chan uint8, 64)
+
+	go cach.query(
+		"SELECT previous_hard_state FROM previous_hard_state WHERE notification_id > ? ORDER BY notification_id",
+		[]interface{}{lni},
+		func(row struct{ PreviousHardState uint8 }) {
+			previousHardStates <- row.PreviousHardState
+		},
+	)
+
+	nh := bulkInsert{
+		stmt: "REPLACE INTO notification_history(id, environment_id, endpoint_id, object_type, host_id, service_id, " +
+			"notification_id, type, send_time, state, previous_hard_state, author, `text`, users_notified) " +
+			"VALUES (?, ?, ?, ?, ?, ?, X'0000000000000000000000000000000000000000', ?, ?, ?, ?, '-', ?, ?)",
+	}
+
+	h := bulkInsert{
+		stmt: "REPLACE INTO history(id, environment_id, endpoint_id, object_type, host_id, service_id, " +
+			"notification_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, 'notification', ?)",
+	}
+
+	unh := bulkInsert{
+		stmt: "REPLACE INTO user_notification_history(id, environment_id, notification_history_id, user_id) " +
+			"VALUES (?, ?, ?, ?)",
+	}
+
+	var lastInserted uint64
+	massRander := bufio.NewReader(rand.Reader)
+
+	snapshot.query(
+		"SELECT n.notification_id, n.notification_reason, UNIX_TIMESTAMP(n.end_time), "+
+			"n.end_time_usec, n.state, n.output, n.long_output, n.contacts_notified, "+
+			"mo.objecttype_id, mo.name1, IFNULL(mo.name2, ''), "+
+			"uo.name1 "+
+			"FROM icinga_notifications n "+
+			"INNER JOIN icinga_objects mo ON mo.object_id=n.object_id "+
+			"INNER JOIN icinga_contactnotifications cn ON cn.notification_id=n.notification_id "+
+			"INNER JOIN icinga_objects uo ON uo.object_id=cn.contact_object_id "+
+			"WHERE n.notification_id BETWEEN ? AND ? "+
+			"ORDER BY n.notification_id",
+		[]interface{}{lni + 1, limit[0].NotificationId},
+		func(row struct {
+			NotificationId     uint64
+			NotificationReason uint8
+			EndTime            int64
+
+			EndTimeUsec      uint32
+			State            uint8
+			Output           string
+			LongOutput       string
+			ContactsNotified uint16
+
+			MonObjecttypeId uint8
+			MonObjectName1  string
+			MonObjectName2  string
+
+			UserName string
+		}) {
+			id := mkDeterministicUuid(notificationHistory, row.NotificationId)
+
+			if row.NotificationId != lastInserted {
+				lastInserted = row.NotificationId
+
+				if len(nh.rows) == *bulk {
+					flush(nh, h, unh)
+
+					nh.rows = nil
+					h.rows = nil
+					unh.rows = nil
+				}
+
+				monObjTyp := objectTypes[row.MonObjecttypeId]
+				hostId := calcObjectId(row.MonObjectName1)
+				serviceId := calcServiceId(row.MonObjectName1, row.MonObjectName2)
+				ts := convertTime(row.EndTime, row.EndTimeUsec)
+
+				var typ string
+				if row.NotificationReason == 0 {
+					if row.State == 0 {
+						typ = "recovery"
+					} else {
+						typ = "problem"
+					}
+				} else {
+					typ = notificationTypes[row.NotificationReason]
+				}
+
+				text := row.Output
+				if row.LongOutput == "" {
+					text += "\n\n" + row.LongOutput
+				}
+
+				nh.rows = append(nh.rows, []interface{}{
+					id, envId, endpointId, monObjTyp, hostId, serviceId, typ,
+					ts, row.State, <-previousHardStates, text, row.ContactsNotified,
+				})
+
+				h.rows = append(h.rows, []interface{}{id, envId, endpointId, monObjTyp, hostId, serviceId, id, ts})
+
+				bar.Increment()
+			}
+
+			unhId, errNR := uuid.NewRandomFromReader(massRander)
+			assert(errNR, "Couldn't generate random UUID", nil)
+
+			userId := calcObjectId(row.UserName)
+			unh.rows = append(unh.rows, []interface{}{unhId[:], envId, id, userId})
+		},
+	)
+
+	if len(nh.rows) > 0 {
+		flush(nh, h, unh)
+	}
+
+	syncBar.stopWorker()
+}
+
+// syncStates migrates IDO's icinga_statehistory table to Icinga DB's state_history table using the -sh-cache FILE.
 func syncStates() {
 	// Icinga DB's state_history#previous_hard_state would need a subquery.
 	// That make the IDO reading even slower than the Icinga DB writing.
 	// Therefore: Stream IDO's icinga_statehistory once, compute state_history#previous_hard_state
 	// and cache it into an SQLite database. Then steam from that database and the IDO.
 
-	dbc, errOp := sql.Open("sqlite3", "file:"+cache.value)
-	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": cache.value})
+	dbc, errOp := sql.Open("sqlite3", "file:"+sHcache.value)
+	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": sHcache.value})
 	defer dbc.Close()
 
 	cach := &database{
-		whichOne: "cache",
+		whichOne: "-sh-cache",
 		conn:     dbc,
 	}
 
@@ -101,7 +368,7 @@ func syncStates() {
 		// We continue where we finished before. As we build the cache in reverse chronological order:
 		// 1. If the history grows between two migration trials, we won't migrate the difference. Workarounds:
 		//    a. Start migration after Icinga DB is up and running.
-		//    b. Remove the -cache FILE before the next migration trial.
+		//    b. Remove the -sh-cache FILE before the next migration trial.
 		// 2. If the history gets cleaned up between two migration trials,
 		//    the difference either just doesn't appear in the cache or - if already there - will be ignored later.
 

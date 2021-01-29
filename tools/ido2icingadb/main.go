@@ -85,16 +85,17 @@ var ido = newDb("IDO")
 var icingaDb = newDb("Icinga DB")
 var bulk = flag.Int("bulk", 200, "FACTOR")
 
-var icingaEnv, icingaEndpoint, cache stringValue
+var icingaEnv, icingaEndpoint, nHcache, sHcache stringValue
 var envId, endpointId []byte
 
-var cacheBar = newMultiTaskBar(1)
-var syncBar = newMultiTaskBar(1)
+var cacheBar = newMultiTaskBar(2)
+var syncBar = newMultiTaskBar(2)
 
 func main() {
 	flag.Var(&icingaEnv, "icinga-env", "ENVIRONMENT")
 	flag.Var(&icingaEndpoint, "icinga-endpoint", "ENDPOINT")
-	flag.Var(&cache, "cache", "FILE")
+	flag.Var(&nHcache, "nh-cache", "FILE")
+	flag.Var(&sHcache, "sh-cache", "FILE")
 	flag.Parse()
 
 	ido.validate()
@@ -112,8 +113,14 @@ func main() {
 		os.Exit(2)
 	}
 
-	if !cache.isSet {
-		fmt.Fprintln(os.Stderr, "-cache missing")
+	if !nHcache.isSet {
+		fmt.Fprintln(os.Stderr, "-nh-cache missing")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	if !sHcache.isSet {
+		fmt.Fprintln(os.Stderr, "-sh-cache missing")
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -126,6 +133,7 @@ func main() {
 
 	log.Info("Building cache")
 
+	go syncNotifications()
 	go syncStates()
 
 	cacheBar.runMaster()
