@@ -68,12 +68,12 @@ func TestGetLastSyncedId(t *testing.T) {
 					t.Error("getProgress()'s total is wrong")
 				}
 
-				if done > int64(lastSynced-start) {
-					t.Error("getProgress()'s done is too high")
+				if done != int64(lastSynced-start+1) {
+					t.Error("getProgress()'s done is wrong")
 				}
 
-				if lsi > int64(lastSynced) {
-					t.Error("getProgress()'s lastSyncedId is too high")
+				if lsi != int64(lastSynced) {
+					t.Error("getProgress()'s lastSyncedId is wrong")
 				}
 			}
 		}

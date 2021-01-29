@@ -185,7 +185,7 @@ func syncStates() {
 
 	// Stream concurrently from two databases. Possible due to WHERE and ORDER BY.
 	go cach.query(
-		"SELECT previous_hard_state FROM previous_hard_state WHERE statehistory_id >= ? ORDER BY statehistory_id",
+		"SELECT previous_hard_state FROM previous_hard_state WHERE statehistory_id > ? ORDER BY statehistory_id",
 		[]interface{}{lsi},
 		func(row struct{ PreviousHardState uint8 }) {
 			previousHardStates <- row.PreviousHardState
@@ -213,7 +213,7 @@ func syncStates() {
 			"INNER JOIN icinga_objects o ON o.object_id=sh.object_id "+
 			"WHERE sh.statehistory_id BETWEEN ? AND ? "+
 			"ORDER BY sh.statehistory_id",
-		[]interface{}{lsi, limit[0].StatehistoryId},
+		[]interface{}{lsi + 1, limit[0].StatehistoryId},
 		func(row struct {
 			StatehistoryId uint64
 			StateTime      int64
@@ -312,15 +312,13 @@ func getProgress(idoTx tx, table historyTable, idoTable, idoIdColumn, icingadbTa
 		return
 	}
 
+	left.Int64 -= 1
 	query := fmt.Sprintf("SELECT 1 FROM %s WHERE id=?", icingadbTable)
-	total = right.Int64 - left.Int64 + 1
-	firstId := left.Int64
+	total = right.Int64 - left.Int64
+	firstLeft := left.Int64
 
 	for {
-		if lastSyncedId = left.Int64 + (right.Int64-left.Int64)/2; lastSyncedId == left.Int64 {
-			done = lastSyncedId - firstId
-			return
-		}
+		lastSyncedId = right.Int64 - (right.Int64-left.Int64)/2
 
 		has := false
 		icingaDb.query(
@@ -332,7 +330,13 @@ func getProgress(idoTx tx, table historyTable, idoTable, idoIdColumn, icingadbTa
 		if has {
 			left.Int64 = lastSyncedId
 		} else {
+			lastSyncedId--
 			right.Int64 = lastSyncedId
+		}
+
+		if left.Int64 == right.Int64 {
+			done = left.Int64 - firstLeft
+			return
 		}
 	}
 }
