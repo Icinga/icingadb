@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"fmt"
-	"github.com/cheggaaa/pb/v3"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
@@ -70,7 +69,7 @@ func syncStates() {
 	var limit []struct{ StatehistoryId sql.NullInt64 }
 
 	{
-		bar := pb.StartNew(int(total))
+		bar := cacheBar.startWorker(int(total))
 		tx := cach.begin(sql.LevelSerializable, false)
 		var checkpoint int64
 
@@ -176,8 +175,11 @@ func syncStates() {
 		tx.fetchAll(&limit, "SELECT MAX(statehistory_id) FROM previous_hard_state")
 
 		tx.commit()
-		bar.Finish()
+		cacheBar.stopWorker()
 	}
+
+	bar := syncBar.startWorker(int(total))
+	bar.Add(int(done))
 
 	previousHardStates := make(chan uint8, 64)
 
@@ -189,9 +191,6 @@ func syncStates() {
 			previousHardStates <- row.PreviousHardState
 		},
 	)
-
-	bar := pb.StartNew(int(total))
-	bar.Add(int(done))
 
 	sh := bulkInsert{
 		stmt: "REPLACE INTO state_history(id, environment_id, endpoint_id, object_type, host_id, " +
@@ -265,7 +264,7 @@ func syncStates() {
 		flush(sh, h)
 	}
 
-	bar.Finish()
+	syncBar.stopWorker()
 }
 
 // flush runs bulks on icingaDb in a single transaction.

@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/cheggaaa/pb/v3"
 	log "github.com/sirupsen/logrus"
 	"os"
+	"sync"
 )
 
 // stringValue allows to differ a string not passed via the CLI and an empty string passed via the CLI
@@ -30,12 +32,64 @@ func (sv *stringValue) Set(s string) error {
 	return nil
 }
 
+// multiTaskBar lets multiple workers report their progress to a single progress bar.
+type multiTaskBar struct {
+	// items contains the amount of work per worker.
+	items chan int
+	// bar indicates the overall progress.
+	bar *pb.ProgressBar
+	// start indicates that bar is ready.
+	start chan struct{}
+	// wg indicates that the workers are done.
+	wg sync.WaitGroup
+}
+
+// runMaster coordinates everything and waits until the workers are done.
+func (mtb *multiTaskBar) runMaster() {
+	items := 0
+	for i := cap(mtb.items); i > 0; i-- {
+		items += <-mtb.items
+	}
+
+	mtb.bar = pb.StartNew(items)
+	close(mtb.start)
+
+	mtb.wg.Wait()
+	mtb.bar.Finish()
+}
+
+// startWorker shall be called once per worker with their individual amount of work.
+func (mtb *multiTaskBar) startWorker(items int) *pb.ProgressBar {
+	mtb.items <- items
+	<-mtb.start
+	return mtb.bar
+}
+
+// stopWorker shall be called once per worker once done.
+func (mtb *multiTaskBar) stopWorker() {
+	mtb.wg.Done()
+}
+
+// newMultiTaskBar creates a new multiTaskBar suitable for workers workers.
+func newMultiTaskBar(workers int) *multiTaskBar {
+	mtb := &multiTaskBar{
+		items: make(chan int, workers),
+		start: make(chan struct{}),
+	}
+
+	mtb.wg.Add(workers)
+	return mtb
+}
+
 var ido = newDb("IDO")
 var icingaDb = newDb("Icinga DB")
 var bulk = flag.Int("bulk", 200, "FACTOR")
 
 var icingaEnv, icingaEndpoint, cache stringValue
 var envId, endpointId []byte
+
+var cacheBar = newMultiTaskBar(1)
+var syncBar = newMultiTaskBar(1)
 
 func main() {
 	flag.Var(&icingaEnv, "icinga-env", "ENVIRONMENT")
@@ -70,7 +124,14 @@ func main() {
 	ido.connect()
 	icingaDb.connect()
 
-	syncStates()
+	log.Info("Building cache")
+
+	go syncStates()
+
+	cacheBar.runMaster()
+
+	log.Info("Migrating history")
+	syncBar.runMaster()
 }
 
 // assert logs message with fields and err and terminates the program if err is not nil.
