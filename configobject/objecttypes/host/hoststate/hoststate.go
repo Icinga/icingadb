@@ -90,8 +90,8 @@ func (h *HostState) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
 	limit := 65535
-
-	outputVal, truncated := utils.TruncText(h.Output, limit)
+    biglimit := 16777215
+	outputVal, truncated := utils.TruncText(h.Output, biglimit)
 	if truncated {
 		log.WithFields(log.Fields{
 			"Table": "host_state",
@@ -100,7 +100,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		}).Infof("Truncated plugin output to 64KB")
 	}
 
-	longOutputVal, truncated := utils.TruncText(h.LongOutput, limit)
+	longOutputVal, truncated := utils.TruncText(h.LongOutput, biglimit)
 	if truncated {
 		log.WithFields(log.Fields{
 			"Table": "host_state",
@@ -109,7 +109,7 @@ func (h *HostState) UpdateValues() []interface{} {
 		}).Infof("Truncated long plugin output to 64KB")
 	}
 
-	perfData, truncated := utils.TruncPerfData(h.PerformanceData, limit)
+	perfData, truncated := utils.TruncPerfData(h.PerformanceData, biglimit)
 	if truncated {
 		log.WithFields(log.Fields{
 			"Table": "host_state",

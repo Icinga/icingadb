@@ -90,8 +90,9 @@ func (s *ServiceState) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
 	limit := 65535
+	biglimit := 16777215
 
-	outputVal, truncated := utils.TruncText(s.Output, limit)
+	outputVal, truncated := utils.TruncText(s.Output, biglimit)
 	if truncated {
 		log.WithFields(log.Fields{
 			"Table": "service_state",
@@ -100,7 +101,7 @@ func (s *ServiceState) UpdateValues() []interface{} {
 		}).Infof("Truncated plugin output to 64KB", )
 	}
 
-	longOutputVal, truncated := utils.TruncText(s.LongOutput, limit)
+	longOutputVal, truncated := utils.TruncText(s.LongOutput, biglimit)
 	if truncated {
 		log.WithFields(log.Fields{
 			"Table": "service_state",
@@ -109,7 +110,7 @@ func (s *ServiceState) UpdateValues() []interface{} {
 		}).Infof("Truncated long plugin output to 64KB")
 	}
 
-	perfData, truncated := utils.TruncPerfData(s.PerformanceData, limit)
+	perfData, truncated := utils.TruncPerfData(s.PerformanceData, biglimit)
 	if truncated {
 		log.WithFields(log.Fields{
 			"Table": "service_state",

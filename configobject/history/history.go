@@ -14,6 +14,10 @@ import (
 	"sync/atomic"
 	"time"
 )
+const(
+	limit = 65535
+	biglimit = 16777215
+)
 
 var mysqlObservers = struct {
 	state            prometheus.Observer
@@ -105,7 +109,7 @@ func notificationHistoryWorker(super *supervisor.Supervisor) {
 		func(values map[string]interface{}) []interface{} {
 			id := uuid.MustParse(values["id"].(string))
 
-			text, truncated := utils.TruncText(values["text"].(string), 65535)
+			text, truncated := utils.TruncText(values["text"].(string), limit)
 			if truncated {
 				log.WithFields(log.Fields{
 					"Table": "notification_history",
@@ -197,7 +201,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 		func(values map[string]interface{}) []interface{} {
 			id := uuid.MustParse(values["id"].(string))
 
-			outputVal, truncated := utils.TruncText(utils.DefaultIfNil(values["output"], "").(string), 65535)
+			outputVal, truncated := utils.TruncText(utils.DefaultIfNil(values["output"], "").(string), biglimit)
 			if truncated {
 				log.WithFields(log.Fields{
 					"Table": "state_history",
@@ -206,7 +210,7 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 				}).Infof("Truncated plugin output to 64KB")
 			}
 
-			longOutputVal, truncated := utils.TruncText(utils.DefaultIfNil(values["long_output"], "").(string), 65535)
+			longOutputVal, truncated := utils.TruncText(utils.DefaultIfNil(values["long_output"], "").(string), biglimit)
 			if truncated {
 				log.WithFields(log.Fields{
 					"Table": "state_history",
@@ -286,7 +290,7 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 				triggeredById = utils.EncodeChecksum(values["triggered_by_id"].(string))
 			}
 
-			comment, truncated := utils.TruncText(values["comment"].(string), 65535)
+			comment, truncated := utils.TruncText(values["comment"].(string), limit)
 			if truncated {
 				log.WithFields(log.Fields{
 					"Table": "downtime_history",
@@ -371,7 +375,7 @@ func commentHistoryWorker(super *supervisor.Supervisor) {
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
 		func(values map[string]interface{}) []interface{} {
-			comment, truncated := utils.TruncText(values["comment"].(string), 65535)
+			comment, truncated := utils.TruncText(values["comment"].(string), limit)
 			if truncated {
 				log.WithFields(log.Fields{
 					"Table": "comment_history",
@@ -531,7 +535,7 @@ func acknowledgementHistoryWorker(super *supervisor.Supervisor) {
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
 		func(values map[string]interface{}) []interface{} {
-			comment, truncated := utils.TruncText(utils.DefaultIfNil(values["comment"], "").(string), 65535)
+			comment, truncated := utils.TruncText(utils.DefaultIfNil(values["comment"], "").(string), limit)
 			if truncated {
 				log.WithFields(log.Fields{
 					"Table": "acknowledgement_history",
