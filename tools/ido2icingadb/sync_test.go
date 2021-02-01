@@ -26,7 +26,10 @@ func TestGetLastSyncedId(t *testing.T) {
 	icingaDb.conn = db
 	tx := ido.begin(sql.LevelRepeatableRead, true)
 
-	total, done, lsi := getProgress(tx, stateHistory, "icinga_statehistory", "statehistory_id", "state_history", "id")
+	total, done, lsi := getProgress(
+		tx, "icinga_statehistory", "statehistory_id", "state_history", "id",
+		func(idoId uint64) []byte { return mkDeterministicUuid(stateHistory, idoId) },
+	)
 	if total != 0 || done != 0 || lsi != 0 {
 		t.Error("getProgress() must return 0,0,0 if the IDO table is empty")
 	}
@@ -61,7 +64,8 @@ func TestGetLastSyncedId(t *testing.T) {
 				}
 
 				total, done, lsi := getProgress(
-					tx, stateHistory, "icinga_statehistory", "statehistory_id", "state_history", "id",
+					tx, "icinga_statehistory", "statehistory_id", "state_history", "id",
+					func(idoId uint64) []byte { return mkDeterministicUuid(stateHistory, idoId) },
 				)
 
 				if total != int64(evenOdd)+11 {
