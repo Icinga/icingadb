@@ -67,7 +67,7 @@ func syncNotifications() {
 	defer snapshot.commit()
 
 	total, done, lni := getProgress(
-		snapshot, notificationHistory, "icinga_notifications", "notification_id", "notification_history",
+		snapshot, notificationHistory, "icinga_notifications", "notification_id", "notification_history", "id",
 	)
 
 	var limit []struct{ NotificationId sql.NullInt64 }
@@ -351,7 +351,10 @@ func syncStates() {
 	snapshot := ido.begin(sql.LevelRepeatableRead, true)
 	defer snapshot.commit()
 
-	total, done, lsi := getProgress(snapshot, stateHistory, "icinga_statehistory", "statehistory_id", "state_history")
+	total, done, lsi := getProgress(
+		snapshot, stateHistory, "icinga_statehistory", "statehistory_id", "state_history", "id",
+	)
+
 	var limit []struct{ StatehistoryId sql.NullInt64 }
 
 	{
@@ -597,9 +600,9 @@ func flush(bulks ...bulkInsert) {
 	tx.commit()
 }
 
-// getProgress bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable using idoTx
+// getProgress bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable's icingadbIdColumn using idoTx
 // and returns the current progress and an idoIdColumn value to start/continue sync with.
-func getProgress(idoTx tx, table historyTable, idoTable, idoIdColumn, icingadbTable string) (
+func getProgress(idoTx tx, table historyTable, idoTable, idoIdColumn, icingadbTable, icingadbIdColumn string) (
 	total, done, lastSyncedId int64,
 ) {
 	var left, right sql.NullInt64
@@ -618,7 +621,7 @@ func getProgress(idoTx tx, table historyTable, idoTable, idoIdColumn, icingadbTa
 	}
 
 	left.Int64 -= 1
-	query := fmt.Sprintf("SELECT 1 FROM %s WHERE id=?", icingadbTable)
+	query := fmt.Sprintf("SELECT 1 FROM %s WHERE %s=?", icingadbTable, icingadbIdColumn)
 	total = right.Int64 - left.Int64
 	firstLeft := left.Int64
 
