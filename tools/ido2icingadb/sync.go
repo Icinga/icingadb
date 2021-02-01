@@ -215,19 +215,8 @@ func syncNotifications() {
 	var lastInserted uint64
 	massRander := bufio.NewReader(rand.Reader)
 
-	snapshot.query(
-		"SELECT n.notification_id, n.notification_reason, UNIX_TIMESTAMP(n.end_time), "+
-			"n.end_time_usec, n.state, n.output, n.long_output, n.contacts_notified, "+
-			"mo.objecttype_id, mo.name1, IFNULL(mo.name2, ''), "+
-			"uo.name1 "+
-			"FROM icinga_notifications n "+
-			"INNER JOIN icinga_objects mo ON mo.object_id=n.object_id "+
-			"INNER JOIN icinga_contactnotifications cn ON cn.notification_id=n.notification_id "+
-			"INNER JOIN icinga_objects uo ON uo.object_id=cn.contact_object_id "+
-			"WHERE n.notification_id BETWEEN ? AND ? "+
-			"ORDER BY n.notification_id",
-		[]interface{}{lni + 1, limit[0].NotificationId},
-		func(row struct {
+	{
+		ch := make(chan struct {
 			NotificationId     uint64
 			NotificationReason uint8
 			EndTime            int64
@@ -243,7 +232,25 @@ func syncNotifications() {
 			MonObjectName2  string
 
 			UserName string
-		}) {
+		}, chSize)
+
+		go streamQuery(
+			snapshot,
+			ch,
+			"SELECT n.notification_id, n.notification_reason, UNIX_TIMESTAMP(n.end_time), "+
+				"n.end_time_usec, n.state, n.output, n.long_output, n.contacts_notified, "+
+				"mo.objecttype_id, mo.name1, IFNULL(mo.name2, ''), "+
+				"uo.name1 "+
+				"FROM icinga_notifications n "+
+				"INNER JOIN icinga_objects mo ON mo.object_id=n.object_id "+
+				"INNER JOIN icinga_contactnotifications cn ON cn.notification_id=n.notification_id "+
+				"INNER JOIN icinga_objects uo ON uo.object_id=cn.contact_object_id "+
+				"WHERE n.notification_id BETWEEN ? AND ? "+
+				"ORDER BY n.notification_id",
+			lni+1, limit[0].NotificationId,
+		)
+
+		for row := range ch {
 			id := mkDeterministicUuid(notificationHistory, row.NotificationId)
 
 			if row.NotificationId != lastInserted {
@@ -293,8 +300,10 @@ func syncNotifications() {
 
 			userId := calcObjectId(row.UserName)
 			unh.rows = append(unh.rows, []interface{}{unhId[:], envId, id, userId})
-		},
-	)
+		}
+
+		<-ch
+	}
 
 	if len(nh.rows) > 0 {
 		flush(nh, h, unh)
@@ -493,17 +502,8 @@ func syncStates() {
 			"state_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, 'state_change', ?)",
 	}
 
-	snapshot.query(
-		"SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_time), sh.state_time_usec, "+
-			"sh.state_change, sh.state, sh.state_type, sh.current_check_attempt, sh.max_check_attempts, "+
-			"sh.last_state, sh.last_hard_state, sh.output, sh.long_output, sh.check_source, "+
-			"o.objecttype_id, o.name1, IFNULL(o.name2, '') "+
-			"FROM icinga_statehistory sh "+
-			"INNER JOIN icinga_objects o ON o.object_id=sh.object_id "+
-			"WHERE sh.statehistory_id BETWEEN ? AND ? "+
-			"ORDER BY sh.statehistory_id",
-		[]interface{}{lsi + 1, limit[0].StatehistoryId},
-		func(row struct {
+	{
+		ch := make(chan struct {
 			StatehistoryId uint64
 			StateTime      int64
 			StateTimeUsec  uint32
@@ -523,7 +523,23 @@ func syncStates() {
 			ObjecttypeId uint8
 			Name1        string
 			Name2        string
-		}) {
+		}, chSize)
+
+		go streamQuery(
+			snapshot,
+			ch,
+			"SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_time), sh.state_time_usec, "+
+				"sh.state_change, sh.state, sh.state_type, sh.current_check_attempt, sh.max_check_attempts, "+
+				"sh.last_state, sh.last_hard_state, sh.output, sh.long_output, sh.check_source, "+
+				"o.objecttype_id, o.name1, IFNULL(o.name2, '') "+
+				"FROM icinga_statehistory sh "+
+				"INNER JOIN icinga_objects o ON o.object_id=sh.object_id "+
+				"WHERE sh.statehistory_id BETWEEN ? AND ? "+
+				"ORDER BY sh.statehistory_id",
+			lsi+1, limit[0].StatehistoryId,
+		)
+
+		for row := range ch {
 			id := mkDeterministicUuid(stateHistory, row.StatehistoryId)
 			typ := objectTypes[row.ObjecttypeId]
 			hostId := calcObjectId(row.Name1)
@@ -546,8 +562,10 @@ func syncStates() {
 			}
 
 			bar.Increment()
-		},
-	)
+		}
+
+		<-ch
+	}
 
 	if len(sh.rows) > 0 {
 		flush(sh, h)
