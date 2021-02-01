@@ -121,6 +121,41 @@ func TestTx_query(t *testing.T) {
 	})
 }
 
+func TestStreamQuery(t *testing.T) {
+	db := mkTestDb(t, "TestStreamQuery")
+	defer db.Close()
+
+	dB := database{conn: db}
+	var actual []row
+
+	{
+		ch := make(chan row)
+		go streamQuery(&dB, ch, query, nil)
+
+		for r := range ch {
+			actual = append(actual, r)
+		}
+	}
+
+	if len(actual) == len(expected) {
+		for i, v := range actual {
+			if !reflect.DeepEqual(v, expected[i]) {
+				t.Errorf("channel received %#v, not %#v on %d. time", v, expected[i], i+1)
+			}
+		}
+	} else {
+		t.Errorf("channel received %d, not 3 items", len(actual))
+	}
+
+	assertPanic(t, func() {
+		streamQuery(&dB, []row(nil), query, nil)
+	})
+
+	assertPanic(t, func() {
+		streamQuery(&dB, make(chan int), query, nil)
+	})
+}
+
 func mkTestDb(t *testing.T, name string) *sql.DB {
 	db, errOp := sql.Open("sqlite3", "file:"+name+"?mode=memory&cache=shared")
 	if errOp != nil {

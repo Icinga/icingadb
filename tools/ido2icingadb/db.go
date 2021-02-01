@@ -255,3 +255,33 @@ func (t tx) exec(query string, args ...interface{}) {
 func (t tx) commit() {
 	assert(t.tx.Commit(), "Couldn't commit transaction", log.Fields{"backend": t.db.whichOne})
 }
+
+// queryable abstracts *database and tx.
+type queryable interface {
+	query(query string, args []interface{}, onRow interface{})
+}
+
+// streamQuery performs query with args on source and sends each row to dest.
+func streamQuery(source queryable, dest interface{}, query string, args ...interface{}) {
+	vDest := reflect.ValueOf(dest)
+	tDest := vDest.Type()
+
+	if tDest.Kind() != reflect.Chan {
+		panic("dest must be a channel")
+	}
+
+	tDestElem := tDest.Elem()
+	if tDestElem.Kind() != reflect.Struct {
+		panic("dest must be a channel of structs")
+	}
+
+	defer vDest.Close()
+
+	source.query(query, args, reflect.MakeFunc(
+		reflect.FuncOf([]reflect.Type{tDestElem}, nil, false),
+		func(args []reflect.Value) []reflect.Value {
+			vDest.Send(args[0])
+			return nil
+		},
+	).Interface())
+}
