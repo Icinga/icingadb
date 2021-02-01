@@ -99,15 +99,22 @@ func syncNotifications() {
 		bar.Add(int(phsC[0].Count + niCMNi[0].Count))
 		inTx := 0
 
-		snapshot.query(
-			"SELECT notification_id, object_id, state FROM icinga_notifications "+
-				"WHERE notification_id < ? ORDER BY notification_id DESC",
-			[]interface{}{checkpoint},
-			func(row struct {
+		{
+			ch := make(chan struct {
 				NotificationId uint64
 				ObjectId       uint64
 				State          uint8
-			}) {
+			}, chSize)
+
+			go streamQuery(
+				snapshot,
+				ch,
+				"SELECT notification_id, object_id, state FROM icinga_notifications "+
+					"WHERE notification_id < ? ORDER BY notification_id DESC",
+				checkpoint,
+			)
+
+			for row := range ch {
 				var nhs []struct{ NextHardState uint8 }
 				tx.fetchAll(&nhs, "SELECT next_hard_state FROM next_hard_state WHERE object_id=?", row.ObjectId)
 
@@ -155,8 +162,10 @@ func syncNotifications() {
 				}
 
 				bar.Increment()
-			},
-		)
+			}
+
+			<-ch
+		}
 
 		tx.exec(
 			"INSERT INTO previous_hard_state(notification_id, previous_hard_state) " +
@@ -367,22 +376,29 @@ func syncStates() {
 		bar.Add(int(phsC[0].Count + niCMShi[0].Count))
 		inTx := 0
 
-		// We continue where we finished before. As we build the cache in reverse chronological order:
-		// 1. If the history grows between two migration trials, we won't migrate the difference. Workarounds:
-		//    a. Start migration after Icinga DB is up and running.
-		//    b. Remove the -sh-cache FILE before the next migration trial.
-		// 2. If the history gets cleaned up between two migration trials,
-		//    the difference either just doesn't appear in the cache or - if already there - will be ignored later.
-
-		snapshot.query(
-			"SELECT statehistory_id, object_id, last_hard_state FROM icinga_statehistory "+
-				"WHERE statehistory_id < ? ORDER BY statehistory_id DESC",
-			[]interface{}{checkpoint},
-			func(row struct {
+		{
+			ch := make(chan struct {
 				StatehistoryId uint64
 				ObjectId       uint64
 				LastHardState  uint8
-			}) {
+			}, chSize)
+
+			// We continue where we finished before. As we build the cache in reverse chronological order:
+			// 1. If the history grows between two migration trials, we won't migrate the difference. Workarounds:
+			//    a. Start migration after Icinga DB is up and running.
+			//    b. Remove the -sh-cache FILE before the next migration trial.
+			// 2. If the history gets cleaned up between two migration trials,
+			//    the difference either just doesn't appear in the cache or - if already there - will be ignored later.
+
+			go streamQuery(
+				snapshot,
+				ch,
+				"SELECT statehistory_id, object_id, last_hard_state FROM icinga_statehistory "+
+					"WHERE statehistory_id < ? ORDER BY statehistory_id DESC",
+				checkpoint,
+			)
+
+			for row := range ch {
 				var nhs []struct{ NextHardState uint8 }
 				tx.fetchAll(&nhs, "SELECT next_hard_state FROM next_hard_state WHERE object_id=?", row.ObjectId)
 
@@ -430,8 +446,10 @@ func syncStates() {
 				}
 
 				bar.Increment()
-			},
-		)
+			}
+
+			<-ch
+		}
 
 		tx.exec(
 			"INSERT INTO previous_hard_state(statehistory_id, previous_hard_state) " +

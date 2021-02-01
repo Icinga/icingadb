@@ -84,6 +84,7 @@ func newMultiTaskBar(workers int) *multiTaskBar {
 var ido = newDb("IDO")
 var icingaDb = newDb("Icinga DB")
 var bulk = flag.Int("bulk", 200, "FACTOR")
+var chSize = 64
 
 var icingaEnv, icingaEndpoint, nHcache, sHcache stringValue
 var envId, endpointId []byte
@@ -127,6 +128,10 @@ func main() {
 
 	envId = hashStr(icingaEnv.value)
 	endpointId = hashAny([2]string{icingaEnv.value, icingaEndpoint.value})
+
+	if *bulk > chSize {
+		chSize = *bulk
+	}
 
 	ido.connect()
 	icingaDb.connect()
