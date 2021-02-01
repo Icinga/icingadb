@@ -186,14 +186,13 @@ func syncNotifications() {
 	bar := syncBar.startWorker(int(total))
 	bar.Add(int(done))
 
-	previousHardStates := make(chan uint8, 64)
+	previousHardStates := make(chan struct{ PreviousHardState uint8 }, 64)
 
-	go cach.query(
+	go streamQuery(
+		cach,
+		previousHardStates,
 		"SELECT previous_hard_state FROM previous_hard_state WHERE notification_id > ? ORDER BY notification_id",
-		[]interface{}{lni},
-		func(row struct{ PreviousHardState uint8 }) {
-			previousHardStates <- row.PreviousHardState
-		},
+		lni,
 	)
 
 	nh := bulkInsert{
@@ -286,8 +285,8 @@ func syncNotifications() {
 				}
 
 				nh.rows = append(nh.rows, []interface{}{
-					id, envId, endpointId, monObjTyp, hostId, serviceId, typ,
-					ts, row.State, <-previousHardStates, text, row.ContactsNotified,
+					id, envId, endpointId, monObjTyp, hostId, serviceId, typ, ts, row.State,
+					(<-previousHardStates).PreviousHardState, text, row.ContactsNotified,
 				})
 
 				h.rows = append(h.rows, []interface{}{id, envId, endpointId, monObjTyp, hostId, serviceId, id, ts})
@@ -479,15 +478,14 @@ func syncStates() {
 	bar := syncBar.startWorker(int(total))
 	bar.Add(int(done))
 
-	previousHardStates := make(chan uint8, 64)
+	previousHardStates := make(chan struct{ PreviousHardState uint8 }, chSize)
 
 	// Stream concurrently from two databases. Possible due to WHERE and ORDER BY.
-	go cach.query(
+	go streamQuery(
+		cach,
+		previousHardStates,
 		"SELECT previous_hard_state FROM previous_hard_state WHERE statehistory_id > ? ORDER BY statehistory_id",
-		[]interface{}{lsi},
-		func(row struct{ PreviousHardState uint8 }) {
-			previousHardStates <- row.PreviousHardState
-		},
+		lsi,
 	)
 
 	sh := bulkInsert{
@@ -548,7 +546,7 @@ func syncStates() {
 
 			sh.rows = append(sh.rows, []interface{}{
 				id, envId, endpointId, typ, hostId, serviceId, ts, stateTypes[row.StateType], row.State,
-				row.LastHardState, row.LastState, <-previousHardStates, row.CurrentCheckAttempt,
+				row.LastHardState, row.LastState, (<-previousHardStates).PreviousHardState, row.CurrentCheckAttempt,
 				row.Output, row.LongOutput, row.MaxCheckAttempts, row.CheckSource,
 			})
 
