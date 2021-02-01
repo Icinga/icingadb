@@ -76,6 +76,7 @@ type RedisClient interface {
 	XDel(stream string, ids ...string) *redis.IntCmd
 	XAdd(a *redis.XAddArgs) *redis.StringCmd
 	HKeys(key string) *redis.StringSliceCmd
+	HScan(key string, cursor uint64, match string, count int64) *redis.ScanCmd
 	HMGet(key string, fields ...string) *redis.SliceCmd
 	HGetAll(key string) *redis.StringStringMapCmd
 	TxPipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
@@ -297,6 +298,27 @@ func (rdbw *RDBWrapper) HKeys(key string) *redis.StringSliceCmd {
 
 		cmd := rdbw.Rdb.HKeys(key)
 		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// HScan is a wrapper for connection handling.
+func (rdbw *RDBWrapper) HScan(key string, cursor uint64, match string, count int64) *redis.ScanCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.HScan(key, cursor, match, count)
+		_, _, err := cmd.Result()
 
 		if err != nil {
 			if !rdbw.CheckConnection(false) {

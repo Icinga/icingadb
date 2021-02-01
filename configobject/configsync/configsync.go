@@ -211,13 +211,30 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		var err error
-		res, err := super.Rdbw.HKeys(fmt.Sprintf("icinga:config:%s", objectInformation.RedisKey)).Result()
-		if err != nil {
+
+		key := fmt.Sprintf("icinga:config:%s", objectInformation.RedisKey)
+		cursor := uint64(0)
+
+		// Redis HSCAN may return duplicate results, use a map to remove duplicates.
+		idHash := make(map[string]bool)
+
+		iter := super.Rdbw.HScan(key, cursor, "", 1000).Iterator()
+		for i := 0; iter.Next(); i++ {
+			// HScan returns a slice of alternating keys and values.
+			// As only the keys are needed, only consider even indices.
+			if i % 2 == 0 {
+				idHash[iter.Val()] = true
+			}
+		}
+		if err := iter.Err(); err != nil {
 			super.ChErr <- err
 			return
 		}
-		redisIds = res
+
+		redisIds = make([]string, 0, len(idHash))
+		for id, _ := range idHash {
+			redisIds = append(redisIds, id)
+		}
 	}()
 
 	//get ids from mysql
