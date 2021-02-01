@@ -169,6 +169,8 @@ func syncNotifications() {
 		tx.fetchAll(&limit, "SELECT MAX(notification_id) FROM previous_hard_state")
 
 		tx.commit()
+		cach.exec("VACUUM")
+
 		cacheBar.stopWorker()
 	}
 
@@ -442,6 +444,8 @@ func syncStates() {
 		tx.fetchAll(&limit, "SELECT MAX(statehistory_id) FROM previous_hard_state")
 
 		tx.commit()
+		cach.exec("VACUUM")
+
 		cacheBar.stopWorker()
 	}
 
