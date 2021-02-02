@@ -975,7 +975,7 @@ CREATE TABLE comment_history (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE flapping_history (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.name + "host"|"service" + host|service.name + start_time)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + "Host"|"Service" + host|service.name + start_time)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
@@ -993,7 +993,7 @@ CREATE TABLE flapping_history (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE acknowledgement_history (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.name + "host"|"service" + host|service.name + set_time)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + "Host"|"Service" + host|service.name + set_time)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
