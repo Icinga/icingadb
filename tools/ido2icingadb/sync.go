@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"io"
 )
 
 // historyTable represents Icinga DB history tables.
@@ -295,11 +296,8 @@ func syncNotifications() {
 				bar.Increment()
 			}
 
-			unhId, errNR := uuid.NewRandomFromReader(massRander)
-			assert(errNR, "Couldn't generate random UUID", nil)
-
 			userId := calcObjectId(row.UserName)
-			unh.rows = append(unh.rows, []interface{}{unhId[:], envId, id, userId})
+			unh.rows = append(unh.rows, []interface{}{mkRandomUuid(massRander), envId, id, userId})
 		}
 
 		<-ch
@@ -691,6 +689,13 @@ func mkDeterministicUuid(table historyTable, rowId uint64) []byte {
 	copy(uid[9:], bEId[1:])
 
 	return uid[:]
+}
+
+// mkRandomUuid generates a new UUIDv4.
+func mkRandomUuid(rander io.Reader) []byte {
+	id, errNR := uuid.NewRandomFromReader(rander)
+	assert(errNR, "Couldn't generate random UUID", nil)
+	return id[:]
 }
 
 // convertTime converts *nix timestamps from the IDO for Icinga DB.
