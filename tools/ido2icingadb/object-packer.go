@@ -35,7 +35,11 @@ func hashAny(in interface{}) []byte {
 }
 
 // calcObjectId calculates the ID of the config object named name1 for Icinga DB.
-func calcObjectId(name1 string) []byte {
+func calcObjectId(name1 string) interface{} {
+	if name1 == "" {
+		return nil
+	}
+
 	return hashAny([2]string{icingaEnv.value, name1})
 }
 
