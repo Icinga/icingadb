@@ -16,7 +16,7 @@ var icingaEnv, icingaEndpoint, nHcache, sHcache stringValue
 var envId, endpointId []byte
 
 var cacheBar = newMultiTaskBar(2)
-var syncBar = newMultiTaskBar(3)
+var syncBar = newMultiTaskBar(4)
 
 func main() {
 	flag.Var(&icingaEnv, "icinga-env", "ENVIRONMENT")
@@ -64,6 +64,7 @@ func main() {
 
 	log.Info("Building cache")
 
+	go syncComments()
 	go syncDowntimes()
 	go syncNotifications()
 	go syncStates()

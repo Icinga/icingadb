@@ -23,6 +23,7 @@ const (
 
 var bools = map[uint8]string{0: "n", 1: "y"}
 var objectTypes = map[uint8]string{1: "host", 2: "service"}
+var commentTypes = map[uint8]string{1: "comment", 4: "ack"}
 var stateTypes = map[uint8]string{0: "soft", 1: "hard"}
 
 var notificationTypes = map[uint8]string{

@@ -4,8 +4,124 @@ import (
 	"bufio"
 	"crypto/rand"
 	"database/sql"
+	"github.com/Icinga/icingadb/utils"
 	log "github.com/sirupsen/logrus"
 )
+
+// syncComments migrates IDO's icinga_commenthistory table to Icinga DB's comment_history table.
+func syncComments() {
+	snapshot := ido.begin(sql.LevelRepeatableRead, true)
+	defer snapshot.commit()
+
+	total, done, lci := getProgress(
+		snapshot, "icinga_commenthistory", "commenthistory_id", "comment_history", "comment_id",
+		func(idoId uint64) interface{} {
+			var res []struct{ Name string }
+			snapshot.fetchAll(&res, "SELECT name FROM icinga_commenthistory WHERE commenthistory_id=?", idoId)
+
+			if len(res) < 1 {
+				return make([]byte, 20)
+			} else {
+				return calcObjectId(res[0].Name)
+			}
+		},
+	)
+
+	bar := syncBar.startWorker(int(total))
+	bar.Add(int(done))
+
+	coh := bulkInsert{
+		stmt: "REPLACE INTO comment_history(comment_id, environment_id, endpoint_id, object_type, host_id, " +
+			"service_id, entry_time, author, comment, entry_type, is_persistent, is_sticky, expire_time, " +
+			"remove_time, has_been_removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'n', ?, ?, ?)",
+	}
+
+	h := bulkInsert{
+		stmt: "REPLACE INTO history(id, environment_id, endpoint_id, object_type, host_id, service_id, " +
+			"comment_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	}
+
+	{
+		ch := make(chan struct {
+			EntryTime     int64
+			EntryTimeUsec uint32
+			EntryType     uint8
+			AuthorName    string
+
+			CommentData    string
+			IsPersistent   uint8
+			Expires        uint8
+			ExpirationTime int64
+
+			DeletionTime     int64
+			DeletionTimeUsec uint32
+			Name             string
+
+			MonObjecttypeId uint8
+			MonObjName1     string
+			MonObjName2     string
+		}, chSize)
+
+		go streamQuery(
+			snapshot,
+			ch,
+			"SELECT UNIX_TIMESTAMP(ch.entry_time), ch.entry_time_usec, ch.entry_type, ch.author_name, "+
+				"ch.comment_data, ch.is_persistent, ch.expires, IFNULL(UNIX_TIMESTAMP(ch.expiration_time), 0), "+
+				"IFNULL(UNIX_TIMESTAMP(ch.deletion_time), 0), ch.deletion_time_usec, ch.name, "+
+				"o.objecttype_id, o.name1, IFNULL(o.name2, '') "+
+				"FROM icinga_commenthistory ch "+
+				"INNER JOIN icinga_objects o ON o.object_id=ch.object_id "+
+				"WHERE ch.commenthistory_id > ? "+
+				"ORDER BY ch.commenthistory_id",
+			lci,
+		)
+
+		massRander := bufio.NewReader(rand.Reader)
+
+		for row := range ch {
+			id := calcObjectId(row.Name)
+			typ := objectTypes[row.MonObjecttypeId]
+			hostId := calcObjectId(row.MonObjName1)
+			serviceId := calcServiceId(row.MonObjName1, row.MonObjName2)
+			removeTime := convertTime(row.DeletionTime, row.DeletionTimeUsec)
+
+			coh.rows = append(coh.rows, []interface{}{
+				id, envId, endpointId, typ, hostId, serviceId, row.EntryTime * 1000, row.AuthorName,
+				row.CommentData, commentTypes[row.EntryType], bools[row.IsPersistent],
+				row.ExpirationTime * 1000, removeTime, utils.Bool[removeTime == 0],
+			})
+
+			h.rows = append(h.rows, []interface{}{
+				mkRandomUuid(massRander), envId, endpointId, typ, hostId,
+				serviceId, id, "comment_add", row.EntryTime * 1000,
+			})
+
+			if removeTime != 0 {
+				h.rows = append(h.rows, []interface{}{
+					mkRandomUuid(massRander), envId, endpointId, typ, hostId,
+					serviceId, id, "comment_remove", removeTime,
+				})
+			}
+
+			if len(coh.rows) == *bulk {
+				flush(coh, h)
+
+				coh.rows = nil
+				h.rows = nil
+			}
+
+			bar.Increment()
+		}
+
+		<-ch
+	}
+
+	if len(coh.rows) > 0 {
+		flush(coh, h)
+	}
+
+	syncBar.stopWorker()
+}
 
 // syncDowntimes migrates IDO's icinga_downtimehistory table to Icinga DB's downtime_history table.
 func syncDowntimes() {
