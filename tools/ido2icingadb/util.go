@@ -60,10 +60,14 @@ func (sv *stringValue) Set(s string) error {
 	return nil
 }
 
+type progress struct {
+	total, done int64
+}
+
 // multiTaskBar lets multiple workers report their progress to a single progress bar.
 type multiTaskBar struct {
-	// items contains the amount of work per worker.
-	items chan int
+	// progress contains the progress per worker.
+	progress chan progress
 	// bar indicates the overall progress.
 	bar *pb.ProgressBar
 	// start indicates that bar is ready.
@@ -74,21 +78,24 @@ type multiTaskBar struct {
 
 // runMaster coordinates everything and waits until the workers are done.
 func (mtb *multiTaskBar) runMaster() {
-	items := 0
-	for i := cap(mtb.items); i > 0; i-- {
-		items += <-mtb.items
+	var progress progress
+	for i := cap(mtb.progress); i > 0; i-- {
+		p := <-mtb.progress
+
+		progress.total += p.total
+		progress.done += p.done
 	}
 
-	mtb.bar = pb.StartNew(items)
+	mtb.bar = pb.New64(progress.total).SetCurrent(progress.done).Start()
 	close(mtb.start)
 
 	mtb.wg.Wait()
 	mtb.bar.Finish()
 }
 
-// startWorker shall be called once per worker with their individual amount of work.
-func (mtb *multiTaskBar) startWorker(items int) *pb.ProgressBar {
-	mtb.items <- items
+// startWorker shall be called once per worker with their individual progress.
+func (mtb *multiTaskBar) startWorker(total, done int64) *pb.ProgressBar {
+	mtb.progress <- progress{total, done}
 	<-mtb.start
 	return mtb.bar
 }
@@ -101,8 +108,8 @@ func (mtb *multiTaskBar) stopWorker() {
 // newMultiTaskBar creates a new multiTaskBar suitable for workers workers.
 func newMultiTaskBar(workers int) *multiTaskBar {
 	mtb := &multiTaskBar{
-		items: make(chan int, workers),
-		start: make(chan struct{}),
+		progress: make(chan progress, workers),
+		start:    make(chan struct{}),
 	}
 
 	mtb.wg.Add(workers)

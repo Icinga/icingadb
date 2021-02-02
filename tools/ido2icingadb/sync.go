@@ -27,8 +27,7 @@ func syncComments() {
 		},
 	)
 
-	bar := syncBar.startWorker(int(total))
-	bar.Add(int(done))
+	bar := syncBar.startWorker(total, done)
 
 	coh := bulkInsert{
 		stmt: "REPLACE INTO comment_history(comment_id, environment_id, endpoint_id, object_type, host_id, " +
@@ -142,8 +141,7 @@ func syncDowntimes() {
 		},
 	)
 
-	bar := syncBar.startWorker(int(total))
-	bar.Add(int(done))
+	bar := syncBar.startWorker(total, done)
 
 	dh := bulkInsert{
 		stmt: "REPLACE INTO downtime_history(downtime_id, environment_id, endpoint_id, triggered_by_id, object_type, " +
@@ -296,17 +294,16 @@ func syncNotifications() {
 	var limit []struct{ NotificationId sql.NullInt64 }
 
 	{
-		bar := cacheBar.startWorker(int(total))
 		tx := cach.begin(sql.LevelSerializable, false)
 		var checkpoint int64
 
 		var niCMNi []struct {
-			Count          uint64
+			Count          int64
 			NotificationId sql.NullInt64
 		}
 		tx.fetchAll(&niCMNi, "SELECT COUNT(*), MIN(notification_id) FROM next_ids")
 
-		var phsC []struct{ Count uint64 }
+		var phsC []struct{ Count int64 }
 		tx.fetchAll(&phsC, "SELECT COUNT(*) FROM previous_hard_state")
 
 		if niCMNi[0].NotificationId.Valid {
@@ -319,7 +316,7 @@ func syncNotifications() {
 			}
 		}
 
-		bar.Add(int(phsC[0].Count + niCMNi[0].Count))
+		bar := cacheBar.startWorker(total, phsC[0].Count+niCMNi[0].Count)
 		inTx := 0
 
 		{
@@ -406,9 +403,7 @@ func syncNotifications() {
 		cacheBar.stopWorker()
 	}
 
-	bar := syncBar.startWorker(int(total))
-	bar.Add(int(done))
-
+	bar := syncBar.startWorker(total, done)
 	previousHardStates := make(chan struct{ PreviousHardState uint8 }, 64)
 
 	go streamQuery(
@@ -579,17 +574,16 @@ func syncStates() {
 	var limit []struct{ StatehistoryId sql.NullInt64 }
 
 	{
-		bar := cacheBar.startWorker(int(total))
 		tx := cach.begin(sql.LevelSerializable, false)
 		var checkpoint int64
 
 		var niCMShi []struct {
-			Count          uint64
+			Count          int64
 			StatehistoryId sql.NullInt64
 		}
 		tx.fetchAll(&niCMShi, "SELECT COUNT(*), MIN(statehistory_id) FROM next_ids")
 
-		var phsC []struct{ Count uint64 }
+		var phsC []struct{ Count int64 }
 		tx.fetchAll(&phsC, "SELECT COUNT(*) FROM previous_hard_state")
 
 		if niCMShi[0].StatehistoryId.Valid {
@@ -605,7 +599,7 @@ func syncStates() {
 			}
 		}
 
-		bar.Add(int(phsC[0].Count + niCMShi[0].Count))
+		bar := cacheBar.startWorker(total, phsC[0].Count+niCMShi[0].Count)
 		inTx := 0
 
 		{
@@ -699,9 +693,7 @@ func syncStates() {
 		cacheBar.stopWorker()
 	}
 
-	bar := syncBar.startWorker(int(total))
-	bar.Add(int(done))
-
+	bar := syncBar.startWorker(total, done)
 	previousHardStates := make(chan struct{ PreviousHardState uint8 }, chSize)
 
 	// Stream concurrently from two databases. Possible due to WHERE and ORDER BY.
