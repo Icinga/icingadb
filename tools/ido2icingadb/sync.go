@@ -26,12 +26,145 @@ type bulkInsert struct {
 	rows [][]interface{}
 }
 
+var bools = map[uint8]string{0: "n", 1: "y"}
 var objectTypes = map[uint8]string{1: "host", 2: "service"}
 var stateTypes = map[uint8]string{0: "soft", 1: "hard"}
 
 var notificationTypes = map[uint8]string{
 	5: "downtime_start", 6: "downtime_end", 7: "downtime_removed",
 	8: "custom", 1: "acknowledgement", 2: "flapping_start", 3: "flapping_end",
+}
+
+// syncDowntimes migrates IDO's icinga_downtimehistory table to Icinga DB's downtime_history table.
+func syncDowntimes() {
+	snapshot := ido.begin(sql.LevelRepeatableRead, true)
+	defer snapshot.commit()
+
+	total, done, ldi := getProgress(
+		snapshot, "icinga_downtimehistory", "downtimehistory_id", "downtime_history", "downtime_id",
+		func(idoId uint64) interface{} {
+			var res []struct{ Name string }
+			snapshot.fetchAll(&res, "SELECT name FROM icinga_downtimehistory WHERE downtimehistory_id=?", idoId)
+
+			if len(res) < 1 {
+				return make([]byte, 20)
+			} else {
+				return calcObjectId(res[0].Name)
+			}
+		},
+	)
+
+	bar := syncBar.startWorker(int(total))
+	bar.Add(int(done))
+
+	dh := bulkInsert{
+		stmt: "REPLACE INTO downtime_history(downtime_id, environment_id, endpoint_id, triggered_by_id, object_type, " +
+			"host_id, service_id, entry_time, author, comment, is_flexible, flexible_duration, " +
+			"scheduled_start_time, scheduled_end_time, start_time, end_time, has_been_cancelled, trigger_time, " +
+			"cancel_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	}
+
+	h := bulkInsert{
+		stmt: "REPLACE INTO history(id, environment_id, endpoint_id, object_type, host_id, service_id, " +
+			"downtime_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+	}
+
+	{
+		ch := make(chan struct {
+			EntryTime   int64
+			AuthorName  string
+			CommentData string
+			IsFixed     uint8
+			Duration    int64
+
+			ScheduledStartTime int64
+			ScheduledEndTime   int64
+
+			ActualStartTime     int64
+			ActualStartTimeUsec uint32
+
+			ActualEndTime     int64
+			ActualEndTimeUsec uint32
+			WasCancelled      uint8
+
+			TriggerTime int64
+			Name        string
+
+			MonObjecttypeId uint8
+			MonObjName1     string
+			MonObjName2     string
+
+			TriggeredBy string
+		}, chSize)
+
+		go streamQuery(
+			snapshot,
+			ch,
+			"SELECT UNIX_TIMESTAMP(dh.entry_time), dh.author_name, dh.comment_data, dh.is_fixed, dh.duration, "+
+				"UNIX_TIMESTAMP(dh.scheduled_start_time), UNIX_TIMESTAMP(dh.scheduled_end_time), "+
+				"IFNULL(UNIX_TIMESTAMP(dh.actual_start_time), 0), dh.actual_start_time_usec, "+
+				"IFNULL(UNIX_TIMESTAMP(dh.actual_end_time), 0), dh.actual_end_time_usec, dh.was_cancelled, "+
+				"IFNULL(UNIX_TIMESTAMP(dh.trigger_time), 0), dh.name, "+
+				"o.objecttype_id, o.name1, IFNULL(o.name2, ''), "+
+				"IFNULL(sd.name, '') "+
+				"FROM icinga_downtimehistory dh "+
+				"INNER JOIN icinga_objects o ON o.object_id=dh.object_id "+
+				"LEFT JOIN icinga_scheduleddowntime sd ON sd.scheduleddowntime_id=dh.triggered_by_id "+
+				"WHERE dh.downtimehistory_id > ? "+
+				"ORDER BY dh.downtimehistory_id",
+			ldi,
+		)
+
+		massRander := bufio.NewReader(rand.Reader)
+
+		for row := range ch {
+			id := calcObjectId(row.Name)
+			typ := objectTypes[row.MonObjecttypeId]
+			hostId := calcObjectId(row.MonObjName1)
+			serviceId := calcServiceId(row.MonObjName1, row.MonObjName2)
+			start := convertTime(row.ActualStartTime, row.ActualStartTimeUsec)
+			end := convertTime(row.ActualEndTime, row.ActualEndTimeUsec)
+
+			var cancelTime uint64
+			if row.WasCancelled != 0 {
+				cancelTime = end
+			}
+
+			dh.rows = append(dh.rows, []interface{}{
+				id, envId, endpointId, calcObjectId(row.TriggeredBy), typ, hostId, serviceId, row.EntryTime * 1000,
+				row.AuthorName, row.CommentData, bools[1-row.IsFixed], row.Duration * 1000,
+				row.ScheduledStartTime * 1000, row.ScheduledEndTime * 1000, start, end, bools[row.WasCancelled],
+				row.TriggerTime * 1000, cancelTime,
+			})
+
+			h.rows = append(h.rows, []interface{}{
+				mkRandomUuid(massRander), envId, endpointId, typ, hostId, serviceId, id, "downtime_start", start,
+			})
+
+			if end != 0 {
+				h.rows = append(h.rows, []interface{}{
+					mkRandomUuid(massRander), envId, endpointId, typ, hostId, serviceId, id, "downtime_end", end,
+				})
+			}
+
+			if len(dh.rows) == *bulk {
+				flush(dh, h)
+
+				dh.rows = nil
+				h.rows = nil
+			}
+
+			bar.Increment()
+		}
+
+		<-ch
+	}
+
+	if len(dh.rows) > 0 {
+		flush(dh, h)
+	}
+
+	syncBar.stopWorker()
 }
 
 // syncNotifications migrates IDO's icinga_notifications table
