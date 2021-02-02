@@ -68,7 +68,7 @@ func syncNotifications() {
 
 	total, done, lni := getProgress(
 		snapshot, "icinga_notifications", "notification_id", "notification_history", "id",
-		func(idoId uint64) []byte { return mkDeterministicUuid(notificationHistory, idoId) },
+		func(idoId uint64) interface{} { return mkDeterministicUuid(notificationHistory, idoId) },
 	)
 
 	var limit []struct{ NotificationId sql.NullInt64 }
@@ -354,7 +354,7 @@ func syncStates() {
 
 	total, done, lsi := getProgress(
 		snapshot, "icinga_statehistory", "statehistory_id", "state_history", "id",
-		func(idoId uint64) []byte { return mkDeterministicUuid(stateHistory, idoId) },
+		func(idoId uint64) interface{} { return mkDeterministicUuid(stateHistory, idoId) },
 	)
 
 	var limit []struct{ StatehistoryId sql.NullInt64 }
@@ -606,7 +606,7 @@ func flush(bulks ...bulkInsert) {
 // and returns the current progress and an idoIdColumn value to start/continue sync with.
 func getProgress(
 	idoTx tx, idoTable, idoIdColumn, icingadbTable, icingadbIdColumn string,
-	mkIcingadbId func(idoId uint64) (icingadbId []byte),
+	mkIcingadbId func(idoId uint64) (icingadbId interface{}),
 ) (
 	total, done, lastSyncedId int64,
 ) {
