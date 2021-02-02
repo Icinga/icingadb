@@ -82,7 +82,7 @@ func (db *database) connect() {
 		assert(errOp, "Couldn't connect to database", log.Fields{"backend": db.whichOne})
 	}
 
-	db.conn.SetMaxIdleConns(1)
+	db.conn.SetMaxIdleConns(16)
 
 	assert(db.conn.Ping(), "Couldn't connect to database", log.Fields{"backend": db.whichOne})
 }
