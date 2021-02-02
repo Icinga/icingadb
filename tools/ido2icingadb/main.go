@@ -3,83 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/cheggaaa/pb/v3"
 	log "github.com/sirupsen/logrus"
 	"os"
-	"sync"
 )
-
-// stringValue allows to differ a string not passed via the CLI and an empty string passed via the CLI
-// w/o polluting the usage instructions.
-type stringValue struct {
-	// value is the string passed via the CLI if any.
-	value string
-	// isSet tells whether the string was passed.
-	isSet bool
-}
-
-var _ flag.Value = (*stringValue)(nil)
-
-// String implements flag.Value.
-func (sv *stringValue) String() string {
-	return sv.value
-}
-
-// Set implements flag.Value.
-func (sv *stringValue) Set(s string) error {
-	sv.value = s
-	sv.isSet = true
-	return nil
-}
-
-// multiTaskBar lets multiple workers report their progress to a single progress bar.
-type multiTaskBar struct {
-	// items contains the amount of work per worker.
-	items chan int
-	// bar indicates the overall progress.
-	bar *pb.ProgressBar
-	// start indicates that bar is ready.
-	start chan struct{}
-	// wg indicates that the workers are done.
-	wg sync.WaitGroup
-}
-
-// runMaster coordinates everything and waits until the workers are done.
-func (mtb *multiTaskBar) runMaster() {
-	items := 0
-	for i := cap(mtb.items); i > 0; i-- {
-		items += <-mtb.items
-	}
-
-	mtb.bar = pb.StartNew(items)
-	close(mtb.start)
-
-	mtb.wg.Wait()
-	mtb.bar.Finish()
-}
-
-// startWorker shall be called once per worker with their individual amount of work.
-func (mtb *multiTaskBar) startWorker(items int) *pb.ProgressBar {
-	mtb.items <- items
-	<-mtb.start
-	return mtb.bar
-}
-
-// stopWorker shall be called once per worker once done.
-func (mtb *multiTaskBar) stopWorker() {
-	mtb.wg.Done()
-}
-
-// newMultiTaskBar creates a new multiTaskBar suitable for workers workers.
-func newMultiTaskBar(workers int) *multiTaskBar {
-	mtb := &multiTaskBar{
-		items: make(chan int, workers),
-		start: make(chan struct{}),
-	}
-
-	mtb.wg.Add(workers)
-	return mtb
-}
 
 var ido = newDb("IDO")
 var icingaDb = newDb("Icinga DB")
@@ -146,11 +72,4 @@ func main() {
 
 	log.Info("Migrating history")
 	syncBar.runMaster()
-}
-
-// assert logs message with fields and err and terminates the program if err is not nil.
-func assert(err error, message string, fields log.Fields) {
-	if err != nil {
-		log.WithFields(fields).WithFields(log.Fields{"error": err.Error()}).Fatal(message)
-	}
 }
