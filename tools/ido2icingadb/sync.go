@@ -187,7 +187,7 @@ func syncDowntimes() {
 			snapshot,
 			ch,
 			"SELECT UNIX_TIMESTAMP(dh.entry_time), dh.author_name, dh.comment_data, dh.is_fixed, dh.duration, "+
-				"UNIX_TIMESTAMP(dh.scheduled_start_time), UNIX_TIMESTAMP(dh.scheduled_end_time), "+
+				"UNIX_TIMESTAMP(dh.scheduled_start_time), IFNULL(UNIX_TIMESTAMP(dh.scheduled_end_time), 0), "+
 				"IFNULL(UNIX_TIMESTAMP(dh.actual_start_time), 0), dh.actual_start_time_usec, "+
 				"IFNULL(UNIX_TIMESTAMP(dh.actual_end_time), 0), dh.actual_end_time_usec, dh.was_cancelled, "+
 				"IFNULL(UNIX_TIMESTAMP(dh.trigger_time), 0), dh.name, "+
