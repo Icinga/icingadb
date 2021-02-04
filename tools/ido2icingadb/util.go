@@ -20,6 +20,7 @@ import (
 type historyTable byte
 
 const (
+	ackHistory          historyTable = 'a'
 	flappingHistory     historyTable = 'f'
 	notificationHistory historyTable = 'n'
 	stateHistory        historyTable = 's'

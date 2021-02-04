@@ -9,6 +9,260 @@ import (
 	"strings"
 )
 
+// syncAcks migrates IDO's icinga_acknowledgements table to Icinga DB's acknowledgement_history table
+// using the -ah-cache FILE similar to syncFlapping.
+func syncAcks() {
+	dbc, errOp := sql.Open("sqlite3", "file:"+aHcache.value)
+	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": aHcache.value})
+	defer dbc.Close()
+
+	cach := &database{
+		whichOne: "-ah-cache",
+		conn:     dbc,
+	}
+
+	cach.exec(`CREATE TABLE IF NOT EXISTS ack_clear_set_time (
+	acknowledgement_id INT PRIMARY KEY,
+	entry_time INT,
+	entry_time_usec INT
+)`)
+
+	cach.exec(`CREATE TABLE IF NOT EXISTS last_ack_set_time (
+	object_id INT PRIMARY KEY,
+	entry_time INT NOT NULL,
+	entry_time_usec INT NOT NULL
+)`)
+
+	snapshot := ido.begin(sql.LevelRepeatableRead, true)
+	defer snapshot.commit()
+
+	total, done, lai := getProgress(
+		snapshot, "icinga_acknowledgements", "acknowledgement_id", "history", "id",
+		func(idoId uint64) interface{} { return mkDeterministicUuid(ackHistory, idoId) },
+	)
+
+	{
+		tx := cach.begin(sql.LevelSerializable, false)
+		inTx := 0
+
+		{
+			var checkpoint []struct {
+				Count int64
+				Max   sql.NullInt64
+			}
+			tx.fetchAll(&checkpoint, "SELECT COUNT(*), MAX(acknowledgement_id) FROM ack_clear_set_time")
+
+			bar := cacheBar.startWorker(total, checkpoint[0].Count*2)
+
+			ch := make(chan struct {
+				AcknowledgementId   uint64
+				EntryTime           int64
+				EntryTimeUsec       uint32
+				AcknowledgementType uint8
+				ObjectId            uint64
+			}, chSize)
+
+			go streamQuery(
+				snapshot,
+				ch,
+				"SELECT acknowledgement_id, UNIX_TIMESTAMP(entry_time), "+
+					"entry_time_usec, acknowledgement_type, object_id "+
+					"FROM icinga_acknowledgements "+
+					"WHERE acknowledgement_id > ? "+
+					"ORDER BY acknowledgement_id",
+				checkpoint[0].Max.Int64,
+			)
+
+			for row := range ch {
+				if row.AcknowledgementType == 0 {
+					var last []struct {
+						EntryTime     int64
+						EntryTimeUsec uint32
+					}
+					tx.fetchAll(
+						&last,
+						"SELECT entry_time, entry_time_usec FROM last_ack_set_time WHERE object_id=?",
+						row.ObjectId,
+					)
+
+					if len(last) > 0 {
+						tx.exec(
+							"INSERT INTO ack_clear_set_time(acknowledgement_id, entry_time, entry_time_usec) "+
+								"VALUES (?, ?, ?)",
+							row.AcknowledgementId, last[0].EntryTime, last[0].EntryTimeUsec,
+						)
+
+						tx.exec("DELETE FROM last_ack_set_time WHERE object_id=?", row.ObjectId)
+					} else {
+						tx.exec(
+							"INSERT INTO ack_clear_set_time(acknowledgement_id, entry_time, entry_time_usec) "+
+								"VALUES (?, NULL, NULL)",
+							row.AcknowledgementId,
+						)
+					}
+				} else {
+					tx.exec("DELETE FROM last_ack_set_time WHERE object_id=?", row.ObjectId)
+
+					tx.exec(
+						"INSERT INTO last_ack_set_time(object_id, entry_time, entry_time_usec) VALUES (?, ?, ?)",
+						row.ObjectId, row.EntryTime, row.EntryTimeUsec,
+					)
+				}
+
+				inTx++
+				if inTx == *bulk {
+					tx.commit()
+					tx = cach.begin(sql.LevelSerializable, false)
+					inTx = 0
+				}
+
+				bar.Increment()
+			}
+
+			<-ch
+		}
+
+		tx.exec("DELETE FROM last_ack_set_time")
+
+		tx.commit()
+		cach.exec("VACUUM")
+
+		cacheBar.stopWorker()
+
+		bar := syncBar.startWorker(total, done)
+
+		ackClearSetTime := make(chan struct {
+			EntryTime     sql.NullInt64
+			EntryTimeUsec sql.NullInt64
+		}, chSize)
+
+		go streamQuery(
+			cach,
+			ackClearSetTime,
+			"SELECT entry_time, entry_time_usec "+
+				"FROM ack_clear_set_time "+
+				"WHERE acknowledgement_id > ? "+
+				"ORDER BY acknowledgement_id",
+			lai,
+		)
+
+		ahs := bulkInsert{
+			stmt: "REPLACE INTO acknowledgement_history(id, environment_id, endpoint_id, object_type, host_id, " +
+				"service_id, set_time, author, comment, expire_time, is_sticky, is_persistent) " +
+				"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		}
+
+		ahc := bulkInsert{stmt: "UPDATE acknowledgement_history SET clear_time=? WHERE id=?"}
+
+		h := bulkInsert{
+			stmt: "REPLACE INTO history(id, environment_id, endpoint_id, object_type, host_id, service_id, " +
+				"acknowledgement_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		}
+
+		{
+			ch := make(chan struct {
+				AcknowledgementId uint64
+				EntryTime         int64
+
+				EntryTimeUsec       uint32
+				AcknowledgementType uint8
+				AuthorName          string
+				CommentData         string
+
+				IsSticky          uint8
+				PersistentComment uint8
+				EndTime           sql.NullInt64
+
+				ObjecttypeId uint8
+				Name1        string
+				Name2        string
+			}, chSize)
+
+			go streamQuery(
+				snapshot,
+				ch,
+				"SELECT ah.acknowledgement_id, UNIX_TIMESTAMP(ah.entry_time), "+
+					"ah.entry_time_usec, ah.acknowledgement_type, ah.author_name, ah.comment_data, "+
+					"ah.is_sticky, ah.persistent_comment, UNIX_TIMESTAMP(ah.end_time), "+
+					"o.objecttype_id, o.name1, IFNULL(o.name2, '') "+
+					"FROM icinga_acknowledgements ah "+
+					"INNER JOIN icinga_objects o ON o.object_id=ah.object_id "+
+					"WHERE ah.acknowledgement_id > ? "+
+					"ORDER BY ah.acknowledgement_id",
+				lai,
+			)
+
+			for row := range ch {
+				name := row.Name1
+				if row.Name2 != "" {
+					name += "!" + row.Name2
+				}
+
+				ts := convertTime(row.EntryTime, row.EntryTimeUsec)
+				var set uint64
+
+				if row.AcknowledgementType == 0 {
+					st := <-ackClearSetTime
+					if !st.EntryTime.Valid {
+						continue
+					}
+
+					set = convertTime(st.EntryTime.Int64, uint32(st.EntryTimeUsec.Int64))
+				} else {
+					set = ts
+				}
+
+				id := mkDeterministicUuid(ackHistory, row.AcknowledgementId)
+				typ := objectTypes[row.ObjecttypeId]
+				hostId := calcObjectId(row.Name1)
+				serviceId := calcServiceId(row.Name1, row.Name2)
+
+				acknowledgementHistoryId := hashAny([]interface{}{
+					icingaEnv.value, strings.Title(objectTypes[row.ObjecttypeId]), name, set,
+				})
+
+				if row.AcknowledgementType == 0 {
+					ahc.rows = append(ahc.rows, []interface{}{ts, acknowledgementHistoryId})
+
+					h.rows = append(h.rows, []interface{}{
+						id, envId, endpointId, typ, hostId, serviceId, acknowledgementHistoryId, "ack_clear", ts,
+					})
+				} else {
+					row.EndTime.Int64 *= 1000
+
+					ahs.rows = append(ahs.rows, []interface{}{
+						acknowledgementHistoryId, envId, endpointId, typ, hostId,
+						serviceId, set, row.AuthorName, row.CommentData, row.EndTime,
+						bools[row.IsSticky], bools[row.PersistentComment],
+					})
+
+					h.rows = append(h.rows, []interface{}{
+						id, envId, endpointId, typ, hostId, serviceId, acknowledgementHistoryId, "ack_set", ts,
+					})
+				}
+
+				if len(h.rows) == *bulk {
+					flush(ahs, ahc, h)
+
+					ahs.rows = nil
+					ahc.rows = nil
+					h.rows = nil
+				}
+
+				bar.Increment()
+			}
+
+			<-ch
+		}
+
+		if len(h.rows) > 0 {
+			flush(ahs, ahc, h)
+		}
+
+		syncBar.stopWorker()
+	}
+}
+
 // syncComments migrates IDO's icinga_commenthistory table to Icinga DB's comment_history table.
 func syncComments() {
 	snapshot := ido.begin(sql.LevelRepeatableRead, true)
