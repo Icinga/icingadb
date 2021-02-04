@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"github.com/Icinga/icingadb/utils"
 	log "github.com/sirupsen/logrus"
+	"strings"
 )
 
 // syncComments migrates IDO's icinga_commenthistory table to Icinga DB's comment_history table.
@@ -251,6 +252,264 @@ func syncDowntimes() {
 	}
 
 	syncBar.stopWorker()
+}
+
+// syncFlapping migrates IDO's icinga_flappinghistory table to Icinga DB's flapping_history table
+// using the -fh-cache FILE.
+func syncFlapping() {
+	// Icinga DB's flapping_history#id always needs start_time. flapping_end rows would need a subquery for that.
+	// That would make the IDO reading even slower than the Icinga DB writing.
+	// Therefore: Stream IDO's icinga_flappinghistory once, compute flapping_history#start_time
+	// and cache it into an SQLite database. Then steam from that database and the IDO.
+
+	dbc, errOp := sql.Open("sqlite3", "file:"+fHcache.value)
+	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": fHcache.value})
+	defer dbc.Close()
+
+	cach := &database{
+		whichOne: "-fh-cache",
+		conn:     dbc,
+	}
+
+	// Icinga DB's flapping_history#start_time per flapping_end row (IDO's icinga_flappinghistory#flappinghistory_id).
+	cach.exec(`CREATE TABLE IF NOT EXISTS flapping_end_start_time (
+	flappinghistory_id INT PRIMARY KEY,
+	event_time INT,
+	event_time_usec INT
+)`)
+
+	// Helper table, the last start_time per icinga_statehistory#object_id.
+	cach.exec(`CREATE TABLE IF NOT EXISTS last_flapping_start_time (
+	object_id INT PRIMARY KEY,
+	event_time INT NOT NULL,
+	event_time_usec INT NOT NULL
+)`)
+
+	snapshot := ido.begin(sql.LevelRepeatableRead, true)
+	defer snapshot.commit()
+
+	total, done, lfi := getProgress(
+		snapshot, "icinga_flappinghistory", "flappinghistory_id", "history", "id",
+		func(idoId uint64) interface{} { return mkDeterministicUuid(flappingHistory, idoId) },
+	)
+
+	{
+		tx := cach.begin(sql.LevelSerializable, false)
+		inTx := 0
+
+		{
+			var checkpoint []struct {
+				Count int64
+				Max   sql.NullInt64
+			}
+			tx.fetchAll(&checkpoint, "SELECT COUNT(*), MAX(flappinghistory_id) FROM flapping_end_start_time")
+
+			bar := cacheBar.startWorker(total, checkpoint[0].Count*2)
+
+			ch := make(chan struct {
+				FlappinghistoryId uint64
+				EventTime         int64
+				EventTimeUsec     uint32
+				EventType         uint16
+				ObjectId          uint64
+			}, chSize)
+
+			go streamQuery(
+				snapshot,
+				ch,
+				"SELECT flappinghistory_id, UNIX_TIMESTAMP(event_time), event_time_usec, event_type, object_id "+
+					"FROM icinga_flappinghistory "+
+					"WHERE flappinghistory_id > ? "+
+					"ORDER BY flappinghistory_id",
+				checkpoint[0].Max.Int64,
+			)
+
+			for row := range ch {
+				if row.EventType == 1000 {
+					tx.exec("DELETE FROM last_flapping_start_time WHERE object_id=?", row.ObjectId)
+
+					tx.exec(
+						"INSERT INTO last_flapping_start_time(object_id, event_time, event_time_usec) VALUES (?, ?, ?)",
+						row.ObjectId, row.EventTime, row.EventTimeUsec,
+					)
+				} else {
+					var lfst []struct {
+						EventTime     int64
+						EventTimeUsec uint32
+					}
+					tx.fetchAll(
+						&lfst,
+						"SELECT event_time, event_time_usec FROM last_flapping_start_time WHERE object_id=?",
+						row.ObjectId,
+					)
+
+					if len(lfst) > 0 {
+						tx.exec(
+							"INSERT INTO flapping_end_start_time(flappinghistory_id, event_time, event_time_usec) "+
+								"VALUES (?, ?, ?)",
+							row.FlappinghistoryId, lfst[0].EventTime, lfst[0].EventTimeUsec,
+						)
+
+						tx.exec("DELETE FROM last_flapping_start_time WHERE object_id=?", row.ObjectId)
+					} else {
+						tx.exec(
+							"INSERT INTO flapping_end_start_time(flappinghistory_id, event_time, event_time_usec) "+
+								"VALUES (?, NULL, NULL)",
+							row.FlappinghistoryId,
+						)
+					}
+				}
+
+				inTx++
+				if inTx == *bulk {
+					tx.commit()
+					tx = cach.begin(sql.LevelSerializable, false)
+					inTx = 0
+				}
+
+				bar.Increment()
+			}
+
+			<-ch
+		}
+
+		tx.exec("DELETE FROM last_flapping_start_time")
+
+		tx.commit()
+		cach.exec("VACUUM")
+
+		cacheBar.stopWorker()
+
+		bar := syncBar.startWorker(total, done)
+
+		flappingEndStartTimes := make(chan struct {
+			EventTime     sql.NullInt64
+			EventTimeUsec sql.NullInt64
+		}, chSize)
+
+		// Stream concurrently from two databases. Possible due to WHERE and ORDER BY.
+		go streamQuery(
+			cach,
+			flappingEndStartTimes,
+			"SELECT event_time, event_time_usec "+
+				"FROM flapping_end_start_time "+
+				"WHERE flappinghistory_id > ? "+
+				"ORDER BY flappinghistory_id",
+			lfi,
+		)
+
+		fhs := bulkInsert{
+			stmt: "REPLACE INTO flapping_history(id, environment_id, endpoint_id, object_type, host_id, service_id, " +
+				"start_time, percent_state_change_start, flapping_threshold_low, " +
+				"flapping_threshold_high) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		}
+
+		fhe := bulkInsert{
+			stmt: "UPDATE flapping_history " +
+				"SET end_time=?, percent_state_change_end=?, flapping_threshold_low=?, flapping_threshold_high=? " +
+				"WHERE id=?",
+		}
+
+		h := bulkInsert{
+			stmt: "REPLACE INTO history(id, environment_id, endpoint_id, object_type, host_id, service_id, " +
+				"flapping_history_id, event_type, event_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		}
+
+		{
+			ch := make(chan struct {
+				FlappinghistoryId uint64
+				EventTime         int64
+				EventTimeUsec     uint32
+
+				EventType          uint16
+				PercentStateChange float64
+				LowThreshold       float64
+				HighThreshold      float64
+
+				ObjecttypeId uint8
+				Name1        string
+				Name2        string
+			}, chSize)
+
+			go streamQuery(
+				snapshot,
+				ch,
+				"SELECT fh.flappinghistory_id, UNIX_TIMESTAMP(fh.event_time), fh.event_time_usec, "+
+					"fh.event_type, fh.percent_state_change, fh.low_threshold, fh.high_threshold, "+
+					"o.objecttype_id, o.name1, IFNULL(o.name2, '') "+
+					"FROM icinga_flappinghistory fh "+
+					"INNER JOIN icinga_objects o ON o.object_id=fh.object_id "+
+					"WHERE fh.flappinghistory_id > ? "+
+					"ORDER BY fh.flappinghistory_id",
+				lfi,
+			)
+
+			for row := range ch {
+				name := row.Name1
+				if row.Name2 != "" {
+					name += "!" + row.Name2
+				}
+
+				ts := convertTime(row.EventTime, row.EventTimeUsec)
+				var start uint64
+
+				if row.EventType == 1000 {
+					start = ts
+				} else {
+					st := <-flappingEndStartTimes
+					if !st.EventTime.Valid {
+						// End w/o associated start.
+						continue
+					}
+
+					start = convertTime(st.EventTime.Int64, uint32(st.EventTimeUsec.Int64))
+				}
+
+				id := mkDeterministicUuid(flappingHistory, row.FlappinghistoryId)
+				flappingHistoryId := hashAny([]interface{}{icingaEnv.value, strings.Title(objectTypes[row.ObjecttypeId]), name, start})
+				typ := objectTypes[row.ObjecttypeId]
+				hostId := calcObjectId(row.Name1)
+				serviceId := calcServiceId(row.Name1, row.Name2)
+
+				if row.EventType == 1000 {
+					fhs.rows = append(fhs.rows, []interface{}{
+						flappingHistoryId, envId, endpointId, typ, hostId, serviceId,
+						start, row.PercentStateChange, row.LowThreshold, row.HighThreshold,
+					})
+
+					h.rows = append(h.rows, []interface{}{
+						id, envId, endpointId, typ, hostId, serviceId, flappingHistoryId, "flapping_start", ts,
+					})
+				} else {
+					fhe.rows = append(fhe.rows, []interface{}{
+						ts, row.PercentStateChange, row.LowThreshold, row.HighThreshold, flappingHistoryId,
+					})
+
+					h.rows = append(h.rows, []interface{}{
+						id, envId, endpointId, typ, hostId, serviceId, flappingHistoryId, "flapping_end", ts,
+					})
+				}
+
+				if len(h.rows) == *bulk {
+					flush(fhs, fhe, h)
+
+					fhs.rows = nil
+					fhe.rows = nil
+					h.rows = nil
+				}
+
+				bar.Increment()
+			}
+
+			<-ch
+		}
+
+		if len(h.rows) > 0 {
+			flush(fhs, fhe, h)
+		}
+
+		syncBar.stopWorker()
+	}
 }
 
 // syncNotifications migrates IDO's icinga_notifications table

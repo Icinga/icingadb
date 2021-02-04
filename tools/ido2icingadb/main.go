@@ -12,15 +12,16 @@ var icingaDb = newDb("Icinga DB")
 var bulk = flag.Int("bulk", 200, "FACTOR")
 var chSize = 64
 
-var icingaEnv, icingaEndpoint, nHcache, sHcache stringValue
+var icingaEnv, icingaEndpoint, fHcache, nHcache, sHcache stringValue
 var envId, endpointId []byte
 
-var cacheBar = newMultiTaskBar(2)
-var syncBar = newMultiTaskBar(4)
+var cacheBar = newMultiTaskBar(3)
+var syncBar = newMultiTaskBar(5)
 
 func main() {
 	flag.Var(&icingaEnv, "icinga-env", "ENVIRONMENT")
 	flag.Var(&icingaEndpoint, "icinga-endpoint", "ENDPOINT")
+	flag.Var(&fHcache, "fh-cache", "FILE")
 	flag.Var(&nHcache, "nh-cache", "FILE")
 	flag.Var(&sHcache, "sh-cache", "FILE")
 	flag.Parse()
@@ -36,6 +37,12 @@ func main() {
 
 	if !icingaEndpoint.isSet {
 		fmt.Fprintln(os.Stderr, "-icinga-endpoint missing")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	if !fHcache.isSet {
+		fmt.Fprintln(os.Stderr, "-fh-cache missing")
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -66,6 +73,7 @@ func main() {
 
 	go syncComments()
 	go syncDowntimes()
+	go syncFlapping()
 	go syncNotifications()
 	go syncStates()
 

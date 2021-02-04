@@ -20,6 +20,7 @@ import (
 type historyTable byte
 
 const (
+	flappingHistory     historyTable = 'f'
 	notificationHistory historyTable = 'n'
 	stateHistory        historyTable = 's'
 )
@@ -140,6 +141,10 @@ func flush(bulks ...bulkInsert) {
 	tx := icingaDb.begin(sql.LevelReadCommitted, false)
 
 	for _, b := range bulks {
+		if len(b.rows) < 1 {
+			continue
+		}
+
 		stmt, errPp := tx.tx.Prepare(b.stmt)
 		assert(errPp, "Couldn't prepare SQL statement", log.Fields{"backend": icingaDb.whichOne, "statement": b.stmt})
 
