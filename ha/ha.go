@@ -310,15 +310,29 @@ func (h *HA) runHA(chEnv chan *Environment, env *Environment) {
 	updateTimer := time.NewTimer(updateTimerDuration)
 
 	for {
+		var newEnv *Environment
+
+		// Selecting from multiple channels does not guarantee which case gets executed if multiple ones
+		// are ready. However, when both a new environment is available and the update timer expired, we
+		// want to prefer the new environment. Therefore first try to select only from chEnv and only if
+		// there is nothing in the channel, i.e. in the default case, select from both channels.
 		select {
-		case env = <-chEnv:
+		case newEnv = <-chEnv:
+		default:
+			select {
+			case newEnv = <-chEnv:
+			case <-updateTimer.C:
+			}
+		}
+
+		if newEnv != nil {
+			env = newEnv
 			if bytes.Compare(env.ID, h.super.EnvId) != 0 {
 				h.logger.Error("Received environment is not the one we expected. Panic.")
 				h.super.ChErr <- errors.New("received unexpected environment")
 				return
 			}
 			h.lastHeartbeat = utils.TimeToMillisecs(time.Now())
-		case <-updateTimer.C: // force update
 		}
 
 		updateTimer.Reset(updateTimerDuration)
