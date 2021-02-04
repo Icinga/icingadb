@@ -7,10 +7,13 @@ import (
 	"flag"
 	"fmt"
 	"github.com/cheggaaa/pb/v3"
+	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"io"
+	"os"
 	"sync"
+	"syscall"
 )
 
 // historyTable represents Icinga DB history tables.
@@ -119,6 +122,15 @@ func newMultiTaskBar(workers int) *multiTaskBar {
 // assert logs message with fields and err and terminates the program if err is not nil.
 func assert(err error, message string, fields log.Fields) {
 	if err != nil {
+		if err == mysql.ErrInvalidConn {
+			// Likely while streaming a large result of a MySQL query the connection suddenly broke.
+			log.WithFields(fields).WithFields(log.Fields{"error": err.Error()}).Error(message)
+
+			// Luckily we can just "travel back in time" via exec(3), but preserve our progress.
+			log.Warn("Re-trying")
+			assert(syscall.Exec(os.Args[0], os.Args, os.Environ()), "Couldn't re-exec(3) program", nil)
+		}
+
 		log.WithFields(fields).WithFields(log.Fields{"error": err.Error()}).Fatal(message)
 	}
 }
