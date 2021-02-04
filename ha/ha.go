@@ -226,6 +226,8 @@ func (h *HA) removePreviousInstances(tx connection.DbTransaction, env *Environme
 }
 
 func (h *HA) checkResponsibility(env *Environment) {
+	start := time.Now()
+
 	var newState State
 	err := h.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
 		err := h.removePreviousInstances(tx, env)
@@ -280,6 +282,22 @@ func (h *HA) checkResponsibility(env *Environment) {
 		h.logger.Errorf("HA heartbeat failed: %s", err.Error())
 		newState = StateInactiveUnkown
 	}
+
+	txDuration := time.Since(start)
+	icinga2HeartbeatAge := utils.TimeToMillisecs(time.Now()) - h.lastHeartbeat
+	if newState == StateActive && txDuration > heartbeatValidMillisecs*time.Millisecond/2 {
+		// The SQL transaction is too slow if it takes more than half the heartbeat validity
+		// period as in this case, we cannot expect to renew the heartbeat in time.
+		h.logger.Warnf("SQL transaction took %s, too slow to keep our heartbeat alive. "+
+			"Check the health of your database.", txDuration)
+		newState = StateAllInactive
+	} else if newState == StateActive && icinga2HeartbeatAge > heartbeatValidMillisecs {
+		// If this was a forced periodic update, the heartbeat might also have
+		// expired during the execution of the SQL transaction.
+		h.logger.Warnf("Icinga 2 heartbeat expired during SQL transaction")
+		newState = StateAllInactive
+	}
+
 	h.setState(newState)
 }
 
