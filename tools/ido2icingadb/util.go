@@ -12,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
+	"path"
 	"sync"
 	"syscall"
 )
@@ -144,6 +145,19 @@ func assert(err error, message string, fields log.Fields) {
 		}
 
 		log.WithFields(fields).WithFields(log.Fields{"error": err.Error()}).Fatal(message)
+	}
+}
+
+// mkCache opens the SQLite3 database for which cache in the -cache DIRECTORY.
+func mkCache(which string) *database {
+	file := path.Join(cache.value, which+".sqlite3")
+
+	dbc, errOp := sql.Open("sqlite3", "file:"+file)
+	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": file})
+
+	return &database{
+		whichOne: file,
+		conn:     dbc,
 	}
 }
 

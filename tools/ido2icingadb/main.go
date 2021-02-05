@@ -12,7 +12,7 @@ var icingaDb = newDb("Icinga DB")
 var bulk = flag.Int("bulk", 200, "FACTOR")
 var chSize = 64
 
-var icingaEnv, icingaEndpoint, aHcache, fHcache, nHcache, sHcache stringValue
+var icingaEnv, icingaEndpoint, cache stringValue
 var envId, endpointId []byte
 
 var cacheBar = newMultiTaskBar(4)
@@ -21,10 +21,7 @@ var syncBar = newMultiTaskBar(6)
 func main() {
 	flag.Var(&icingaEnv, "icinga-env", "ENVIRONMENT")
 	flag.Var(&icingaEndpoint, "icinga-endpoint", "ENDPOINT")
-	flag.Var(&aHcache, "ah-cache", "FILE")
-	flag.Var(&fHcache, "fh-cache", "FILE")
-	flag.Var(&nHcache, "nh-cache", "FILE")
-	flag.Var(&sHcache, "sh-cache", "FILE")
+	flag.Var(&cache, "cache", "DIRECTORY")
 	flag.Parse()
 
 	ido.validate()
@@ -42,26 +39,8 @@ func main() {
 		os.Exit(2)
 	}
 
-	if !aHcache.isSet {
-		fmt.Fprintln(os.Stderr, "-ah-cache missing")
-		flag.Usage()
-		os.Exit(2)
-	}
-
-	if !fHcache.isSet {
-		fmt.Fprintln(os.Stderr, "-fh-cache missing")
-		flag.Usage()
-		os.Exit(2)
-	}
-
-	if !nHcache.isSet {
-		fmt.Fprintln(os.Stderr, "-nh-cache missing")
-		flag.Usage()
-		os.Exit(2)
-	}
-
-	if !sHcache.isSet {
-		fmt.Fprintln(os.Stderr, "-sh-cache missing")
+	if !cache.isSet {
+		fmt.Fprintln(os.Stderr, "-cache missing")
 		flag.Usage()
 		os.Exit(2)
 	}
@@ -77,6 +56,7 @@ func main() {
 	icingaDb.connect()
 
 	log.Info("Building cache")
+	assert(os.MkdirAll(cache.value, 0700), "Couldn't create cache dir", log.Fields{"path": cache.value})
 
 	go syncAcks()
 	go syncComments()

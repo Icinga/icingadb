@@ -5,21 +5,14 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 	"strings"
 )
 
 // syncAcks migrates IDO's icinga_acknowledgements table to Icinga DB's acknowledgement_history table
 // using the -ah-cache FILE similar to syncFlapping.
 func syncAcks() {
-	dbc, errOp := sql.Open("sqlite3", "file:"+aHcache.value)
-	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": aHcache.value})
-	defer dbc.Close()
-
-	cach := &database{
-		whichOne: "-ah-cache",
-		conn:     dbc,
-	}
+	cach := mkCache("acks")
+	defer cach.conn.Close()
 
 	cach.exec(`CREATE TABLE IF NOT EXISTS ack_clear_set_time (
 	acknowledgement_id INT PRIMARY KEY,
@@ -516,14 +509,8 @@ func syncFlapping() {
 	// Therefore: Stream IDO's icinga_flappinghistory once, compute flapping_history#start_time
 	// and cache it into an SQLite database. Then steam from that database and the IDO.
 
-	dbc, errOp := sql.Open("sqlite3", "file:"+fHcache.value)
-	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": fHcache.value})
-	defer dbc.Close()
-
-	cach := &database{
-		whichOne: "-fh-cache",
-		conn:     dbc,
-	}
+	cach := mkCache("flapping")
+	defer cach.conn.Close()
 
 	// Icinga DB's flapping_history#start_time per flapping_end row (IDO's icinga_flappinghistory#flappinghistory_id).
 	cach.exec(`CREATE TABLE IF NOT EXISTS flapping_end_start_time (
@@ -769,14 +756,8 @@ func syncFlapping() {
 // syncNotifications migrates IDO's icinga_notifications table
 // to Icinga DB's notification_history table using the -nh-cache FILE similar to syncStates.
 func syncNotifications() {
-	dbc, errOp := sql.Open("sqlite3", "file:"+nHcache.value)
-	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": nHcache.value})
-	defer dbc.Close()
-
-	cach := &database{
-		whichOne: "-nh-cache",
-		conn:     dbc,
-	}
+	cach := mkCache("notifications")
+	defer cach.conn.Close()
 
 	cach.exec(`CREATE TABLE IF NOT EXISTS previous_hard_state (
 	notification_id INT PRIMARY KEY,
@@ -1046,14 +1027,8 @@ func syncStates() {
 	// Therefore: Stream IDO's icinga_statehistory once, compute state_history#previous_hard_state
 	// and cache it into an SQLite database. Then steam from that database and the IDO.
 
-	dbc, errOp := sql.Open("sqlite3", "file:"+sHcache.value)
-	assert(errOp, "Couldn't open SQLite3 database", log.Fields{"file": sHcache.value})
-	defer dbc.Close()
-
-	cach := &database{
-		whichOne: "-sh-cache",
-		conn:     dbc,
-	}
+	cach := mkCache("states")
+	defer cach.conn.Close()
 
 	// Icinga DB's state_history#previous_hard_state per IDO's icinga_statehistory#statehistory_id.
 	cach.exec(`CREATE TABLE IF NOT EXISTS previous_hard_state (
