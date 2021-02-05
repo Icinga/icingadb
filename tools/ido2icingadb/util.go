@@ -27,6 +27,8 @@ const (
 	stateHistory        historyTable = 's'
 )
 
+const flappingStart uint16 = 1000
+
 var bools = map[uint8]string{0: "n", 1: "y"}
 var objectTypes = map[uint8]string{1: "host", 2: "service"}
 var commentTypes = map[uint8]string{1: "comment", 4: "ack"}

@@ -566,7 +566,7 @@ func syncFlapping() {
 			)
 
 			for row := range ch {
-				if row.EventType == 1000 {
+				if row.EventType == flappingStart {
 					tx.exec("DELETE FROM last_flapping_start_time WHERE object_id=?", row.ObjectId)
 
 					tx.exec(
@@ -694,7 +694,7 @@ func syncFlapping() {
 				ts := convertTime(row.EventTime, row.EventTimeUsec)
 				var start uint64
 
-				if row.EventType == 1000 {
+				if row.EventType == flappingStart {
 					start = ts
 				} else {
 					st := <-flappingEndStartTimes
@@ -712,7 +712,7 @@ func syncFlapping() {
 				hostId := calcObjectId(row.Name1)
 				serviceId := calcServiceId(row.Name1, row.Name2)
 
-				if row.EventType == 1000 {
+				if row.EventType == flappingStart {
 					fhs.rows = append(fhs.rows, []interface{}{
 						flappingHistoryId, envId, endpointId, typ, hostId, serviceId,
 						start, row.PercentStateChange, row.LowThreshold, row.HighThreshold,
