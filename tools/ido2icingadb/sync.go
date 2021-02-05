@@ -112,7 +112,7 @@ func syncAcks() {
 				bar.Increment()
 			}
 
-			<-ch
+			<-ch // wait for close
 		}
 
 		tx.exec("DELETE FROM last_ack_set_time")
@@ -245,7 +245,7 @@ func syncAcks() {
 				bar.Increment()
 			}
 
-			<-ch
+			<-ch // wait for close
 		}
 
 		if len(h.rows) > 0 {
@@ -360,7 +360,7 @@ func syncComments() {
 			bar.Increment()
 		}
 
-		<-ch
+		<-ch // wait for close
 	}
 
 	if len(coh.rows) > 0 {
@@ -491,7 +491,7 @@ func syncDowntimes() {
 			bar.Increment()
 		}
 
-		<-ch
+		<-ch // wait for close
 	}
 
 	if len(dh.rows) > 0 {
@@ -611,7 +611,7 @@ func syncFlapping() {
 				bar.Increment()
 			}
 
-			<-ch
+			<-ch // wait for close
 		}
 
 		tx.exec("DELETE FROM last_flapping_start_time")
@@ -742,7 +742,7 @@ func syncFlapping() {
 				bar.Increment()
 			}
 
-			<-ch
+			<-ch // wait for close
 		}
 
 		if len(h.rows) > 0 {
@@ -878,7 +878,7 @@ func syncNotifications() {
 				bar.Increment()
 			}
 
-			<-ch
+			<-ch // wait for close
 		}
 
 		tx.exec(
@@ -1010,7 +1010,7 @@ func syncNotifications() {
 			unh.rows = append(unh.rows, []interface{}{mkRandomUuid(massRander), envId, id, userId})
 		}
 
-		<-ch
+		<-ch // wait for close
 	}
 
 	if len(nh.rows) > 0 {
@@ -1162,7 +1162,7 @@ func syncStates() {
 				bar.Increment()
 			}
 
-			<-ch
+			<-ch // wait for close
 		}
 
 		tx.exec(
@@ -1266,7 +1266,7 @@ func syncStates() {
 			bar.Increment()
 		}
 
-		<-ch
+		<-ch // wait for close
 	}
 
 	if len(sh.rows) > 0 {
