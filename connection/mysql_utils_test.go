@@ -175,4 +175,15 @@ func TestChunkRows(t *testing.T) {
 	}
 	chunks = ChunkRows(rows, 2)
 	assert.Equal(t, want, chunks)
+
+	{
+		rows := make([]Row, 501)
+		for i := 0; i <= 501; i++ {
+			for j := 1; j <= 501; j++ {
+				for _, chunk := range ChunkRows(rows[:i], j) {
+					assert.NotEqual(t, 0, len(chunk))
+				}
+			}
+		}
+	}
 }
