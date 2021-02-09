@@ -76,16 +76,16 @@ func (h *HA) setState(state State) {
 
 	// invalid arguments
 	case StateInit:
-		log.Fatal("Must not set HA state to StateInit")
+		h.logger.Fatal("Must not set HA state to StateInit")
 	default:
-		log.Fatalf("Trying to change to invalid HA state %d", state)
+		h.logger.Fatalf("Trying to change to invalid HA state %d", state)
 	}
 
 	if state != h.state {
 		if h.state != StateInit {
-			log.Infof("Changing HA state to %s (was %s)", state.String(), h.state.String())
+			h.logger.Infof("Changing HA state to %s (was %s)", state.String(), h.state.String())
 		} else {
-			log.Infof("Changing HA state to %s", state.String())
+			h.logger.Infof("Changing HA state to %s", state.String())
 		}
 
 		h.state = state
@@ -251,6 +251,7 @@ func (h *HA) checkResponsibility(env *Environment) {
 				} else {
 					// We are active according to the DB but our heartbeat from Icinga 2 is no longer valid.
 					// Give up active state so that another instance has a chance to take over.
+					h.logger.Info("Becoming inactive due to expired Icinga 2 heartbeat.")
 					newState = StateAllInactive
 				}
 			} else {
@@ -264,6 +265,11 @@ func (h *HA) checkResponsibility(env *Environment) {
 				h.logger.Info("No active instance, trying to take over.")
 				newState = StateActive
 			} else {
+				if h.state == StateActive {
+					// We are active according to our last state, however when
+					// reading from the database our heartbeat expired already.
+					h.logger.Info("Becoming inactive due to expired Icinga 2 heartbeat.")
+				}
 				newState = StateAllInactive
 			}
 		}
