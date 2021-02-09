@@ -10,7 +10,6 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"io/ioutil"
 	oldlog "log"
-	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -426,11 +425,14 @@ type Row interface {
 type RowFactory func() Row
 
 func ChunkRows(rows []Row, size int) [][]Row {
-	chunksLen := int(math.Ceil(float64(len(rows)) / float64(size)))
+	chunksLen := len(rows) / size
+	if len(rows)%size != 0 {
+		chunksLen++
+	}
 	chunks := make([][]Row, chunksLen)
 
 	for i := 0; i < chunksLen; i++ {
-		start := i * size;
+		start := i * size
 		end := start + size
 		if end > len(rows) {
 			end = len(rows)
