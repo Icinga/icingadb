@@ -28,6 +28,7 @@ var (
 		"flexible_duration",
 		"is_flexible",
 		"is_in_effect",
+		"creator",
 		"start_time",
 		"end_time",
 		"zone_id",
@@ -52,6 +53,7 @@ type Downtime struct {
 	FlexibleDuration   float64 `json:"flexible_duration"`
 	IsFlexible         bool    `json:"is_flexible"`
 	IsInEffect         bool    `json:"is_in_effect"`
+	Creator            string  `json:"creator"`
 	StartTime          float64 `json:"start_time"`
 	EndTime            float64 `json:"end_time"`
 	ZoneId             string  `json:"zone_id"`
@@ -90,6 +92,7 @@ func (d *Downtime) UpdateValues() []interface{} {
 		d.FlexibleDuration,
 		utils.Bool[d.IsFlexible],
 		utils.Bool[d.IsInEffect],
+		d.Creator,
 		d.StartTime,
 		d.EndTime,
 		utils.EncodeChecksumOrNil(d.ZoneId),
