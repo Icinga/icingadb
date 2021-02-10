@@ -25,6 +25,7 @@ type HA struct {
 	uid                       uuid.UUID
 	super                     *supervisor.Supervisor
 	logger                    *log.Entry
+	dbw                       *connection.DBWrapper
 }
 
 const (
@@ -35,10 +36,11 @@ const (
 	heartbeatTimeoutMillisecs = heartbeatValidMillisecs + 5*1000
 )
 
-func NewHA(super *supervisor.Supervisor) (*HA, error) {
+func NewHA(super *supervisor.Supervisor, dbw *connection.DBWrapper) (*HA, error) {
 	var err error
 	ho := HA{
 		super: super,
+		dbw:   dbw,
 	}
 
 	if ho.uid, err = uuid.NewRandom(); err != nil {
@@ -96,7 +98,7 @@ func (h *HA) setState(state State) {
 func (h *HA) upsertInstance(tx connection.DbTransaction, env *Environment, isActive bool) error {
 	if isActive {
 		// If we are active or become active, ensure that no other instance has the active flag set.
-		_, err := h.super.Dbw.SqlExecTx(tx, mysqlObservers.updateIcingadbInstanceByEnvironmentId,
+		_, err := h.dbw.SqlExecTx(tx, mysqlObservers.updateIcingadbInstanceByEnvironmentId,
 			"UPDATE icingadb_instance SET responsible = ? WHERE environment_id = ? AND responsible = ?",
 			utils.Bool[false], h.super.EnvId, utils.Bool[true])
 		if err != nil {
@@ -104,7 +106,7 @@ func (h *HA) upsertInstance(tx connection.DbTransaction, env *Environment, isAct
 		}
 	}
 
-	_, err := h.super.Dbw.SqlExecTx(
+	_, err := h.dbw.SqlExecTx(
 		tx, mysqlObservers.insertIntoIcingadbInstance,
 		"REPLACE INTO icingadb_instance(id, environment_id, endpoint_id, responsible, heartbeat,"+
 			" icinga2_version, icinga2_start_time, icinga2_notifications_enabled,"+
@@ -129,7 +131,7 @@ func (h *HA) upsertInstance(tx connection.DbTransaction, env *Environment, isAct
 }
 
 func (h *HA) getActiveInstance(tx connection.DbTransaction) (bool, uuid.UUID, error) {
-	rows, err := h.super.Dbw.SqlFetchAllTx(
+	rows, err := h.dbw.SqlFetchAllTx(
 		tx, mysqlObservers.selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId,
 		"SELECT id, heartbeat FROM icingadb_instance"+
 			" WHERE environment_id = ? AND responsible = ? AND heartbeat > ?",
@@ -204,7 +206,7 @@ func (h *HA) waitForEnvironment(chEnv chan *Environment) *Environment {
 func (h *HA) setAndInsertEnvironment(env *Environment) error {
 	h.super.EnvId = env.ID
 
-	_, err := h.super.Dbw.SqlExec(
+	_, err := h.dbw.SqlExec(
 		mysqlObservers.insertIntoEnvironment,
 		"REPLACE INTO environment(id, name) VALUES (?, ?)",
 		env.ID, env.Name,
@@ -218,7 +220,7 @@ func (h *HA) setAndInsertEnvironment(env *Environment) error {
 // endpoint_id. Rows with a recent heartbeat are never removed.
 func (h *HA) removePreviousInstances(tx connection.DbTransaction, env *Environment) error {
 	heartbeatTimeoutThreshold := utils.TimeToMillisecs(time.Now()) - heartbeatTimeoutMillisecs
-	_, err := h.super.Dbw.SqlExecTx(tx, mysqlObservers.deleteIcingadbInstanceByEndpointId,
+	_, err := h.dbw.SqlExecTx(tx, mysqlObservers.deleteIcingadbInstanceByEndpointId,
 		"DELETE FROM icingadb_instance "+
 			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?",
 		h.uid[:], h.super.EnvId, env.Icinga2.EndpointId, heartbeatTimeoutThreshold)
@@ -229,7 +231,7 @@ func (h *HA) checkResponsibility(env *Environment) {
 	start := time.Now()
 
 	var newState State
-	err := h.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
+	err := h.dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
 		err := h.removePreviousInstances(tx, env)
 		if err != nil {
 			return err

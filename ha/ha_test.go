@@ -20,22 +20,21 @@ import (
 )
 
 func createTestingHA(t *testing.T, redisAddr string) *HA {
-	mysqlConn, err := connection.NewDBWrapper(testbackends.MysqlTestDsn, 50)
+	mysqlConn, err := connection.NewDBWrapper(testbackends.MysqlTestDsn, 1)
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	super := supervisor.Supervisor{
 		ChErr: make(chan error),
-		Dbw:   mysqlConn,
 	}
 
-	ha, _ := NewHA(&super)
+	ha, _ := NewHA(&super, mysqlConn)
 
 	hash := sha1.New()
 	hash.Write([]byte("derp"))
 	ha.super.EnvId = hash.Sum(nil)
 	ha.uid = uuid.MustParse("551bc748-94b2-4d27-b6a4-15c52aecfe85")
 
-	_, err = ha.super.Dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
+	_, err = ha.dbw.SqlExec(mysqlTestObserver, "TRUNCATE TABLE icingadb_instance")
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	ha.logger = log.WithFields(log.Fields{
@@ -60,10 +59,9 @@ func createTestingMultipleHA(t *testing.T, redisAddr string, numInstances int) (
 
 		super := supervisor.Supervisor{
 			ChErr: chErr,
-			Dbw:   mysqlConn,
 		}
 
-		ha, _ := NewHA(&super)
+		ha, _ := NewHA(&super, mysqlConn)
 
 		hash := sha1.New()
 		hash.Write([]byte("derp"))
@@ -86,12 +84,12 @@ var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
 func TestHA_UpsertInstance(t *testing.T) {
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
-	err := ha.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
+	err := ha.dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
 		return ha.upsertInstance(tx, &Environment{}, false)
 	})
 	require.NoError(t, err, "transaction running upsertInstance should not return an error")
 
-	rows, err := ha.super.Dbw.SqlFetchAll(
+	rows, err := ha.dbw.SqlFetchAll(
 		mysqlObservers.selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId,
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		ha.super.EnvId,
@@ -124,7 +122,7 @@ func TestHA_checkResponsibility_OtherInactiveInstance(t *testing.T) {
 	otherUuid, err := uuid.NewRandom()
 	assert.NoError(t, err, "UUID generation failed")
 
-	_, err = ha.super.Dbw.SqlExec(
+	_, err = ha.dbw.SqlExec(
 		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, responsible, heartbeat,"+
 			" icinga2_version, icinga2_start_time)"+
@@ -148,7 +146,7 @@ func TestHA_checkResponsibility_OtherTimedOutInstance(t *testing.T) {
 	otherUuid, err := uuid.NewRandom()
 	assert.NoError(t, err, "UUID generation failed")
 
-	_, err = ha.super.Dbw.SqlExec(
+	_, err = ha.dbw.SqlExec(
 		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, responsible, heartbeat,"+
 			" icinga2_version, icinga2_start_time)"+
@@ -171,7 +169,7 @@ func TestHA_checkResponsibility_OtherActiveInstance(t *testing.T) {
 	otherUuid, err := uuid.NewRandom()
 	assert.NoError(t, err, "UUID generation failed")
 
-	_, err = ha.super.Dbw.SqlExec(
+	_, err = ha.dbw.SqlExec(
 		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, responsible, heartbeat,"+
 			" icinga2_version, icinga2_start_time)"+
@@ -287,7 +285,7 @@ func TestHA_setAndInsertEnvironment(t *testing.T) {
 	err := ha.setAndInsertEnvironment(&env)
 	require.NoError(t, err, "setAndInsertEnvironment should not return an error")
 
-	rows, err := ha.super.Dbw.SqlFetchAll(
+	rows, err := ha.dbw.SqlFetchAll(
 		mysqlTestObserver,
 		"SELECT name from environment where id = ? LIMIT 1",
 		ha.super.EnvId,
@@ -367,7 +365,7 @@ func TestHA_removePreviousInstances(t *testing.T) {
 	err := ha.setAndInsertEnvironment(env)
 	require.NoError(t, err, "setAndInsertEnvironment should not return an error")
 
-	err = ha.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
+	err = ha.dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
 		return ha.upsertInstance(tx, &Environment{}, false)
 	})
 	require.NoError(t, err, "upsertInstance() should not return an error")
@@ -375,7 +373,7 @@ func TestHA_removePreviousInstances(t *testing.T) {
 	now := utils.TimeToMillisecs(time.Now())
 	activeUuid, err := uuid.NewRandom()
 	require.NoError(t, err, "UUID generation failed")
-	_, err = ha.super.Dbw.SqlExec(
+	_, err = ha.dbw.SqlExec(
 		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, endpoint_id, responsible, heartbeat,"+
 			" icinga2_version, icinga2_start_time)"+
@@ -387,7 +385,7 @@ func TestHA_removePreviousInstances(t *testing.T) {
 	timedOut := now - heartbeatTimeoutMillisecs
 	timedOutUuid, err := uuid.NewRandom()
 	require.NoError(t, err, "UUID generation failed")
-	_, err = ha.super.Dbw.SqlExec(
+	_, err = ha.dbw.SqlExec(
 		mysqlObservers.insertIntoIcingadbInstance,
 		"INSERT INTO icingadb_instance(id, environment_id, endpoint_id, responsible, heartbeat,"+
 			" icinga2_version, icinga2_start_time)"+
@@ -396,12 +394,12 @@ func TestHA_removePreviousInstances(t *testing.T) {
 	)
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
-	err = ha.super.Dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
+	err = ha.dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
 		return ha.removePreviousInstances(tx, env)
 	})
 	assert.NoError(t, err, "removePreviousInstances() should not return an error")
 
-	rows, err := ha.super.Dbw.SqlFetchAll(mysqlTestObserver, "SELECT id FROM icingadb_instance")
+	rows, err := ha.dbw.SqlFetchAll(mysqlTestObserver, "SELECT id FROM icingadb_instance")
 	var instanceIds []string
 	for _, row := range rows {
 		instanceIds = append(instanceIds, hex.EncodeToString(row[0].([]byte)))

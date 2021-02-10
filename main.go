@@ -119,6 +119,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	mysqlConnHa, err := connection.NewDBWrapper(dbDSN, 1)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	super := supervisor.Supervisor{
 		ChErr:        make(chan error),
@@ -130,7 +134,7 @@ func main() {
 	}
 
 	chEnv := make(chan *ha.Environment)
-	haInstance, err := ha.NewHA(&super)
+	haInstance, err := ha.NewHA(&super, mysqlConnHa)
 	if err != nil {
 		log.Fatal(err)
 	}
