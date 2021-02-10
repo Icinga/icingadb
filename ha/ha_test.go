@@ -20,14 +20,11 @@ import (
 )
 
 func createTestingHA(t *testing.T, redisAddr string) *HA {
-	redisConn := connection.NewRDBWrapper(redisAddr, "", 64)
-
 	mysqlConn, err := connection.NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
 	super := supervisor.Supervisor{
 		ChErr: make(chan error),
-		Rdbw:  redisConn,
 		Dbw:   mysqlConn,
 	}
 
@@ -50,8 +47,6 @@ func createTestingHA(t *testing.T, redisAddr string) *HA {
 }
 
 func createTestingMultipleHA(t *testing.T, redisAddr string, numInstances int) ([]*HA, <-chan error) {
-	redisConn := connection.NewRDBWrapper(redisAddr, "", 64)
-
 	mysqlConn, err := connection.NewDBWrapper(testbackends.MysqlTestDsn, 50)
 	require.NoError(t, err, "This test needs a working MySQL connection!")
 
@@ -65,7 +60,6 @@ func createTestingMultipleHA(t *testing.T, redisAddr string, numInstances int) (
 
 		super := supervisor.Supervisor{
 			ChErr: chErr,
-			Rdbw:  redisConn,
 			Dbw:   mysqlConn,
 		}
 

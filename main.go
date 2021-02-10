@@ -106,6 +106,7 @@ func main() {
 	metricsInfo := config.GetMetricsInfo()
 
 	redisConn := connection.NewRDBWrapper(redisInfo.Host+":"+redisInfo.Port, redisInfo.Password, redisInfo.PoolSize)
+	redisConnHa := connection.NewRDBWrapper(redisInfo.Host+":"+redisInfo.Port, redisInfo.Password, 1)
 
 	var dbDSN string
 	if filepath.IsAbs(mysqlInfo.Host) {
@@ -135,7 +136,7 @@ func main() {
 	}
 
 	go haInstance.StartHA(chEnv)
-	go ha.IcingaHeartbeatListener(redisConn, chEnv, super.ChErr)
+	go ha.IcingaHeartbeatListener(redisConnHa, chEnv, super.ChErr)
 
 	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)
 
