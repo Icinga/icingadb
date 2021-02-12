@@ -5,12 +5,10 @@ package ha
 import (
 	"crypto/sha1"
 	"encoding/json"
-	"fmt"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/go-redis/redis/v7"
 	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 type Environment struct {
@@ -43,7 +41,7 @@ func IcingaHeartbeatListener(rdb *connection.RDBWrapper, chEnv chan *Environment
 	log.Info("Starting heartbeat listener")
 
 	xReadArgs := redis.XReadArgs{
-		Streams: []string{"icinga:stats", fmt.Sprintf("%d-0", utils.TimeToMillisecs(time.Now().Add(-15*time.Second)))},
+		Streams: []string{"icinga:stats", "$"},
 		Count:   1,
 		Block:   0,
 	}
