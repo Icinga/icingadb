@@ -911,7 +911,9 @@ CREATE TABLE user_notification_history (
   notification_history_id binary(16) NOT NULL COMMENT 'UUID notification_history.id',
   user_id binary(20) NOT NULL COMMENT 'user.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  CONSTRAINT fk_user_history_notification FOREIGN KEY (notification_history_id) REFERENCES notification_history (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE state_history (
@@ -1041,6 +1043,13 @@ CREATE TABLE history (
   event_time bigint unsigned NOT NULL,
 
   PRIMARY KEY (id),
+
+  CONSTRAINT fk_history_acknowledgement FOREIGN KEY (acknowledgement_history_id) REFERENCES acknowledgement_history (id) ON DELETE CASCADE,
+  CONSTRAINT fk_history_comment FOREIGN KEY (comment_history_id) REFERENCES comment_history (comment_id) ON DELETE CASCADE,
+  CONSTRAINT fk_history_downtime FOREIGN KEY (downtime_history_id) REFERENCES downtime_history (downtime_id) ON DELETE CASCADE,
+  CONSTRAINT fk_history_flapping FOREIGN KEY (flapping_history_id) REFERENCES flapping_history (id) ON DELETE CASCADE,
+  CONSTRAINT fk_history_notification FOREIGN KEY (notification_history_id) REFERENCES notification_history (id) ON DELETE CASCADE,
+  CONSTRAINT fk_history_state FOREIGN KEY (state_history_id) REFERENCES state_history (id) ON DELETE CASCADE,
 
   INDEX idx_history_event_time (event_time) COMMENT 'History filtered/ordered by event_time',
   INDEX idx_history_acknowledgement (acknowledgement_history_id),
