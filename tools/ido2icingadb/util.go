@@ -192,56 +192,38 @@ func flush(bulks ...bulkInsert) {
 	tx.commit()
 }
 
-// getProgress bisects the range of idoIdColumn in idoTable as UUIDs in icingadbTable's icingadbIdColumn using idoTx
-// and returns the current progress and an idoIdColumn value to start/continue sync with.
+// getProgress compares the numbers of idoIdColumn in idoTable with the UUIDs in icingadbTable's icingadbIdColumn
+// using idoTx and returns the current progress and an idoIdColumn value to start/continue sync with.
 func getProgress(
 	idoTx tx, idoTable, idoIdColumn, icingadbTable, icingadbIdColumn string,
 	mkIcingadbId func(idoId uint64) (icingadbId interface{}),
 ) (
 	total, done, lastSyncedId int64,
 ) {
-	var left, right sql.NullInt64
+	var count []struct{ Count int64 }
+	idoTx.fetchAll(&count, fmt.Sprintf("SELECT COUNT(*) FROM %s", idoTable))
 
-	idoTx.query(
-		fmt.Sprintf("SELECT MIN(%s), MAX(%s) FROM %s", idoIdColumn, idoIdColumn, idoTable),
-		nil,
-		func(row struct{ Min, Max sql.NullInt64 }) {
-			left = row.Min
-			right = row.Max
-		},
-	)
-
-	if !left.Valid {
+	if total = count[0].Count; total == 0 {
 		return
 	}
 
-	left.Int64 -= 1
 	query := fmt.Sprintf("SELECT 1 FROM %s WHERE %s=?", icingadbTable, icingadbIdColumn)
-	total = right.Int64 - left.Int64
-	firstLeft := left.Int64
+	idoTx.query(
+		fmt.Sprintf("SELECT %s FROM %s ORDER BY %s", idoIdColumn, idoTable, idoIdColumn), nil,
+		func(row struct{ Id uint64 }) bool {
+			has := false
+			icingaDb.query(query, []interface{}{mkIcingadbId(row.Id)}, func(struct{ One uint8 }) { has = true })
 
-	for {
-		lastSyncedId = right.Int64 - (right.Int64-left.Int64)/2
+			if has {
+				done++
+				lastSyncedId = int64(row.Id)
+			}
 
-		has := false
-		icingaDb.query(
-			query,
-			[]interface{}{mkIcingadbId(uint64(lastSyncedId))},
-			func(struct{ One uint8 }) { has = true },
-		)
+			return has
+		},
+	)
 
-		if has {
-			left.Int64 = lastSyncedId
-		} else {
-			lastSyncedId--
-			right.Int64 = lastSyncedId
-		}
-
-		if left.Int64 == right.Int64 {
-			done = left.Int64 - firstLeft
-			return
-		}
-	}
+	return
 }
 
 // uuidTemplate is for mkDeterministicUuid.
