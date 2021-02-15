@@ -41,6 +41,22 @@ func TestDatabase_query(t *testing.T) {
 		t.Errorf("function called %d, not 3 times", len(actual))
 	}
 
+	actual = nil
+	dB.query(query, nil, func(r row) bool {
+		actual = append(actual, r)
+		return len(actual) < 2
+	})
+
+	if len(actual) == 2 {
+		for i, v := range actual {
+			if !reflect.DeepEqual(v, expected[i]) {
+				t.Errorf("function got %#v, not %#v on %d. call", v, expected[i], i+1)
+			}
+		}
+	} else {
+		t.Errorf("function called %d, not 2 times", len(actual))
+	}
+
 	assertPanic(t, func() {
 		dB.query(query, nil, 0)
 	})
@@ -106,6 +122,22 @@ func TestTx_query(t *testing.T) {
 		}
 	} else {
 		t.Errorf("function called %d, not 3 times", len(actual))
+	}
+
+	actual = nil
+	tx.query(query, nil, func(r row) bool {
+		actual = append(actual, r)
+		return len(actual) < 2
+	})
+
+	if len(actual) == 2 {
+		for i, v := range actual {
+			if !reflect.DeepEqual(v, expected[i]) {
+				t.Errorf("function got %#v, not %#v on %d. call", v, expected[i], i+1)
+			}
+		}
+	} else {
+		t.Errorf("function called %d, not 2 times", len(actual))
 	}
 
 	assertPanic(t, func() {

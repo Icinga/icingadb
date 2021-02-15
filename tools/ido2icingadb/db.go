@@ -127,7 +127,10 @@ func (db *database) query(query string, args []interface{}, onRow interface{}) {
 			break
 		}
 
-		vOnRow.Call([]reflect.Value{vRes.Index(0)})
+		ret := vOnRow.Call([]reflect.Value{vRes.Index(0)})
+		if len(ret) > 0 && ret[0].Kind() == reflect.Bool && !ret[0].Bool() {
+			break
+		}
 	}
 }
 
@@ -240,7 +243,10 @@ func (t tx) query(query string, args []interface{}, onRow interface{}) {
 			break
 		}
 
-		vOnRow.Call([]reflect.Value{vRes.Index(0)})
+		ret := vOnRow.Call([]reflect.Value{vRes.Index(0)})
+		if len(ret) > 0 && ret[0].Kind() == reflect.Bool && !ret[0].Bool() {
+			break
+		}
 	}
 }
 
