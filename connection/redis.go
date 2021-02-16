@@ -76,6 +76,7 @@ type RedisClient interface {
 	XDel(stream string, ids ...string) *redis.IntCmd
 	XAdd(a *redis.XAddArgs) *redis.StringCmd
 	HKeys(key string) *redis.StringSliceCmd
+	HScan(key string, cursor uint64, match string, count int64) *redis.ScanCmd
 	HMGet(key string, fields ...string) *redis.SliceCmd
 	HGetAll(key string) *redis.StringStringMapCmd
 	TxPipelined(fn func(redis.Pipeliner) error) ([]redis.Cmder, error)
@@ -297,6 +298,27 @@ func (rdbw *RDBWrapper) HKeys(key string) *redis.StringSliceCmd {
 
 		cmd := rdbw.Rdb.HKeys(key)
 		_, err := cmd.Result()
+
+		if err != nil {
+			if !rdbw.CheckConnection(false) {
+				continue
+			}
+		}
+
+		return cmd
+	}
+}
+
+// HScan is a wrapper for connection handling.
+func (rdbw *RDBWrapper) HScan(key string, cursor uint64, match string, count int64) *redis.ScanCmd {
+	for {
+		if !rdbw.IsConnected() {
+			rdbw.WaitForConnection()
+			continue
+		}
+
+		cmd := rdbw.Rdb.HScan(key, cursor, match, count)
+		_, _, err := cmd.Result()
 
 		if err != nil {
 			if !rdbw.CheckConnection(false) {
@@ -535,38 +557,67 @@ type ConfigChunk struct {
 	Checksums []interface{}
 }
 
-type ChecksumChunk struct {
-	Keys      []string
-	Checksums []interface{}
-}
+type PipeConfigChunksFlags uint8
 
-func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, keys []string, redisKey string) <-chan *ConfigChunk {
+const (
+	FetchChecksum PipeConfigChunksFlags = 1 << iota
+	FetchConfig
+)
+
+func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, objType string, inChunk *ConfigChunk,
+	fetch PipeConfigChunksFlags) <-chan *ConfigChunk {
+
 	out := make(chan *ConfigChunk)
 
-	worker := func(chunk <-chan []string) {
-		for k := range chunk {
+	fetchChecksum := fetch&FetchChecksum == FetchChecksum
+	fetchConfig := fetch&FetchConfig == FetchConfig
+
+	if !fetchChecksum && !fetchConfig {
+		// Shortcut just forwarding the chunk if no information needs to be fetched.
+		go func() {
+			select {
+			case out <- inChunk:
+			case <-done:
+			}
+		}()
+
+		return out
+	}
+
+	worker := func(chChunk <-chan *ConfigChunk) {
+		for chunk := range chChunk {
 			pipe := rdbw.Pipeline()
 			cmds := make([]*redis.SliceCmd, 2)
 
-			cmds[0] = pipe.HMGet(fmt.Sprintf("icinga:config:%s", redisKey), k...)
-			cmds[1] = pipe.HMGet(fmt.Sprintf("icinga:checksum:%s", redisKey), k...)
+			// Checksums is the first query so that in the worst case, we read an older checksum
+			// than config and perform a redundant update than missing an update.
+			if fetchChecksum {
+				cmds[0] = pipe.HMGet(fmt.Sprintf("icinga:checksum:%s", objType), chunk.Keys...)
+			}
+			if fetchConfig {
+				cmds[1] = pipe.HMGet(fmt.Sprintf("icinga:config:%s", objType), chunk.Keys...)
+			}
 
 			_, err := pipe.Exec() // TODO(el): What to do with the Cmder slice?
 			if err != nil {
 				panic(err)
 			}
 
-			configs, err := cmds[0].Result()
-			if err != nil {
-				panic(err)
+			if fetchChecksum {
+				chunk.Checksums, err = cmds[0].Result()
+				if err != nil {
+					panic(err)
+				}
 			}
-			checksums, err := cmds[1].Result()
-			if err != nil {
-				panic(err)
+			if fetchConfig {
+				chunk.Configs, err = cmds[1].Result()
+				if err != nil {
+					panic(err)
+				}
 			}
 
 			select {
-			case out <- &ConfigChunk{Keys: k, Configs: configs, Checksums: checksums}:
+			case out <- chunk:
 			case <-done:
 				return
 			}
@@ -574,49 +625,26 @@ func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, keys []string, re
 	}
 
 	//TODO: Replace fixed chunkSize
-	work := utils.ChunkKeys(done, keys, 500)
+	chunkSize := 500
 
+	work := make(chan *ConfigChunk)
 	go func() {
-		defer close(out)
-
-		wg := &sync.WaitGroup{}
-
-		for i := 0; i < 32; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				worker(work)
-			}()
-		}
-
-		wg.Wait()
-	}()
-
-	return out
-}
-
-func (rdbw *RDBWrapper) PipeChecksumChunks(done <-chan struct{}, keys []string, redisKey string) <-chan *ChecksumChunk {
-	out := make(chan *ChecksumChunk)
-
-	worker := func(chunk <-chan []string) {
-		for k := range chunk {
-			cmd := rdbw.HMGet(fmt.Sprintf("icinga:checksum:%s", redisKey), k...)
-
-			checksums, err := cmd.Result()
-			if err != nil {
-				panic(err)
+		defer close(work)
+		for _, c := range utils.ChunkIndices(len(inChunk.Keys), chunkSize) {
+			chunk := &ConfigChunk{Keys: inChunk.Keys[c.Begin:c.End]}
+			if inChunk.Configs != nil {
+				chunk.Configs = inChunk.Configs[c.Begin:c.End]
 			}
-
+			if inChunk.Checksums != nil {
+				chunk.Checksums = inChunk.Checksums[c.Begin:c.End]
+			}
 			select {
-			case out <- &ChecksumChunk{Keys: k, Checksums: checksums}:
+			case work <- chunk:
 			case <-done:
 				return
 			}
 		}
-	}
-
-	//TODO: Replace fixed chunkSize
-	work := utils.ChunkKeys(done, keys, 500)
+	}()
 
 	go func() {
 		defer close(out)

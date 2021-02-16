@@ -36,19 +36,19 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 		done chan struct{}
 		// Used by this Operator to provide the InsertPrepWorker with IDs to insert
 		// Operator -> InsertPrepWorker
-		chInsert chan []string
+		chInsert chan *connection.ConfigChunk
 		// Used by the JsonDecodePool to provide the InsertExecWorker with decoded rows, ready to be inserted
 		// JsonDecodePool -> InsertExecWorker
 		chInsertBack chan []connection.Row
 		// Used by this Operator to provide the DeleteExecWorker with IDs to delete
 		// Operator -> DeleteExecWorker
-		chDelete chan []string
+		chDelete chan *connection.ConfigChunk
 		// Used by this Operator to provide the UpdateCompWorker with IDs to compare
 		// Operator -> UpdateCompWorker
-		chUpdateComp chan []string
+		chUpdateComp chan *connection.ConfigChunk
 		// Used by the UpdateCompWorker to provide the UpdatePrepWorker with IDs that have to be updated
 		// UpdateCompWorker -> UpdatePrepWorker
-		chUpdate chan []string
+		chUpdate chan *connection.ConfigChunk
 		// Used by the JsonDecodePool to provide the UpdateExecWorker with decoded rows, ready to be updated
 		// JsonDecodePool -> UpdateExecWorker
 		chUpdateBack chan []connection.Row
@@ -77,16 +77,16 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 			log.Debugf("%s: Got responsibility", objectInformation.ObjectType)
 
 			//TODO: This should only be done, if HA was taken over from another instance
-			insert, update, delete := GetDelta(super, objectInformation)
-			//log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", objectInformation.ObjectType, len(insert), len(update), len(delete))
+			ins, upd, del := GetDelta(super, objectInformation)
+			//log.Infof("%s - Delta: (Insert: %d, Maybe Update: %d, Delete: %d)", objectInformation.ObjectType, len(ins), len(upd), len(del))
 
 			// Clean up all channels and wait groups for a fresh config dump
 			done = make(chan struct{})
-			chInsert = make(chan []string)
+			chInsert = make(chan *connection.ConfigChunk)
 			chInsertBack = make(chan []connection.Row)
-			chDelete = make(chan []string)
-			chUpdateComp = make(chan []string)
-			chUpdate = make(chan []string)
+			chDelete = make(chan *connection.ConfigChunk)
+			chUpdateComp = make(chan *connection.ConfigChunk)
+			chUpdate = make(chan *connection.ConfigChunk)
 			chUpdateBack = make(chan []connection.Row)
 			wgInsert = &sync.WaitGroup{}
 			wgDelete = &sync.WaitGroup{}
@@ -124,21 +124,21 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				defer super.WgConfigSync.Done()
 
 				benchmarc := utils.NewBenchmark()
-				wgInsert.Add(len(insert))
+				wgInsert.Add(len(ins.Keys))
 
 				// Provide the InsertPrepWorker with IDs to insert
-				chInsert <- insert
+				chInsert <- ins
 
 				// Wait for all IDs to be inserted into MySQL
 				kill := waitOrKill(wgInsert, done)
 				benchmarc.Stop()
-				if !kill && len(insert) > 0 {
+				if !kill && len(ins.Keys) > 0 {
 					log.WithFields(log.Fields{
 						"type":      objectInformation.ObjectType,
-						"count":     len(insert),
+						"count":     len(ins.Keys),
 						"benchmark": benchmarc.String(),
 						"action":    "insert",
-					}).Infof("Inserted %v %ss in %v", len(insert), objectInformation.ObjectType, benchmarc.String())
+					}).Infof("Inserted %v %ss in %v", len(ins.Keys), objectInformation.ObjectType, benchmarc.String())
 				}
 			}()
 
@@ -146,21 +146,22 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 				defer super.WgConfigSync.Done()
 
 				benchmarc := utils.NewBenchmark()
-				wgDelete.Add(len(delete))
+				wgDelete.Add(len(del.Keys))
 
 				// Provide the DeleteExecWorker with IDs to delete
-				chDelete <- delete
+				chDelete <- del
 
 				// Wait for all IDs to be deleted from MySQL
 				kill := waitOrKill(wgDelete, done)
 				benchmarc.Stop()
-				if !kill && len(delete) > 0 {
+				if !kill && len(del.Keys) > 0 {
 					log.WithFields(log.Fields{
 						"type":      objectInformation.ObjectType,
-						"count":     len(delete),
+						"count":     len(del.Keys),
 						"benchmark": benchmarc.String(),
 						"action":    "delete",
-					}).Infof("Deleted %v %ss in %v", len(delete), objectInformation.ObjectType, benchmarc.String())
+					}).Infof("Deleted %v %ss in %v", len(del.Keys),
+						objectInformation.ObjectType, benchmarc.String())
 				}
 			}()
 
@@ -169,10 +170,10 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 					defer super.WgConfigSync.Done()
 
 					benchmarc := utils.NewBenchmark()
-					wgUpdate.Add(len(update))
+					wgUpdate.Add(len(upd.Keys))
 
-					// Provide the UpdateCompWorker with IDs to compare
-					chUpdateComp <- update
+					// Provide the UpdatePrepWorker with IDs to compare
+					chUpdateComp <- upd
 
 					// Wait for all IDs to be update in MySQL
 					kill := waitOrKill(wgUpdate, done)
@@ -196,28 +197,61 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 }
 
 // GetDelta takes the ObjectInformation (host, service, checkcommand, etc.) and fetches the ids from MySQL and Redis. It
-// returns three string slices:
+// returns three *ConfigChunk:
 // 1. IDs which are in the Redis but not in the MySQL (to insert)
 // 2. IDs which are in both (to possibly update)
 // 3. IDs which are in the MySQL but not the Redis (to delete)
-func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation) ([]string, []string, []string) {
+// All chunks have the Keys member set to a slice of IDs. The insert and update chunks additionally have either the
+// Checksums or the Configs member set. If the object type has checksums available, then Checksums is set, otherwise
+// Configs.
+func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation) (
+	ins *connection.ConfigChunk, upd *connection.ConfigChunk, del *connection.ConfigChunk) {
+
 	var (
-		redisIds []string
-		mysqlIds []string
-		wg       = sync.WaitGroup{}
+		redisIds  []string
+		mysqlIds  []string
+		allValues = make(map[string]string)
+		wg        = sync.WaitGroup{}
 	)
 
 	//get ids from redis
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		var err error
-		res, err := super.Rdbw.HKeys(fmt.Sprintf("icinga:config:%s", objectInformation.RedisKey)).Result()
-		if err != nil {
+
+		var key string
+		if objectInformation.HasChecksum {
+			key = fmt.Sprintf("icinga:checksum:%s", objectInformation.RedisKey)
+		} else {
+			key = fmt.Sprintf("icinga:config:%s", objectInformation.RedisKey)
+		}
+		cursor := uint64(0)
+
+		iter := super.Rdbw.HScan(key, cursor, "", 1000).Iterator()
+		for iter.Next() {
+			// HScan returns a slice of alternating keys and values.
+			id := iter.Val()
+			if !iter.Next() {
+				if err := iter.Err(); err != nil {
+					super.ChErr <- err
+					return
+				} else {
+					super.ChErr <- fmt.Errorf("unexpected end of iterator while reading %s objects from Redis",
+						objectInformation.ObjectType)
+					return
+				}
+			}
+			allValues[id] = iter.Val()
+		}
+		if err := iter.Err(); err != nil {
 			super.ChErr <- err
 			return
 		}
-		redisIds = res
+
+		redisIds = make([]string, 0, len(allValues))
+		for id := range allValues {
+			redisIds = append(redisIds, id)
+		}
 	}()
 
 	//get ids from mysql
@@ -235,11 +269,31 @@ func GetDelta(super *supervisor.Supervisor, objectInformation *configobject.Obje
 	}()
 
 	wg.Wait()
-	return utils.Delta(redisIds, mysqlIds)
+	insIds, updIds, delIds := utils.Delta(redisIds, mysqlIds)
+
+	// Helper function to add either Checksums or Configs (depending on what was fetched by HScan) to a chunk.
+	addValues := func(chunk *connection.ConfigChunk) *connection.ConfigChunk {
+		values := make([]interface{}, len(chunk.Keys))
+		for i, key := range chunk.Keys {
+			values[i] = allValues[key]
+		}
+		if objectInformation.HasChecksum {
+			chunk.Checksums = values
+		} else {
+			chunk.Configs = values
+		}
+		return chunk
+	}
+
+	return addValues(&connection.ConfigChunk{Keys: insIds}),
+		addValues(&connection.ConfigChunk{Keys: updIds}),
+		&connection.ConfigChunk{Keys: delIds}
 }
 
 // InsertPrepWorker fetches config for IDs(chInsert) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
-func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsert <-chan []string, chInsertBack chan<- []connection.Row) {
+func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation,
+	done chan struct{}, chInsert <-chan *connection.ConfigChunk, chInsertBack chan<- []connection.Row) {
+
 	log.Debugf("%s: Insert preparation worker started", objectInformation.ObjectType)
 	defer log.Debugf("%s: Insert preparation worker stopped", objectInformation.ObjectType)
 
@@ -259,7 +313,7 @@ func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 				ObjectType: objectInformation.ObjectType,
 			}
 
-			if chunk.Checksums[i] != nil {
+			if chunk.Checksums != nil && chunk.Checksums[i] != nil {
 				pkg.ChecksumsRaw = chunk.Checksums[i].(string)
 			}
 
@@ -269,7 +323,7 @@ func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 		super.ChDecode <- &pkgs
 	}
 
-	for keys := range chInsert {
+	for chunk := range chInsert {
 		select {
 		case _, ok := <-done:
 			if !ok {
@@ -278,7 +332,14 @@ func InsertPrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 		default:
 		}
 
-		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.RedisKey)
+		var flags connection.PipeConfigChunksFlags
+		if chunk.Configs == nil {
+			flags |= connection.FetchConfig
+		}
+		if objectInformation.HasChecksum && chunk.Checksums == nil {
+			flags |= connection.FetchChecksum
+		}
+		ch := super.Rdbw.PipeConfigChunks(done, objectInformation.RedisKey, chunk, flags)
 		go func() {
 			for chunk := range ch {
 				go prep(chunk)
@@ -311,11 +372,13 @@ func InsertExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 }
 
 // DeleteExecWorker deletes IDs(chDelete) from MySQL
-func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chDelete <-chan []string, wg *sync.WaitGroup) {
+func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation,
+	done chan struct{}, chDelete <-chan *connection.ConfigChunk, wg *sync.WaitGroup) {
+
 	log.Debugf("%s: Delete execution worker started", objectInformation.ObjectType)
 	defer log.Debugf("%s: Delete execution worker stopped", objectInformation.ObjectType)
 
-	for keys := range chDelete {
+	for chunk := range chDelete {
 		select {
 		case _, ok := <-done:
 			if !ok {
@@ -329,18 +392,21 @@ func DeleteExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 			rowLen := len(keys)
 			wg.Add(-rowLen)
 			ConfigSyncDeletesTotal.WithLabelValues(objectInformation.ObjectType).Add(float64(rowLen))
-		}(keys)
+		}(chunk.Keys)
 	}
 }
 
-// UpdateCompWorker gets IDs(chUpdateComp) that might need an update, fetches the corresponding checksums for Redis and MySQL,
-// compares them and inserts changed IDs into chUpdate.
-func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdateComp <-chan []string, chUpdate chan<- []string, wg *sync.WaitGroup) {
+// UpdateCompWorker gets IDs(chUpdateComp) that might need an update, fetches the corresponding checksums for Redis and
+// MySQL, compares them and inserts changed IDs into chUpdate.
+func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation,
+	done chan struct{}, chUpdateComp <-chan *connection.ConfigChunk, chUpdate chan<- *connection.ConfigChunk,
+	wg *sync.WaitGroup) {
+
 	log.Debugf("%s: Update comparison worker started", objectInformation.ObjectType)
 	defer log.Debugf("%s: Update comparison worker stopped", objectInformation.ObjectType)
 
-	prep := func(chunk *connection.ChecksumChunk, mysqlChecksums map[string]map[string]string) {
-		changed := make([]string, 0)
+	prep := func(chunk *connection.ConfigChunk, mysqlChecksums map[string]map[string]string) {
+		changed := new(connection.ConfigChunk)
 		for i, key := range chunk.Keys {
 			if chunk.Checksums[i] == nil {
 				continue
@@ -354,7 +420,11 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 			}
 
 			if redisChecksums.PropertiesChecksum != mysqlChecksums[key]["properties_checksum"] {
-				changed = append(changed, key)
+				changed.Keys = append(changed.Keys, key)
+				changed.Checksums = append(changed.Configs, chunk.Checksums[i])
+				if chunk.Configs != nil {
+					changed.Configs = append(changed.Configs, chunk.Configs[i])
+				}
 			} else {
 				wg.Done()
 			}
@@ -362,7 +432,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 		chUpdate <- changed
 	}
 
-	for keys := range chUpdateComp {
+	for chunk := range chUpdateComp {
 		select {
 		case _, ok := <-done:
 			if !ok {
@@ -371,8 +441,12 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 		default:
 		}
 
-		ch := super.Rdbw.PipeChecksumChunks(done, keys, objectInformation.RedisKey)
-		checksums, err := super.Dbw.SqlFetchChecksums(objectInformation.ObjectType, keys)
+		var flags connection.PipeConfigChunksFlags
+		if chunk.Checksums == nil {
+			flags |= connection.FetchChecksum
+		}
+		ch := super.Rdbw.PipeConfigChunks(done, objectInformation.RedisKey, chunk, flags)
+		checksums, err := super.Dbw.SqlFetchChecksums(objectInformation.ObjectType, chunk.Keys)
 		if err != nil {
 			super.ChErr <- err
 		}
@@ -386,7 +460,9 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 }
 
 // UpdatePrepWorker fetches config for IDs(chUpdate) from Redis, wraps it into JsonDecodePackages and throws it into the JsonDecodePool
-func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdate <-chan []string, chUpdateBack chan<- []connection.Row) {
+func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation,
+	done chan struct{}, chUpdate <-chan *connection.ConfigChunk, chUpdateBack chan<- []connection.Row) {
+
 	log.Debugf("%s: Update preparation worker started", objectInformation.ObjectType)
 	defer log.Debugf("%s: Update preparation worker stopped", objectInformation.ObjectType)
 
@@ -411,7 +487,7 @@ func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 		super.ChDecode <- &pkgs
 	}
 
-	for keys := range chUpdate {
+	for chunk := range chUpdate {
 		select {
 		case _, ok := <-done:
 			if !ok {
@@ -420,7 +496,14 @@ func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 		default:
 		}
 
-		ch := super.Rdbw.PipeConfigChunks(done, keys, objectInformation.RedisKey)
+		var flags connection.PipeConfigChunksFlags
+		if chunk.Configs == nil {
+			flags |= connection.FetchConfig
+		}
+		if objectInformation.HasChecksum && chunk.Checksums == nil {
+			flags |= connection.FetchChecksum
+		}
+		ch := super.Rdbw.PipeConfigChunks(done, objectInformation.RedisKey, chunk, flags)
 		go func() {
 			for chunk := range ch {
 				go prep(chunk)
@@ -430,7 +513,9 @@ func UpdatePrepWorker(super *supervisor.Supervisor, objectInformation *configobj
 }
 
 // UpdateExecWorker gets decoded connection.Row objects from the JsonDecodePool and updates them in MySQL
-func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chUpdateBack <-chan []connection.Row, wg *sync.WaitGroup, updateCounter *uint32) {
+func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation,
+	done chan struct{}, chUpdateBack <-chan []connection.Row, wg *sync.WaitGroup, updateCounter *uint32) {
+
 	log.Debugf("%s: Update execution worker started", objectInformation.ObjectType)
 	defer log.Debugf("%s: Update execution worker stopped", objectInformation.ObjectType)
 
@@ -453,7 +538,11 @@ func UpdateExecWorker(super *supervisor.Supervisor, objectInformation *configobj
 	}
 }
 
-func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation, done chan struct{}, chInsert chan []string, chUpdate chan []string, chDelete chan []string, wgInsert *sync.WaitGroup, wgUpdate *sync.WaitGroup, wgDelete *sync.WaitGroup) {
+func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *configobject.ObjectInformation,
+	done chan struct{}, chInsert chan *connection.ConfigChunk, chUpdate chan *connection.ConfigChunk,
+	chDelete chan *connection.ConfigChunk, wgInsert *sync.WaitGroup, wgUpdate *sync.WaitGroup,
+	wgDelete *sync.WaitGroup) {
+
 	subscription := super.Rdbw.Subscribe()
 	defer subscription.Close()
 
@@ -473,10 +562,10 @@ func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *config
 		updateLen := len(currentUpdatePackage)
 
 		if objectInformation.HasChecksum {
-			chUpdate <- currentUpdatePackage
+			chUpdate <- &connection.ConfigChunk{Keys: currentUpdatePackage}
 			wgUpdate.Add(updateLen)
 		} else {
-			chInsert <- currentUpdatePackage
+			chInsert <- &connection.ConfigChunk{Keys: currentUpdatePackage}
 			wgInsert.Add(updateLen)
 		}
 
@@ -490,7 +579,7 @@ func RuntimeUpdateWorker(super *supervisor.Supervisor, objectInformation *config
 
 	insertCurrentDeletePackage := func() {
 		deleteLen := len(currentDeletePackage)
-		chDelete <- currentDeletePackage
+		chDelete <- &connection.ConfigChunk{Keys: currentDeletePackage}
 		wgDelete.Add(deleteLen)
 		currentDeletePackage = []string{}
 

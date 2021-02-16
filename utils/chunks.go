@@ -32,13 +32,35 @@ func ChunkInterfaces(interfaces []interface{}, size int) [][]interface{} {
 	chunks := make([][]interface{}, chunksLen)
 
 	for i := 0; i < chunksLen; i++ {
-		start := i * size;
+		start := i * size
 		end := start + size
 		if end > len(interfaces) {
 			end = len(interfaces)
 		}
 
 		chunks[i] = interfaces[start:end]
+	}
+
+	return chunks
+}
+
+type Chunk struct {
+	Begin, End int
+}
+
+func ChunkIndices(total, chunk int) []Chunk {
+	n := total / chunk
+	if total%chunk > 0 {
+		n++
+	}
+
+	chunks := make([]Chunk, n)
+	for i := range chunks {
+		chunks[i].Begin = i * chunk
+		chunks[i].End = i*chunk + chunk
+		if chunks[i].End > total {
+			chunks[i].End = total
+		}
 	}
 
 	return chunks

@@ -297,24 +297,21 @@ func TestRDBWrapper_PipeConfigChunks(t *testing.T) {
 	testbackends.RedisTestClient.HSet("icinga:config:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-config")
 	testbackends.RedisTestClient.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
 
-	chChunk := rdbw.PipeConfigChunks(make(chan struct{}), []string{"123534534fsdf12sdas12312adg23423f"}, "testkey")
+	chChunk := rdbw.PipeConfigChunks(make(chan struct{}), "testkey",
+		&ConfigChunk{Keys: []string{"123534534fsdf12sdas12312adg23423f"}}, FetchChecksum)
 	chunk := <-chChunk
-	assert.Equal(t, "this-should-be-the-config", chunk.Configs[0])
+	assert.Nil(t, chunk.Configs)
 	assert.Equal(t, "this-should-be-the-checksum", chunk.Checksums[0])
-}
 
-func TestRDBWrapper_PipeChecksumChunks(t *testing.T) {
-	rdbw := NewTestRDBW(testbackends.RedisTestClient)
+	chChunk = rdbw.PipeConfigChunks(make(chan struct{}), "testkey",
+		&ConfigChunk{Keys: []string{"123534534fsdf12sdas12312adg23423f"}}, FetchConfig)
+	chunk = <-chChunk
+	assert.Equal(t, "this-should-be-the-config", chunk.Configs[0])
+	assert.Nil(t, chunk.Checksums)
 
-	if !rdbw.CheckConnection(true) {
-		t.Fatal("This test needs a working Redis connection")
-	}
-
-	testbackends.RedisTestClient.Del("icinga:checksum:testkey")
-
-	testbackends.RedisTestClient.HSet("icinga:checksum:testkey", "123534534fsdf12sdas12312adg23423f", "this-should-be-the-checksum")
-
-	chChunk := rdbw.PipeChecksumChunks(make(chan struct{}), []string{"123534534fsdf12sdas12312adg23423f"}, "testkey")
-	chunk := <-chChunk
+	chChunk = rdbw.PipeConfigChunks(make(chan struct{}), "testkey",
+		&ConfigChunk{Keys: []string{"123534534fsdf12sdas12312adg23423f"}}, FetchChecksum|FetchConfig)
+	chunk = <-chChunk
+	assert.Equal(t, "this-should-be-the-config", chunk.Configs[0])
 	assert.Equal(t, "this-should-be-the-checksum", chunk.Checksums[0])
 }
