@@ -107,36 +107,6 @@ func TestDBWrapper_CheckConnection(t *testing.T) {
 	assert.Equal(t, uint32(11), atomic.LoadUint32(dbw.ConnectionLostCounterAtomic))
 }
 
-func TestDBWrapper_SqlCommit(t *testing.T) {
-	mockDb := new(DbMock)
-	dbw := NewTestDBW(mockDb)
-	mockTx := new(TransactionMock)
-
-	mockTx.On("Commit").Return(errors.New("whoops")).Once()
-	mockTx.On("Commit").Return(nil).Once()
-	mockDb.On("Ping").Return(errors.New("whoops")).Once()
-
-	var err error
-	done := make(chan bool)
-
-	dbw.CompareAndSetConnected(true)
-	go func() {
-		err = dbw.SqlCommit(mockTx, false)
-		done <- true
-	}()
-
-	time.Sleep(time.Millisecond * 50)
-
-	dbw.CompareAndSetConnected(true)
-	dbw.ConnectionUpCondition.Broadcast()
-
-	<-done
-
-	assert.NoError(t, err)
-	mockTx.AssertExpectations(t)
-	mockDb.AssertExpectations(t)
-}
-
 func TestDBWrapper_SqlBegin(t *testing.T) {
 	mockDb := new(DbMock)
 	dbw := NewTestDBW(mockDb)

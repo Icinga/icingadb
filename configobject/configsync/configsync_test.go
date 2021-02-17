@@ -7,7 +7,6 @@ import (
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/configobject/objecttypes/host"
 	"github.com/Icinga/icingadb/connection"
-	"github.com/Icinga/icingadb/ha"
 	"github.com/Icinga/icingadb/jsondecoder"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
@@ -66,7 +65,7 @@ func TestOperator_InsertHost(t *testing.T) {
 	testbackends.RedisTestClient.HSet("icinga:checksum:host", "a9ef44eb69fda8fbc32bee33322b6518057f559f", "{\"checksum\":\"b6e87de3d4f31b3d4d35466171f4088693b46071\"}")
 
 	for _, ch := range chs {
-		ch <- ha.Notify_StartSync
+		ch <- Notify_StartSync
 	}
 
 	assert.Eventually(t, func() bool {
@@ -142,7 +141,7 @@ func TestOperator_DeleteHost(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, ch := range chs {
-		ch <- ha.Notify_StartSync
+		ch <- Notify_StartSync
 	}
 
 	assert.Eventually(t, func() bool {
@@ -214,7 +213,7 @@ func TestOperator_UpdateHost(t *testing.T) {
 	require.NoError(t, err)
 
 	for _, ch := range chs {
-		ch <- ha.Notify_StartSync
+		ch <- Notify_StartSync
 	}
 
 	assert.Eventually(t, func() bool {

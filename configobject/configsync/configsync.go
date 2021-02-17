@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/Icinga/icingadb/configobject"
 	"github.com/Icinga/icingadb/connection"
-	"github.com/Icinga/icingadb/ha"
 	"github.com/Icinga/icingadb/jsondecoder"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
@@ -60,14 +59,14 @@ func Operator(super *supervisor.Supervisor, chHA chan int, objectInformation *co
 	for msg := range chHA {
 		switch msg {
 		// Icinga 2 probably restarted or died, stop operations and tell all workers to shut down.
-		case ha.Notify_StopSync:
+		case Notify_StopSync:
 			if done != nil {
 				log.Debugf("%s: Lost responsibility", objectInformation.ObjectType)
 				close(done)
 				done = nil
 			}
 		// Starts up the whole sync process.
-		case ha.Notify_StartSync:
+		case Notify_StartSync:
 			if done != nil {
 				continue
 			}

@@ -106,6 +106,7 @@ func main() {
 	metricsInfo := config.GetMetricsInfo()
 
 	redisConn := connection.NewRDBWrapper(redisInfo.Host+":"+redisInfo.Port, redisInfo.Password, redisInfo.PoolSize)
+	redisConnHa := connection.NewRDBWrapper(redisInfo.Host+":"+redisInfo.Port, redisInfo.Password, 1)
 
 	var dbDSN string
 	if filepath.IsAbs(mysqlInfo.Host) {
@@ -115,6 +116,10 @@ func main() {
 	}
 
 	mysqlConn, err := connection.NewDBWrapper(dbDSN, mysqlInfo.MaxOpenConns)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mysqlConnHa, err := connection.NewDBWrapper(dbDSN, 1)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,13 +134,13 @@ func main() {
 	}
 
 	chEnv := make(chan *ha.Environment)
-	haInstance, err := ha.NewHA(&super)
+	haInstance, err := ha.NewHA(&super, mysqlConnHa)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	go haInstance.StartHA(chEnv)
-	go ha.IcingaHeartbeatListener(redisConn, chEnv, super.ChErr)
+	go ha.IcingaHeartbeatListener(redisConnHa, chEnv, super.ChErr)
 
 	go jsondecoder.DecodePool(super.ChDecode, super.ChErr, 16)
 
@@ -144,8 +149,6 @@ func main() {
 	statesync.StartStateSync(&super)
 
 	history.StartHistoryWorkers(&super)
-
-	go haInstance.StartEventListener()
 
 	if metricsInfo.Host != "" {
 		go prometheus.HandleHttp("["+metricsInfo.Host+"]:"+metricsInfo.Port, super.ChErr)
@@ -228,9 +231,12 @@ func startConfigSyncOperators(super *supervisor.Supervisor, haInstance *ha.HA) {
 		&hoststate.ObjectInformation,
 	}
 
+	configSyncHA := configsync.NewConfigSyncHA(super, haInstance.RegisterStateChangeListener())
+	configSyncHA.Start()
+
 	for _, objectInformation := range objectTypes {
 		go func(information *configobject.ObjectInformation) {
-			super.ChErr <- configsync.Operator(super, haInstance.RegisterNotificationListener(information.NotificationListenerType), information)
+			super.ChErr <- configsync.Operator(super, configSyncHA.RegisterNotificationListener(information.NotificationListenerType), information)
 		}(objectInformation)
 	}
 }
