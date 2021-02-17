@@ -60,7 +60,7 @@ var connectionErrors = []string{
 	"operation timed out",
 }
 
-// DbClientOrTransaction is used in SqlFetchAll and SqlFetchAllQuiet.
+// DbClientOrTransaction abstracts database connections and transactions.
 type DbClientOrTransaction interface {
 	Query(query string, args ...interface{}) (*sql.Rows, error)
 	Exec(query string, args ...interface{}) (sql.Result, error)
@@ -357,16 +357,8 @@ func (dbw *DBWrapper) SqlFetchAll(queryObserver prometheus.Observer, query strin
 	return dbw.sqlFetchAllInternal(dbw.Db, queryObserver, query, false, args...)
 }
 
-func (dbw *DBWrapper) SqlFetchAllQuiet(queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(dbw.Db, queryObserver, query, true, args...)
-}
-
 func (dbw *DBWrapper) SqlFetchAllTx(tx DbTransaction, queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
 	return dbw.sqlFetchAllInternal(tx, queryObserver, query, false, args...)
-}
-
-func (dbw *DBWrapper) SqlFetchAllTxQuiet(tx DbTransaction, queryObserver prometheus.Observer, query string, args ...interface{}) ([][]interface{}, error) {
-	return dbw.sqlFetchAllInternal(tx, queryObserver, query, true, args...)
 }
 
 // sqlExecInternal is a wrapper around sql.Exec() for auto-logging.
