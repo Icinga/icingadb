@@ -5,6 +5,7 @@ package statesync
 import (
 	"encoding/hex"
 	"github.com/Icinga/icingadb/connection"
+	"github.com/Icinga/icingadb/ha"
 	"github.com/Icinga/icingadb/supervisor"
 	"github.com/Icinga/icingadb/utils"
 	"github.com/go-redis/redis/v7"
@@ -33,8 +34,8 @@ var mysqlObservers = struct {
 }
 
 // StartStateSync starts the sync goroutines for hosts and services.
-func StartStateSync(super *supervisor.Supervisor) {
-	startOverdueSync(super)
+func StartStateSync(super *supervisor.Supervisor, haInstance *ha.HA) {
+	startOverdueSync(super, haInstance)
 
 	go func() {
 		for {

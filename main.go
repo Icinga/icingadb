@@ -146,7 +146,7 @@ func main() {
 
 	startConfigSyncOperators(&super, haInstance)
 
-	statesync.StartStateSync(&super)
+	statesync.StartStateSync(&super, haInstance)
 
 	history.StartHistoryWorkers(&super)
 
