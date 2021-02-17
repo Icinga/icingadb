@@ -66,6 +66,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"sync"
 	"syscall"
@@ -106,10 +107,14 @@ func main() {
 
 	redisConn := connection.NewRDBWrapper(redisInfo.Host+":"+redisInfo.Port, redisInfo.Password, redisInfo.PoolSize)
 
-	mysqlConn, err := connection.NewDBWrapper(
-		mysqlInfo.User+":"+mysqlInfo.Password+"@tcp("+mysqlInfo.Host+":"+mysqlInfo.Port+")/"+mysqlInfo.Database,
-		mysqlInfo.MaxOpenConns,
-	)
+	var dbDSN string
+	if filepath.IsAbs(mysqlInfo.Host) {
+		dbDSN = mysqlInfo.User+":"+mysqlInfo.Password+"@unix("+mysqlInfo.Host+")/"+mysqlInfo.Database
+	} else {
+		dbDSN = mysqlInfo.User+":"+mysqlInfo.Password+"@tcp("+mysqlInfo.Host+":"+mysqlInfo.Port+")/"+mysqlInfo.Database
+	}
+
+	mysqlConn, err := connection.NewDBWrapper(dbDSN, mysqlInfo.MaxOpenConns)
 	if err != nil {
 		log.Fatal(err)
 	}
