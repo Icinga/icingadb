@@ -82,6 +82,11 @@ func createTestingMultipleHA(t *testing.T, redisAddr string, numInstances int) (
 var mysqlTestObserver = connection.DbIoSeconds.WithLabelValues("mysql", "test")
 
 func TestHA_UpsertInstance(t *testing.T) {
+	type row struct {
+		Id        uuid.UUID
+		Heartbeat int64
+	}
+
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
 	err := ha.dbw.SqlTransaction(true, false, false, func(tx connection.DbTransaction) error {
@@ -89,19 +94,17 @@ func TestHA_UpsertInstance(t *testing.T) {
 	})
 	require.NoError(t, err, "transaction running upsertInstance should not return an error")
 
-	rows, err := ha.dbw.SqlFetchAll(
-		mysqlObservers.selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId,
+	rawRows, err := ha.dbw.SqlFetchAll(
+		mysqlObservers.selectIdHeartbeatResponsibleFromIcingadbInstanceByEnvironmentId, row{},
 		"SELECT id, heartbeat from icingadb_instance where environment_id = ? LIMIT 1",
 		ha.super.EnvId,
 	)
 
+	rows := rawRows.([]row)
+
 	require.NoError(t, err, "There was an unexpected SQL error")
 	assert.Equal(t, 1, len(rows), "There should be a row inserted")
-
-	var theirUUID uuid.UUID
-	copy(theirUUID[:], rows[0][0].([]byte))
-
-	assert.Equal(t, ha.uid, theirUUID, "UUID must match")
+	assert.Equal(t, ha.uid, rows[0].Id, "UUID must match")
 }
 
 func TestHA_checkResponsibility_NoOtherInstance(t *testing.T) {
@@ -275,6 +278,10 @@ func TestHA_waitForEnvironment(t *testing.T) {
 }
 
 func TestHA_setAndInsertEnvironment(t *testing.T) {
+	type row struct {
+		Name string
+	}
+
 	ha := createTestingHA(t, testbackends.RedisTestAddr)
 
 	env := Environment{
@@ -285,15 +292,17 @@ func TestHA_setAndInsertEnvironment(t *testing.T) {
 	err := ha.setAndInsertEnvironment(&env)
 	require.NoError(t, err, "setAndInsertEnvironment should not return an error")
 
-	rows, err := ha.dbw.SqlFetchAll(
-		mysqlTestObserver,
+	rawRows, err := ha.dbw.SqlFetchAll(
+		mysqlTestObserver, row{},
 		"SELECT name from environment where id = ? LIMIT 1",
 		ha.super.EnvId,
 	)
 
+	rows := rawRows.([]row)
+
 	require.NoError(t, err, "There was an unexpected SQL error")
 	assert.Equal(t, 1, len(rows), "There should be a row inserted")
-	assert.Equal(t, env.Name, rows[0][0], "name must match")
+	assert.Equal(t, env.Name, rows[0].Name, "name must match")
 }
 
 func TestHA_runHA(t *testing.T) {
@@ -356,6 +365,10 @@ func TestHA_RegisterStateChangeListener(t *testing.T) {
 }
 
 func TestHA_removePreviousInstances(t *testing.T) {
+	type row struct {
+		Id []byte
+	}
+
 	env := &Environment{}
 	env.Name = "test"
 	env.ID = Sha1bytes([]byte(env.Name))
@@ -399,10 +412,12 @@ func TestHA_removePreviousInstances(t *testing.T) {
 	})
 	assert.NoError(t, err, "removePreviousInstances() should not return an error")
 
-	rows, err := ha.dbw.SqlFetchAll(mysqlTestObserver, "SELECT id FROM icingadb_instance")
+	rawRows, err := ha.dbw.SqlFetchAll(mysqlTestObserver, row{}, "SELECT id FROM icingadb_instance")
+	rows := rawRows.([]row)
+
 	var instanceIds []string
 	for _, row := range rows {
-		instanceIds = append(instanceIds, hex.EncodeToString(row[0].([]byte)))
+		instanceIds = append(instanceIds, hex.EncodeToString(row.Id))
 	}
 
 	assert.Contains(t, instanceIds, hex.EncodeToString(ha.uid[:]), "removePreviousInstance() should not remove its own row")
