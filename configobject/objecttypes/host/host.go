@@ -4,9 +4,9 @@ package host
 
 import (
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 	"net"
 )
 
@@ -86,7 +86,7 @@ type Host struct {
 	IsVolatile            bool    `json:"is_volatile"`
 	ActionUrlId           string  `json:"action_url_id"`
 	NotesUrlId            string  `json:"notes_url_id"`
-	Notes                 string  `json:"notes"`
+	Notes                 trunccol.Txtcol  `json:"notes"`
 	IconImageId           string  `json:"icon_image_id"`
 	IconImageAlt          string  `json:"icon_image_alt"`
 	Zone                  string  `json:"zone"`
@@ -119,15 +119,6 @@ func ipOrNil(ip net.IP) interface{} {
 
 func (h *Host) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
-
-	notes, truncated := utils.TruncText(h.Notes, 65535)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "host",
-			"Column": "notes",
-			"id": h.Id,
-		}).Infof("Truncated host notes to 64KB")
-	}
 
 	v = append(
 		v,
@@ -162,7 +153,7 @@ func (h *Host) UpdateValues() []interface{} {
 		utils.Bool[h.IsVolatile],
 		utils.EncodeChecksumOrNil(h.ActionUrlId),
 		utils.EncodeChecksumOrNil(h.NotesUrlId),
-		notes,
+		h.Notes,
 		utils.EncodeChecksumOrNil(h.IconImageId),
 		h.IconImageAlt,
 		h.Zone,

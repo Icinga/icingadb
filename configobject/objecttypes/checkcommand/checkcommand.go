@@ -4,9 +4,9 @@ package checkcommand
 
 import (
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -32,7 +32,7 @@ type CheckCommand struct {
 	Name               string  `json:"name"`
 	NameCi             *string `json:"name_ci"`
 	ZoneId             string  `json:"zone_id"`
-	Command            string  `json:"command"`
+	Command            trunccol.Txtcol  `json:"command"`
 	Timeout            float64 `json:"timeout"`
 }
 
@@ -52,15 +52,6 @@ func (c *CheckCommand) InsertValues() []interface{} {
 func (c *CheckCommand) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
-	cmd, truncated := utils.TruncText(c.Command, 65535)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "checkcommand",
-			"Column": "command",
-			"id": c.Id,
-		}).Infof("Truncated check command to 64KB")
-	}
-
 	v = append(
 		v,
 		utils.EncodeChecksum(c.EnvId),
@@ -69,7 +60,7 @@ func (c *CheckCommand) UpdateValues() []interface{} {
 		c.Name,
 		c.NameCi,
 		utils.EncodeChecksumOrNil(c.ZoneId),
-		cmd,
+		c.Command,
 		c.Timeout,
 	)
 

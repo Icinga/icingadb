@@ -4,9 +4,9 @@ package servicestate
 
 import (
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -53,10 +53,10 @@ type ServiceState struct {
 	PreviousHardState        float32 `json:"previous_hard_state"`
 	Attempt                  float32 `json:"check_attempt"`
 	Severity                 float32 `json:"severity"`
-	Output                   string  `json:"output"`
-	LongOutput               string  `json:"long_output"`
-	PerformanceData          string  `json:"performance_data"`
-	CheckCommandline         string  `json:"commandline"`
+	Output                   trunccol.Mediumtxtcol  `json:"output"`
+	LongOutput               trunccol.Mediumtxtcol  `json:"long_output"`
+	PerformanceData          trunccol.Perfcol  `json:"performance_data"`
+	CheckCommandline         trunccol.Txtcol  `json:"commandline"`
 	IsProblem                bool    `json:"is_problem"`
 	IsHandled                bool    `json:"is_handled"`
 	IsReachable              bool    `json:"is_reachable"`
@@ -89,45 +89,6 @@ func (s *ServiceState) InsertValues() []interface{} {
 func (s *ServiceState) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
-	limit := 65535
-	biglimit := 16777215
-
-	outputVal, truncated := utils.TruncText(s.Output, biglimit)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "service_state",
-			"Column": "output",
-			"service_id": s.ServiceId,
-		}).Infof("Truncated plugin output to 64KB", )
-	}
-
-	longOutputVal, truncated := utils.TruncText(s.LongOutput, biglimit)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "service_state",
-			"Column": "long_output",
-			"service_id": s.ServiceId,
-		}).Infof("Truncated long plugin output to 64KB")
-	}
-
-	perfData, truncated := utils.TruncPerfData(s.PerformanceData, biglimit)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "service_state",
-			"Column": "performance_data",
-			"service_id": s.ServiceId,
-		}).Infof("Truncated plugin performance data to 64KB")
-	}
-
-	checkCmdLine, truncated := utils.TruncText(s.CheckCommandline, limit)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "service_state",
-			"Column": "check_commandline",
-			"service_id": s.ServiceId,
-		}).Infof("Truncated plugin check command line to 64KB")
-	}
-
 	v = append(
 		v,
 		utils.EncodeChecksum(s.EnvId),
@@ -137,10 +98,10 @@ func (s *ServiceState) UpdateValues() []interface{} {
 		s.PreviousHardState,
 		s.Attempt,
 		s.Severity,
-		outputVal,
-		longOutputVal,
-		perfData,
-		checkCmdLine,
+		s.Output,
+		s.LongOutput,
+		s.PerformanceData,
+		s.CheckCommandline,
 		utils.Bool[s.IsProblem],
 		utils.Bool[s.IsHandled],
 		utils.Bool[s.IsReachable],

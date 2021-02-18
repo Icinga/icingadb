@@ -4,9 +4,9 @@ package actionurl
 
 import (
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 type ActionUrl struct {
 	Id        string `json:"id"`
 	EnvId     string `json:"environment_id"`
-	ActionUrl string `json:"action_url"`
+	ActionUrl trunccol.Txtcol `json:"action_url"`
 }
 
 func NewActionUrl() connection.Row {
@@ -39,19 +39,10 @@ func (a *ActionUrl) InsertValues() []interface{} {
 func (a *ActionUrl) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
-	actionUrl, truncated := utils.TruncText(a.ActionUrl, 65535)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "action_url",
-			"Column": "action_url",
-			"id": a.Id,
-		}).Infof("Truncated action url to 64KB")
-	}
-
 	v = append(
 		v,
 		utils.EncodeChecksum(a.EnvId),
-		actionUrl,
+		a.ActionUrl,
 	)
 
 	return v

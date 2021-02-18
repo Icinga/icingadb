@@ -4,9 +4,9 @@ package service
 
 import (
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -81,7 +81,7 @@ type Service struct {
 	IsVolatile            bool    `json:"is_volatile"`
 	ActionUrlId           string  `json:"action_url_id"`
 	NotesUrlId            string  `json:"notes_url_id"`
-	Notes                 string  `json:"notes"`
+	Notes                 trunccol.Txtcol  `json:"notes"`
 	IconImageId           string  `json:"icon_image_id"`
 	IconImageAlt          string  `json:"icon_image_alt"`
 	Zone                  string  `json:"zone"`
@@ -105,15 +105,6 @@ func (s *Service) InsertValues() []interface{} {
 
 func (s *Service) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
-
-	notes, truncated := utils.TruncText(s.Notes, 65535)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "service",
-			"Column": "notes",
-			"id": s.Id,
-		}).Infof("Truncated service notes to 64KB")
-	}
 
 	v = append(
 		v,
@@ -145,7 +136,7 @@ func (s *Service) UpdateValues() []interface{} {
 		utils.Bool[s.IsVolatile],
 		utils.EncodeChecksumOrNil(s.ActionUrlId),
 		utils.EncodeChecksumOrNil(s.NotesUrlId),
-		notes,
+		s.Notes,
 		utils.EncodeChecksumOrNil(s.IconImageId),
 		s.IconImageAlt,
 		s.Zone,

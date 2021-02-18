@@ -4,9 +4,9 @@ package customvar
 
 import (
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -25,7 +25,7 @@ type Customvar struct {
 	EnvId        string `json:"environment_id"`
 	NameChecksum string `json:"name_checksum"`
 	Name         string `json:"name"`
-	Value        string `json:"value"`
+	Value        trunccol.Txtcol `json:"value"`
 }
 
 func NewCustomvar() connection.Row {
@@ -43,21 +43,12 @@ func (c *Customvar) InsertValues() []interface{} {
 func (c *Customvar) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
-	val, truncated := utils.TruncText(c.Value, 65535)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "customvar",
-			"Column": "value",
-			"id": c.Id,
-		}).Infof("Truncated custom variable value to 64KB")
-	}
-
 	v = append(
 		v,
 		utils.EncodeChecksum(c.EnvId),
 		utils.EncodeChecksum(c.NameChecksum),
 		c.Name,
-		val,
+		c.Value,
 	)
 
 	return v

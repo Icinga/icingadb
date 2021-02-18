@@ -4,9 +4,9 @@ package checkcommandenvvar
 
 import (
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -27,7 +27,7 @@ type CheckCommandEnvvar struct {
 	EnvvarKey          string `json:"envvar_key"`
 	EnvId              string `json:"environment_id"`
 	PropertiesChecksum string `json:"checksum"`
-	EnvvarValue        string `json:"value"`
+	EnvvarValue        trunccol.Txtcol `json:"value"`
 }
 
 func NewCheckCommandEnvvar() connection.Row {
@@ -44,22 +44,13 @@ func (c *CheckCommandEnvvar) InsertValues() []interface{} {
 func (c *CheckCommandEnvvar) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
-	envvarVal, truncated := utils.TruncText(c.EnvvarValue, 65536)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "checkcommand_envvar",
-			"Column": "envvar_value",
-			"id": c.Id,
-		}).Infof("Truncated check command environment variable value to 64KB")
-	}
-
 	v = append(
 		v,
 		utils.EncodeChecksum(c.CommandId),
 		c.EnvvarKey,
 		utils.EncodeChecksum(c.EnvId),
 		utils.EncodeChecksum(c.PropertiesChecksum),
-		envvarVal,
+		c.EnvvarValue,
 	)
 
 	return v

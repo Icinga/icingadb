@@ -4,9 +4,9 @@ package checkcommandargument
 
 import (
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -34,9 +34,9 @@ type CheckCommandArgument struct {
 	ArgumentKey         string      `json:"argument_key"`
 	EnvId               string      `json:"environment_id"`
 	PropertiesChecksum  string      `json:"checksum"`
-	ArgumentValue       string      `json:"value"`
+	ArgumentValue       trunccol.Txtcol      `json:"value"`
 	ArgumentOrder       float32     `json:"order"`
-	Description         string      `json:"description"`
+	Description         trunccol.Txtcol      `json:"description"`
 	ArgumentKeyOverride string      `json:"key"`
 	RepeatKey           bool        `json:"repeat_key"`
 	Required            bool        `json:"required"`
@@ -58,33 +58,15 @@ func (c *CheckCommandArgument) InsertValues() []interface{} {
 func (c *CheckCommandArgument) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
-	argVal, truncated := utils.TruncText(c.ArgumentValue, 65535)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "checkcommand_argument",
-			"Column": "argument_value",
-			"id": c.Id,
-		}).Infof("Truncated check command argument value to 64KB")
-	}
-
-	desc, truncated := utils.TruncText(c.Description, 65535)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "checkcommand_argument",
-			"Column": "description",
-			"id": c.Id,
-		}).Infof("Truncated check command description to 64KB")
-	}
-
 	v = append(
 		v,
 		utils.EncodeChecksum(c.CommandId),
 		c.ArgumentKey,
 		utils.EncodeChecksum(c.EnvId),
 		utils.EncodeChecksum(c.PropertiesChecksum),
-		argVal,
+		c.ArgumentValue,
 		c.ArgumentOrder,
-		desc,
+		c.Description,
 		c.ArgumentKeyOverride,
 		utils.Bool[c.RepeatKey],
 		utils.Bool[c.Required],

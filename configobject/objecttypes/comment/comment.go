@@ -5,9 +5,9 @@ package comment
 import (
 	"fmt"
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -42,7 +42,7 @@ type Comment struct {
 	PropertiesChecksum string  `json:"checksum"`
 	Name               string  `json:"name"`
 	Author             string  `json:"author"`
-	Text               string  `json:"text"`
+	Text               trunccol.Txtcol  `json:"text"`
 	EntryType          float64 `json:"entry_type"`
 	EntryTime          float64 `json:"entry_time"`
 	IsPersistent       bool    `json:"is_persistent"`
@@ -66,15 +66,6 @@ func (c *Comment) InsertValues() []interface{} {
 func (c *Comment) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
-	txt, truncated := utils.TruncText(c.Text, 65535)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "comment",
-			"Column": "text",
-			"id": c.Id,
-		}).Infof("Truncated comment message to 64KB")
-	}
-
 	v = append(
 		v,
 		utils.EncodeChecksum(c.EnvId),
@@ -85,7 +76,7 @@ func (c *Comment) UpdateValues() []interface{} {
 		utils.EncodeChecksum(c.PropertiesChecksum),
 		c.Name,
 		c.Author,
-		txt,
+		c.Text,
 		utils.CommentEntryTypes[fmt.Sprintf("%.0f", c.EntryType)],
 		c.EntryTime,
 		utils.Bool[c.IsPersistent],

@@ -4,9 +4,9 @@ package hoststate
 
 import (
 	"github.com/Icinga/icingadb/configobject"
+	"github.com/Icinga/icingadb/configobject/trunccol"
 	"github.com/Icinga/icingadb/connection"
 	"github.com/Icinga/icingadb/utils"
-	log "github.com/sirupsen/logrus"
 	"time"
 )
 
@@ -53,10 +53,10 @@ type HostState struct {
 	PreviousHardState        float32     `json:"previous_hard_state"`
 	Attempt                  float32     `json:"check_attempt"`
 	Severity                 float32     `json:"severity"`
-	Output                   string      `json:"output"`
-	LongOutput               string      `json:"long_output"`
-	PerformanceData          string      `json:"performance_data"`
-	CheckCommandline         string      `json:"commandline"`
+	Output                   trunccol.Mediumtxtcol      `json:"output"`
+	LongOutput               trunccol.Mediumtxtcol      `json:"long_output"`
+	PerformanceData          trunccol.Perfcol     `json:"performance_data"`
+	CheckCommandline         trunccol.Txtcol      `json:"commandline"`
 	IsProblem                bool        `json:"is_problem"`
 	IsHandled                bool        `json:"is_handled"`
 	IsReachable              bool        `json:"is_reachable"`
@@ -89,44 +89,6 @@ func (h *HostState) InsertValues() []interface{} {
 func (h *HostState) UpdateValues() []interface{} {
 	v := make([]interface{}, 0)
 
-	limit := 65535
-    biglimit := 16777215
-	outputVal, truncated := utils.TruncText(h.Output, biglimit)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "host_state",
-			"Column": "output",
-			"host_id": h.HostId,
-		}).Infof("Truncated plugin output to 64KB")
-	}
-
-	longOutputVal, truncated := utils.TruncText(h.LongOutput, biglimit)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "host_state",
-			"Column": "long_output",
-			"host_id": h.HostId,
-		}).Infof("Truncated long plugin output to 64KB")
-	}
-
-	perfData, truncated := utils.TruncPerfData(h.PerformanceData, biglimit)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "host_state",
-			"Column": "performance_data",
-			"host_id": h.HostId,
-		}).Infof("Truncated plugin performance data to 64KB")
-	}
-
-	checkCmdLine, truncated := utils.TruncText(h.CheckCommandline, limit)
-	if truncated {
-		log.WithFields(log.Fields{
-			"Table": "host_state",
-			"Column": "check_commandline",
-			"host_id": h.HostId,
-		}).Infof("Truncated plugin check command line to 64KB")
-	}
-
 	v = append(
 		v,
 		utils.EncodeChecksum(h.EnvId),
@@ -136,10 +98,10 @@ func (h *HostState) UpdateValues() []interface{} {
 		h.PreviousHardState,
 		h.Attempt,
 		h.Severity,
-		outputVal,
-		longOutputVal,
-		perfData,
-		checkCmdLine,
+		h.Output,
+		h.LongOutput,
+		h.PerformanceData,
+		h.CheckCommandline,
 		utils.Bool[h.IsProblem],
 		utils.Bool[h.IsHandled],
 		utils.Bool[h.IsReachable],
