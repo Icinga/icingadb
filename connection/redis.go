@@ -653,13 +653,21 @@ func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, objType string, i
 	go func() {
 		defer close(work)
 		for _, c := range utils.ChunkIndices(len(inChunk.Keys), chunkSize) {
-			chunk := &ConfigChunk{Keys: inChunk.Keys[c.Begin:c.End]}
-			if inChunk.Configs != nil {
-				chunk.Configs = inChunk.Configs[c.Begin:c.End]
+			chunk := &ConfigChunk{}
+			*chunk = *inChunk
+
+			utils.SafeSlice(&chunk.Keys, c.Begin, c.End)
+			utils.SafeSlice(&chunk.Configs, c.Begin, c.End)
+			utils.SafeSlice(&chunk.Checksums, c.Begin, c.End)
+
+			if len(chunk.Configs) < len(chunk.Keys) {
+				chunk.Configs = append(chunk.Configs, make([]interface{}, len(chunk.Keys)-len(chunk.Configs))...)
 			}
-			if inChunk.Checksums != nil {
-				chunk.Checksums = inChunk.Checksums[c.Begin:c.End]
+
+			if len(chunk.Checksums) < len(chunk.Keys) {
+				chunk.Checksums = append(chunk.Checksums, make([]interface{}, len(chunk.Keys)-len(chunk.Checksums))...)
 			}
+
 			select {
 			case work <- chunk:
 			case <-done:

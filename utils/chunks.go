@@ -4,6 +4,7 @@ package utils
 
 import (
 	"math"
+	"reflect"
 )
 
 func ChunkKeys(done <-chan struct{}, keys []string, size int) <-chan []string {
@@ -64,4 +65,27 @@ func ChunkIndices(total, chunk int) []Chunk {
 	}
 
 	return chunks
+}
+
+func SafeSlice(slicePtr interface{}, start, stop int) {
+	vSlicePtr := reflect.ValueOf(slicePtr)
+	if vSlicePtr.Kind() != reflect.Ptr {
+		panic("slicePtr must be a pointer")
+	}
+
+	vSlice := vSlicePtr.Elem()
+	if vSlice.Kind() != reflect.Slice {
+		panic("slicePtr must point to a slice")
+	}
+
+	l := vSlice.Len()
+	if start > l {
+		start = l
+	}
+
+	if stop > l {
+		stop = l
+	}
+
+	vSlice.Set(vSlice.Slice(start, stop))
 }
