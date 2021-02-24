@@ -181,6 +181,9 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`REPLACE INTO sla_history_state (id, environment_id, endpoint_id, object_type, object_id,` +
+			`event_time, hard_state)` +
+			`VALUES (?,?,?,?,?,?,?)`,
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -235,6 +238,36 @@ func stateHistoryWorker(super *supervisor.Supervisor) {
 
 			return data
 		},
+		func(values map[string]interface{}) []interface{} {
+			stateType, err := strconv.ParseFloat(values["state_type"].(string), 32)
+			if err != nil {
+				log.Errorf("StateHistory: Could not parse stateType (%s) into float32", values["state_type"])
+			}
+
+			var data []interface{}
+
+			if utils.IcingaStateTypeToString(float32(stateType)) == "hard" {
+				id := uuid.MustParse(values["id"].(string))
+				var objectId []byte
+				if values["service_id"] != nil {
+					objectId = utils.EncodeChecksum(values["service_id"].(string))
+				} else {
+					objectId = utils.EncodeChecksum(values["host_id"].(string))
+				}
+
+				data = []interface{}{
+					id[:],
+					super.EnvId,
+					utils.DecodeHexIfNotNil(values["endpoint_id"]),
+					values["object_type"].(string),
+					objectId,
+					values["event_time"],
+					values["hard_state"],
+				}
+			}
+
+			return data
+		},
 	}
 
 	historyWorker(super, "state", statements, dataFunctions, mysqlObservers.state, &historyCounter.state)
@@ -248,6 +281,17 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 		`REPLACE INTO history (id, environment_id, endpoint_id, object_type, host_id, service_id, notification_history_id,` +
 			`state_history_id, downtime_history_id, comment_history_id, flapping_history_id, event_type, event_time)` +
 			`VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+		`REPLACE INTO sla_history_downtime (environment_id, endpoint_id, object_type, object_id,` +
+			`downtime_id, downtime_start, downtime_end)` +
+			`VALUES (?,?,?,?,?,?,?)`,
+	}
+
+	downtimeEnd := func(values map[string]interface{}) string {
+		if values["has_been_cancelled"].(string) == "1" {
+			return values["cancel_time"].(string)
+		} else {
+			return values["end_time"].(string)
+		}
 	}
 
 	dataFunctions := []func(values map[string]interface{}) []interface{}{
@@ -291,11 +335,7 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 			case "downtime_start":
 				eventTime = values["start_time"].(string)
 			case "downtime_end":
-				if values["has_been_cancelled"].(string) == "1" {
-					eventTime = values["cancel_time"].(string)
-				} else {
-					eventTime = values["end_time"].(string)
-				}
+				eventTime = downtimeEnd(values)
 			}
 
 			data := []interface{}{
@@ -312,6 +352,26 @@ func downtimeHistoryWorker(super *supervisor.Supervisor) {
 				nil,
 				values["event_type"],
 				eventTime,
+			}
+
+			return data
+		},
+		func(values map[string]interface{}) []interface{} {
+			var objectId []byte
+			if values["service_id"] != nil {
+				objectId = utils.EncodeChecksum(values["service_id"].(string))
+			} else {
+				objectId = utils.EncodeChecksum(values["host_id"].(string))
+			}
+
+			data := []interface{}{
+				super.EnvId,
+				utils.DecodeHexIfNotNil(values["endpoint_id"]),
+				values["object_type"].(string),
+				objectId,
+				utils.EncodeChecksum(values["downtime_id"].(string)),
+				values["start_time"],
+				downtimeEnd(values),
 			}
 
 			return data
@@ -564,11 +624,17 @@ func historyWorker(super *supervisor.Supervisor, historyType string, preparedSta
 		errTx := super.Dbw.SqlTransaction(false, true, false, func(tx connection.DbTransaction) error {
 			for i, state := range entries {
 				for statementIndex, statement := range preparedStatements {
+					data := dataFunctions[statementIndex](state.Values)
+					if data == nil {
+						// skip this query if no data is returned
+						continue
+					}
+
 					_, errExec := super.Dbw.SqlExecTx(
 						tx,
 						observer,
 						statement,
-						dataFunctions[statementIndex](state.Values)...,
+						data...,
 					)
 
 					if errExec != nil {

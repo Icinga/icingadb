@@ -1039,3 +1039,37 @@ CREATE TABLE history (
   INDEX idx_history_notification (notification_history_id),
   INDEX idx_history_state (state_history_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
+CREATE TABLE sla_history_state (
+  id binary(16) NOT NULL COMMENT 'UUID',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
+  object_type enum('host', 'service') NOT NULL,
+  object_id binary(20) DEFAULT NULL COMMENT 'host.id or service.id',
+
+  event_time bigint unsigned NOT NULL COMMENT 'unix timestamp the event occurred',
+  hard_state TINYINT UNSIGNED NOT NULL COMMENT 'hard state after this event',
+
+  PRIMARY KEY (id),
+
+  INDEX idx_sla_history_event_time (event_time),
+  INDEX idx_sla_history_object_id_event_time (object_id, event_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
+CREATE TABLE sla_history_downtime (
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
+  object_type enum('host', 'service') NOT NULL,
+  object_id binary(20) DEFAULT NULL COMMENT 'host.id or service.id',
+
+  downtime_id binary(20) NOT NULL COMMENT 'downtime.id (may reference already deleted rows)',
+  downtime_start BIGINT UNSIGNED NOT NULL COMMENT 'start time of the downtime',
+  downtime_end BIGINT UNSIGNED NOT NULL COMMENT 'end time of the downtime',
+
+  PRIMARY KEY (downtime_id),
+
+  INDEX idx_sla_history_interval_start (downtime_start),
+  INDEX idx_sla_history_interval_end (downtime_end),
+  INDEX idx_sla_history_object_id_downtime_start (object_id, downtime_start),
+  INDEX idx_sla_history_object_id_downtime_end (object_id, downtime_end)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;

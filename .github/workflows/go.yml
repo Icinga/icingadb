@@ -75,8 +75,8 @@ jobs:
           do sleep 1
           done
 
-          mysql -h ${ICINGADB_TEST_MYSQL_HOST} -P ${ICINGADB_TEST_MYSQL_PORT} \
-            -u${ICINGADB_TEST_MYSQL_USER} -p${ICINGADB_TEST_MYSQL_PASSWORD} ${ICINGADB_TEST_MYSQL_DATABASE} \
-            <etc/schema/mysql/mysql.schema.sql
+          cat etc/schema/mysql/mysql.schema.sql etc/schema/mysql/helper/functions.sql \
+            | mysql -h ${ICINGADB_TEST_MYSQL_HOST} -P ${ICINGADB_TEST_MYSQL_PORT} \
+            -uroot -proot ${ICINGADB_TEST_MYSQL_DATABASE}
 
           go test -v -race -timeout 5m ./...
