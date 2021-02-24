@@ -420,7 +420,7 @@ func UpdateCompWorker(super *supervisor.Supervisor, objectInformation *configobj
 
 			if redisChecksums.PropertiesChecksum != mysqlChecksums[key]["properties_checksum"] {
 				changed.Keys = append(changed.Keys, key)
-				changed.Checksums = append(changed.Configs, chunk.Checksums[i])
+				changed.Checksums = append(changed.Checksums, chunk.Checksums[i])
 				if chunk.Configs != nil {
 					changed.Configs = append(changed.Configs, chunk.Configs[i])
 				}
