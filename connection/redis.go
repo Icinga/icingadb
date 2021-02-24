@@ -609,15 +609,15 @@ func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, objType string, i
 	worker := func(chChunk <-chan *ConfigChunk) {
 		for chunk := range chChunk {
 			pipe := rdbw.Pipeline()
-			cmds := make([]*redis.SliceCmd, 2)
+			var cmdChecksum, cmdConfig *redis.SliceCmd
 
 			// Checksums is the first query so that in the worst case, we read an older checksum
 			// than config and perform a redundant update than missing an update.
 			if fetchChecksum {
-				cmds[0] = pipe.HMGet(fmt.Sprintf("icinga:checksum:%s", objType), chunk.Keys...)
+				cmdChecksum = pipe.HMGet(fmt.Sprintf("icinga:checksum:%s", objType), chunk.Keys...)
 			}
 			if fetchConfig {
-				cmds[1] = pipe.HMGet(fmt.Sprintf("icinga:config:%s", objType), chunk.Keys...)
+				cmdConfig = pipe.HMGet(fmt.Sprintf("icinga:config:%s", objType), chunk.Keys...)
 			}
 
 			_, err := pipe.Exec() // TODO(el): What to do with the Cmder slice?
@@ -625,14 +625,14 @@ func (rdbw *RDBWrapper) PipeConfigChunks(done <-chan struct{}, objType string, i
 				panic(err)
 			}
 
-			if fetchChecksum {
-				chunk.Checksums, err = cmds[0].Result()
+			if fetchChecksum && cmdChecksum != nil {
+				chunk.Checksums, err = cmdChecksum.Result()
 				if err != nil {
 					panic(err)
 				}
 			}
-			if fetchConfig {
-				chunk.Configs, err = cmds[1].Result()
+			if fetchConfig && cmdConfig != nil {
+				chunk.Configs, err = cmdConfig.Result()
 				if err != nil {
 					panic(err)
 				}
