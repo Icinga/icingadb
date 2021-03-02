@@ -137,7 +137,7 @@ func (h *HA) controller() {
 
 func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 	// boff := backoff.NewExponentialWithJitter(time.Millisecond*1, time.Second*1)
-	for attempt, retry := 0, true; retry; attempt++ {
+	for attempt := 0; true; attempt++ {
 		// sleep := boff(uint64(attempt))
 		// h.logger.Debugf("Sleeping for %s..", sleep)
 		// time.Sleep(sleep)
@@ -158,41 +158,37 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 			break
 		}
 		_ = rows.Close()
-		if takeover {
-			i := v1.IcingadbInstance{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{
-						Id: h.instanceId,
-					},
+		i := v1.IcingadbInstance{
+			EntityWithoutChecksum: v1.EntityWithoutChecksum{
+				IdMeta: v1.IdMeta{
+					Id: h.instanceId,
 				},
-				EnvironmentMeta: v1.EnvironmentMeta{
-					EnvironmentId: s.EnvironmentID(),
-				},
-				Heartbeat:                         *t,
-				Responsible:                       types.Yes,
-				EndpointId:                        s.EndpointId,
-				Icinga2Version:                    s.Version,
-				Icinga2StartTime:                  s.ProgramStart,
-				Icinga2NotificationsEnabled:       s.NotificationsEnabled,
-				Icinga2ActiveServiceChecksEnabled: s.ActiveServiceChecksEnabled,
-				Icinga2ActiveHostChecksEnabled:    s.ActiveHostChecksEnabled,
-				Icinga2EventHandlersEnabled:       s.EventHandlersEnabled,
-				Icinga2FlapDetectionEnabled:       s.FlapDetectionEnabled,
-				Icinga2PerformanceDataEnabled:     s.PerformanceDataEnabled,
-			}
-			_, err := tx.NamedExecContext(ctx, h.db.BuildUpsertStmt(i), i)
-			if err != nil {
-				cancel()
-				if !utils.IsDeadlock(err) {
-					retry = false
-					h.logger.Errorw("Can't Update or insert instance.", zap.Error(err))
-				} else {
-					h.logger.Infow("Can't Update or insert instance. Retrying..", zap.Error(err))
-				}
+			},
+			EnvironmentMeta: v1.EnvironmentMeta{
+				EnvironmentId: s.EnvironmentID(),
+			},
+			Heartbeat:                         *t,
+			Responsible:                       types.Bool{Bool: takeover || h.responsible, Valid: true},
+			EndpointId:                        s.EndpointId,
+			Icinga2Version:                    s.Version,
+			Icinga2StartTime:                  s.ProgramStart,
+			Icinga2NotificationsEnabled:       s.NotificationsEnabled,
+			Icinga2ActiveServiceChecksEnabled: s.ActiveServiceChecksEnabled,
+			Icinga2ActiveHostChecksEnabled:    s.ActiveHostChecksEnabled,
+			Icinga2EventHandlersEnabled:       s.EventHandlersEnabled,
+			Icinga2FlapDetectionEnabled:       s.FlapDetectionEnabled,
+			Icinga2PerformanceDataEnabled:     s.PerformanceDataEnabled,
+		}
+		_, err = tx.NamedExecContext(ctx, h.db.BuildUpsertStmt(i), i)
+		if err != nil {
+			cancel()
+			if !utils.IsDeadlock(err) {
+				h.logger.Errorw("Can't Update or insert instance.", zap.Error(err))
+				break
+			} else {
+				h.logger.Infow("Can't Update or insert instance. Retrying..", zap.Error(err))
 				continue
 			}
-		} else {
-			retry = false
 		}
 		if err := tx.Commit(); err != nil {
 			return err
@@ -200,6 +196,7 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 		if takeover {
 			h.signalTakeover()
 		}
+		break
 	}
 
 	return nil
