@@ -170,6 +170,7 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 				},
 				Heartbeat:                         *t,
 				Responsible:                       types.Yes,
+				EndpointId:                        s.EndpointId,
 				Icinga2Version:                    s.Version,
 				Icinga2StartTime:                  s.ProgramStart,
 				Icinga2NotificationsEnabled:       s.NotificationsEnabled,
