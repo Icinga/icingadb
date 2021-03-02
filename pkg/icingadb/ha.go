@@ -3,7 +3,9 @@ package icingadb
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
+	"github.com/google/uuid"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
@@ -32,13 +34,15 @@ type HA struct {
 	errOnce     sync.Once
 }
 
-func NewHA(ctx context.Context, instanceId types.Binary, db *DB, heartbeat *icingaredis.Heartbeat, logger *zap.SugaredLogger) *HA {
+func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger *zap.SugaredLogger) *HA {
 	ctx, cancel := context.WithCancel(ctx)
+
+	instanceId := uuid.New()
 
 	ha := &HA{
 		ctx:        ctx,
 		cancel:     cancel,
-		instanceId: instanceId,
+		instanceId: instanceId[:],
 		db:         db,
 		heartbeat:  heartbeat,
 		logger:     logger,
@@ -94,6 +98,8 @@ func (h *HA) abort(err error) {
 
 // controller loop.
 func (h *HA) controller() {
+	h.logger.Debugw("Starting HA", zap.String("instance_id", hex.EncodeToString(h.instanceId)))
+
 	for {
 		select {
 		case b, ok := <-h.heartbeat.Beat():
@@ -126,6 +132,7 @@ func (h *HA) controller() {
 			if err = h.realize(s, t); err != nil {
 				h.abort(err)
 			}
+			go h.removeOldInstances(s)
 		case <-h.heartbeat.Lost():
 			h.logger.Error("Lost heartbeat")
 			h.signalHandover()
@@ -200,6 +207,24 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 	}
 
 	return nil
+}
+
+func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
+	result, err := h.db.ExecContext(h.ctx, "DELETE FROM icingadb_instance "+
+		"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?",
+		h.instanceId, s.EnvironmentID(), s.EndpointId, types.UnixMilli(time.Now().Add(-timeout)))
+	if err != nil {
+		h.logger.Errorw("Can't remove rows of old instances", zap.Error(err))
+		return
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		h.logger.Errorw("Can't get number of removed old instances", zap.Error(err))
+		return
+	}
+	if affected > 0 {
+		h.logger.Debugf("Removed %d old instances", affected)
+	}
 }
 
 func (h *HA) signalHandover() {
