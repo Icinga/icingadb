@@ -197,7 +197,9 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 		if err := tx.Commit(); err != nil {
 			return err
 		}
-		h.signalTakeover()
+		if takeover {
+			h.signalTakeover()
+		}
 	}
 
 	return nil
