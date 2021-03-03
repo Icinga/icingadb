@@ -100,6 +100,8 @@ func (h *HA) abort(err error) {
 func (h *HA) controller() {
 	h.logger.Debugw("Starting HA", zap.String("instance_id", hex.EncodeToString(h.instanceId)))
 
+	oldInstancesRemoved := false
+
 	for {
 		select {
 		case b, ok := <-h.heartbeat.Beat():
@@ -132,7 +134,10 @@ func (h *HA) controller() {
 			if err = h.realize(s, t); err != nil {
 				h.abort(err)
 			}
-			go h.removeOldInstances(s)
+			if !oldInstancesRemoved {
+				go h.removeOldInstances(s)
+				oldInstancesRemoved = true
+			}
 		case <-h.heartbeat.Lost():
 			h.logger.Error("Lost heartbeat")
 			h.signalHandover()
@@ -210,19 +215,22 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 }
 
 func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
-	result, err := h.db.ExecContext(h.ctx, "DELETE FROM icingadb_instance "+
-		"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?",
-		h.instanceId, s.EnvironmentID(), s.EndpointId, types.UnixMilli(time.Now().Add(-timeout)))
-	if err != nil {
-		h.logger.Errorw("Can't remove rows of old instances", zap.Error(err))
+	select {
+	case <-h.ctx.Done():
 		return
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		h.logger.Errorw("Can't get number of removed old instances", zap.Error(err))
-		return
-	}
-	if affected > 0 {
+	case <-time.After(timeout):
+		result, err := h.db.ExecContext(h.ctx, "DELETE FROM icingadb_instance "+
+			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?",
+			h.instanceId, s.EnvironmentID(), s.EndpointId, types.UnixMilli(time.Now().Add(-timeout)))
+		if err != nil {
+			h.logger.Errorw("Can't remove rows of old instances", zap.Error(err))
+			return
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			h.logger.Errorw("Can't get number of removed old instances", zap.Error(err))
+			return
+		}
 		h.logger.Debugf("Removed %d old instances", affected)
 	}
 }
