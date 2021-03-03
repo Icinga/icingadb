@@ -24,7 +24,7 @@ type Database struct {
 // calls sqlx.Open, but returns *icingadb.DB.
 func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
 	dsn := fmt.Sprintf(
-		"%s:%s@tcp(%s:%d)/%s",
+		"%s:%s@tcp(%s:%d)/%s?timeout=60s",
 		d.User, d.Password, d.Host, d.Port, d.Database)
 
 	db, err := sqlx.Open("mysql", dsn)
