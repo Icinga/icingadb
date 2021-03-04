@@ -201,7 +201,9 @@ func getProgress(
 	total, done, lastSyncedId int64,
 ) {
 	var count []struct{ Count int64 }
-	idoTx.fetchAll(&count, fmt.Sprintf("SELECT COUNT(*) FROM %s", idoTable))
+	idoTx.fetchAll(&count, fmt.Sprintf(
+		"SELECT COUNT(*) FROM %s xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id", idoTable,
+	))
 
 	if total = count[0].Count; total == 0 {
 		return
@@ -209,7 +211,11 @@ func getProgress(
 
 	query := fmt.Sprintf("SELECT 1 FROM %s WHERE %s=?", icingadbTable, icingadbIdColumn)
 	idoTx.query(
-		fmt.Sprintf("SELECT %s FROM %s ORDER BY %s", idoIdColumn, idoTable, idoIdColumn), nil,
+		fmt.Sprintf(
+			"SELECT xh.%s FROM %s xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id ORDER BY xh.%s",
+			idoIdColumn, idoTable, idoIdColumn,
+		),
+		nil,
 		func(row struct{ Id uint64 }) bool {
 			has := false
 			icingaDb.query(query, []interface{}{mkIcingadbId(row.Id)}, func(struct{ One uint8 }) { has = true })

@@ -58,11 +58,12 @@ func syncAcks() {
 			go streamQuery(
 				snapshot,
 				ch,
-				"SELECT acknowledgement_id, UNIX_TIMESTAMP(entry_time), "+
-					"entry_time_usec, acknowledgement_type, object_id "+
-					"FROM icinga_acknowledgements "+
-					"WHERE acknowledgement_id > ? "+
-					"ORDER BY acknowledgement_id",
+				"SELECT ah.acknowledgement_id, UNIX_TIMESTAMP(ah.entry_time), "+
+					"ah.entry_time_usec, ah.acknowledgement_type, ah.object_id "+
+					"FROM icinga_acknowledgements ah "+
+					"INNER JOIN icinga_objects o ON o.object_id=ah.object_id "+
+					"WHERE ah.acknowledgement_id > ? "+
+					"ORDER BY ah.acknowledgement_id",
 				checkpoint[0].Max.Int64,
 			)
 
@@ -558,10 +559,12 @@ func syncFlapping() {
 			go streamQuery(
 				snapshot,
 				ch,
-				"SELECT flappinghistory_id, UNIX_TIMESTAMP(event_time), event_time_usec, event_type, object_id "+
-					"FROM icinga_flappinghistory "+
-					"WHERE flappinghistory_id > ? "+
-					"ORDER BY flappinghistory_id",
+				"SELECT fh.flappinghistory_id, UNIX_TIMESTAMP(fh.event_time), "+
+					"fh.event_time_usec, fh.event_type, fh.object_id "+
+					"FROM icinga_flappinghistory fh "+
+					"INNER JOIN icinga_objects o ON o.object_id=fh.object_id "+
+					"WHERE fh.flappinghistory_id > ? "+
+					"ORDER BY fh.flappinghistory_id",
 				checkpoint[0].Max.Int64,
 			)
 
@@ -823,8 +826,9 @@ func syncNotifications() {
 			go streamQuery(
 				snapshot,
 				ch,
-				"SELECT notification_id, object_id, state FROM icinga_notifications "+
-					"WHERE notification_id < ? ORDER BY notification_id DESC",
+				"SELECT nh.notification_id, nh.object_id, nh.state "+
+					"FROM icinga_notifications nh INNER JOIN icinga_objects o ON o.object_id=nh.object_id "+
+					"WHERE nh.notification_id < ? ORDER BY nh.notification_id DESC",
 				checkpoint,
 			)
 
@@ -1107,8 +1111,9 @@ func syncStates() {
 			go streamQuery(
 				snapshot,
 				ch,
-				"SELECT statehistory_id, object_id, last_hard_state FROM icinga_statehistory "+
-					"WHERE statehistory_id < ? ORDER BY statehistory_id DESC",
+				"SELECT sh.statehistory_id, sh.object_id, sh.last_hard_state "+
+					"FROM icinga_statehistory sh INNER JOIN icinga_objects o ON o.object_id=sh.object_id "+
+					"WHERE sh.statehistory_id < ? ORDER BY sh.statehistory_id DESC",
 				checkpoint,
 			)
 
