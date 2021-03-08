@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"flag"
 	"fmt"
+	icingaSql "github.com/Icinga/go-libs/sql"
 	"github.com/cheggaaa/pb/v3"
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
@@ -13,6 +14,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"reflect"
 	"sync"
 	"syscall"
 )
@@ -210,6 +212,11 @@ func getProgress(
 	}
 
 	query := fmt.Sprintf("SELECT 1 FROM %s WHERE %s=?", icingadbTable, icingadbIdColumn)
+
+	stmt, errPp := icingaDb.conn.Prepare(query)
+	assert(errPp, "Couldn't prepare SQL statement", log.Fields{"backend": icingaDb.whichOne, "statement": query})
+	defer stmt.Close()
+
 	idoTx.query(
 		fmt.Sprintf(
 			"SELECT xh.%s FROM %s xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id ORDER BY xh.%s",
@@ -217,9 +224,19 @@ func getProgress(
 		),
 		nil,
 		func(row struct{ Id uint64 }) bool {
-			has := false
-			icingaDb.query(query, []interface{}{mkIcingadbId(row.Id)}, func(struct{ One uint8 }) { has = true })
+			args := []interface{}{mkIcingadbId(row.Id)}
 
+			res, errQr := stmt.Query(args...)
+			assert(errQr, "Query failed", log.Fields{"backend": icingaDb.whichOne, "query": query, "args": args})
+			defer res.Close()
+
+			rows, errFR := icingaSql.FetchRowsAsStructSlice(res, struct{ One uint8 }{}, 1)
+			assert(
+				errFR, "Couldn't fetch query result",
+				log.Fields{"backend": icingaDb.whichOne, "query": query, "args": args, "row": 1},
+			)
+
+			has := reflect.ValueOf(rows).Len() > 0
 			if has {
 				done++
 				lastSyncedId = int64(row.Id)
