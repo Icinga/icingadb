@@ -15,6 +15,7 @@ var chSize = 64
 var icingaEnv, icingaEndpoint, cache stringValue
 var envId, endpointId []byte
 
+var calcBar = newMultiTaskBar(6)
 var cacheBar = newMultiTaskBar(4)
 var syncBar = newMultiTaskBar(6)
 
@@ -55,7 +56,6 @@ func main() {
 	ido.connect()
 	icingaDb.connect()
 
-	log.Info("Building cache")
 	assert(os.MkdirAll(cache.value, 0700), "Couldn't create cache dir", log.Fields{"path": cache.value})
 
 	go syncAcks()
@@ -65,6 +65,10 @@ func main() {
 	go syncNotifications()
 	go syncStates()
 
+	log.Info("Computing where to resume")
+	calcBar.runMaster()
+
+	log.Info("Building cache")
 	cacheBar.runMaster()
 
 	log.Info("Migrating history")

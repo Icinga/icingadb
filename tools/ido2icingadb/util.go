@@ -207,7 +207,12 @@ func getProgress(
 		"SELECT COUNT(*) FROM %s xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id", idoTable,
 	))
 
-	if total = count[0].Count; total == 0 {
+	total = count[0].Count
+
+	bar := calcBar.startWorker(total, 0)
+	defer calcBar.stopWorker()
+
+	if total == 0 {
 		return
 	}
 
@@ -242,6 +247,7 @@ func getProgress(
 				lastSyncedId = int64(row.Id)
 			}
 
+			bar.Increment()
 			return has
 		},
 	)
