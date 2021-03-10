@@ -43,11 +43,7 @@ type Host struct {
 }
 
 func NewHost() contracts.Entity {
-	h := &Host{}
-	// TODO(el): Interfacify!
-	h.NameCi = &h.Name
-
-	return h
+	return &Host{}
 }
 
 // Assert interface compliance.

@@ -11,11 +11,7 @@ type Service struct {
 }
 
 func NewService() contracts.Entity {
-	s := &Service{}
-	// TODO(el): Interfacify!
-	s.NameCi = &s.Name
-
-	return s
+	return &Service{}
 }
 
 // Assert interface compliance.
