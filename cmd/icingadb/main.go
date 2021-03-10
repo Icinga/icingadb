@@ -126,6 +126,8 @@ func main() {
 						v1.NewNotesUrl,
 						v1.NewService,
 						v1.NewServiceCustomvar,
+						v1.NewUser,
+						v1.NewUserCustomvar,
 					} {
 						factoryFunc := factoryFunc
 
