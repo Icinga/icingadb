@@ -13,12 +13,10 @@ type Customvar struct {
 }
 
 type CustomvarFlat struct {
-	EntityWithoutChecksum `json:",inline"`
-	EnvironmentMeta       `json:",inline"`
-	CustomvarId           types.Binary `json:"customvar_id"`
-	Flatname              string       `json:"flatname"`
-	FlatnameChecksum      types.Binary `json:"flatname_checksum"`
-	Flatvalue             string       `json:"flatvalue"`
+	CustomvarMeta    `json:",inline"`
+	Flatname         string       `json:"flatname"`
+	FlatnameChecksum types.Binary `json:"flatname_checksum"`
+	Flatvalue        string       `json:"flatvalue"`
 }
 
 func NewCustomvar() contracts.Entity {

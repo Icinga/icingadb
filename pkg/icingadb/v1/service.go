@@ -11,10 +11,8 @@ type Service struct {
 }
 
 type ServiceCustomvar struct {
-	EntityWithoutChecksum `json:",inline"`
-	EnvironmentMeta       `json:",inline"`
-	ServiceId             types.Binary `json:"object_id"`
-	CustomvarId           types.Binary `json:"customvar_id"`
+	CustomvarMeta `json:",inline"`
+	ServiceId     types.Binary `json:"object_id"`
 }
 
 func NewService() contracts.Entity {

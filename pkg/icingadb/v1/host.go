@@ -12,10 +12,8 @@ type Host struct {
 }
 
 type HostCustomvar struct {
-	EntityWithoutChecksum `json:",inline"`
-	EnvironmentMeta       `json:",inline"`
-	HostId                types.Binary `json:"object_id"`
-	CustomvarId           types.Binary `json:"customvar_id"`
+	CustomvarMeta `json:",inline"`
+	HostId        types.Binary `json:"object_id"`
 }
 
 func NewHost() contracts.Entity {

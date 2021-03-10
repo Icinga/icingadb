@@ -87,17 +87,19 @@ func main() {
 										for flatname, flatvalue := range flattened {
 											flatvalue := fmt.Sprintf("%v", flatvalue)
 											flat <- &v1.CustomvarFlat{
-												EntityWithoutChecksum: v1.EntityWithoutChecksum{
-													IdMeta: v1.IdMeta{
-														// TODO(el): Schema comment is wrong.
-														// Without customvar.Id we would produce duplicate keys here.
-														Id: utils.Checksum(customvar.EnvironmentId.String() + customvar.Id.String() + flatname + flatvalue),
+												CustomvarMeta: v1.CustomvarMeta{
+													EntityWithoutChecksum: v1.EntityWithoutChecksum{
+														IdMeta: v1.IdMeta{
+															// TODO(el): Schema comment is wrong.
+															// Without customvar.Id we would produce duplicate keys here.
+															Id: utils.Checksum(customvar.EnvironmentId.String() + customvar.Id.String() + flatname + flatvalue),
+														},
 													},
+													EnvironmentMeta: v1.EnvironmentMeta{
+														EnvironmentId: customvar.EnvironmentId,
+													},
+													CustomvarId: customvar.Id,
 												},
-												EnvironmentMeta: v1.EnvironmentMeta{
-													EnvironmentId: customvar.EnvironmentId,
-												},
-												CustomvarId:      customvar.Id,
 												Flatname:         flatname,
 												FlatnameChecksum: utils.Checksum(flatname),
 												Flatvalue:        flatvalue,
