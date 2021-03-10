@@ -49,3 +49,8 @@ func NewHost() contracts.Entity {
 
 	return h
 }
+
+// Assert interface compliance.
+var (
+	_ contracts.Initer = (*Host)(nil)
+)

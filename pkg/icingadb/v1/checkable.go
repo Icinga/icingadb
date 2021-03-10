@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -38,3 +39,8 @@ type Checkable struct {
 	Zone                  string       `json:"zone"`
 	ZoneId                types.Binary `json:"zone_id"`
 }
+
+// Assert interface compliance.
+var (
+	_ contracts.Initer = (*Checkable)(nil)
+)

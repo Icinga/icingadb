@@ -17,3 +17,8 @@ func NewService() contracts.Entity {
 
 	return s
 }
+
+// Assert interface compliance.
+var (
+	_ contracts.Initer = (*Service)(nil)
+)

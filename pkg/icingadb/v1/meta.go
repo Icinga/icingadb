@@ -51,3 +51,13 @@ type NameCiMeta struct {
 	NameMeta
 	NameCi *string `json:"name_ci"`
 }
+
+// Init implements the contracts.Initer interface.
+func (n *NameCiMeta) Init() {
+	n.NameCi = &n.Name
+}
+
+// Assert interface compliance.
+var (
+	_ contracts.Initer = (*NameCiMeta)(nil)
+)
