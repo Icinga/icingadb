@@ -151,6 +151,7 @@ func main() {
 						v1.NewUsergroup,
 						v1.NewUsergroupCustomvar,
 						v1.NewUsergroupMember,
+						v1.NewZone,
 					} {
 						factoryFunc := factoryFunc
 
