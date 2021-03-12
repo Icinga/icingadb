@@ -16,6 +16,21 @@ type HostCustomvar struct {
 	HostId        types.Binary `json:"object_id"`
 }
 
+type Hostgroup struct {
+	GroupMeta `json:",inline"`
+}
+
+type HostgroupCustomvar struct {
+	CustomvarMeta `json:",inline"`
+	HostgroupId   types.Binary `json:"object_id"`
+}
+
+type HostgroupMember struct {
+	MemberMeta  `json:",inline"`
+	HostId      types.Binary `json:"object_id"`
+	HostgroupId types.Binary `json:"group_id"`
+}
+
 func NewHost() contracts.Entity {
 	return &Host{}
 }
@@ -24,7 +39,20 @@ func NewHostCustomvar() contracts.Entity {
 	return &HostCustomvar{}
 }
 
+func NewHostgroup() contracts.Entity {
+	return &Hostgroup{}
+}
+
+func NewHostgroupCustomvar() contracts.Entity {
+	return &HostgroupCustomvar{}
+}
+
+func NewHostgroupMember() contracts.Entity {
+	return &HostgroupMember{}
+}
+
 // Assert interface compliance.
 var (
 	_ contracts.Initer = (*Host)(nil)
+	_ contracts.Initer = (*Hostgroup)(nil)
 )
