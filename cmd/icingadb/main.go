@@ -120,6 +120,7 @@ func main() {
 					for _, factoryFunc := range []contracts.EntityFactoryFunc{
 						v1.NewActionUrl,
 						v1.NewCustomvar,
+						v1.NewDowntime,
 						v1.NewEndpoint,
 						v1.NewHost,
 						v1.NewHostCustomvar,
