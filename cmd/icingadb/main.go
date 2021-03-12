@@ -117,9 +117,12 @@ func main() {
 					})
 
 					for _, factoryFunc := range []contracts.EntityFactoryFunc{
+						v1.NewActionUrl,
 						v1.NewCustomvar,
 						v1.NewHost,
 						v1.NewHostCustomvar,
+						v1.NewIconImage,
+						v1.NewNotesUrl,
 						v1.NewService,
 						v1.NewServiceCustomvar,
 					} {
