@@ -1,14 +1,11 @@
 package command
 
 import (
-	"fmt"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
-	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"go.uber.org/zap"
-	"path/filepath"
 )
 
 type Command struct {
@@ -48,20 +45,6 @@ func (c Command) Database() *icingadb.DB {
 	}
 
 	return db
-}
-
-func (c Command) InstanceId() types.Binary {
-	var instanceId types.Binary
-	path := filepath.Join(c.Flags.Datadir, "instance-id")
-
-	instanceId, err := utils.CreateOrRead(path, utils.Uuid)
-	if err != nil {
-		c.Logger.Fatalw(fmt.Sprintf("can't create or read instance-id file %s", path), zap.Error(err))
-	}
-	instanceId = utils.Checksum([]byte(instanceId))
-	c.Logger.Infof("My instance ID is %s", instanceId)
-
-	return instanceId
 }
 
 func (c Command) Redis() *icingaredis.Client {

@@ -18,7 +18,6 @@ import (
 
 func main() {
 	cmd := command.New()
-	instanceId := cmd.InstanceId()
 	logger := cmd.Logger
 	defer logger.Sync()
 	defer func() {
@@ -39,7 +38,7 @@ func main() {
 
 	ctx := context.Background()
 	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
-	ha := icingadb.NewHA(ctx, instanceId, db, heartbeat, logger)
+	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
 	s := icingadb.NewSync(db, rc, logger)
 
 	// For temporary exit after sync

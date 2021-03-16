@@ -3,7 +3,9 @@ package icingadb
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
+	"github.com/google/uuid"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
@@ -32,13 +34,15 @@ type HA struct {
 	errOnce     sync.Once
 }
 
-func NewHA(ctx context.Context, instanceId types.Binary, db *DB, heartbeat *icingaredis.Heartbeat, logger *zap.SugaredLogger) *HA {
+func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger *zap.SugaredLogger) *HA {
 	ctx, cancel := context.WithCancel(ctx)
+
+	instanceId := uuid.New()
 
 	ha := &HA{
 		ctx:        ctx,
 		cancel:     cancel,
-		instanceId: instanceId,
+		instanceId: instanceId[:],
 		db:         db,
 		heartbeat:  heartbeat,
 		logger:     logger,
@@ -94,6 +98,10 @@ func (h *HA) abort(err error) {
 
 // controller loop.
 func (h *HA) controller() {
+	h.logger.Debugw("Starting HA", zap.String("instance_id", hex.EncodeToString(h.instanceId)))
+
+	oldInstancesRemoved := false
+
 	for {
 		select {
 		case b, ok := <-h.heartbeat.Beat():
@@ -126,6 +134,10 @@ func (h *HA) controller() {
 			if err = h.realize(s, t); err != nil {
 				h.abort(err)
 			}
+			if !oldInstancesRemoved {
+				go h.removeOldInstances(s)
+				oldInstancesRemoved = true
+			}
 		case <-h.heartbeat.Lost():
 			h.logger.Error("Lost heartbeat")
 			h.signalHandover()
@@ -137,7 +149,7 @@ func (h *HA) controller() {
 
 func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 	// boff := backoff.NewExponentialWithJitter(time.Millisecond*1, time.Second*1)
-	for attempt, retry := 0, true; retry; attempt++ {
+	for attempt := 0; true; attempt++ {
 		// sleep := boff(uint64(attempt))
 		// h.logger.Debugf("Sleeping for %s..", sleep)
 		// time.Sleep(sleep)
@@ -158,48 +170,69 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 			break
 		}
 		_ = rows.Close()
-		if takeover {
-			i := v1.IcingadbInstance{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{
-						Id: h.instanceId,
-					},
+		i := v1.IcingadbInstance{
+			EntityWithoutChecksum: v1.EntityWithoutChecksum{
+				IdMeta: v1.IdMeta{
+					Id: h.instanceId,
 				},
-				EnvironmentMeta: v1.EnvironmentMeta{
-					EnvironmentId: s.EnvironmentID(),
-				},
-				Heartbeat:                         *t,
-				Responsible:                       types.Yes,
-				Icinga2Version:                    s.Version,
-				Icinga2StartTime:                  s.ProgramStart,
-				Icinga2NotificationsEnabled:       s.NotificationsEnabled,
-				Icinga2ActiveServiceChecksEnabled: s.ActiveServiceChecksEnabled,
-				Icinga2ActiveHostChecksEnabled:    s.ActiveHostChecksEnabled,
-				Icinga2EventHandlersEnabled:       s.EventHandlersEnabled,
-				Icinga2FlapDetectionEnabled:       s.FlapDetectionEnabled,
-				Icinga2PerformanceDataEnabled:     s.PerformanceDataEnabled,
-			}
-			_, err := tx.NamedExecContext(ctx, h.db.BuildUpsertStmt(i), i)
-			if err != nil {
-				cancel()
-				if !utils.IsDeadlock(err) {
-					retry = false
-					h.logger.Errorw("Can't Update or insert instance.", zap.Error(err))
-				} else {
-					h.logger.Infow("Can't Update or insert instance. Retrying..", zap.Error(err))
-				}
+			},
+			EnvironmentMeta: v1.EnvironmentMeta{
+				EnvironmentId: s.EnvironmentID(),
+			},
+			Heartbeat:                         *t,
+			Responsible:                       types.Bool{Bool: takeover || h.responsible, Valid: true},
+			EndpointId:                        s.EndpointId,
+			Icinga2Version:                    s.Version,
+			Icinga2StartTime:                  s.ProgramStart,
+			Icinga2NotificationsEnabled:       s.NotificationsEnabled,
+			Icinga2ActiveServiceChecksEnabled: s.ActiveServiceChecksEnabled,
+			Icinga2ActiveHostChecksEnabled:    s.ActiveHostChecksEnabled,
+			Icinga2EventHandlersEnabled:       s.EventHandlersEnabled,
+			Icinga2FlapDetectionEnabled:       s.FlapDetectionEnabled,
+			Icinga2PerformanceDataEnabled:     s.PerformanceDataEnabled,
+		}
+		_, err = tx.NamedExecContext(ctx, h.db.BuildUpsertStmt(i), i)
+		if err != nil {
+			cancel()
+			if !utils.IsDeadlock(err) {
+				h.logger.Errorw("Can't Update or insert instance.", zap.Error(err))
+				break
+			} else {
+				h.logger.Infow("Can't Update or insert instance. Retrying..", zap.Error(err))
 				continue
 			}
-		} else {
-			retry = false
 		}
 		if err := tx.Commit(); err != nil {
 			return err
 		}
-		h.signalTakeover()
+		if takeover {
+			h.signalTakeover()
+		}
+		break
 	}
 
 	return nil
+}
+
+func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
+	select {
+	case <-h.ctx.Done():
+		return
+	case <-time.After(timeout):
+		result, err := h.db.ExecContext(h.ctx, "DELETE FROM icingadb_instance "+
+			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?",
+			h.instanceId, s.EnvironmentID(), s.EndpointId, types.UnixMilli(time.Now().Add(-timeout)))
+		if err != nil {
+			h.logger.Errorw("Can't remove rows of old instances", zap.Error(err))
+			return
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			h.logger.Errorw("Can't get number of removed old instances", zap.Error(err))
+			return
+		}
+		h.logger.Debugf("Removed %d old instances", affected)
+	}
 }
 
 func (h *HA) signalHandover() {
