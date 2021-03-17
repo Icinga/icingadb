@@ -19,9 +19,9 @@ type Heartbeat struct {
 	client *Client
 	logger *zap.SugaredLogger
 	active bool
-	beat   chan interface{}
-	lost   chan interface{}
-	done   chan interface{}
+	beat   chan v1.StatsMessage
+	lost   chan struct{}
+	done   chan struct{}
 	mu     *sync.Mutex
 	err    error
 }
@@ -34,9 +34,9 @@ func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger
 		cancel: cancel,
 		client: client,
 		logger: logger,
-		beat:   make(chan interface{}),
-		lost:   make(chan interface{}),
-		done:   make(chan interface{}),
+		beat:   make(chan v1.StatsMessage),
+		lost:   make(chan struct{}),
+		done:   make(chan struct{}),
 		mu:     &sync.Mutex{},
 	}
 
@@ -55,7 +55,7 @@ func (h Heartbeat) Close() error {
 	return h.Err()
 }
 
-func (h Heartbeat) Done() <-chan interface{} {
+func (h Heartbeat) Done() <-chan struct{} {
 	return h.done
 }
 
@@ -66,17 +66,17 @@ func (h Heartbeat) Err() error {
 	return h.err
 }
 
-func (h Heartbeat) Beat() <-chan interface{} {
+func (h Heartbeat) Beat() <-chan v1.StatsMessage {
 	return h.beat
 }
 
-func (h Heartbeat) Lost() <-chan interface{} {
+func (h Heartbeat) Lost() <-chan struct{} {
 	return h.lost
 }
 
 // controller loop.
 func (h Heartbeat) controller() {
-	messages := make(chan interface{})
+	messages := make(chan v1.StatsMessage)
 	defer close(messages)
 
 	g, ctx := errgroup.WithContext(h.ctx)
@@ -95,7 +95,7 @@ func (h Heartbeat) controller() {
 			}
 
 			select {
-			case messages <- v1.StatsMessage(streams[0].Messages[0].Values):
+			case messages <- streams[0].Messages[0].Values:
 			case <-ctx.Done():
 				return ctx.Err()
 			}

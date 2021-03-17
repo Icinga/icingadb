@@ -42,7 +42,7 @@ func main() {
 	s := icingadb.NewSync(db, rc, logger)
 
 	// For temporary exit after sync
-	done := make(chan interface{}, 0)
+	done := make(chan struct{}, 0)
 
 	// Main loop
 	for {

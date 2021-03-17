@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
-	"errors"
 	"github.com/google/uuid"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -26,9 +25,9 @@ type HA struct {
 	heartbeat   *icingaredis.Heartbeat
 	logger      *zap.SugaredLogger
 	responsible bool
-	handover    chan interface{}
-	takeover    chan interface{}
-	done        chan interface{}
+	handover    chan struct{}
+	takeover    chan struct{}
+	done        chan struct{}
 	mu          *sync.Mutex
 	err         error
 	errOnce     sync.Once
@@ -46,9 +45,9 @@ func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger
 		db:         db,
 		heartbeat:  heartbeat,
 		logger:     logger,
-		handover:   make(chan interface{}),
-		takeover:   make(chan interface{}),
-		done:       make(chan interface{}),
+		handover:   make(chan struct{}),
+		takeover:   make(chan struct{}),
+		done:       make(chan struct{}),
 		mu:         &sync.Mutex{},
 	}
 
@@ -67,7 +66,7 @@ func (h *HA) Close() error {
 	return h.Err()
 }
 
-func (h *HA) Done() <-chan interface{} {
+func (h *HA) Done() <-chan struct{} {
 	return h.done
 }
 
@@ -78,11 +77,11 @@ func (h *HA) Err() error {
 	return h.err
 }
 
-func (h *HA) Handover() chan interface{} {
+func (h *HA) Handover() chan struct{} {
 	return h.handover
 }
 
-func (h *HA) Takeover() chan interface{} {
+func (h *HA) Takeover() chan struct{} {
 	return h.takeover
 }
 
@@ -104,16 +103,12 @@ func (h *HA) controller() {
 
 	for {
 		select {
-		case b, ok := <-h.heartbeat.Beat():
+		case m, ok := <-h.heartbeat.Beat():
 			if !ok {
 				// Beat channel closed.
 				return
 			}
 			now := time.Now()
-			m, ok := b.(icingaredisv1.StatsMessage)
-			if !ok {
-				h.abort(errors.New("bad message"))
-			}
 			t, err := m.Time()
 			if err != nil {
 				h.abort(err)
