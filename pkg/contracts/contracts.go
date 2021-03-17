@@ -54,3 +54,9 @@ type EntityFactoryFunc func() Entity
 type Waiter interface {
 	Wait() error // Wait waits for execution to complete.
 }
+
+// Initer implements the Init method,
+// which initializes the object in addition to zeroing.
+type Initer interface {
+	Init() // Init initializes the object.
+}

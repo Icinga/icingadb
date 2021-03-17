@@ -123,6 +123,16 @@ func main() {
 						v1.NewServiceCustomvar,
 					} {
 						factoryFunc := factoryFunc
+
+						ff := func() contracts.Entity {
+							v := factoryFunc()
+							if initer, ok := v.(contracts.Initer); ok {
+								initer.Init()
+							}
+
+							return v
+						}
+
 						// vs
 						// g.Go(func(factoryFunc contracts.EntityFactoryFunc) func() error {
 						//     return func() error {
@@ -130,7 +140,7 @@ func main() {
 						//     }
 						// }(factoryFunc))
 						g.Go(func() error {
-							return s.Sync(synctx, factoryFunc)
+							return s.Sync(synctx, ff)
 						})
 					}
 
