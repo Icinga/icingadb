@@ -57,6 +57,12 @@ func (n *NameCiMeta) Init() {
 	n.NameCi = &n.Name
 }
 
+type CustomvarMeta struct {
+	EntityWithoutChecksum `json:",inline"`
+	EnvironmentMeta       `json:",inline"`
+	CustomvarId           types.Binary `json:"customvar_id"`
+}
+
 // Assert interface compliance.
 var (
 	_ contracts.Initer = (*NameCiMeta)(nil)

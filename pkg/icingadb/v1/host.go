@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/types"
 )
 
 type Host struct {
@@ -10,8 +11,17 @@ type Host struct {
 	Address6  string `json:"address6"`
 }
 
+type HostCustomvar struct {
+	CustomvarMeta `json:",inline"`
+	HostId        types.Binary `json:"object_id"`
+}
+
 func NewHost() contracts.Entity {
 	return &Host{}
+}
+
+func NewHostCustomvar() contracts.Entity {
+	return &HostCustomvar{}
 }
 
 // Assert interface compliance.
