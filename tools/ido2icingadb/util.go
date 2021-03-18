@@ -17,6 +17,7 @@ import (
 	"reflect"
 	"sync"
 	"syscall"
+	"time"
 )
 
 // historyTable represents Icinga DB history tables.
@@ -143,7 +144,8 @@ func assert(err error, message string, fields log.Fields) {
 				log.WithFields(fields).WithFields(log.Fields{"error": err.Error()}).Error(message)
 
 				// Luckily we can just "travel back in time" via exec(3), but preserve our progress.
-				log.Warn("Re-trying")
+				log.WithFields(log.Fields{"after": *retryAfter}).Warn("Re-trying")
+				time.Sleep(*retryAfter)
 				assert(syscall.Exec(os.Args[0], os.Args, os.Environ()), "Couldn't re-exec(3) program", nil)
 			}
 		}

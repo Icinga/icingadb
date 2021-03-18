@@ -5,11 +5,13 @@ import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
 	"os"
+	"time"
 )
 
 var ido = newDb("IDO")
 var icingaDb = newDb("Icinga DB")
 var bulk = flag.Int("bulk", 200, "FACTOR")
+var retryAfter = flag.Duration("retry-after", 5*time.Minute, "DURATION")
 var chSize = 64
 
 var icingaEnv, icingaEndpoint, cache stringValue
