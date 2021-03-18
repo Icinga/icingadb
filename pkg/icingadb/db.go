@@ -158,7 +158,9 @@ func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent i
 	return g.Wait()
 }
 
-func (db DB) NamedBulkExec(ctx context.Context, query string, count int, concurrent int, arg chan interface{}) error {
+func (db DB) NamedBulkExec(
+	ctx context.Context, query string, count int, concurrent int, arg chan contracts.Entity,
+) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
 	bulk := com.Bulk(ctx, arg, count)
@@ -186,7 +188,7 @@ func (db DB) NamedBulkExec(ctx context.Context, query string, count int, concurr
 					return err
 				}
 
-				g.Go(func(b []interface{}) func() error {
+				g.Go(func(b []contracts.Entity) func() error {
 					return func() error {
 						defer sem.Release(1)
 
@@ -219,7 +221,9 @@ func (db DB) NamedBulkExec(ctx context.Context, query string, count int, concurr
 	return g.Wait()
 }
 
-func (db DB) NamedBulkExecTx(ctx context.Context, query string, count int, concurrent int, arg chan interface{}) error {
+func (db DB) NamedBulkExecTx(
+	ctx context.Context, query string, count int, concurrent int, arg chan contracts.Entity,
+) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
 	bulk := com.Bulk(ctx, arg, count)
@@ -243,7 +247,7 @@ func (db DB) NamedBulkExecTx(ctx context.Context, query string, count int, concu
 					return err
 				}
 
-				g.Go(func(b []interface{}) func() error {
+				g.Go(func(b []contracts.Entity) func() error {
 					return func() error {
 						defer sem.Release(1)
 
@@ -335,7 +339,7 @@ func (db DB) Create(ctx context.Context, entities <-chan contracts.Entity) error
 		return nil
 	}
 	// Buffer of one because we receive an entity and send it back immediately.
-	inserts := make(chan interface{}, 1)
+	inserts := make(chan contracts.Entity, 1)
 	inserts <- entity
 
 	go func() {
@@ -360,7 +364,7 @@ func (db DB) Update(ctx context.Context, entities <-chan contracts.Entity) error
 		return nil
 	}
 	// Buffer of one because we receive an entity and send it back immediately.
-	updates := make(chan interface{}, 1)
+	updates := make(chan contracts.Entity, 1)
 	updates <- entity
 
 	go func() {
