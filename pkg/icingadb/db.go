@@ -352,6 +352,17 @@ func (db DB) Create(ctx context.Context, entities <-chan contracts.Entity) error
 	return db.NamedBulkExec(ctx, db.BuildInsertStmt(first), 1<<15/len(db.BuildColumns(first)), 1<<3, forward, nil)
 }
 
+func (db DB) Upsert(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
+	first, forward, err := com.CopyFirst(ctx, entities)
+	if first == nil {
+		return err
+	}
+
+	return db.NamedBulkExec(
+		ctx, db.BuildUpsertStmt(first), 1<<15/len(db.BuildColumns(first))/2, 1<<3, forward, succeeded,
+	)
+}
+
 func (db DB) Update(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
