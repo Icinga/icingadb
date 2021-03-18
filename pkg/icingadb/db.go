@@ -160,7 +160,7 @@ func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent i
 
 func (db DB) NamedBulkExec(
 	ctx context.Context, query string, count int, concurrent int,
-	arg chan contracts.Entity, succeeded chan<- contracts.Entity,
+	arg <-chan contracts.Entity, succeeded chan<- contracts.Entity,
 ) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
@@ -233,7 +233,7 @@ func (db DB) NamedBulkExec(
 }
 
 func (db DB) NamedBulkExecTx(
-	ctx context.Context, query string, count int, concurrent int, arg chan contracts.Entity,
+	ctx context.Context, query string, count int, concurrent int, arg <-chan contracts.Entity,
 ) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
