@@ -123,12 +123,21 @@ func main() {
 						v1.NewEndpoint,
 						v1.NewHost,
 						v1.NewHostCustomvar,
+						v1.NewHostgroup,
+						v1.NewHostgroupCustomvar,
+						v1.NewHostgroupMember,
 						v1.NewIconImage,
 						v1.NewNotesUrl,
 						v1.NewService,
 						v1.NewServiceCustomvar,
+						v1.NewServicegroup,
+						v1.NewServicegroupCustomvar,
+						v1.NewServicegroupMember,
 						v1.NewUser,
 						v1.NewUserCustomvar,
+						v1.NewUsergroup,
+						v1.NewUsergroupCustomvar,
+						v1.NewUsergroupMember,
 					} {
 						factoryFunc := factoryFunc
 

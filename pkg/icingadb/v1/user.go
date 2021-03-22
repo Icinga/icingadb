@@ -24,6 +24,21 @@ type UserCustomvar struct {
 	UserId        types.Binary `json:"object_id"`
 }
 
+type Usergroup struct {
+	GroupMeta `json:",inline"`
+}
+
+type UsergroupCustomvar struct {
+	CustomvarMeta `json:",inline"`
+	UsergroupId   types.Binary `json:"object_id"`
+}
+
+type UsergroupMember struct {
+	MemberMeta  `json:",inline"`
+	UserId      types.Binary `json:"object_id"`
+	UsergroupId types.Binary `json:"group_id"`
+}
+
 func NewUser() contracts.Entity {
 	return &User{}
 }
@@ -32,7 +47,20 @@ func NewUserCustomvar() contracts.Entity {
 	return &UserCustomvar{}
 }
 
+func NewUsergroup() contracts.Entity {
+	return &Usergroup{}
+}
+
+func NewUsergroupCustomvar() contracts.Entity {
+	return &UsergroupCustomvar{}
+}
+
+func NewUsergroupMember() contracts.Entity {
+	return &UsergroupMember{}
+}
+
 // Assert interface compliance.
 var (
 	_ contracts.Initer = (*User)(nil)
+	_ contracts.Initer = (*Usergroup)(nil)
 )

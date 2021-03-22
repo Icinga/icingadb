@@ -63,7 +63,21 @@ type CustomvarMeta struct {
 	CustomvarId           types.Binary `json:"customvar_id"`
 }
 
+type GroupMeta struct {
+	EntityWithChecksum `json:",inline"`
+	EnvironmentMeta    `json:",inline"`
+	NameCiMeta         `json:",inline"`
+	DisplayName        string       `json:"display_name"`
+	ZoneId             types.Binary `json:"zone_id"`
+}
+
+type MemberMeta struct {
+	EntityWithoutChecksum `json:",inline"`
+	EnvironmentMeta       `json:",inline"`
+}
+
 // Assert interface compliance.
 var (
 	_ contracts.Initer = (*NameCiMeta)(nil)
+	_ contracts.Initer = (*GroupMeta)(nil)
 )
