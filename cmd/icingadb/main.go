@@ -124,6 +124,7 @@ func main() {
 						v1.NewCheckcommandCustomvar,
 						v1.NewCheckcommandEnvvar,
 						v1.NewCustomvar,
+						v1.NewDowntime,
 						v1.NewEndpoint,
 						v1.NewEventcommand,
 						v1.NewEventcommandArgument,
