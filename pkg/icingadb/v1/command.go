@@ -29,6 +29,24 @@ type CommandArgument struct {
 	SkipKey             types.Bool   `json:"skip_key"`
 }
 
+// Init implements the contracts.Initer interface.
+func (ca *CommandArgument) Init() {
+	ca.RepeatKey = types.Bool{
+		Bool:  true,
+		Valid: true,
+	}
+
+	ca.Required = types.Bool{
+		Bool:  false,
+		Valid: true,
+	}
+
+	ca.SkipKey = types.Bool{
+		Bool:  false,
+		Valid: true,
+	}
+}
+
 type CommandEnvvar struct {
 	EntityWithChecksum `json:",inline"`
 	EnvironmentMeta    `json:",inline"`
@@ -141,6 +159,7 @@ func NewNotificationcommandCustomvar() contracts.Entity {
 // Assert interface compliance.
 var (
 	_ contracts.Initer = (*Command)(nil)
+	_ contracts.Initer = (*CommandArgument)(nil)
 	_ contracts.Initer = (*Checkcommand)(nil)
 	_ contracts.Initer = (*Eventcommand)(nil)
 	_ contracts.Initer = (*Notificationcommand)(nil)
