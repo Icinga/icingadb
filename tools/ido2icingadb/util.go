@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"database/sql"
+	"database/sql/driver"
 	"encoding/binary"
 	"flag"
 	"fmt"
@@ -137,7 +138,7 @@ func assert(err error, message string, fields log.Fields) {
 				retry = tErr.Number == 1205
 			default:
 				// Likely while streaming a large result of a MySQL query the connection suddenly broke.
-				retry = err == mysql.ErrInvalidConn
+				retry = err == mysql.ErrInvalidConn || err == driver.ErrBadConn
 			}
 
 			if retry {
