@@ -14,8 +14,8 @@ func (e EntityWithoutChecksum) Fingerprint() contracts.Fingerprinter {
 
 // EntityWithChecksum represents entities with a checksum.
 type EntityWithChecksum struct {
-	EntityWithoutChecksum
-	ChecksumMeta `json:",inline"`
+	EntityWithoutChecksum `json:",inline"`
+	ChecksumMeta          `json:",inline"`
 }
 
 // Fingerprint implements the contracts.Fingerprinter interface.
