@@ -123,6 +123,7 @@ func main() {
 						v1.NewCheckcommandArgument,
 						v1.NewCheckcommandCustomvar,
 						v1.NewCheckcommandEnvvar,
+						v1.NewComment,
 						v1.NewCustomvar,
 						v1.NewDowntime,
 						v1.NewEndpoint,
