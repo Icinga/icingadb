@@ -9,14 +9,14 @@ type User struct {
 	EntityWithChecksum   `json:",inline"`
 	EnvironmentMeta      `json:",inline"`
 	NameCiMeta           `json:",inline"`
-	DisplayName          string       `json:"display_name"`
-	Email                string       `json:"email"`
-	Pager                string       `json:"pager"`
-	NotificationsEnabled types.Bool   `json:"notifications_enabled"`
-	TimeperiodId         types.Binary `json:"timeperiod_id"`
-	States               uint8        `json:"states"`
-	Types                uint16       `json:"types"`
-	ZoneId               types.Binary `json:"zone_id"`
+	DisplayName          string                  `json:"display_name"`
+	Email                string                  `json:"email"`
+	Pager                string                  `json:"pager"`
+	NotificationsEnabled types.Bool              `json:"notifications_enabled"`
+	TimeperiodId         types.Binary            `json:"timeperiod_id"`
+	States               uint8                   `json:"states"`
+	Types                types.NotificationTypes `json:"types"`
+	ZoneId               types.Binary            `json:"zone_id"`
 }
 
 type UserCustomvar struct {
