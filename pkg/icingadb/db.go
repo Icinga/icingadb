@@ -86,21 +86,29 @@ func (db DB) BuildUpdateStmt(update interface{}) string {
 	)
 }
 
-func (db DB) BuildUpsertStmt(subject interface{}) string {
-	columns := db.BuildColumns(subject)
-	set := make([]string, 0, len(columns))
+func (db DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {
+	insertColumns := db.BuildColumns(subject)
+	var updateColumns []string
 
-	for _, col := range columns {
+	if upserter, ok := subject.(contracts.Upserter); ok {
+		updateColumns = db.BuildColumns(upserter.Upsert())
+	} else {
+		updateColumns = insertColumns
+	}
+
+	set := make([]string, 0, len(updateColumns))
+
+	for _, col := range updateColumns {
 		set = append(set, fmt.Sprintf("%s = :%s", col, col))
 	}
 
 	return fmt.Sprintf(
 		`INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s`,
 		utils.Key(utils.Name(subject), '_'),
-		strings.Join(columns, ","),
-		fmt.Sprintf(":%s", strings.Join(columns, ",:")),
+		strings.Join(insertColumns, ","),
+		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
 		strings.Join(set, ","),
-	)
+	), len(insertColumns) + len(updateColumns)
 }
 
 func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent int, args []interface{}) error {
@@ -358,9 +366,8 @@ func (db DB) Upsert(ctx context.Context, entities <-chan contracts.Entity, succe
 		return err
 	}
 
-	return db.NamedBulkExec(
-		ctx, db.BuildUpsertStmt(first), 1<<15/len(db.BuildColumns(first))/2, 1<<3, forward, succeeded,
-	)
+	stmt, placeholders := db.BuildUpsertStmt(first)
+	return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
 }
 
 func (db DB) Update(ctx context.Context, entities <-chan contracts.Entity) error {

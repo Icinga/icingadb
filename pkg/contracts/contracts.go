@@ -60,3 +60,9 @@ type Waiter interface {
 type Initer interface {
 	Init() // Init initializes the object.
 }
+
+// Upserter implements the Upsert method,
+// which returns a part of the object for ON DUPLICATE KEY UPDATE.
+type Upserter interface {
+	Upsert() interface{} // Upsert partitions the object.
+}
