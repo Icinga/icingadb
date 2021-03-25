@@ -366,8 +366,11 @@ func (db DB) Upsert(ctx context.Context, entities <-chan contracts.Entity, succe
 		return err
 	}
 
-	stmt, placeholders := db.BuildUpsertStmt(first)
-	return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
+	// TODO(ak): wait for https://github.com/jmoiron/sqlx/issues/694
+	//stmt, placeholders := db.BuildUpsertStmt(first)
+	//return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
+	stmt, _ := db.BuildUpsertStmt(first)
+	return db.NamedBulkExec(ctx, stmt, 1, 1<<3, forward, succeeded)
 }
 
 func (db DB) Update(ctx context.Context, entities <-chan contracts.Entity) error {
