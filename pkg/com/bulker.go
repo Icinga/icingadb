@@ -50,7 +50,7 @@ func (b *Bulker) run(ch <-chan contracts.Entity, count int) {
 
 				bufCh <- v
 			case <-ctx.Done():
-				return nil
+				return ctx.Err()
 			}
 		}
 	})
@@ -74,7 +74,7 @@ func (b *Bulker) run(ch <-chan contracts.Entity, count int) {
 				case <-timeout:
 					drain = false
 				case <-ctx.Done():
-					return nil
+					return ctx.Err()
 				}
 			}
 

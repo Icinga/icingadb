@@ -30,7 +30,9 @@ func WithBackoff(ctx context.Context, retryableFunc RetryableFunc, retryable IsR
 		select {
 		case <-ctx.Done():
 			// Context canceled. Return last known error.
-			// TODO(el): Return ctx.Err() if err is nil?
+			if err == nil {
+				err = ctx.Err()
+			}
 			return
 		case <-time.After(sleep):
 			// Wait for backoff duration and continue.
