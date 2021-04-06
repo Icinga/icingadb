@@ -48,7 +48,7 @@ func (db DB) BuildColumns(subject interface{}) []string {
 func (db DB) BuildDeleteStmt(from interface{}) string {
 	return fmt.Sprintf(
 		`DELETE FROM %s WHERE id IN (?)`,
-		utils.Key(utils.Name(from), '_'),
+		utils.TableName(from),
 	)
 }
 
@@ -57,7 +57,7 @@ func (db DB) BuildInsertStmt(into interface{}) string {
 
 	return fmt.Sprintf(
 		`INSERT INTO %s (%s) VALUES (%s)`,
-		utils.Key(utils.Name(into), '_'),
+		utils.TableName(into),
 		strings.Join(columns, ", "),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 	)
@@ -67,7 +67,7 @@ func (db DB) BuildSelectStmt(from interface{}, into interface{}) string {
 	return fmt.Sprintf(
 		`SELECT %s FROM %s`,
 		strings.Join(db.BuildColumns(into), ", "),
-		utils.Key(utils.Name(from), '_'),
+		utils.TableName(from),
 	)
 }
 
@@ -81,7 +81,7 @@ func (db DB) BuildUpdateStmt(update interface{}) string {
 
 	return fmt.Sprintf(
 		`UPDATE %s SET %s WHERE id = :id`,
-		utils.Key(utils.Name(update), '_'),
+		utils.TableName(update),
 		strings.Join(set, ", "),
 	)
 }
@@ -104,7 +104,7 @@ func (db DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int
 
 	return fmt.Sprintf(
 		`INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s`,
-		utils.Key(utils.Name(subject), '_'),
+		utils.TableName(subject),
 		strings.Join(insertColumns, ","),
 		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
 		strings.Join(set, ","),
