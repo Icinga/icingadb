@@ -68,7 +68,8 @@ func shouldRetry(err error) bool {
 	if sys, ok := underlying.(*os.SyscallError); ok {
 		underlying = sys.Err
 	}
-	if underlying == syscall.ECONNREFUSED {
+	switch underlying {
+	case driver.ErrBadConn, syscall.ECONNREFUSED:
 		return true
 	}
 
