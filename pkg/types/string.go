@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"database/sql/driver"
+	"encoding"
 	"encoding/json"
 )
 
@@ -21,6 +22,16 @@ func (s String) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(v)
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (s *String) UnmarshalText(text []byte) error {
+	*s = String{sql.NullString{
+		String: string(text),
+		Valid:  true,
+	}}
+
+	return nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
@@ -41,8 +52,9 @@ func (s *String) UnmarshalJSON(data []byte) error {
 
 // Assert interface compliance.
 var (
-	_ json.Marshaler   = String{}
-	_ json.Unmarshaler = (*String)(nil)
-	_ driver.Valuer    = String{}
-	_ sql.Scanner      = (*String)(nil)
+	_ json.Marshaler           = String{}
+	_ encoding.TextUnmarshaler = (*String)(nil)
+	_ json.Unmarshaler         = (*String)(nil)
+	_ driver.Valuer            = String{}
+	_ sql.Scanner              = (*String)(nil)
 )
