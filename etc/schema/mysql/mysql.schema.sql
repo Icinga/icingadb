@@ -580,6 +580,7 @@ CREATE TABLE downtime (
   is_flexible enum('y', 'n') NOT NULL,
 
   is_in_effect enum('y', 'n') NOT NULL,
+  creator enum('scheduled_downtime', 'user') NOT NULL,
   start_time bigint unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
   end_time bigint unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + flexible_duration otherwise',
 
