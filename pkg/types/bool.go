@@ -3,8 +3,10 @@ package types
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding"
 	"encoding/json"
 	"errors"
+	"strconv"
 )
 
 var (
@@ -39,6 +41,17 @@ func (b Bool) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(b.Bool)
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (b *Bool) UnmarshalText(text []byte) error {
+	parsed, err := strconv.ParseUint(string(text), 10, 64)
+	if err != nil {
+		return err
+	}
+
+	*b = Bool{parsed != 0, true}
+	return nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
@@ -95,8 +108,9 @@ func (b Bool) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
-	_ json.Marshaler   = (*Bool)(nil)
-	_ json.Unmarshaler = (*Bool)(nil)
-	_ sql.Scanner      = (*Bool)(nil)
-	_ driver.Valuer    = (*Bool)(nil)
+	_ json.Marshaler           = (*Bool)(nil)
+	_ encoding.TextUnmarshaler = (*Bool)(nil)
+	_ json.Unmarshaler         = (*Bool)(nil)
+	_ sql.Scanner              = (*Bool)(nil)
+	_ driver.Valuer            = (*Bool)(nil)
 )
