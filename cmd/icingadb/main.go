@@ -65,7 +65,7 @@ func main() {
 							return err
 						}
 
-						entities := utils.SyncMapEntities(delta.Create)
+						entities := delta.Create.Entities(synctx)
 						flat := make(chan contracts.Entity, 0)
 
 						cvg, _ := errgroup.WithContext(synctx)

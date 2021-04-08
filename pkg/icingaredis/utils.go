@@ -8,7 +8,6 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/types"
 	"golang.org/x/sync/errgroup"
-	"sync"
 )
 
 func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, pairs <-chan HPair, concurrent int) (<-chan contracts.Entity, <-chan error) {
@@ -52,7 +51,7 @@ func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc
 	return entities, com.WaitAsync(g)
 }
 
-func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksums *sync.Map, concurrent int) (<-chan contracts.Entity, <-chan error) {
+func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksums map[string]contracts.Entity, concurrent int) (<-chan contracts.Entity, <-chan error) {
 	entitiesWithChecksum := make(chan contracts.Entity, 0)
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -64,7 +63,7 @@ func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksu
 		for i := 0; i < concurrent; i++ {
 			g.Go(func() error {
 				for entity := range entities {
-					if checksumer, ok := checksums.Load(entity.ID().String()); ok {
+					if checksumer, ok := checksums[entity.ID().String()]; ok {
 						entity.(contracts.Checksumer).SetChecksum(checksumer.(contracts.Checksumer).Checksum())
 					} else {
 						panic("no checksum")
