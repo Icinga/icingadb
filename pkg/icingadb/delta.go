@@ -46,6 +46,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 	}
 	actual := sync.Map{}
 	desired := sync.Map{}
+	var mtx sync.Mutex
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -61,14 +62,18 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 				}
 
 				id := a.ID().String()
+				mtx.Lock()
+
 				if d, ok := desired.Load(id); ok {
 					desired.Delete(id)
+					mtx.Unlock()
 
 					if delta.WithChecksum && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
 						update.Store(id, d)
 					}
 				} else {
 					actual.Store(id, a)
+					mtx.Unlock()
 				}
 
 				cnt.Inc()
@@ -91,14 +96,18 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 				}
 
 				id := d.ID().String()
+				mtx.Lock()
+
 				if a, ok := actual.Load(id); ok {
 					actual.Delete(id)
+					mtx.Unlock()
 
 					if delta.WithChecksum && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
 						update.Store(id, d)
 					}
 				} else {
 					desired.Store(id, d)
+					mtx.Unlock()
 				}
 
 				cnt.Inc()
