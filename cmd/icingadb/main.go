@@ -8,6 +8,7 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/flatten"
 	"github.com/icinga/icingadb/pkg/icingadb"
+	"github.com/icinga/icingadb/pkg/icingadb/history"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -40,6 +41,7 @@ func main() {
 	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
 	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
 	s := icingadb.NewSync(db, rc, logger)
+	hs := history.NewSync(db, rc, logger)
 
 	// For temporary exit after sync
 	done := make(chan struct{}, 0)
@@ -185,6 +187,10 @@ func main() {
 							return s.Sync(synctx, ff)
 						})
 					}
+
+					g.Go(func() error {
+						return hs.Sync(synctx)
+					})
 
 					if err := g.Wait(); err != nil {
 						// TODO(el): This panics here even if a ctx gets cancelled.
