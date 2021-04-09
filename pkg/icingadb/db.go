@@ -344,53 +344,21 @@ func (db DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFu
 }
 
 func (db DB) Create(ctx context.Context, entities <-chan contracts.Entity) error {
-	// TODO(el): Check ctx.Done()?
-	entity := <-entities
-	if entity == nil {
-		return nil
+	first, forward, err := com.CopyFirst(ctx, entities)
+	if first == nil {
+		return err
 	}
-	// Buffer of one because we receive an entity and send it back immediately.
-	inserts := make(chan contracts.Entity, 1)
-	inserts <- entity
 
-	go func() {
-		defer close(inserts)
-
-		for e := range entities {
-			select {
-			case inserts <- e:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return db.NamedBulkExec(ctx, db.BuildInsertStmt(entity), 1<<15/len(db.BuildColumns(entity)), 1<<3, inserts, nil)
+	return db.NamedBulkExec(ctx, db.BuildInsertStmt(first), 1<<15/len(db.BuildColumns(first)), 1<<3, forward, nil)
 }
 
 func (db DB) Update(ctx context.Context, entities <-chan contracts.Entity) error {
-	// TODO(el): Check ctx.Done()?
-	entity := <-entities
-	if entity == nil {
-		return nil
+	first, forward, err := com.CopyFirst(ctx, entities)
+	if first == nil {
+		return err
 	}
-	// Buffer of one because we receive an entity and send it back immediately.
-	updates := make(chan contracts.Entity, 1)
-	updates <- entity
 
-	go func() {
-		defer close(updates)
-
-		for e := range entities {
-			select {
-			case updates <- e:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(entity), 1<<15, 1<<3, updates)
+	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(first), 1<<15, 1<<3, forward)
 }
 
 func IsRetryable(err error) bool {
