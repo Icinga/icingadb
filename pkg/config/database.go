@@ -35,7 +35,7 @@ func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
 		"%s:%s@tcp(%s:%d)/%s?timeout=60s",
 		d.User, d.Password, d.Host, d.Port, d.Database)
 
-	db, err := sqlx.Open("mysql", dsn)
+	db, err := sqlx.Open("icingadb-mysql", dsn)
 	if err != nil {
 		return nil, err
 	}
