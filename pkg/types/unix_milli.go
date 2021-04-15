@@ -3,6 +3,7 @@ package types
 import (
 	"database/sql"
 	"database/sql/driver"
+	"encoding"
 	"encoding/json"
 	"errors"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -26,6 +27,17 @@ func (t UnixMilli) MarshalJSON() ([]byte, error) {
 	}
 
 	return []byte(strconv.FormatInt(utils.UnixMilli(time.Time(t)), 10)), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (t *UnixMilli) UnmarshalText(text []byte) error {
+	parsed, err := strconv.ParseFloat(string(text), 64)
+	if err != nil {
+		return err
+	}
+
+	*t = UnixMilli(utils.FromUnixMilli(int64(parsed)))
+	return nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
@@ -74,8 +86,9 @@ func (t UnixMilli) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
-	_ json.Marshaler   = (*UnixMilli)(nil)
-	_ json.Unmarshaler = (*UnixMilli)(nil)
-	_ sql.Scanner      = (*UnixMilli)(nil)
-	_ driver.Valuer    = (*UnixMilli)(nil)
+	_ json.Marshaler           = (*UnixMilli)(nil)
+	_ encoding.TextUnmarshaler = (*UnixMilli)(nil)
+	_ json.Unmarshaler         = (*UnixMilli)(nil)
+	_ sql.Scanner              = (*UnixMilli)(nil)
+	_ driver.Valuer            = (*UnixMilli)(nil)
 )

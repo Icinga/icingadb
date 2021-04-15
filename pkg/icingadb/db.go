@@ -48,7 +48,7 @@ func (db DB) BuildColumns(subject interface{}) []string {
 func (db DB) BuildDeleteStmt(from interface{}) string {
 	return fmt.Sprintf(
 		`DELETE FROM %s WHERE id IN (?)`,
-		utils.Key(utils.Name(from), '_'),
+		utils.TableName(from),
 	)
 }
 
@@ -57,7 +57,7 @@ func (db DB) BuildInsertStmt(into interface{}) string {
 
 	return fmt.Sprintf(
 		`INSERT INTO %s (%s) VALUES (%s)`,
-		utils.Key(utils.Name(into), '_'),
+		utils.TableName(into),
 		strings.Join(columns, ", "),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 	)
@@ -67,7 +67,7 @@ func (db DB) BuildSelectStmt(from interface{}, into interface{}) string {
 	return fmt.Sprintf(
 		`SELECT %s FROM %s`,
 		strings.Join(db.BuildColumns(into), ", "),
-		utils.Key(utils.Name(from), '_'),
+		utils.TableName(from),
 	)
 }
 
@@ -81,26 +81,34 @@ func (db DB) BuildUpdateStmt(update interface{}) string {
 
 	return fmt.Sprintf(
 		`UPDATE %s SET %s WHERE id = :id`,
-		utils.Key(utils.Name(update), '_'),
+		utils.TableName(update),
 		strings.Join(set, ", "),
 	)
 }
 
-func (db DB) BuildUpsertStmt(subject interface{}) string {
-	columns := db.BuildColumns(subject)
-	set := make([]string, 0, len(columns))
+func (db DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {
+	insertColumns := db.BuildColumns(subject)
+	var updateColumns []string
 
-	for _, col := range columns {
+	if upserter, ok := subject.(contracts.Upserter); ok {
+		updateColumns = db.BuildColumns(upserter.Upsert())
+	} else {
+		updateColumns = insertColumns
+	}
+
+	set := make([]string, 0, len(updateColumns))
+
+	for _, col := range updateColumns {
 		set = append(set, fmt.Sprintf("%s = :%s", col, col))
 	}
 
 	return fmt.Sprintf(
 		`INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s`,
-		utils.Key(utils.Name(subject), '_'),
-		strings.Join(columns, ","),
-		fmt.Sprintf(":%s", strings.Join(columns, ",:")),
+		utils.TableName(subject),
+		strings.Join(insertColumns, ","),
+		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
 		strings.Join(set, ","),
-	)
+	), len(insertColumns) + len(updateColumns)
 }
 
 func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent int, args []interface{}) error {
@@ -158,7 +166,10 @@ func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent i
 	return g.Wait()
 }
 
-func (db DB) NamedBulkExec(ctx context.Context, query string, count int, concurrent int, arg chan interface{}) error {
+func (db DB) NamedBulkExec(
+	ctx context.Context, query string, count int, concurrent int,
+	arg <-chan contracts.Entity, succeeded chan<- contracts.Entity,
+) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
 	bulk := com.Bulk(ctx, arg, count)
@@ -186,7 +197,7 @@ func (db DB) NamedBulkExec(ctx context.Context, query string, count int, concurr
 					return err
 				}
 
-				g.Go(func(b []interface{}) func() error {
+				g.Go(func(b []contracts.Entity) func() error {
 					return func() error {
 						defer sem.Release(1)
 
@@ -204,6 +215,16 @@ func (db DB) NamedBulkExec(ctx context.Context, query string, count int, concurr
 
 								cnt.Add(uint64(len(b)))
 
+								if succeeded != nil {
+									for _, row := range b {
+										select {
+										case <-ctx.Done():
+											return ctx.Err()
+										case succeeded <- row:
+										}
+									}
+								}
+
 								return nil
 							},
 							IsRetryable,
@@ -219,7 +240,9 @@ func (db DB) NamedBulkExec(ctx context.Context, query string, count int, concurr
 	return g.Wait()
 }
 
-func (db DB) NamedBulkExecTx(ctx context.Context, query string, count int, concurrent int, arg chan interface{}) error {
+func (db DB) NamedBulkExecTx(
+	ctx context.Context, query string, count int, concurrent int, arg <-chan contracts.Entity,
+) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
 	bulk := com.Bulk(ctx, arg, count)
@@ -243,7 +266,7 @@ func (db DB) NamedBulkExecTx(ctx context.Context, query string, count int, concu
 					return err
 				}
 
-				g.Go(func(b []interface{}) func() error {
+				g.Go(func(b []contracts.Entity) func() error {
 					return func() error {
 						defer sem.Release(1)
 
@@ -329,53 +352,34 @@ func (db DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFu
 }
 
 func (db DB) Create(ctx context.Context, entities <-chan contracts.Entity) error {
-	// TODO(el): Check ctx.Done()?
-	entity := <-entities
-	if entity == nil {
-		return nil
+	first, forward, err := com.CopyFirst(ctx, entities)
+	if first == nil {
+		return err
 	}
-	// Buffer of one because we receive an entity and send it back immediately.
-	inserts := make(chan interface{}, 1)
-	inserts <- entity
 
-	go func() {
-		defer close(inserts)
+	return db.NamedBulkExec(ctx, db.BuildInsertStmt(first), 1<<15/len(db.BuildColumns(first)), 1<<3, forward, nil)
+}
 
-		for e := range entities {
-			select {
-			case inserts <- e:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+func (db DB) Upsert(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
+	first, forward, err := com.CopyFirst(ctx, entities)
+	if first == nil {
+		return err
+	}
 
-	return db.NamedBulkExec(ctx, db.BuildInsertStmt(entity), 1<<15/len(db.BuildColumns(entity)), 1<<3, inserts)
+	// TODO(ak): wait for https://github.com/jmoiron/sqlx/issues/694
+	//stmt, placeholders := db.BuildUpsertStmt(first)
+	//return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
+	stmt, _ := db.BuildUpsertStmt(first)
+	return db.NamedBulkExec(ctx, stmt, 1, 1<<3, forward, succeeded)
 }
 
 func (db DB) Update(ctx context.Context, entities <-chan contracts.Entity) error {
-	// TODO(el): Check ctx.Done()?
-	entity := <-entities
-	if entity == nil {
-		return nil
+	first, forward, err := com.CopyFirst(ctx, entities)
+	if first == nil {
+		return err
 	}
-	// Buffer of one because we receive an entity and send it back immediately.
-	updates := make(chan interface{}, 1)
-	updates <- entity
 
-	go func() {
-		defer close(updates)
-
-		for e := range entities {
-			select {
-			case updates <- e:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(entity), 1<<15, 1<<3, updates)
+	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(first), 1<<15, 1<<3, forward)
 }
 
 func IsRetryable(err error) bool {

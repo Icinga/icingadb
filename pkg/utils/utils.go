@@ -42,6 +42,15 @@ func Name(t interface{}) string {
 	return s[strings.LastIndex(s, ".")+1:]
 }
 
+// TableName returns the table of t.
+func TableName(t interface{}) string {
+	if tn, ok := t.(contracts.TableNamer); ok {
+		return tn.TableName()
+	} else {
+		return Key(Name(t), '_')
+	}
+}
+
 // Key returns the name with all Unicode letters mapped to lower case letters,
 // with an additional separator in front of each original upper case letter.
 func Key(name string, sep byte) string {

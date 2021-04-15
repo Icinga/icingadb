@@ -1,6 +1,7 @@
 package com
 
 import (
+	"context"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"golang.org/x/sync/errgroup"
 )
@@ -43,4 +44,49 @@ func PipeError(in <-chan error, out chan<- error) {
 			out <- e
 		}
 	}()
+}
+
+// CopyFirst asynchronously forwards all items from input to forward and synchronously returns the first item.
+func CopyFirst(
+	ctx context.Context, input <-chan contracts.Entity,
+) (first contracts.Entity, forward <-chan contracts.Entity, err error) {
+	var ok bool
+	select {
+	case <-ctx.Done():
+		return nil, nil, ctx.Err()
+	case first, ok = <-input:
+	}
+
+	if !ok {
+		return
+	}
+
+	// Buffer of one because we receive an entity and send it back immediately.
+	fwd := make(chan contracts.Entity, 1)
+	fwd <- first
+
+	forward = fwd
+
+	go func() {
+		defer close(fwd)
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case e, ok := <-input:
+				if !ok {
+					return
+				}
+
+				select {
+				case <-ctx.Done():
+					return
+				case fwd <- e:
+				}
+			}
+		}
+	}()
+
+	return
 }

@@ -186,7 +186,10 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 			Icinga2FlapDetectionEnabled:       s.FlapDetectionEnabled,
 			Icinga2PerformanceDataEnabled:     s.PerformanceDataEnabled,
 		}
-		_, err = tx.NamedExecContext(ctx, h.db.BuildUpsertStmt(i), i)
+
+		stmt, _ := h.db.BuildUpsertStmt(i)
+		_, err = tx.NamedExecContext(ctx, stmt, i)
+
 		if err != nil {
 			cancel()
 			if !utils.IsDeadlock(err) {
