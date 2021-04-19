@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"math"
@@ -118,52 +117,6 @@ func BatchSliceOfInterfaces(ctx context.Context, keys []interface{}, count int) 
 	}()
 
 	return batches
-}
-
-func SyncMapKeys(m *sync.Map) []string {
-	keys := make([]string, 0)
-
-	if m != nil {
-		m.Range(func(key, value interface{}) bool {
-			keys = append(keys, key.(string))
-
-			return true
-		})
-	}
-
-	return keys
-}
-
-func SyncMapIDs(m *sync.Map) []interface{} {
-	ids := make([]interface{}, 0)
-
-	if m != nil {
-		m.Range(func(key, value interface{}) bool {
-			ids = append(ids, value.(contracts.IDer).ID())
-
-			return true
-		})
-	}
-
-	return ids
-}
-
-func SyncMapEntities(m *sync.Map) <-chan contracts.Entity {
-	entities := make(chan contracts.Entity, 0)
-
-	go func() {
-		defer close(entities)
-		if m != nil {
-			m.Range(func(key, value interface{}) bool {
-				entities <- value.(contracts.Entity)
-
-				return true
-			})
-		}
-
-	}()
-
-	return entities
 }
 
 func IsContextCanceled(err error) bool {

@@ -12,9 +12,9 @@ import (
 )
 
 type Delta struct {
-	Create       *sync.Map
-	Update       *sync.Map
-	Delete       *sync.Map
+	Create       EntitiesById
+	Update       EntitiesById
+	Delete       EntitiesById
 	WithChecksum bool
 	done         chan error
 	err          error
@@ -40,12 +40,13 @@ func (delta Delta) Wait() error {
 func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contracts.Entity) {
 	defer close(delta.done)
 
-	var update sync.Map
+	var update EntitiesById
 	if delta.WithChecksum {
-		update = sync.Map{}
+		update = EntitiesById{}
 	}
-	actual := sync.Map{}
-	desired := sync.Map{}
+	actual := EntitiesById{}
+	desired := EntitiesById{}
+	var mtx, updateMtx sync.Mutex
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -61,14 +62,20 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 				}
 
 				id := a.ID().String()
-				if d, ok := desired.Load(id); ok {
-					desired.Delete(id)
+				mtx.Lock()
+
+				if d, ok := desired[id]; ok {
+					delete(desired, id)
+					mtx.Unlock()
 
 					if delta.WithChecksum && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
-						update.Store(id, d)
+						updateMtx.Lock()
+						update[id] = d
+						updateMtx.Unlock()
 					}
 				} else {
-					actual.Store(id, a)
+					actual[id] = a
+					mtx.Unlock()
 				}
 
 				cnt.Inc()
@@ -91,14 +98,20 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 				}
 
 				id := d.ID().String()
-				if a, ok := actual.Load(id); ok {
-					actual.Delete(id)
+				mtx.Lock()
+
+				if a, ok := actual[id]; ok {
+					delete(actual, id)
+					mtx.Unlock()
 
 					if delta.WithChecksum && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
-						update.Store(id, d)
+						updateMtx.Lock()
+						update[id] = d
+						updateMtx.Unlock()
 					}
 				} else {
-					desired.Store(id, d)
+					desired[id] = d
+					mtx.Unlock()
 				}
 
 				cnt.Inc()
@@ -114,9 +127,9 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 		return
 	}
 
-	delta.Create = &desired
-	delta.Delete = &actual
+	delta.Create = desired
+	delta.Delete = actual
 	if delta.WithChecksum {
-		delta.Update = &update
+		delta.Update = update
 	}
 }

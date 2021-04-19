@@ -82,7 +82,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 				fmt.Sprintf("icinga:config:%s", utils.Key(utils.Name(v), ':')),
 				count,
 				concurrent,
-				utils.SyncMapKeys(delta.Create)...)
+				delta.Create.Keys()...)
 			// Let errors from Redis cancel our group.
 			com.ErrgroupReceive(g, errs)
 
@@ -93,7 +93,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 			// Let errors from SetChecksums cancel our group.
 			com.ErrgroupReceive(g, errs)
 		} else {
-			entities = utils.SyncMapEntities(delta.Create)
+			entities = delta.Create.Entities(ctx)
 		}
 
 		g.Go(func() error {
@@ -103,13 +103,13 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 
 	// Update
 	{
-		s.logger.Infof("Updating %d rows of type %s", len(utils.SyncMapKeys(delta.Update)), utils.Key(utils.Name(v), ' '))
+		s.logger.Infof("Updating %d rows of type %s", len(delta.Update), utils.Key(utils.Name(v), ' '))
 		pairs, errs := s.redis.HMYield(
 			ctx,
 			fmt.Sprintf("icinga:config:%s", utils.Key(utils.Name(v), ':')),
 			count,
 			concurrent,
-			utils.SyncMapKeys(delta.Update)...)
+			delta.Update.Keys()...)
 		// Let errors from Redis cancel our group.
 		com.ErrgroupReceive(g, errs)
 
@@ -130,9 +130,9 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 
 	// Delete
 	{
-		s.logger.Infof("Deleting %d rows of type %s", len(utils.SyncMapKeys(delta.Delete)), utils.Key(utils.Name(v), ' '))
+		s.logger.Infof("Deleting %d rows of type %s", len(delta.Delete), utils.Key(utils.Name(v), ' '))
 		g.Go(func() error {
-			return s.db.BulkExec(ctx, s.db.BuildDeleteStmt(v), 1<<15, 1<<3, utils.SyncMapIDs(delta.Delete))
+			return s.db.BulkExec(ctx, s.db.BuildDeleteStmt(v), 1<<15, 1<<3, delta.Delete.IDs())
 		})
 	}
 
