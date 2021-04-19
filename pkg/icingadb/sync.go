@@ -74,7 +74,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 	}
 
 	// Create
-	{
+	if len(delta.Create) > 0 {
 		var entities <-chan contracts.Entity
 		if delta.WithChecksum {
 			pairs, errs := s.redis.HMYield(
@@ -102,7 +102,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 	}
 
 	// Update
-	{
+	if len(delta.Update) > 0 {
 		s.logger.Infof("Updating %d rows of type %s", len(delta.Update), utils.Key(utils.Name(v), ' '))
 		pairs, errs := s.redis.HMYield(
 			ctx,
@@ -129,7 +129,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 	}
 
 	// Delete
-	{
+	if len(delta.Delete) > 0 {
 		s.logger.Infof("Deleting %d rows of type %s", len(delta.Delete), utils.Key(utils.Name(v), ' '))
 		g.Go(func() error {
 			return s.db.BulkExec(ctx, s.db.BuildDeleteStmt(v), 1<<15, 1<<3, delta.Delete.IDs())
