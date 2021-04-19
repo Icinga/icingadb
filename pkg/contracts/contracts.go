@@ -15,7 +15,7 @@ type Fingerprinter interface {
 }
 
 // ID is a unique identifier of an entity.
-type ID [sha1.Size]byte
+type ID Checksum
 
 // IDer is implemented by every entity that uniquely identifies itself.
 type IDer interface {
@@ -29,13 +29,7 @@ type Equaler interface {
 }
 
 // Checksum is a unique identifier of an entity.
-type Checksum interface {
-	Equaler
-	// String returns the string representation form of the Checksum.
-	// The String method is used to use the Checksum in functions
-	// where it needs to be compared or hashed.
-	String() string
-}
+type Checksum [sha1.Size]byte
 
 // Checksumer is implemented by every entity with a checksum.
 type Checksumer interface {

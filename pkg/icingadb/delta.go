@@ -118,5 +118,5 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan contract
 func checksumsMatch(a, b contracts.Entity) bool {
 	c1 := a.(contracts.Checksumer).Checksum()
 	c2 := b.(contracts.Checksumer).Checksum()
-	return c1.Equal(c2)
+	return c1 == c2
 }

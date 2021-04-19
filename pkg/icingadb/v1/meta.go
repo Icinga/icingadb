@@ -11,13 +11,16 @@ type ChecksumMeta struct {
 }
 
 // Checksum implements part of the contracts.Checksumer interface.
-func (m ChecksumMeta) Checksum() contracts.Checksum {
-	return m.PropertiesChecksum
+func (m ChecksumMeta) Checksum() (checksum contracts.Checksum) {
+    copy(checksum[:], m.PropertiesChecksum)
+    return
 }
 
 // SetChecksum implements part of the contracts.Checksumer interface.
 func (m *ChecksumMeta) SetChecksum(checksum contracts.Checksum) {
-	m.PropertiesChecksum = checksum.(types.Binary)
+    cp := make(types.Binary, len(checksum))
+    copy(cp, checksum[:])
+    m.PropertiesChecksum = cp
 }
 
 // EnvironmentMeta is embedded by every type which belongs to an environment.
