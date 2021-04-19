@@ -58,7 +58,13 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 					flattened := flatten.Flatten(value, customvar.Name)
 
 					for flatname, flatvalue := range flattened {
-						flatvalue := fmt.Sprintf("%v", flatvalue)
+						var fv string
+						if flatvalue == nil {
+							fv = "null"
+						} else {
+							fv = fmt.Sprintf("%v", flatvalue)
+						}
+
 						select {
 						case cvFlats <- &CustomvarFlat{
 							CustomvarMeta: CustomvarMeta{
@@ -76,7 +82,7 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 							},
 							Flatname:         flatname,
 							FlatnameChecksum: utils.Checksum(flatname),
-							Flatvalue:        flatvalue,
+							Flatvalue:        fv,
 						}:
 						case <-ctx.Done():
 							return ctx.Err()
