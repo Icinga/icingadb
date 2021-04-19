@@ -63,7 +63,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan contract
 			}
 			numActual++
 
-			id := actualValue.ID().String()
+			id := actualValue.ID()
 			if desiredValue, ok := desired[id]; ok {
 				delete(desired, id)
 				if update != nil && !checksumsMatch(actualValue, desiredValue) {
@@ -81,7 +81,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan contract
 			}
 			numDesired++
 
-			id := desiredValue.ID().String()
+			id := desiredValue.ID()
 			if actualValue, ok := actual[id]; ok {
 				delete(actual, id)
 				if update != nil && !checksumsMatch(actualValue, desiredValue) {

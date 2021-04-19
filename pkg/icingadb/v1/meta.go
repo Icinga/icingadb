@@ -31,13 +31,16 @@ type IdMeta struct {
 }
 
 // ID implements part of the contracts.IDer interface.
-func (m IdMeta) ID() contracts.ID {
-	return m.Id
+func (m IdMeta) ID() (id contracts.ID) {
+    copy(id[:], m.Id)
+    return
 }
 
 // SetID implements part of the contracts.IDer interface.
 func (m *IdMeta) SetID(id contracts.ID) {
-	m.Id = id.(types.Binary)
+    cp := make(types.Binary, len(id))
+    copy(cp, id[:])
+    m.Id = cp
 }
 
 // NameMeta is embedded by every type with a name.

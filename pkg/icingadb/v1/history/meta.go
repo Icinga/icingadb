@@ -22,13 +22,14 @@ func (hte HistoryTableEntity) Fingerprint() contracts.Fingerprinter {
 }
 
 // ID implements part of the contracts.Entity interface.
-func (hte HistoryTableEntity) ID() contracts.ID {
-	return hte.Id
+func (hte HistoryTableEntity) ID() (id contracts.ID) {
+	copy(id[:], hte.Id.UUID[:])
+	return
 }
 
 // SetID implements part of the contracts.Entity interface.
 func (hte *HistoryTableEntity) SetID(id contracts.ID) {
-	hte.Id = id.(types.UUID)
+	copy(hte.Id.UUID[:], id[:])
 }
 
 // Upsert implements the contracts.Upserter interface.
@@ -48,13 +49,14 @@ func (he HistoryEntity) Fingerprint() contracts.Fingerprinter {
 }
 
 // ID implements part of the contracts.Entity interface.
-func (he HistoryEntity) ID() contracts.ID {
-	return he.Id
+func (he HistoryEntity) ID() (id contracts.ID) {
+	copy(id[:], he.Id.UUID[:])
+	return
 }
 
 // SetID implements part of the contracts.Entity interface.
 func (he *HistoryEntity) SetID(id contracts.ID) {
-	he.Id = id.(types.UUID)
+	copy(he.Id.UUID[:], id[:])
 }
 
 // Upsert implements the contracts.Upserter interface.

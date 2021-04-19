@@ -1,5 +1,7 @@
 package contracts
 
+import "crypto/sha1"
+
 // Entity is implemented by every type Icinga DB should synchronize.
 type Entity interface {
 	Fingerprinter
@@ -13,12 +15,7 @@ type Fingerprinter interface {
 }
 
 // ID is a unique identifier of an entity.
-type ID interface {
-	// String returns the string representation form of the ID.
-	// The String method is used to use the ID in functions
-	// where it needs to be compared or hashed.
-	String() string
-}
+type ID [sha1.Size]byte
 
 // IDer is implemented by every entity that uniquely identifies itself.
 type IDer interface {
