@@ -49,35 +49,52 @@ func main() {
 
 	// Main loop
 	for {
-		hactx, cancel := context.WithCancel(ctx)
-		for {
+		hactx, cancelHactx := context.WithCancel(ctx)
+		for hactx.Err() == nil {
 			select {
 			case <-ha.Takeover():
 				go func() {
-					g, synctx := errgroup.WithContext(hactx)
+					for hactx.Err() == nil {
+						synctx, cancelSynctx := context.WithCancel(hactx)
+						g, synctx := errgroup.WithContext(synctx)
 
-					for _, factory := range v1.Factories {
-						factory := factory
+						dump := icingadb.NewDumpSignals(rc, logger)
+						g.Go(func() error {
+							return dump.Listen(synctx)
+						})
 
 						g.Go(func() error {
-							return s.Sync(synctx, factory.WithInit)
+							select {
+							case <-dump.InProgress():
+								logger.Info("Icinga 2 started a new config dump, waiting for it to complete")
+								cancelSynctx()
+								return nil
+							case <-synctx.Done():
+								return synctx.Err()
+							}
 						})
+
+						g.Go(func() error {
+							return hs.Sync(synctx)
+						})
+
+						for _, factory := range v1.Factories {
+							factory := factory
+
+							g.Go(func() error {
+								return s.SyncAfterDump(synctx, factory.WithInit, dump)
+							})
+						}
+
+						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
+							panic(err)
+						}
 					}
-
-					g.Go(func() error {
-						return hs.Sync(synctx)
-					})
-
-					if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
-						panic(err)
-					}
-
-					logger.Debugf("Requesting shutdown..")
-					cancelCtx()
-					return
 				}()
 			case <-ha.Handover():
-				cancel()
+				cancelHactx()
+			case <-hactx.Done():
+				// Nothing to do here, surrounding loop will terminate now.
 			case <-ctx.Done():
 				if err := ctx.Err(); err != nil && !utils.IsContextCanceled(err) {
 					panic(err)
