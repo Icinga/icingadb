@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
+	"github.com/icinga/icingadb/pkg/contracts"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"math"
