@@ -7,6 +7,7 @@ import (
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/flatten"
+	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"golang.org/x/sync/errgroup"
@@ -65,7 +66,7 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 									IdMeta: IdMeta{
 										// TODO(el): Schema comment is wrong.
 										// Without customvar.Id we would produce duplicate keys here.
-										Id: utils.Checksum(customvar.EnvironmentId.String() + customvar.Id.String() + flatname + flatvalue),
+										Id: utils.Checksum(objectpacker.MustPackAny(customvar.EnvironmentId, customvar.Id, flatname, flatvalue)),
 									},
 								},
 								EnvironmentMeta: EnvironmentMeta{
