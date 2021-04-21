@@ -35,20 +35,6 @@ func NewSync(db *DB, redis *icingaredis.Client, logger *zap.SugaredLogger) *Sync
 	}
 }
 
-func (s Sync) GetDelta(ctx context.Context, subject *common.SyncSubject) *Delta {
-	// Error channel.
-	err := make(chan error, 1)
-
-	desired, errs := s.redis.YieldAll(ctx, subject)
-	com.PipeError(errs, err)
-
-	actual, errs := s.db.YieldAll(
-		ctx, subject.Factory(), s.db.BuildSelectStmt(subject.Entity(), subject.Entity().Fingerprint()))
-	com.PipeError(errs, err)
-
-	return NewDelta(ctx, actual, desired, subject.WithChecksum(), s.logger)
-}
-
 // SyncAfterDump waits for a config dump to finish (using the dump parameter) and then starts a sync for the given
 // sync subject using the Sync function.
 func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, dump *DumpSignals) error {
@@ -87,30 +73,48 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 // Sync synchronizes entities between Icinga DB and Redis created with the specified sync subject.
 // This function does not respect dump signals. For this, use SyncAfterDump.
 func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
-	// Group for the sync. Whole sync will be cancelled if an error occurs.
-	g, ctx := errgroup.WithContext(ctx)
-
 	s.logger.Infof("Syncing %s", utils.Key(utils.Name(subject.Entity()), ' '))
 
-	delta := s.GetDelta(ctx, subject)
+	g, ctx := errgroup.WithContext(ctx)
+
+	desired, redisErrs := s.redis.YieldAll(ctx, subject)
+	// Let errors from Redis cancel our group.
+	com.ErrgroupReceive(g, redisErrs)
+
+	actual, dbErrs := s.db.YieldAll(
+		ctx, subject.Factory(), s.db.BuildSelectStmt(subject.Entity(), subject.Entity().Fingerprint()))
+	// Let errors from DB cancel our group.
+	com.ErrgroupReceive(g, dbErrs)
+
+	g.Go(func() error {
+		return s.ApplyDelta(ctx, NewDelta(ctx, actual, desired, subject, s.logger))
+	})
+
+	return g.Wait()
+}
+
+// ApplyDelta applies all changes from Delta to the database.
+func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	if err := delta.Wait(); err != nil {
 		return err
 	}
 
+	g, ctx := errgroup.WithContext(ctx)
+
 	// Create
 	if len(delta.Create) > 0 {
 		var entities <-chan contracts.Entity
-		if delta.WithChecksum {
+		if delta.Subject.WithChecksum() {
 			pairs, errs := s.redis.HMYield(
 				ctx,
-				fmt.Sprintf("icinga:%s", utils.Key(utils.Name(subject.Entity()), ':')),
+				fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
 				count,
 				concurrent,
 				delta.Create.Keys()...)
 			// Let errors from Redis cancel our group.
 			com.ErrgroupReceive(g, errs)
 
-			entitiesWithoutChecksum, errs := icingaredis.CreateEntities(ctx, subject.Factory(), pairs, runtime.NumCPU())
+			entitiesWithoutChecksum, errs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, runtime.NumCPU())
 			// Let errors from CreateEntities cancel our group.
 			com.ErrgroupReceive(g, errs)
 			entities, errs = icingaredis.SetChecksums(ctx, entitiesWithoutChecksum, delta.Create, runtime.NumCPU())
@@ -127,17 +131,17 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 
 	// Update
 	if len(delta.Update) > 0 {
-		s.logger.Infof("Updating %d rows of type %s", len(delta.Update), utils.Key(utils.Name(subject.Entity()), ' '))
+		s.logger.Infof("Updating %d rows of type %s", len(delta.Update), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		pairs, errs := s.redis.HMYield(
 			ctx,
-			fmt.Sprintf("icinga:%s", utils.Key(utils.Name(subject.Entity()), ':')),
+			fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
 			count,
 			concurrent,
 			delta.Update.Keys()...)
 		// Let errors from Redis cancel our group.
 		com.ErrgroupReceive(g, errs)
 
-		entitiesWithoutChecksum, errs := icingaredis.CreateEntities(ctx, subject.Factory(), pairs, runtime.NumCPU())
+		entitiesWithoutChecksum, errs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, runtime.NumCPU())
 		// Let errors from CreateEntities cancel our group.
 		com.ErrgroupReceive(g, errs)
 		entities, errs := icingaredis.SetChecksums(ctx, entitiesWithoutChecksum, delta.Update, runtime.NumCPU())
@@ -154,9 +158,9 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 
 	// Delete
 	if len(delta.Delete) > 0 {
-		s.logger.Infof("Deleting %d rows of type %s", len(delta.Delete), utils.Key(utils.Name(subject.Entity()), ' '))
+		s.logger.Infof("Deleting %d rows of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		g.Go(func() error {
-			return s.db.Delete(ctx, subject.Entity(), delta.Delete.IDs())
+			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs())
 		})
 	}
 
@@ -165,8 +169,7 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 
 func (s Sync) fromRedis(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, key string) (<-chan contracts.Entity, <-chan error) {
 	// Channel for Redis field-value pairs for the specified key and errors.
-	pairs, errs := s.redis.HYield(
-		ctx, key, count)
+	pairs, errs := s.redis.HYield(ctx, key, count)
 	// Group for the Redis sync. Redis sync will be cancelled if an error occurs.
 	// Note that we're calling HYield with the original context.
 	g, ctx := errgroup.WithContext(ctx)
