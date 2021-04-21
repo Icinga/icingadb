@@ -3,6 +3,7 @@ package icingadb
 import (
 	"context"
 	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/utils"
 	"go.uber.org/zap"
@@ -12,20 +13,20 @@ import (
 )
 
 type Delta struct {
-	Create       EntitiesById
-	Update       EntitiesById
-	Delete       EntitiesById
-	WithChecksum bool
-	done         chan error
-	err          error
-	logger       *zap.SugaredLogger
+	Create  EntitiesById
+	Update  EntitiesById
+	Delete  EntitiesById
+	Subject *common.SyncSubject
+	done    chan error
+	err     error
+	logger  *zap.SugaredLogger
 }
 
-func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, withChecksum bool, logger *zap.SugaredLogger) *Delta {
+func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subject *common.SyncSubject, logger *zap.SugaredLogger) *Delta {
 	delta := &Delta{
-		WithChecksum: withChecksum,
-		done:         make(chan error, 1),
-		logger:       logger,
+		Subject: subject,
+		done:    make(chan error, 1),
+		logger:  logger,
 	}
 
 	go delta.start(ctx, actual, desired)
@@ -41,7 +42,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 	defer close(delta.done)
 
 	var update EntitiesById
-	if delta.WithChecksum {
+	if delta.Subject.WithChecksum() {
 		update = EntitiesById{}
 	}
 	actual := EntitiesById{}
@@ -68,7 +69,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 					delete(desired, id)
 					mtx.Unlock()
 
-					if delta.WithChecksum && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
+					if delta.Subject.WithChecksum() && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
 						updateMtx.Lock()
 						update[id] = d
 						updateMtx.Unlock()
@@ -104,7 +105,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 					delete(actual, id)
 					mtx.Unlock()
 
-					if delta.WithChecksum && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
+					if delta.Subject.WithChecksum() && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
 						updateMtx.Lock()
 						update[id] = d
 						updateMtx.Unlock()
@@ -129,7 +130,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 
 	delta.Create = desired
 	delta.Delete = actual
-	if delta.WithChecksum {
+	if delta.Subject.WithChecksum() {
 		delta.Update = update
 	}
 }
