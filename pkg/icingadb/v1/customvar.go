@@ -22,3 +22,7 @@ type CustomvarFlat struct {
 func NewCustomvar() contracts.Entity {
 	return &Customvar{}
 }
+
+func NewCustomvarFlat() contracts.Entity {
+	return &CustomvarFlat{}
+}
