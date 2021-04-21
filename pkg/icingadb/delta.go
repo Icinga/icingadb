@@ -34,7 +34,7 @@ func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subj
 	return delta
 }
 
-func (delta Delta) Wait() error {
+func (delta *Delta) Wait() error {
 	return <-delta.done
 }
 
