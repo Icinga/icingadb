@@ -53,7 +53,8 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 	g.Go(func() error {
 		var cnt com.Counter
 		defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-			delta.logger.Debugf("Synced %d actual elements in %s", cnt.Val(), elapsed)
+			delta.logger.Debugf(
+				"Synced %d actual elements of type %s in %s", cnt.Val(), utils.Name(delta.Subject.Entity()), elapsed)
 		})
 		for {
 			select {
@@ -89,7 +90,8 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 	g.Go(func() error {
 		var cnt com.Counter
 		defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-			delta.logger.Debugf("Synced %d desired elements in %s", cnt.Val(), elapsed)
+			delta.logger.Debugf(
+				"Synced %d desired elements of type %s in %s", cnt.Val(), utils.Name(delta.Subject.Entity()), elapsed)
 		})
 		for {
 			select {
