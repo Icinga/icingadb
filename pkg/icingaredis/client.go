@@ -171,7 +171,7 @@ func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-ch
 	if subject.WithChecksum() {
 		key = "icinga:checksum:" + key
 	} else {
-		key = "icinga:config:" + key
+		key = "icinga:" + key
 	}
 
 	pairs, errs := c.HYield(ctx, key, 1<<12)

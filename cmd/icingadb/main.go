@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/icinga/icingadb/internal/command"
+	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
@@ -106,7 +107,7 @@ func run() int {
 							g.Go(func() error {
 								defer wg.Done()
 
-								return s.SyncAfterDump(synctx, factory.WithInit, dump)
+								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory.WithInit), dump)
 							})
 						}
 
