@@ -32,7 +32,6 @@ func (d Driver) Open(dsn string) (c driver.Conn, err error) {
 	c, err = d.Driver.Open(dsn)
 	if err == nil {
 		// No error. Return immediately.
-		fmt.Println("Returning connection")
 		return
 	}
 
