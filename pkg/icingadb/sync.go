@@ -166,19 +166,3 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	return g.Wait()
 }
-
-func (s Sync) fromRedis(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, key string) (<-chan contracts.Entity, <-chan error) {
-	// Channel for Redis field-value pairs for the specified key and errors.
-	pairs, errs := s.redis.HYield(ctx, key, count)
-	// Group for the Redis sync. Redis sync will be cancelled if an error occurs.
-	// Note that we're calling HYield with the original context.
-	g, ctx := errgroup.WithContext(ctx)
-	// Let errors from HYield cancel our group.
-	com.ErrgroupReceive(g, errs)
-
-	desired, errs := icingaredis.CreateEntities(ctx, factoryFunc, pairs, runtime.NumCPU())
-	// Let errors from CreateEntities cancel our group.
-	com.ErrgroupReceive(g, errs)
-
-	return desired, com.WaitAsync(g)
-}
