@@ -91,6 +91,9 @@ func parseString(src string, dest interface{}) error {
 	case *string:
 		*ptr = src
 		return nil
+	case **string:
+		*ptr = &src
+		return nil
 	case *uint8:
 		i, err := strconv.ParseUint(src, 10, int(unsafe.Sizeof(*ptr)*8))
 		if err == nil {
