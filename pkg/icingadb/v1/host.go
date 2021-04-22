@@ -69,6 +69,11 @@ type HostCustomvar struct {
 	HostId        types.Binary `json:"object_id"`
 }
 
+type HostState struct {
+	State  `json:",inline"`
+	HostId types.Binary `json:"object_id"`
+}
+
 type Hostgroup struct {
 	GroupMeta `json:",inline"`
 }
@@ -90,6 +95,10 @@ func NewHost() contracts.Entity {
 
 func NewHostCustomvar() contracts.Entity {
 	return &HostCustomvar{}
+}
+
+func NewHostState() contracts.Entity {
+	return &HostState{}
 }
 
 func NewHostgroup() contracts.Entity {

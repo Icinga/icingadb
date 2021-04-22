@@ -20,6 +20,7 @@ var Factories = []contracts.EntityFactoryFunc{
 	NewEventcommandEnvvar,
 	NewHost,
 	NewHostCustomvar,
+	NewHostState,
 	NewHostgroup,
 	NewHostgroupCustomvar,
 	NewHostgroupMember,
