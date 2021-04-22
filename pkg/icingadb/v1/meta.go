@@ -48,8 +48,8 @@ type NameMeta struct {
 
 // NameCiMeta is embedded by every type with a case insensitive name.
 type NameCiMeta struct {
-	NameMeta
-	NameCi *string `json:"-"`
+	NameMeta `json:",inline"`
+	NameCi   *string `json:"-"`
 }
 
 // Init implements the contracts.Initer interface.
