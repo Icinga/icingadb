@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"database/sql"
 	"database/sql/driver"
+	"encoding"
 	"encoding/json"
+	"strconv"
 )
 
 // Int adds JSON support to sql.NullInt64.
@@ -21,6 +23,21 @@ func (i Int) MarshalJSON() ([]byte, error) {
 	}
 
 	return json.Marshal(v)
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (i *Int) UnmarshalText(text []byte) error {
+	parsed, err := strconv.ParseInt(string(text), 10, 64)
+	if err != nil {
+		return err
+	}
+
+	*i = Int{sql.NullInt64{
+		Int64: parsed,
+		Valid: true,
+	}}
+
+	return nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
@@ -41,8 +58,9 @@ func (i *Int) UnmarshalJSON(data []byte) error {
 
 // Assert interface compliance.
 var (
-	_ json.Marshaler   = Int{}
-	_ json.Unmarshaler = (*Int)(nil)
-	_ driver.Valuer    = Int{}
-	_ sql.Scanner      = (*Int)(nil)
+	_ json.Marshaler           = Int{}
+	_ json.Unmarshaler         = (*Int)(nil)
+	_ encoding.TextUnmarshaler = (*Int)(nil)
+	_ driver.Valuer            = Int{}
+	_ sql.Scanner              = (*Int)(nil)
 )
