@@ -1,0 +1,50 @@
+name: Go
+on:
+  push:
+    branches:
+      - master
+  pull_request: {}
+
+jobs:
+  build-test:
+
+    strategy:
+      matrix:
+        os: [ macos-latest, ubuntu-latest ]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.x
+
+      - run: go build -gcflags="-m" ./...
+
+      - run: go test -v -race ./...
+
+  lint-vet-fmt:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.x
+
+      - name: Run staticcheck ./...
+        run: |
+            go install honnef.co/go/tools/cmd/staticcheck@4dc1992c9bb4310ba1e98b30c8d7d46444891d3b
+            staticcheck ./...
+
+      - run: go vet ./...
+
+      - name: Run gofmt -s -l .
+        run: |
+            fmtvar="$(gofmt -s -l .)"
+            echo "$fmtvar"
+            test -z "$fmtvar"
+
