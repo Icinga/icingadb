@@ -2,6 +2,7 @@ package types
 
 import (
 	"database/sql/driver"
+	"encoding"
 	"encoding/json"
 	"fmt"
 )
@@ -27,6 +28,11 @@ func (nt *NotificationTypes) UnmarshalJSON(bytes []byte) error {
 
 	*nt = n
 	return nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (nt *NotificationTypes) UnmarshalText(text []byte) error {
+	return nt.UnmarshalJSON(text)
 }
 
 // Value implements the driver.Valuer interface.
@@ -73,7 +79,8 @@ var allNotificationTypes = func() NotificationTypes {
 
 // Assert interface compliance.
 var (
-	_ error            = BadNotificationTypes{}
-	_ json.Unmarshaler = (*NotificationTypes)(nil)
-	_ driver.Valuer    = NotificationTypes(0)
+	_ error                    = BadNotificationTypes{}
+	_ json.Unmarshaler         = (*NotificationTypes)(nil)
+	_ encoding.TextUnmarshaler = (*NotificationTypes)(nil)
+	_ driver.Valuer            = NotificationTypes(0)
 )
