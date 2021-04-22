@@ -62,6 +62,8 @@ func (h *HA) Close() error {
 	h.cancel()
 	// Wait until the controller loop ended.
 	<-h.Done()
+	// Remove our instance from the database.
+	h.removeInstance()
 	// And return an error, if any.
 	return h.Err()
 }
@@ -97,6 +99,8 @@ func (h *HA) abort(err error) {
 
 // controller loop.
 func (h *HA) controller() {
+	defer close(h.done)
+
 	h.logger.Debugw("Starting HA", zap.String("instance_id", hex.EncodeToString(h.instanceId)))
 
 	oldInstancesRemoved := false
@@ -210,6 +214,15 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 	}
 
 	return nil
+}
+
+func (h *HA) removeInstance() {
+	h.logger.Debugw("Removing our row from icingadb_instance", zap.String("instance_id", hex.EncodeToString(h.instanceId)))
+	// Intentionally using context.Background() here as this is a cleanup task and h.ctx is already cancelled.
+	_, err := h.db.ExecContext(context.Background(), "DELETE FROM icingadb_instance WHERE id = ?", h.instanceId)
+	if err != nil {
+		h.logger.Warnw("Could not remove instance from database", zap.Error(err))
+	}
 }
 
 func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
