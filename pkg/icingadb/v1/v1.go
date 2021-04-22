@@ -37,6 +37,7 @@ var Factories = []contracts.EntityFactoryFunc{
 	NewNotificationUsergroup,
 	NewService,
 	NewServiceCustomvar,
+	NewServiceState,
 	NewServicegroup,
 	NewServicegroupCustomvar,
 	NewServicegroupMember,
