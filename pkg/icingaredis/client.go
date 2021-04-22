@@ -117,6 +117,11 @@ func (c *Client) HMYield(ctx context.Context, key string, count int, concurrent 
 
 					g.Go(func() error {
 						for i, v := range vals {
+							if v == nil {
+								c.logger.Warnf("HMGET %s: field %#v missing", key, batch[i])
+								continue
+							}
+
 							select {
 							case pairs <- HPair{
 								Field: batch[i],
