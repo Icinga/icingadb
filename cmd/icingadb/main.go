@@ -109,12 +109,6 @@ func main() {
 							return v
 						}
 
-						// vs
-						// g.Go(func(factoryFunc contracts.EntityFactoryFunc) func() error {
-						//     return func() error {
-						//         return s.Sync(synctx, factoryFunc)
-						//     }
-						// }(factoryFunc))
 						g.Go(func() error {
 							return s.Sync(synctx, ff)
 						})
