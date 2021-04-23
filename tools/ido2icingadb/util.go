@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	icingaSql "github.com/Icinga/go-libs/sql"
-	"github.com/cheggaaa/pb/v3"
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -16,7 +15,6 @@ import (
 	"os"
 	"path"
 	"reflect"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -70,62 +68,6 @@ func (sv *stringValue) Set(s string) error {
 	sv.value = s
 	sv.isSet = true
 	return nil
-}
-
-type progress struct {
-	total, done int64
-}
-
-// multiTaskBar lets multiple workers report their progress to a single progress bar.
-type multiTaskBar struct {
-	// progress contains the progress per worker.
-	progress chan progress
-	// bar indicates the overall progress.
-	bar *pb.ProgressBar
-	// start indicates that bar is ready.
-	start chan struct{}
-	// wg indicates that the workers are done.
-	wg sync.WaitGroup
-}
-
-// runMaster coordinates everything and waits until the workers are done.
-func (mtb *multiTaskBar) runMaster() {
-	var progress progress
-	for i := cap(mtb.progress); i > 0; i-- {
-		p := <-mtb.progress
-
-		progress.total += p.total
-		progress.done += p.done
-	}
-
-	mtb.bar = pb.New64(progress.total).SetCurrent(progress.done).Start()
-	close(mtb.start)
-
-	mtb.wg.Wait()
-	mtb.bar.Finish()
-}
-
-// startWorker shall be called once per worker with their individual progress.
-func (mtb *multiTaskBar) startWorker(total, done int64) *pb.ProgressBar {
-	mtb.progress <- progress{total, done}
-	<-mtb.start
-	return mtb.bar
-}
-
-// stopWorker shall be called once per worker once done.
-func (mtb *multiTaskBar) stopWorker() {
-	mtb.wg.Done()
-}
-
-// newMultiTaskBar creates a new multiTaskBar suitable for workers workers.
-func newMultiTaskBar(workers int) *multiTaskBar {
-	mtb := &multiTaskBar{
-		progress: make(chan progress, workers),
-		start:    make(chan struct{}),
-	}
-
-	mtb.wg.Add(workers)
-	return mtb
 }
 
 // assert logs message with fields and err and terminates the program if err is not nil.
@@ -200,25 +142,23 @@ func flush(bulks ...bulkInsert) {
 // getProgress compares the numbers of idoIdColumn in idoTable with the UUIDs in icingadbTable's icingadbIdColumn
 // using idoTx and returns the current progress and an idoIdColumn value to start/continue sync with.
 func getProgress(
-	idoTx tx, idoTable, idoIdColumn, icingadbTable, icingadbIdColumn string,
+	t *task, idoTx tx, idoTable, idoIdColumn, icingadbTable, icingadbIdColumn string,
 	mkIcingadbId func(idoId uint64) (icingadbId interface{}),
 ) (
 	total, done, lastSyncedId int64,
 ) {
+	t.startOneShotJob("computing where to resume")
+
 	var count []struct{ Count int64 }
 	idoTx.fetchAll(&count, fmt.Sprintf(
 		"SELECT COUNT(*) FROM %s xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id", idoTable,
 	))
 
-	total = count[0].Count
-
-	bar := calcBar.startWorker(total, 0)
-	defer calcBar.stopWorker()
-
-	if total == 0 {
+	if total = count[0].Count; total == 0 {
 		return
 	}
 
+	incr := t.startTrackableJob("computing where to resume", total, 0)
 	query := fmt.Sprintf("SELECT 1 FROM %s WHERE %s=?", icingadbTable, icingadbIdColumn)
 
 	stmt, errPp := icingaDb.conn.Prepare(query)
@@ -250,7 +190,7 @@ func getProgress(
 				lastSyncedId = int64(row.Id)
 			}
 
-			bar.Increment()
+			incr()
 			return has
 		},
 	)

@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"github.com/vbauerster/mpb/v6"
 	"os"
+	"sync"
 	"time"
 )
 
@@ -17,9 +19,8 @@ var chSize = 64
 var icingaEnv, icingaEndpoint, cache stringValue
 var envId, endpointId []byte
 
-var calcBar = newMultiTaskBar(6)
-var cacheBar = newMultiTaskBar(4)
-var syncBar = newMultiTaskBar(6)
+var wg = &sync.WaitGroup{}
+var prg = mpb.New()
 
 func main() {
 	flag.Var(&icingaEnv, "icinga-env", "ENVIRONMENT")
@@ -60,6 +61,8 @@ func main() {
 
 	assert(os.MkdirAll(cache.value, 0700), "Couldn't create cache dir", log.Fields{"path": cache.value})
 
+	wg.Add(6)
+
 	go syncAcks()
 	go syncComments()
 	go syncDowntimes()
@@ -67,12 +70,5 @@ func main() {
 	go syncNotifications()
 	go syncStates()
 
-	log.Info("Computing where to resume")
-	calcBar.runMaster()
-
-	log.Info("Building cache")
-	cacheBar.runMaster()
-
-	log.Info("Migrating history")
-	syncBar.runMaster()
+	wg.Wait()
 }

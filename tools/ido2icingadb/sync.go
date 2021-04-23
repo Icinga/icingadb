@@ -11,6 +11,11 @@ import (
 // syncAcks migrates IDO's icinga_acknowledgements table to Icinga DB's acknowledgement_history table
 // using the -ah-cache FILE similar to syncFlapping.
 func syncAcks() {
+	defer wg.Done()
+
+	tsk := &task{prg, "ack. history", nil}
+	defer tsk.finish()
+
 	cach := mkCache("acks")
 	defer cach.conn.Close()
 
@@ -30,7 +35,7 @@ func syncAcks() {
 	defer snapshot.commit()
 
 	total, done, lai := getProgress(
-		snapshot, "icinga_acknowledgements", "acknowledgement_id", "history", "id",
+		tsk, snapshot, "icinga_acknowledgements", "acknowledgement_id", "history", "id",
 		func(idoId uint64) interface{} { return mkDeterministicUuid(ackHistory, idoId) },
 	)
 
@@ -46,7 +51,7 @@ func syncAcks() {
 			}
 			tx.fetchAll(&checkpoint, "SELECT COUNT(*), MAX(acknowledgement_id) FROM ack_clear_set_time")
 
-			bar := cacheBar.startWorker(total, checkpoint[0].Count*2)
+			incr := tsk.startTrackableJob("building cache", total, checkpoint[0].Count*2)
 
 			ch := make(chan struct {
 				AcknowledgementId   uint64
@@ -111,7 +116,7 @@ func syncAcks() {
 					inTx = 0
 				}
 
-				bar.Increment()
+				incr()
 			}
 
 			<-ch // wait for close
@@ -125,9 +130,7 @@ func syncAcks() {
 			cach.exec("VACUUM")
 		}
 
-		cacheBar.stopWorker()
-
-		bar := syncBar.startWorker(total, done)
+		incr := tsk.startTrackableJob("migrating history", total, done)
 
 		ackClearSetTime := make(chan struct {
 			EntryTime     sql.NullInt64
@@ -247,7 +250,7 @@ func syncAcks() {
 					h.rows = nil
 				}
 
-				bar.Increment()
+				incr()
 			}
 
 			<-ch // wait for close
@@ -256,18 +259,21 @@ func syncAcks() {
 		if len(h.rows) > 0 {
 			flush(ahs, ahc, h)
 		}
-
-		syncBar.stopWorker()
 	}
 }
 
 // syncComments migrates IDO's icinga_commenthistory table to Icinga DB's comment_history table.
 func syncComments() {
+	defer wg.Done()
+
+	tsk := &task{prg, "comment history", nil}
+	defer tsk.finish()
+
 	snapshot := ido.begin(sql.LevelRepeatableRead, true)
 	defer snapshot.commit()
 
 	total, done, lci := getProgress(
-		snapshot, "icinga_commenthistory", "commenthistory_id", "comment_history", "comment_id",
+		tsk, snapshot, "icinga_commenthistory", "commenthistory_id", "comment_history", "comment_id",
 		func(idoId uint64) interface{} {
 			var res []struct{ Name string }
 			snapshot.fetchAll(&res, "SELECT name FROM icinga_commenthistory WHERE commenthistory_id=?", idoId)
@@ -280,7 +286,7 @@ func syncComments() {
 		},
 	)
 
-	bar := syncBar.startWorker(total, done)
+	incr := tsk.startTrackableJob("migrating history", total, done)
 
 	coh := bulkInsert{
 		stmt: "REPLACE INTO comment_history(comment_id, environment_id, endpoint_id, object_type, host_id, " +
@@ -362,7 +368,7 @@ func syncComments() {
 				h.rows = nil
 			}
 
-			bar.Increment()
+			incr()
 		}
 
 		<-ch // wait for close
@@ -371,17 +377,20 @@ func syncComments() {
 	if len(coh.rows) > 0 {
 		flush(coh, h)
 	}
-
-	syncBar.stopWorker()
 }
 
 // syncDowntimes migrates IDO's icinga_downtimehistory table to Icinga DB's downtime_history table.
 func syncDowntimes() {
+	defer wg.Done()
+
+	tsk := &task{prg, "downtime history", nil}
+	defer tsk.finish()
+
 	snapshot := ido.begin(sql.LevelRepeatableRead, true)
 	defer snapshot.commit()
 
 	total, done, ldi := getProgress(
-		snapshot, "icinga_downtimehistory", "downtimehistory_id", "downtime_history", "downtime_id",
+		tsk, snapshot, "icinga_downtimehistory", "downtimehistory_id", "downtime_history", "downtime_id",
 		func(idoId uint64) interface{} {
 			var res []struct{ Name string }
 			snapshot.fetchAll(&res, "SELECT name FROM icinga_downtimehistory WHERE downtimehistory_id=?", idoId)
@@ -394,7 +403,7 @@ func syncDowntimes() {
 		},
 	)
 
-	bar := syncBar.startWorker(total, done)
+	incr := tsk.startTrackableJob("migrating history", total, done)
 
 	dh := bulkInsert{
 		stmt: "REPLACE INTO downtime_history(downtime_id, environment_id, endpoint_id, triggered_by_id, object_type, " +
@@ -493,7 +502,7 @@ func syncDowntimes() {
 				h.rows = nil
 			}
 
-			bar.Increment()
+			incr()
 		}
 
 		<-ch // wait for close
@@ -502,13 +511,16 @@ func syncDowntimes() {
 	if len(dh.rows) > 0 {
 		flush(dh, h)
 	}
-
-	syncBar.stopWorker()
 }
 
 // syncFlapping migrates IDO's icinga_flappinghistory table to Icinga DB's flapping_history table
 // using the -fh-cache FILE.
 func syncFlapping() {
+	defer wg.Done()
+
+	tsk := &task{prg, "flapping history", nil}
+	defer tsk.finish()
+
 	// Icinga DB's flapping_history#id always needs start_time. flapping_end rows would need a subquery for that.
 	// That would make the IDO reading even slower than the Icinga DB writing.
 	// Therefore: Stream IDO's icinga_flappinghistory once, compute flapping_history#start_time
@@ -535,7 +547,7 @@ func syncFlapping() {
 	defer snapshot.commit()
 
 	total, done, lfi := getProgress(
-		snapshot, "icinga_flappinghistory", "flappinghistory_id", "history", "id",
+		tsk, snapshot, "icinga_flappinghistory", "flappinghistory_id", "history", "id",
 		func(idoId uint64) interface{} { return mkDeterministicUuid(flappingHistory, idoId) },
 	)
 
@@ -551,7 +563,7 @@ func syncFlapping() {
 			}
 			tx.fetchAll(&checkpoint, "SELECT COUNT(*), MAX(flappinghistory_id) FROM flapping_end_start_time")
 
-			bar := cacheBar.startWorker(total, checkpoint[0].Count*2)
+			incr := tsk.startTrackableJob("building cache", total, checkpoint[0].Count*2)
 
 			ch := make(chan struct {
 				FlappinghistoryId uint64
@@ -616,7 +628,7 @@ func syncFlapping() {
 					inTx = 0
 				}
 
-				bar.Increment()
+				incr()
 			}
 
 			<-ch // wait for close
@@ -630,9 +642,7 @@ func syncFlapping() {
 			cach.exec("VACUUM")
 		}
 
-		cacheBar.stopWorker()
-
-		bar := syncBar.startWorker(total, done)
+		incr := tsk.startTrackableJob("migrating history", total, done)
 
 		flappingEndStartTimes := make(chan struct {
 			EventTime     sql.NullInt64
@@ -750,7 +760,7 @@ func syncFlapping() {
 					h.rows = nil
 				}
 
-				bar.Increment()
+				incr()
 			}
 
 			<-ch // wait for close
@@ -759,14 +769,17 @@ func syncFlapping() {
 		if len(h.rows) > 0 {
 			flush(fhs, fhe, h)
 		}
-
-		syncBar.stopWorker()
 	}
 }
 
 // syncNotifications migrates IDO's icinga_notifications table
 // to Icinga DB's notification_history table using the -nh-cache FILE similar to syncStates.
 func syncNotifications() {
+	defer wg.Done()
+
+	tsk := &task{prg, "notif. history", nil}
+	defer tsk.finish()
+
 	cach := mkCache("notifications")
 	defer cach.conn.Close()
 
@@ -792,7 +805,7 @@ func syncNotifications() {
 	defer snapshot.commit()
 
 	total, done, lni := getProgress(
-		snapshot, "icinga_notifications", "notification_id", "notification_history", "id",
+		tsk, snapshot, "icinga_notifications", "notification_id", "notification_history", "id",
 		func(idoId uint64) interface{} { return mkDeterministicUuid(notificationHistory, idoId) },
 	)
 
@@ -822,7 +835,7 @@ func syncNotifications() {
 			}
 		}
 
-		bar := cacheBar.startWorker(total, phsC[0].Count+niCMNi[0].Count)
+		incr := tsk.startTrackableJob("building cache", total, phsC[0].Count+niCMNi[0].Count)
 		inTx := 0
 
 		{
@@ -888,7 +901,7 @@ func syncNotifications() {
 					inTx = 0
 				}
 
-				bar.Increment()
+				incr()
 			}
 
 			<-ch // wait for close
@@ -909,11 +922,9 @@ func syncNotifications() {
 		if deleted > 0 {
 			cach.exec("VACUUM")
 		}
-
-		cacheBar.stopWorker()
 	}
 
-	bar := syncBar.startWorker(total, done)
+	incr := tsk.startTrackableJob("migrating history", total, done)
 	previousHardStates := make(chan struct{ PreviousHardState uint8 }, 64)
 
 	go streamQuery(
@@ -1019,7 +1030,7 @@ func syncNotifications() {
 
 				h.rows = append(h.rows, []interface{}{id, envId, endpointId, monObjTyp, hostId, serviceId, id, ts})
 
-				bar.Increment()
+				incr()
 			}
 
 			userId := calcObjectId(row.UserName)
@@ -1032,12 +1043,15 @@ func syncNotifications() {
 	if len(nh.rows) > 0 {
 		flush(nh, h, unh)
 	}
-
-	syncBar.stopWorker()
 }
 
 // syncStates migrates IDO's icinga_statehistory table to Icinga DB's state_history table using the -sh-cache FILE.
 func syncStates() {
+	defer wg.Done()
+
+	tsk := &task{prg, "state history", nil}
+	defer tsk.finish()
+
 	// Icinga DB's state_history#previous_hard_state would need a subquery.
 	// That make the IDO reading even slower than the Icinga DB writing.
 	// Therefore: Stream IDO's icinga_statehistory once, compute state_history#previous_hard_state
@@ -1071,7 +1085,7 @@ func syncStates() {
 	defer snapshot.commit()
 
 	total, done, lsi := getProgress(
-		snapshot, "icinga_statehistory", "statehistory_id", "state_history", "id",
+		tsk, snapshot, "icinga_statehistory", "statehistory_id", "state_history", "id",
 		func(idoId uint64) interface{} { return mkDeterministicUuid(stateHistory, idoId) },
 	)
 
@@ -1104,7 +1118,7 @@ func syncStates() {
 			}
 		}
 
-		bar := cacheBar.startWorker(total, phsC[0].Count+niCMShi[0].Count)
+		incr := tsk.startTrackableJob("building cache", total, phsC[0].Count+niCMShi[0].Count)
 		inTx := 0
 
 		{
@@ -1177,7 +1191,7 @@ func syncStates() {
 					inTx = 0
 				}
 
-				bar.Increment()
+				incr()
 			}
 
 			<-ch // wait for close
@@ -1198,11 +1212,9 @@ func syncStates() {
 		if deleted > 0 {
 			cach.exec("VACUUM")
 		}
-
-		cacheBar.stopWorker()
 	}
 
-	bar := syncBar.startWorker(total, done)
+	incr := tsk.startTrackableJob("migrating history", total, done)
 	previousHardStates := make(chan struct{ PreviousHardState uint8 }, chSize)
 
 	// Stream concurrently from two databases. Possible due to WHERE and ORDER BY.
@@ -1284,7 +1296,7 @@ func syncStates() {
 				h.rows = nil
 			}
 
-			bar.Increment()
+			incr()
 		}
 
 		<-ch // wait for close
@@ -1293,6 +1305,4 @@ func syncStates() {
 	if len(sh.rows) > 0 {
 		flush(sh, h)
 	}
-
-	syncBar.stopWorker()
 }
