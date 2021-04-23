@@ -250,12 +250,20 @@ func (t tx) query(query string, args []interface{}, onRow interface{}) {
 	}
 }
 
-func (t tx) exec(query string, args ...interface{}) {
-	_, errEx := t.tx.Exec(query, args...)
+func (t tx) exec(query string, args ...interface{}) int64 {
+	res, errEx := t.tx.Exec(query, args...)
 	assert(
 		errEx, "Couldn't execute SQL statement",
 		log.Fields{"backend": t.db.whichOne, "statement": query, "args": args},
 	)
+
+	amount, errRA := res.RowsAffected()
+	assert(
+		errRA, "Couldn't figure out amount of rows affected by SQL statement",
+		log.Fields{"backend": t.db.whichOne, "statement": query, "args": args},
+	)
+
+	return amount
 }
 
 func (t tx) commit() {
