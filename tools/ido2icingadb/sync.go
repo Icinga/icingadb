@@ -36,6 +36,7 @@ func syncAcks() {
 
 	{
 		tx := cach.begin(sql.LevelSerializable, false)
+		var deleted int64
 		inTx := 0
 
 		{
@@ -86,7 +87,7 @@ func syncAcks() {
 							row.AcknowledgementId, last[0].EntryTime, last[0].EntryTimeUsec,
 						)
 
-						tx.exec("DELETE FROM last_ack_set_time WHERE object_id=?", row.ObjectId)
+						deleted += tx.exec("DELETE FROM last_ack_set_time WHERE object_id=?", row.ObjectId)
 					} else {
 						tx.exec(
 							"INSERT INTO ack_clear_set_time(acknowledgement_id, entry_time, entry_time_usec) "+
@@ -95,7 +96,7 @@ func syncAcks() {
 						)
 					}
 				} else {
-					tx.exec("DELETE FROM last_ack_set_time WHERE object_id=?", row.ObjectId)
+					deleted += tx.exec("DELETE FROM last_ack_set_time WHERE object_id=?", row.ObjectId)
 
 					tx.exec(
 						"INSERT INTO last_ack_set_time(object_id, entry_time, entry_time_usec) VALUES (?, ?, ?)",
@@ -116,10 +117,13 @@ func syncAcks() {
 			<-ch // wait for close
 		}
 
-		tx.exec("DELETE FROM last_ack_set_time")
+		deleted += tx.exec("DELETE FROM last_ack_set_time")
 
 		tx.commit()
-		cach.exec("VACUUM")
+
+		if deleted > 0 {
+			cach.exec("VACUUM")
+		}
 
 		cacheBar.stopWorker()
 
@@ -537,6 +541,7 @@ func syncFlapping() {
 
 	{
 		tx := cach.begin(sql.LevelSerializable, false)
+		var deleted int64
 		inTx := 0
 
 		{
@@ -570,7 +575,7 @@ func syncFlapping() {
 
 			for row := range ch {
 				if row.EventType == flappingStart {
-					tx.exec("DELETE FROM last_flapping_start_time WHERE object_id=?", row.ObjectId)
+					deleted += tx.exec("DELETE FROM last_flapping_start_time WHERE object_id=?", row.ObjectId)
 
 					tx.exec(
 						"INSERT INTO last_flapping_start_time(object_id, event_time, event_time_usec) VALUES (?, ?, ?)",
@@ -594,7 +599,7 @@ func syncFlapping() {
 							row.FlappinghistoryId, lfst[0].EventTime, lfst[0].EventTimeUsec,
 						)
 
-						tx.exec("DELETE FROM last_flapping_start_time WHERE object_id=?", row.ObjectId)
+						deleted += tx.exec("DELETE FROM last_flapping_start_time WHERE object_id=?", row.ObjectId)
 					} else {
 						tx.exec(
 							"INSERT INTO flapping_end_start_time(flappinghistory_id, event_time, event_time_usec) "+
@@ -617,10 +622,13 @@ func syncFlapping() {
 			<-ch // wait for close
 		}
 
-		tx.exec("DELETE FROM last_flapping_start_time")
+		deleted += tx.exec("DELETE FROM last_flapping_start_time")
 
 		tx.commit()
-		cach.exec("VACUUM")
+
+		if deleted > 0 {
+			cach.exec("VACUUM")
+		}
 
 		cacheBar.stopWorker()
 
@@ -792,6 +800,7 @@ func syncNotifications() {
 
 	{
 		tx := cach.begin(sql.LevelSerializable, false)
+		var deleted int64
 		var checkpoint int64
 
 		var niCMNi []struct {
@@ -858,8 +867,8 @@ func syncNotifications() {
 						row.State, row.ObjectId,
 					)
 
-					tx.exec("DELETE FROM next_hard_state WHERE object_id=?", row.ObjectId)
-					tx.exec("DELETE FROM next_ids WHERE object_id=?", row.ObjectId)
+					deleted += tx.exec("DELETE FROM next_hard_state WHERE object_id=?", row.ObjectId)
+					deleted += tx.exec("DELETE FROM next_ids WHERE object_id=?", row.ObjectId)
 
 					tx.exec(
 						"INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
@@ -890,13 +899,16 @@ func syncNotifications() {
 				"SELECT notification_id, 99 FROM next_ids",
 		)
 
-		tx.exec("DELETE FROM next_hard_state")
-		tx.exec("DELETE FROM next_ids")
+		deleted += tx.exec("DELETE FROM next_hard_state")
+		deleted += tx.exec("DELETE FROM next_ids")
 
 		tx.fetchAll(&limit, "SELECT MAX(notification_id) FROM previous_hard_state")
 
 		tx.commit()
-		cach.exec("VACUUM")
+
+		if deleted > 0 {
+			cach.exec("VACUUM")
+		}
 
 		cacheBar.stopWorker()
 	}
@@ -1067,6 +1079,7 @@ func syncStates() {
 
 	{
 		tx := cach.begin(sql.LevelSerializable, false)
+		var deleted int64
 		var checkpoint int64
 
 		var niCMShi []struct {
@@ -1143,8 +1156,8 @@ func syncStates() {
 						row.LastHardState, row.ObjectId,
 					)
 
-					tx.exec("DELETE FROM next_hard_state WHERE object_id=?", row.ObjectId)
-					tx.exec("DELETE FROM next_ids WHERE object_id=?", row.ObjectId)
+					deleted += tx.exec("DELETE FROM next_hard_state WHERE object_id=?", row.ObjectId)
+					deleted += tx.exec("DELETE FROM next_ids WHERE object_id=?", row.ObjectId)
 
 					tx.exec(
 						"INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
@@ -1175,13 +1188,16 @@ func syncStates() {
 				"SELECT statehistory_id, 99 FROM next_ids",
 		)
 
-		tx.exec("DELETE FROM next_hard_state")
-		tx.exec("DELETE FROM next_ids")
+		deleted += tx.exec("DELETE FROM next_hard_state")
+		deleted += tx.exec("DELETE FROM next_ids")
 
 		tx.fetchAll(&limit, "SELECT MAX(statehistory_id) FROM previous_hard_state")
 
 		tx.commit()
-		cach.exec("VACUUM")
+
+		if deleted > 0 {
+			cach.exec("VACUUM")
+		}
 
 		cacheBar.stopWorker()
 	}
