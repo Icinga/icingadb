@@ -9,6 +9,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
@@ -118,9 +119,7 @@ func main() {
 						return hs.Sync(synctx)
 					})
 
-					if err := g.Wait(); err != nil {
-						// TODO(el): This panics here even if a ctx gets cancelled.
-						// That is intentional for the moment for testing.
+					if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
 						panic(err)
 					}
 
@@ -130,7 +129,7 @@ func main() {
 			case <-ha.Handover():
 				cancel()
 			case <-ctx.Done():
-				if err := ctx.Err(); err != nil {
+				if err := ctx.Err(); err != nil && !utils.IsContextCanceled(err) {
 					panic(err)
 				}
 			case <-done:

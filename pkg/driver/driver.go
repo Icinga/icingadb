@@ -46,7 +46,7 @@ func (d Driver) Open(dsn string) (c driver.Conn, err error) {
 		select {
 		case <-ctx.Done():
 			// Context canceled.
-			return
+			return nil, ctx.Err()
 		case <-time.After(sleep):
 			// Wait for backoff duration and continue.
 		}

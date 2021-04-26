@@ -80,7 +80,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 
 				cnt.Inc()
 			case <-ctx.Done():
-				return nil
+				return ctx.Err()
 			}
 		}
 	})
@@ -116,7 +116,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 
 				cnt.Inc()
 			case <-ctx.Done():
-				return nil
+				return ctx.Err()
 			}
 		}
 	})
