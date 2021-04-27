@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/icinga/icingadb/internal/command"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
@@ -52,66 +51,11 @@ func main() {
 				go func() {
 					g, synctx := errgroup.WithContext(hactx)
 
-					for _, factoryFunc := range []contracts.EntityFactoryFunc{
-						v1.NewActionUrl,
-						v1.NewCheckcommand,
-						v1.NewCheckcommandArgument,
-						v1.NewCheckcommandCustomvar,
-						v1.NewCheckcommandEnvvar,
-						v1.NewComment,
-						v1.NewCustomvar,
-						v1.NewDowntime,
-						v1.NewEndpoint,
-						v1.NewEventcommand,
-						v1.NewEventcommandArgument,
-						v1.NewEventcommandCustomvar,
-						v1.NewEventcommandEnvvar,
-						v1.NewHost,
-						v1.NewHostCustomvar,
-						v1.NewHostgroup,
-						v1.NewHostgroupCustomvar,
-						v1.NewHostgroupMember,
-						v1.NewIconImage,
-						v1.NewNotesUrl,
-						v1.NewNotification,
-						v1.NewNotificationcommand,
-						v1.NewNotificationcommandArgument,
-						v1.NewNotificationcommandCustomvar,
-						v1.NewNotificationcommandEnvvar,
-						v1.NewNotificationCustomvar,
-						v1.NewNotificationRecipient,
-						v1.NewNotificationUser,
-						v1.NewNotificationUsergroup,
-						v1.NewService,
-						v1.NewServiceCustomvar,
-						v1.NewServicegroup,
-						v1.NewServicegroupCustomvar,
-						v1.NewServicegroupMember,
-						v1.NewTimeperiod,
-						v1.NewTimeperiodCustomvar,
-						v1.NewTimeperiodOverrideExclude,
-						v1.NewTimeperiodOverrideInclude,
-						v1.NewTimeperiodRange,
-						v1.NewUser,
-						v1.NewUserCustomvar,
-						v1.NewUsergroup,
-						v1.NewUsergroupCustomvar,
-						v1.NewUsergroupMember,
-						v1.NewZone,
-					} {
-						factoryFunc := factoryFunc
-
-						ff := func() contracts.Entity {
-							v := factoryFunc()
-							if initer, ok := v.(contracts.Initer); ok {
-								initer.Init()
-							}
-
-							return v
-						}
+					for _, factory := range v1.Factories {
+						factory := factory
 
 						g.Go(func() error {
-							return s.Sync(synctx, ff)
+							return s.Sync(synctx, factory.WithInit)
 						})
 					}
 
