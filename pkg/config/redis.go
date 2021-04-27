@@ -33,6 +33,10 @@ func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error
 		ReadTimeout: r.Timeout,
 	})
 
+	opts := c.Options()
+	opts.MaxRetries = opts.PoolSize + 1 // https://github.com/go-redis/redis/issues/1737
+	c = redis.NewClient(opts)
+
 	return icingaredis.NewClient(c, logger, &r.Options), nil
 }
 
