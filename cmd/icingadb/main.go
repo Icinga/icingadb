@@ -45,7 +45,7 @@ func main() {
 	hs := history.NewSync(db, rc, logger)
 
 	sig := make(chan os.Signal)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	// Main loop
 	for {
@@ -82,6 +82,7 @@ func main() {
 				if err := ctx.Err(); err != nil && !utils.IsContextCanceled(err) {
 					panic(err)
 				}
+				return
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
 				cancelCtx()
