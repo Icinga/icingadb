@@ -10,7 +10,11 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"os"
+	"os/signal"
+	"syscall"
 )
 
 func main() {
@@ -33,14 +37,15 @@ func main() {
 	defer db.Close()
 	rc := cmd.Redis()
 
-	ctx := context.Background()
+	ctx, cancelCtx := context.WithCancel(context.Background())
 	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
 	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
+	defer ha.Close()
 	s := icingadb.NewSync(db, rc, logger)
 	hs := history.NewSync(db, rc, logger)
 
-	// For temporary exit after sync
-	done := make(chan struct{}, 0)
+	sig := make(chan os.Signal)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	// Main loop
 	for {
@@ -68,7 +73,8 @@ func main() {
 					}
 
 					logger.Debugf("Requesting shutdown..")
-					close(done)
+					cancelCtx()
+					return
 				}()
 			case <-ha.Handover():
 				cancel()
@@ -76,7 +82,10 @@ func main() {
 				if err := ctx.Err(); err != nil && !utils.IsContextCanceled(err) {
 					panic(err)
 				}
-			case <-done:
+				return
+			case s := <-sig:
+				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
+				cancelCtx()
 				return
 			}
 		}
