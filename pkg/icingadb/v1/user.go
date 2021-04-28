@@ -35,7 +35,7 @@ type UsergroupCustomvar struct {
 
 type UsergroupMember struct {
 	MemberMeta  `json:",inline"`
-	UserId      types.Binary `json:"object_id"`
+	UserId      types.Binary `json:"user_id"`
 	UsergroupId types.Binary `json:"group_id"`
 }
 
