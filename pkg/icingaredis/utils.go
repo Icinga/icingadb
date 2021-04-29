@@ -32,7 +32,7 @@ func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc
 
 					e := factoryFunc()
 					if err := json.Unmarshal([]byte(pair.Value), e); err != nil {
-						return err
+						return errors.Wrap(err, "can't unJSON entity")
 					}
 					e.SetID(id)
 

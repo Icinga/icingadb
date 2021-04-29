@@ -44,6 +44,9 @@ func (d Driver) Open(dsn string) (c driver.Conn, err error) {
 		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
 		timeout,
 	)
+	if err != nil {
+		err = errors.Wrap(err, "can't connect to database")
+	}
 	return
 }
 

@@ -2,8 +2,8 @@ package v1
 
 import (
 	"encoding/json"
-	"errors"
 	"github.com/icinga/icingadb/pkg/types"
+	"github.com/pkg/errors"
 )
 
 // StatsMessage represents a message from the Redis stream icinga:stats.
@@ -24,7 +24,7 @@ func (m StatsMessage) IcingaStatus() (*IcingaStatus, error) {
 		}
 
 		if err := json.Unmarshal([]byte(s), &envelope); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "can't parse Icinga 2 status")
 		}
 
 		return &envelope.Status.IcingaApplication.IcingaStatus, nil
@@ -38,7 +38,7 @@ func (m StatsMessage) Time() (*types.UnixMilli, error) {
 		var t types.UnixMilli
 
 		if err := json.Unmarshal([]byte(s), &t); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "can't parse timestamp")
 		}
 
 		return &t, nil

@@ -151,15 +151,15 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 					return retry.WithBackoff(
 						ctx,
 						func(context.Context) error {
-							query, args, err := sqlx.In(query, b)
+							stmt, args, err := sqlx.In(query, b)
 							if err != nil {
-								return err
+								return errors.Wrap(err, "can't build SQL placeholders for "+query)
 							}
 
-							query = db.Rebind(query)
-							_, err = db.ExecContext(ctx, query, args...)
+							stmt = db.Rebind(stmt)
+							_, err = db.ExecContext(ctx, stmt, args...)
 							if err != nil {
-								return err
+								return errors.Wrap(err, "can't perform "+query)
 							}
 
 							cnt.Add(uint64(len(b)))
@@ -220,6 +220,7 @@ func (db *DB) NamedBulkExec(
 								db.logger.Debugf("Executing %s with %d rows..", query, len(b))
 								_, err := db.NamedExecContext(ctx, query, b)
 								if err != nil {
+									err = errors.Wrap(err, "can't perform "+query)
 									fmt.Println(err)
 									return err
 								}
@@ -339,7 +340,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 
 		rows, err := db.Queryx(query, args...)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "can't perform "+query)
 		}
 		defer rows.Close()
 
@@ -347,7 +348,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 			e := factoryFunc()
 
 			if err := rows.StructScan(e); err != nil {
-				return err
+				return errors.Wrap(err, fmt.Sprintf("can't store query result into a %T: %s", e, query))
 			}
 
 			select {
@@ -381,8 +382,8 @@ func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Enti
 	}
 
 	// TODO(ak): wait for https://github.com/jmoiron/sqlx/issues/694
-	//stmt, placeholders := db.BuildUpsertStmt(first)
-	//return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
+	// stmt, placeholders := db.BuildUpsertStmt(first)
+	// return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
 	stmt, _ := db.BuildUpsertStmt(first)
 	sem := db.getSemaphoreForTable(utils.TableName(first))
 	return db.NamedBulkExec(ctx, stmt, 1, sem, forward, succeeded)

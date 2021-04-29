@@ -5,6 +5,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 )
 
@@ -27,7 +28,7 @@ func New() *Command {
 
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		utils.Fatal(err)
+		utils.Fatal(errors.Wrap(err, "can't create logger"))
 	}
 	sugar := logger.Sugar()
 

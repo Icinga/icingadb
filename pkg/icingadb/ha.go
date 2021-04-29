@@ -11,6 +11,7 @@ import (
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"
 	"time"
@@ -171,12 +172,13 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 		})
 		if err != nil {
 			cancel()
-			return err
+			return errors.Wrap(err, "can't start transaction")
 		}
-		rows, err := tx.QueryxContext(ctx, `SELECT id, heartbeat FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND id != ? AND heartbeat > ?`, s.EnvironmentID(), "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
+		query := `SELECT id, heartbeat FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND id != ? AND heartbeat > ?`
+		rows, err := tx.QueryxContext(ctx, query, s.EnvironmentID(), "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
 		if err != nil {
 			cancel()
-			return err
+			return errors.Wrap(err, "can't perform "+query)
 		}
 		takeover := true
 		if rows.Next() {
@@ -218,6 +220,7 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 		_, err = tx.NamedExecContext(ctx, stmt, i)
 
 		if err != nil {
+			err = errors.Wrap(err, "can't perform "+stmt)
 			cancel()
 			if !utils.IsDeadlock(err) {
 				h.logger.Errorw("Can't update or insert instance", zap.Error(err))
@@ -235,7 +238,7 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 
 		if err := tx.Commit(); err != nil {
 			cancel()
-			return err
+			return errors.Wrap(err, "can't commit transaction")
 		}
 		if takeover {
 			h.signalTakeover()
@@ -251,9 +254,10 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 func (h *HA) removeInstance() {
 	h.logger.Debugw("Removing our row from icingadb_instance", zap.String("instance_id", hex.EncodeToString(h.instanceId)))
 	// Intentionally not using a context here as this is a cleanup task and h.ctx is already cancelled.
-	_, err := h.db.Exec("DELETE FROM icingadb_instance WHERE id = ?", h.instanceId)
+	query := "DELETE FROM icingadb_instance WHERE id = ?"
+	_, err := h.db.Exec(query, h.instanceId)
 	if err != nil {
-		h.logger.Warnw("Could not remove instance from database", zap.Error(err))
+		h.logger.Warnw("Could not remove instance from database", zap.Error(errors.Wrap(err, "can't perform "+query)))
 	}
 }
 
@@ -262,16 +266,20 @@ func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
 	case <-h.ctx.Done():
 		return
 	case <-time.After(timeout):
-		result, err := h.db.ExecContext(h.ctx, "DELETE FROM icingadb_instance "+
-			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?",
-			h.instanceId, s.EnvironmentID(), s.EndpointId, types.UnixMilli(time.Now().Add(-timeout)))
+		query := "DELETE FROM icingadb_instance " +
+			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?"
+		result, err := h.db.ExecContext(h.ctx, query, h.instanceId, s.EnvironmentID(),
+			s.EndpointId, types.UnixMilli(time.Now().Add(-timeout)))
 		if err != nil {
-			h.logger.Errorw("Can't remove rows of old instances", zap.Error(err))
+			h.logger.Errorw("Can't remove rows of old instances", zap.Error(errors.Wrap(err, "can't perform "+query)))
 			return
 		}
 		affected, err := result.RowsAffected()
 		if err != nil {
-			h.logger.Errorw("Can't get number of removed old instances", zap.Error(err))
+			h.logger.Errorw(
+				"Can't get number of removed old instances",
+				zap.Error(errors.Wrap(err, "can't get affected rows")),
+			)
 			return
 		}
 		h.logger.Debugf("Removed %d old instances", affected)

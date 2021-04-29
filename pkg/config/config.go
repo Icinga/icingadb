@@ -1,8 +1,8 @@
 package config
 
 import (
-	"fmt"
 	"github.com/jessevdk/go-flags"
+	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 	"os"
 )
@@ -25,7 +25,7 @@ type Flags struct {
 func FromYAMLFile(name string) (*Config, error) {
 	f, err := os.Open(name)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "can't open YAML file")
 	}
 	defer f.Close()
 
@@ -33,7 +33,7 @@ func FromYAMLFile(name string) (*Config, error) {
 	d := yaml.NewDecoder(f)
 
 	if err := d.Decode(&c); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "can't parse YAML file "+name)
 	}
 
 	return c, nil
@@ -43,11 +43,11 @@ func FromYAMLFile(name string) (*Config, error) {
 func ValidateFile(name string) error {
 	f, err := os.Stat(name)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "not a readable file")
 	}
 
 	if f.IsDir() {
-		return fmt.Errorf("'%s' is a directory", name)
+		return errors.Errorf("'%s' is a directory", name)
 	}
 
 	return nil
@@ -60,7 +60,7 @@ func ParseFlags() (*Flags, error) {
 	parser := flags.NewParser(f, flags.Default)
 
 	if _, err := parser.Parse(); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "can't parse CLI flags")
 	}
 
 	if err := ValidateFile(f.Config); err != nil {

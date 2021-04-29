@@ -2,12 +2,12 @@ package config
 
 import (
 	"context"
-	"errors"
 	"github.com/creasty/defaults"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/retry"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net"
 	"os"
@@ -69,6 +69,11 @@ func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, st
 			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
 			5*time.Minute,
 		)
+
+		if err != nil {
+			err = errors.Wrap(err, "can't connect to Redis")
+		}
+
 		return
 	}
 }
