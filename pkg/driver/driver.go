@@ -7,6 +7,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/retry"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"log"
@@ -47,8 +48,11 @@ func (d Driver) Open(dsn string) (c driver.Conn, err error) {
 }
 
 func shouldRetry(err error) bool {
-	underlying := err
-	if op, ok := err.(*net.OpError); ok {
+	underlying := errors.Unwrap(err)
+	if underlying == nil {
+		underlying = err
+	}
+	if op, ok := underlying.(*net.OpError); ok {
 		underlying = op.Err
 	}
 	if sys, ok := underlying.(*os.SyscallError); ok {
@@ -62,14 +66,14 @@ func shouldRetry(err error) bool {
 	type temporary interface {
 		Temporary() bool
 	}
-	if t, ok := err.(temporary); ok {
+	if t, ok := underlying.(temporary); ok {
 		return t.Temporary()
 	}
 
 	type timeout interface {
 		Timeout() bool
 	}
-	if t, ok := err.(timeout); ok {
+	if t, ok := underlying.(timeout); ok {
 		return t.Timeout()
 	}
 

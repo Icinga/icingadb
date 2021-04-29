@@ -183,8 +183,8 @@ func Fatal(err error) {
 
 // IsDeadlock returns whether the given error signals serialization failure.
 func IsDeadlock(err error) bool {
-	switch e := err.(type) {
-	case *mysql.MySQLError:
+	var e *mysql.MySQLError
+	if errors.As(err, &e) {
 		switch e.Number {
 		case 1205, 1213:
 			return true

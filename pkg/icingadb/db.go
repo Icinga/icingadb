@@ -413,14 +413,12 @@ func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []int
 }
 
 func IsRetryable(err error) bool {
-	err = errors.Cause(err)
-
-	if err == mysql.ErrInvalidConn {
+	if errors.Is(err, mysql.ErrInvalidConn) {
 		return true
 	}
 
-	switch e := err.(type) {
-	case *mysql.MySQLError:
+	var e *mysql.MySQLError
+	if errors.As(err, &e) {
 		switch e.Number {
 		case 1053, 1205, 1213, 2006:
 			// 1053: Server shutdown in progress
