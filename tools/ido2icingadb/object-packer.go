@@ -6,19 +6,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"reflect"
 	"sort"
 )
-
-// nullWriter discards written data.
-type nullWriter struct{}
-
-var _ io.Writer = nullWriter{}
-
-// Write never fails.
-func (nullWriter) Write(p []byte) (int, error) {
-	return len(p), nil
-}
 
 // hashStr hashes s via SHA1.
 func hashStr(s string) []byte {
@@ -119,7 +110,7 @@ func packValue(in reflect.Value, out io.Writer) error {
 			iter := in.MapRange()
 			for iter.Next() {
 				// Disallow (panic) some types in map keys (recursively), too
-				_ = packValue(iter.Key(), nullWriter{})
+				_ = packValue(iter.Key(), ioutil.Discard)
 
 				sorted = append(sorted, kv{[]byte(fmt.Sprint(iter.Key().Interface())), iter.Value()})
 			}
