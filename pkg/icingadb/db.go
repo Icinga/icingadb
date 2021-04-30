@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sync/semaphore"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -24,15 +25,28 @@ import (
 type DB struct {
 	*sqlx.DB
 
-	logger *zap.SugaredLogger
+	logger            *zap.SugaredLogger
+	options           *Options
+	tableSemaphores   map[string]*semaphore.Weighted
+	tableSemaphoresMu sync.Mutex
+}
+
+type Options struct {
+	MaxConnections         int `yaml:"max_connections" default:"16"`
+	MaxConnectionsPerTable int `yaml:"max_connections_per_table" default:"8"`
 }
 
 // NewDb returns a new icingadb.DB wrapper for a pre-existing *sqlx.DB.
-func NewDb(db *sqlx.DB, logger *zap.SugaredLogger) *DB {
-	return &DB{DB: db, logger: logger}
+func NewDb(db *sqlx.DB, logger *zap.SugaredLogger, options *Options) *DB {
+	return &DB{
+		DB:              db,
+		logger:          logger,
+		options:         options,
+		tableSemaphores: make(map[string]*semaphore.Weighted),
+	}
 }
 
-func (db DB) BuildColumns(subject interface{}) []string {
+func (db *DB) BuildColumns(subject interface{}) []string {
 	fields := db.Mapper.TypeMap(reflect.TypeOf(subject)).Names
 	columns := make([]string, 0, len(fields))
 	for _, f := range fields {
@@ -45,14 +59,14 @@ func (db DB) BuildColumns(subject interface{}) []string {
 	return columns
 }
 
-func (db DB) BuildDeleteStmt(from interface{}) string {
+func (db *DB) BuildDeleteStmt(from interface{}) string {
 	return fmt.Sprintf(
 		`DELETE FROM %s WHERE id IN (?)`,
 		utils.TableName(from),
 	)
 }
 
-func (db DB) BuildInsertStmt(into interface{}) string {
+func (db *DB) BuildInsertStmt(into interface{}) string {
 	columns := db.BuildColumns(into)
 
 	return fmt.Sprintf(
@@ -63,7 +77,7 @@ func (db DB) BuildInsertStmt(into interface{}) string {
 	)
 }
 
-func (db DB) BuildSelectStmt(from interface{}, into interface{}) string {
+func (db *DB) BuildSelectStmt(from interface{}, into interface{}) string {
 	return fmt.Sprintf(
 		`SELECT %s FROM %s`,
 		strings.Join(db.BuildColumns(into), ", "),
@@ -71,7 +85,7 @@ func (db DB) BuildSelectStmt(from interface{}, into interface{}) string {
 	)
 }
 
-func (db DB) BuildUpdateStmt(update interface{}) string {
+func (db *DB) BuildUpdateStmt(update interface{}) string {
 	columns := db.BuildColumns(update)
 	set := make([]string, 0, len(columns))
 
@@ -86,7 +100,7 @@ func (db DB) BuildUpdateStmt(update interface{}) string {
 	)
 }
 
-func (db DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {
+func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {
 	insertColumns := db.BuildColumns(subject)
 	var updateColumns []string
 
@@ -111,7 +125,7 @@ func (db DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int
 	), len(insertColumns) + len(updateColumns)
 }
 
-func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent int, arg <-chan interface{}) error {
+func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan interface{}) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
 	// Use context from group.
@@ -123,8 +137,6 @@ func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent i
 	})
 
 	g.Go(func() error {
-		sem := semaphore.NewWeighted(int64(concurrent))
-
 		g, ctx := errgroup.WithContext(ctx)
 
 		for b := range bulk {
@@ -166,8 +178,8 @@ func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent i
 	return g.Wait()
 }
 
-func (db DB) NamedBulkExec(
-	ctx context.Context, query string, count int, concurrent int,
+func (db *DB) NamedBulkExec(
+	ctx context.Context, query string, count int, sem *semaphore.Weighted,
 	arg <-chan contracts.Entity, succeeded chan<- contracts.Entity,
 ) error {
 	var cnt com.Counter
@@ -180,7 +192,6 @@ func (db DB) NamedBulkExec(
 	})
 
 	g.Go(func() error {
-		sem := semaphore.NewWeighted(int64(concurrent))
 		// stmt, err := db.PrepareNamedContext(ctx, query)
 		// if err != nil {
 		//     return err
@@ -238,8 +249,8 @@ func (db DB) NamedBulkExec(
 	return g.Wait()
 }
 
-func (db DB) NamedBulkExecTx(
-	ctx context.Context, query string, count int, concurrent int, arg <-chan contracts.Entity,
+func (db *DB) NamedBulkExecTx(
+	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan contracts.Entity,
 ) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
@@ -251,8 +262,6 @@ func (db DB) NamedBulkExecTx(
 	})
 
 	g.Go(func() error {
-		sem := semaphore.NewWeighted(int64(concurrent))
-
 		for {
 			select {
 			case b, ok := <-bulk:
@@ -308,7 +317,7 @@ func (db DB) NamedBulkExecTx(
 	return g.Wait()
 }
 
-func (db DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, query string, args ...interface{}) (<-chan contracts.Entity, <-chan error) {
+func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, query string, args ...interface{}) (<-chan contracts.Entity, <-chan error) {
 	var cnt com.Counter
 	entities := make(chan contracts.Entity, 1)
 	g, ctx := errgroup.WithContext(ctx)
@@ -349,16 +358,17 @@ func (db DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFu
 	return entities, com.WaitAsync(g)
 }
 
-func (db DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
+func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
 		return err
 	}
 
-	return db.NamedBulkExec(ctx, db.BuildInsertStmt(first), 1<<15/len(db.BuildColumns(first)), 1<<3, forward, nil)
+	sem := db.getSemaphoreForTable(utils.TableName(first))
+	return db.NamedBulkExec(ctx, db.BuildInsertStmt(first), 1<<15/len(db.BuildColumns(first)), sem, forward, nil)
 }
 
-func (db DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
+func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
 		return err
@@ -368,23 +378,25 @@ func (db DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Entit
 	//stmt, placeholders := db.BuildUpsertStmt(first)
 	//return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
 	stmt, _ := db.BuildUpsertStmt(first)
-	return db.NamedBulkExec(ctx, stmt, 1, 1<<3, forward, succeeded)
+	sem := db.getSemaphoreForTable(utils.TableName(first))
+	return db.NamedBulkExec(ctx, stmt, 1, sem, forward, succeeded)
 }
 
-func (db DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
+func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
 		return err
 	}
-
-	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(first), 1<<15, 1<<3, forward)
+	sem := db.getSemaphoreForTable(utils.TableName(first))
+	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(first), 1<<15, sem, forward)
 }
 
-func (db DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}) error {
-	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), 1<<15, 1<<3, ids)
+func (db *DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}) error {
+	sem := db.getSemaphoreForTable(utils.TableName(entityType))
+	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), 1<<15, sem, ids)
 }
 
-func (db DB) Delete(ctx context.Context, entityType contracts.Entity, ids []interface{}) error {
+func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []interface{}) error {
 	idsCh := make(chan interface{}, len(ids))
 	for _, id := range ids {
 		idsCh <- id
@@ -414,4 +426,17 @@ func IsRetryable(err error) bool {
 	}
 
 	return false
+}
+
+func (db *DB) getSemaphoreForTable(table string) *semaphore.Weighted {
+	db.tableSemaphoresMu.Lock()
+	defer db.tableSemaphoresMu.Unlock()
+
+	if sem, ok := db.tableSemaphores[table]; ok {
+		return sem
+	} else {
+		sem = semaphore.NewWeighted(int64(db.options.MaxConnectionsPerTable))
+		db.tableSemaphores[table] = sem
+		return sem
+	}
 }
