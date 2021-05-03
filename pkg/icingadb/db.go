@@ -172,7 +172,7 @@ func (db DB) NamedBulkExec(
 ) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.Bulk(ctx, arg, count)
+	bulk := com.BulkEntities(ctx, arg, count)
 
 	db.logger.Debugf("Executing %s", query)
 	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
@@ -245,7 +245,7 @@ func (db DB) NamedBulkExecTx(
 ) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.Bulk(ctx, arg, count)
+	bulk := com.BulkEntities(ctx, arg, count)
 
 	db.logger.Debugf("Executing %s", query)
 	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
