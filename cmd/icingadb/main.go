@@ -95,6 +95,15 @@ func main() {
 				cancelHactx()
 			case <-hactx.Done():
 				// Nothing to do here, surrounding loop will terminate now.
+			case <-ha.Done():
+				if err := ha.Err(); err != nil {
+					panic(errors.Wrap(err, "HA exited with an error"))
+				} else if ctx.Err() == nil {
+					// ha is created as a single instance once. It should only exit if the main context is cancelled,
+					// otherwise there is no way to get Icinga DB back into a working state.
+					panic(errors.New("HA exited without an error but main context isn't cancelled"))
+				}
+				return
 			case <-ctx.Done():
 				return
 			case s := <-sig:
