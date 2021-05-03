@@ -2,22 +2,21 @@ package com
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"golang.org/x/sync/errgroup"
 	"sync"
 	"time"
 )
 
 type Bulker struct {
-	ch  chan []contracts.Entity
+	ch  chan []interface{}
 	ctx context.Context
 	mu  sync.Mutex
 	err error
 }
 
-func NewBulker(ctx context.Context, ch <-chan contracts.Entity, count int) *Bulker {
+func NewBulker(ctx context.Context, ch <-chan interface{}, count int) *Bulker {
 	b := &Bulker{
-		ch:  make(chan []contracts.Entity),
+		ch:  make(chan []interface{}),
 		ctx: ctx,
 		mu:  sync.Mutex{},
 	}
@@ -28,14 +27,14 @@ func NewBulker(ctx context.Context, ch <-chan contracts.Entity, count int) *Bulk
 }
 
 // Bulk returns the channel on which the bulks are delivered.
-func (b *Bulker) Bulk() <-chan []contracts.Entity {
+func (b *Bulker) Bulk() <-chan []interface{} {
 	return b.ch
 }
 
-func (b *Bulker) run(ch <-chan contracts.Entity, count int) {
+func (b *Bulker) run(ch <-chan interface{}, count int) {
 	defer close(b.ch)
 
-	bufCh := make(chan contracts.Entity, count)
+	bufCh := make(chan interface{}, count)
 	g, ctx := errgroup.WithContext(b.ctx)
 
 	g.Go(func() error {
@@ -57,7 +56,7 @@ func (b *Bulker) run(ch <-chan contracts.Entity, count int) {
 
 	g.Go(func() error {
 		for done := false; !done; {
-			buf := make([]contracts.Entity, 0, count)
+			buf := make([]interface{}, 0, count)
 			timeout := time.After(256 * time.Millisecond)
 
 			for drain := true; drain && len(buf) < count; {
@@ -91,6 +90,6 @@ func (b *Bulker) run(ch <-chan contracts.Entity, count int) {
 	_ = g.Wait()
 }
 
-func Bulk(ctx context.Context, ch <-chan contracts.Entity, count int) <-chan []contracts.Entity {
+func Bulk(ctx context.Context, ch <-chan interface{}, count int) <-chan []interface{} {
 	return NewBulker(ctx, ch, count).Bulk()
 }
