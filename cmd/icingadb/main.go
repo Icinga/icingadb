@@ -43,6 +43,7 @@ func main() {
 	defer ha.Close()
 	s := icingadb.NewSync(db, rc, logger)
 	hs := history.NewSync(db, rc, logger)
+	rt := icingadb.NewRuntimeUpdates(db, rc, logger)
 
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
@@ -63,6 +64,11 @@ func main() {
 							return dump.Listen(synctx)
 						})
 
+						lastRuntimeStreamId, err := rc.StreamLastId(ctx, "icinga:runtime")
+						if err != nil {
+							panic(err)
+						}
+
 						g.Go(func() error {
 							select {
 							case <-dump.InProgress():
@@ -76,6 +82,10 @@ func main() {
 
 						g.Go(func() error {
 							return hs.Sync(synctx)
+						})
+
+						g.Go(func() error {
+							return rt.Sync(synctx, v1.Factories, lastRuntimeStreamId)
 						})
 
 						for _, factory := range v1.Factories {
