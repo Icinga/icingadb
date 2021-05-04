@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"runtime"
+	"time"
 )
 
 var (
@@ -59,7 +60,43 @@ func (s Sync) GetDelta(ctx context.Context, factoryFunc contracts.EntityFactoryF
 	return NewDelta(ctx, actual, desired, withChecksum, s.logger)
 }
 
-// Synchronize entities between Icinga DB and Redis created with the specified factory function.
+// SyncAfterDump waits for a config dump to finish (using the dump parameter) and then starts a sync for the type given
+// by factoryFunc using the Sync function.
+func (s Sync) SyncAfterDump(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, dump *DumpSignals) error {
+	typeName := utils.Name(factoryFunc())
+	key := "icinga:config:" + utils.Key(typeName, ':')
+
+	startTime := time.Now()
+	logTicker := time.NewTicker(20 * time.Second)
+	loggedWaiting := false
+	defer logTicker.Stop()
+
+	for {
+		select {
+		case <-logTicker.C:
+			s.logger.Infow("Waiting for dump done signal",
+				zap.String("type", typeName),
+				zap.String("key", key),
+				zap.Duration("duration", time.Now().Sub(startTime)))
+			loggedWaiting = true
+		case <-dump.Done(key):
+			logFn := s.logger.Debugw
+			if loggedWaiting {
+				logFn = s.logger.Infow
+			}
+			logFn("Starting sync",
+				zap.String("type", typeName),
+				zap.String("key", key),
+				zap.Duration("waited", time.Now().Sub(startTime)))
+			return s.Sync(ctx, factoryFunc)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// Sync synchronizes entities between Icinga DB and Redis created with the specified factory function.
+// This function does not respect dump signals. For this, use SyncAfterDump.
 func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc) error {
 	// Value from the factory so that we know what we are synchronizing here.
 	v := factoryFunc()
