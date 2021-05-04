@@ -74,7 +74,7 @@ func (s Sync) Sync(ctx context.Context) error {
 			// Upserts from struct2db.
 			g.Go(func() error {
 				defer close(succeeded)
-				return s.db.Upsert(ctx, struct2db, succeeded)
+				return s.db.UpsertStreamed(ctx, struct2db, succeeded)
 			})
 		}
 

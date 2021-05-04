@@ -351,7 +351,7 @@ func (db DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFu
 	return entities, com.WaitAsync(g)
 }
 
-func (db DB) Create(ctx context.Context, entities <-chan contracts.Entity) error {
+func (db DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
 		return err
@@ -360,7 +360,7 @@ func (db DB) Create(ctx context.Context, entities <-chan contracts.Entity) error
 	return db.NamedBulkExec(ctx, db.BuildInsertStmt(first), 1<<15/len(db.BuildColumns(first)), 1<<3, forward, nil)
 }
 
-func (db DB) Upsert(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
+func (db DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
 		return err
@@ -373,7 +373,7 @@ func (db DB) Upsert(ctx context.Context, entities <-chan contracts.Entity, succe
 	return db.NamedBulkExec(ctx, stmt, 1, 1<<3, forward, succeeded)
 }
 
-func (db DB) Update(ctx context.Context, entities <-chan contracts.Entity) error {
+func (db DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
 		return err

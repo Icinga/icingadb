@@ -134,7 +134,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 		}
 
 		g.Go(func() error {
-			return s.db.Create(ctx, entities)
+			return s.db.CreateStreamed(ctx, entities)
 		})
 	}
 
@@ -161,7 +161,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 			// TODO (el): This is very slow in high latency scenarios.
 			// Use strings.Repeat() on the query and create a stmt
 			// with a size near the default value of max_allowed_packet.
-			return s.db.Update(ctx, entities)
+			return s.db.UpdateStreamed(ctx, entities)
 		})
 	}
 
