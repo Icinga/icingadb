@@ -48,7 +48,7 @@ func (s Sync) GetDelta(ctx context.Context, factoryFunc contracts.EntityFactoryF
 		withChecksum = true
 		redisKey = fmt.Sprintf("icinga:checksum:%s", utils.Key(utils.Name(v), ':'))
 	} else {
-		redisKey = fmt.Sprintf("icinga:config:%s", utils.Key(utils.Name(v), ':'))
+		redisKey = fmt.Sprintf("icinga:%s", utils.Key(utils.Name(v), ':'))
 	}
 
 	desired, err := s.fromRedis(ctx, factoryFunc, redisKey)
@@ -64,7 +64,7 @@ func (s Sync) GetDelta(ctx context.Context, factoryFunc contracts.EntityFactoryF
 // by factoryFunc using the Sync function.
 func (s Sync) SyncAfterDump(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, dump *DumpSignals) error {
 	typeName := utils.Name(factoryFunc())
-	key := "icinga:config:" + utils.Key(typeName, ':')
+	key := "icinga:" + utils.Key(typeName, ':')
 
 	startTime := time.Now()
 	logTicker := time.NewTicker(20 * time.Second)
@@ -116,7 +116,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 		if delta.WithChecksum {
 			pairs, errs := s.redis.HMYield(
 				ctx,
-				fmt.Sprintf("icinga:config:%s", utils.Key(utils.Name(v), ':')),
+				fmt.Sprintf("icinga:%s", utils.Key(utils.Name(v), ':')),
 				count,
 				concurrent,
 				delta.Create.Keys()...)
@@ -143,7 +143,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 		s.logger.Infof("Updating %d rows of type %s", len(delta.Update), utils.Key(utils.Name(v), ' '))
 		pairs, errs := s.redis.HMYield(
 			ctx,
-			fmt.Sprintf("icinga:config:%s", utils.Key(utils.Name(v), ':')),
+			fmt.Sprintf("icinga:%s", utils.Key(utils.Name(v), ':')),
 			count,
 			concurrent,
 			delta.Update.Keys()...)
