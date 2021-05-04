@@ -111,11 +111,11 @@ func (db DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int
 	), len(insertColumns) + len(updateColumns)
 }
 
-func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent int, args []interface{}) error {
+func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent int, arg <-chan interface{}) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
 	// Use context from group.
-	batches := utils.BatchSliceOfInterfaces(ctx, args, count)
+	bulk := com.Bulk(ctx, arg, count)
 
 	db.logger.Debugf("Executing %s", query)
 	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
@@ -127,7 +127,7 @@ func (db DB) BulkExec(ctx context.Context, query string, count int, concurrent i
 
 		g, ctx := errgroup.WithContext(ctx)
 
-		for b := range batches {
+		for b := range bulk {
 			if err := sem.Acquire(ctx, 1); err != nil {
 				return err
 			}
@@ -380,6 +380,20 @@ func (db DB) Update(ctx context.Context, entities <-chan contracts.Entity) error
 	}
 
 	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(first), 1<<15, 1<<3, forward)
+}
+
+func (db DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}) error {
+	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), 1<<15, 1<<3, ids)
+}
+
+func (db DB) Delete(ctx context.Context, entityType contracts.Entity, ids []interface{}) error {
+	idsCh := make(chan interface{}, len(ids))
+	for _, id := range ids {
+		idsCh <- id
+	}
+	close(idsCh)
+
+	return db.DeleteStreamed(ctx, entityType, idsCh)
 }
 
 func IsRetryable(err error) bool {

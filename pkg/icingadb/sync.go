@@ -169,7 +169,7 @@ func (s Sync) Sync(ctx context.Context, factoryFunc contracts.EntityFactoryFunc)
 	if len(delta.Delete) > 0 {
 		s.logger.Infof("Deleting %d rows of type %s", len(delta.Delete), utils.Key(utils.Name(v), ' '))
 		g.Go(func() error {
-			return s.db.BulkExec(ctx, s.db.BuildDeleteStmt(v), 1<<15, 1<<3, delta.Delete.IDs())
+			return s.db.Delete(ctx, v, delta.Delete.IDs())
 		})
 	}
 
