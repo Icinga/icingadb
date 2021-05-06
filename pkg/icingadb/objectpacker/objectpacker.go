@@ -19,7 +19,7 @@ func PackAny(in interface{}, out io.Writer) error {
 
 // packValue does the actual job of packAny and just exists for recursion w/o unneccessary reflect.ValueOf calls.
 func packValue(in reflect.Value, out io.Writer) error {
-	switch in.Kind() {
+	switch kind := in.Kind(); kind {
 	case reflect.Invalid: // nil
 		_, err := out.Write([]byte{0})
 		return err
@@ -38,6 +38,21 @@ func packValue(in reflect.Value, out io.Writer) error {
 	case reflect.Float32, reflect.Float64:
 		return packFloat64(in.Float(), out)
 	case reflect.Array, reflect.Slice:
+		if typ := in.Type(); typ.Elem().Kind() == reflect.Uint8 {
+			if kind == reflect.Array {
+				if !in.CanAddr() {
+					vNewElem := reflect.New(typ).Elem()
+					vNewElem.Set(in)
+					in = vNewElem
+				}
+
+				in = in.Slice(0, in.Len())
+			}
+
+			// Pack []byte as string, not array of numbers.
+			return packString(in.Interface().([]uint8), out)
+		}
+
 		if _, err := out.Write([]byte{5}); err != nil {
 			return err
 		}
@@ -107,17 +122,7 @@ func packValue(in reflect.Value, out io.Writer) error {
 			return packValue(in.Elem(), out)
 		}
 	case reflect.String:
-		if _, err := out.Write([]byte{4}); err != nil {
-			return err
-		}
-
-		b := []byte(in.String())
-		if err := binary.Write(out, binary.BigEndian, uint64(len(b))); err != nil {
-			return err
-		}
-
-		_, err := out.Write(b)
-		return err
+		return packString([]byte(in.String()), out)
 	default:
 		panic("bad type: " + in.Kind().String())
 	}
@@ -130,4 +135,18 @@ func packFloat64(in float64, out io.Writer) error {
 	}
 
 	return binary.Write(out, binary.BigEndian, in)
+}
+
+// packString deduplicates string packing of multiple locations in packValue.
+func packString(in []byte, out io.Writer) error {
+	if _, err := out.Write([]byte{4}); err != nil {
+		return err
+	}
+
+	if err := binary.Write(out, binary.BigEndian, uint64(len(in))); err != nil {
+		return err
+	}
+
+	_, err := out.Write(in)
+	return err
 }

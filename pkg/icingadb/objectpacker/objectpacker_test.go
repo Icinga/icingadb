@@ -121,6 +121,16 @@ func TestPackAny(t *testing.T) {
 	assertPackAny(t, "a", []byte{4, 0, 0, 0, 0, 0, 0, 0, 1, 'a'})
 	assertPackAny(t, "ä", []byte{4, 0, 0, 0, 0, 0, 0, 0, 2, 0xc3, 0xa4})
 
+	{
+		var binary [256]byte
+		for i := range binary {
+			binary[i] = byte(i)
+		}
+
+		assertPackAny(t, binary, append([]byte{4, 0, 0, 0, 0, 0, 0, 1, 0}, binary[:]...))
+		assertPackAny(t, binary[:], append([]byte{4, 0, 0, 0, 0, 0, 0, 1, 0}, binary[:]...))
+	}
+
 	assertPackAnyPanic(t, complex64(0+0i), 0)
 	assertPackAnyPanic(t, 0+0i, 0)
 	assertPackAnyPanic(t, make(chan struct{}, 0), 0)
