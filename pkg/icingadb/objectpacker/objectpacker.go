@@ -17,6 +17,8 @@ func PackAny(in interface{}, out io.Writer) error {
 	return packValue(reflect.ValueOf(in), out)
 }
 
+var tBytes = reflect.TypeOf([]uint8(nil))
+
 // packValue does the actual job of packAny and just exists for recursion w/o unneccessary reflect.ValueOf calls.
 func packValue(in reflect.Value, out io.Writer) error {
 	switch kind := in.Kind(); kind {
@@ -50,7 +52,8 @@ func packValue(in reflect.Value, out io.Writer) error {
 			}
 
 			// Pack []byte as string, not array of numbers.
-			return packString(in.Interface().([]uint8), out)
+			return packString(in.Convert(tBytes). // Support types.Binary
+								Interface().([]uint8), out)
 		}
 
 		if _, err := out.Write([]byte{5}); err != nil {

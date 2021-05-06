@@ -2,6 +2,7 @@ package objectpacker
 
 import (
 	"bytes"
+	"github.com/icinga/icingadb/pkg/types"
 	"io"
 	"testing"
 	"unsafe"
@@ -129,6 +130,7 @@ func TestPackAny(t *testing.T) {
 
 		assertPackAny(t, binary, append([]byte{4, 0, 0, 0, 0, 0, 0, 1, 0}, binary[:]...))
 		assertPackAny(t, binary[:], append([]byte{4, 0, 0, 0, 0, 0, 0, 1, 0}, binary[:]...))
+		assertPackAny(t, types.Binary(binary[:]), append([]byte{4, 0, 0, 0, 0, 0, 0, 1, 0}, binary[:]...))
 	}
 
 	assertPackAnyPanic(t, complex64(0+0i), 0)
