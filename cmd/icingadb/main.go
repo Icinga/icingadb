@@ -96,9 +96,6 @@ func main() {
 			case <-hactx.Done():
 				// Nothing to do here, surrounding loop will terminate now.
 			case <-ctx.Done():
-				if err := ctx.Err(); err != nil && !utils.IsContextCanceled(err) {
-					panic(err)
-				}
 				return
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
