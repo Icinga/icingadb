@@ -17,7 +17,16 @@ import (
 	"syscall"
 )
 
+const (
+	ExitSuccess = 0
+	ExitFailure = 1
+)
+
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	cmd := command.New()
 	logger := cmd.Logger
 	defer logger.Sync()
@@ -103,13 +112,13 @@ func main() {
 					// otherwise there is no way to get Icinga DB back into a working state.
 					panic(errors.New("HA exited without an error but main context isn't cancelled"))
 				}
-				return
+				return ExitFailure
 			case <-ctx.Done():
-				return
+				panic(errors.New("main context closed unexpectedly"))
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
 				cancelCtx()
-				return
+				return ExitSuccess
 			}
 		}
 	}
