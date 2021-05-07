@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
@@ -58,6 +59,9 @@ func main() {
 					for hactx.Err() == nil {
 						synctx, cancelSynctx := context.WithCancel(hactx)
 						g, synctx := errgroup.WithContext(synctx)
+						// WaitGroup for configuration synchronization.
+						// Runtime updates must wait for configuration synchronization to complete.
+						wg := sync.WaitGroup{}
 
 						dump := icingadb.NewDumpSignals(rc, logger)
 						g.Go(func() error {
@@ -84,17 +88,22 @@ func main() {
 							return hs.Sync(synctx)
 						})
 
-						g.Go(func() error {
-							return rt.Sync(synctx, v1.Factories, lastRuntimeStreamId)
-						})
-
 						for _, factory := range v1.Factories {
 							factory := factory
 
+							wg.Add(1)
 							g.Go(func() error {
+								defer wg.Done()
+
 								return s.SyncAfterDump(synctx, factory.WithInit, dump)
 							})
 						}
+
+						g.Go(func() error {
+							wg.Wait()
+
+							return rt.Sync(synctx, v1.Factories, lastRuntimeStreamId)
+						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
 							panic(err)
