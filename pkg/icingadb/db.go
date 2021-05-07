@@ -205,13 +205,11 @@ func (db DB) NamedBulkExec(
 							ctx,
 							func() error {
 								db.logger.Debugf("Executing %s with %d rows..", query, len(b))
-								start := time.Now()
 								_, err := db.NamedExecContext(ctx, query, b)
 								if err != nil {
 									fmt.Println(err)
 									return err
 								}
-								db.logger.Debugf("..took %s", time.Since(start))
 
 								cnt.Add(uint64(len(b)))
 
