@@ -18,7 +18,16 @@ import (
 	"syscall"
 )
 
+const (
+	ExitSuccess = 0
+	ExitFailure = 1
+)
+
 func main() {
+	os.Exit(run())
+}
+
+func run() int {
 	cmd := command.New()
 	logger := cmd.Logger
 	defer logger.Sync()
@@ -41,6 +50,8 @@ func main() {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
 	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
+	// Closing ha on exit ensures that this instance retracts its heartbeat
+	// from the database so that another instance can take over immediately.
 	defer ha.Close()
 	s := icingadb.NewSync(db, rc, logger)
 	hs := history.NewSync(db, rc, logger)
@@ -114,12 +125,21 @@ func main() {
 				cancelHactx()
 			case <-hactx.Done():
 				// Nothing to do here, surrounding loop will terminate now.
+			case <-ha.Done():
+				if err := ha.Err(); err != nil {
+					panic(errors.Wrap(err, "HA exited with an error"))
+				} else if ctx.Err() == nil {
+					// ha is created as a single instance once. It should only exit if the main context is cancelled,
+					// otherwise there is no way to get Icinga DB back into a working state.
+					panic(errors.New("HA exited without an error but main context isn't cancelled"))
+				}
+				return ExitFailure
 			case <-ctx.Done():
-				return
+				panic(errors.New("main context closed unexpectedly"))
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
 				cancelCtx()
-				return
+				return ExitSuccess
 			}
 		}
 	}
