@@ -71,6 +71,11 @@ func packValue(in reflect.Value, out io.Writer) error {
 			}
 		}
 
+		if l < 1 {
+			// Disallow (panic) some types in array/slice values (recursively), too - even if none present
+			_ = packValue(reflect.Zero(in.Type().Elem()), ioutil.Discard)
+		}
+
 		return nil
 	case reflect.Interface:
 		return packValue(in.Elem(), out)
@@ -117,10 +122,23 @@ func packValue(in reflect.Value, out io.Writer) error {
 			}
 		}
 
+		if l < 1 {
+			typ := in.Type()
+
+			// Disallow (panic) some types in map keys and values (recursively), too - even if none present
+			_ = packValue(reflect.Zero(typ.Key()), ioutil.Discard)
+			_ = packValue(reflect.Zero(typ.Elem()), ioutil.Discard)
+		}
+
 		return nil
 	case reflect.Ptr:
 		if in.IsNil() {
-			return packValue(reflect.Value{}, out)
+			err := packValue(reflect.Value{}, out)
+
+			// Disallow (panic) some types in referenced value (recursively), too - even if none present
+			_ = packValue(reflect.Zero(in.Type().Elem()), ioutil.Discard)
+
+			return err
 		} else {
 			return packValue(in.Elem(), out)
 		}

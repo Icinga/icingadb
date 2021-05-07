@@ -78,8 +78,8 @@ func TestPackAny(t *testing.T) {
 	assertPackAnyPanic(t, float32(-42.5), 0)
 	assertPackAny(t, -42.5, []byte{3, 0xc0, 0x45, 0x40, 0, 0, 0, 0, 0})
 
-	assertPackAny(t, []struct{}(nil), []byte{5, 0, 0, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, []struct{}{}, []byte{5, 0, 0, 0, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, []struct{}(nil), 9)
+	assertPackAnyPanic(t, []struct{}{}, 9)
 
 	assertPackAny(t, []interface{}{nil, true, -42.5}, []byte{
 		5, 0, 0, 0, 0, 0, 0, 0, 3,
@@ -96,8 +96,8 @@ func TestPackAny(t *testing.T) {
 
 	assertPackAnyPanic(t, []interface{}{0 + 0i}, 9)
 
-	assertPackAny(t, map[struct{}]struct{}(nil), []byte{6, 0, 0, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, map[struct{}]struct{}{}, []byte{6, 0, 0, 0, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, map[struct{}]struct{}(nil), 9)
+	assertPackAnyPanic(t, map[struct{}]struct{}{}, 9)
 
 	assertPackAny(t, map[interface{}]interface{}{true: "", "nil": -42.5}, []byte{
 		6, 0, 0, 0, 0, 0, 0, 0, 2,
@@ -115,7 +115,7 @@ func TestPackAny(t *testing.T) {
 
 	assertPackAnyPanic(t, map[struct{}]struct{}{{}: {}}, 9)
 
-	assertPackAny(t, (*int)(nil), []byte{0})
+	assertPackAnyPanic(t, (*int)(nil), 0)
 	assertPackAny(t, new(float64), []byte{3, 0, 0, 0, 0, 0, 0, 0, 0})
 
 	assertPackAny(t, "", []byte{4, 0, 0, 0, 0, 0, 0, 0, 0})
