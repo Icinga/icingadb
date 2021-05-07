@@ -145,3 +145,19 @@ func (c *Client) HMYield(ctx context.Context, key string, count int, concurrent 
 
 	return pairs, com.WaitAsync(g)
 }
+
+// StreamLastId fetches the last message of a stream and returns its ID.
+func (c *Client) StreamLastId(ctx context.Context, stream string) (string, error) {
+	lastId := "0-0"
+
+	messages, err := c.XRevRangeN(ctx, stream, "+", "-", 1).Result()
+	if err != nil {
+		return "", err
+	}
+
+	for _, message := range messages {
+		lastId = message.ID
+	}
+
+	return lastId, nil
+}

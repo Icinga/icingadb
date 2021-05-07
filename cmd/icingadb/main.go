@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
@@ -43,6 +44,7 @@ func main() {
 	defer ha.Close()
 	s := icingadb.NewSync(db, rc, logger)
 	hs := history.NewSync(db, rc, logger)
+	rt := icingadb.NewRuntimeUpdates(db, rc, logger)
 
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
@@ -57,11 +59,19 @@ func main() {
 					for hactx.Err() == nil {
 						synctx, cancelSynctx := context.WithCancel(hactx)
 						g, synctx := errgroup.WithContext(synctx)
+						// WaitGroup for configuration synchronization.
+						// Runtime updates must wait for configuration synchronization to complete.
+						wg := sync.WaitGroup{}
 
 						dump := icingadb.NewDumpSignals(rc, logger)
 						g.Go(func() error {
 							return dump.Listen(synctx)
 						})
+
+						lastRuntimeStreamId, err := rc.StreamLastId(ctx, "icinga:runtime")
+						if err != nil {
+							panic(err)
+						}
 
 						g.Go(func() error {
 							select {
@@ -81,10 +91,19 @@ func main() {
 						for _, factory := range v1.Factories {
 							factory := factory
 
+							wg.Add(1)
 							g.Go(func() error {
+								defer wg.Done()
+
 								return s.SyncAfterDump(synctx, factory.WithInit, dump)
 							})
 						}
+
+						g.Go(func() error {
+							wg.Wait()
+
+							return rt.Sync(synctx, v1.Factories, lastRuntimeStreamId)
+						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
 							panic(err)
