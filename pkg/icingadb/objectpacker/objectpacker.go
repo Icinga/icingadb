@@ -33,12 +33,12 @@ func packValue(in reflect.Value, out io.Writer) error {
 			_, err := out.Write([]byte{1})
 			return err
 		}
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return packFloat64(float64(in.Int()), out)
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return packFloat64(float64(in.Uint()), out)
-	case reflect.Float32, reflect.Float64:
-		return packFloat64(in.Float(), out)
+	case reflect.Float64:
+		if _, err := out.Write([]byte{3}); err != nil {
+			return err
+		}
+
+		return binary.Write(out, binary.BigEndian, in.Float())
 	case reflect.Array, reflect.Slice:
 		if typ := in.Type(); typ.Elem().Kind() == reflect.Uint8 {
 			if kind == reflect.Array {
@@ -129,15 +129,6 @@ func packValue(in reflect.Value, out io.Writer) error {
 	default:
 		panic("bad type: " + in.Kind().String())
 	}
-}
-
-// packFloat64 deduplicates float packing of multiple locations in packValue.
-func packFloat64(in float64, out io.Writer) error {
-	if _, errWr := out.Write([]byte{3}); errWr != nil {
-		return errWr
-	}
-
-	return binary.Write(out, binary.BigEndian, in)
 }
 
 // packString deduplicates string packing of multiple locations in packValue.

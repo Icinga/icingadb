@@ -62,20 +62,20 @@ func TestPackAny(t *testing.T) {
 	assertPackAny(t, false, []byte{1})
 	assertPackAny(t, true, []byte{2})
 
-	assertPackAny(t, -42, []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, int8(-42), []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, int16(-42), []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, int32(-42), []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, int64(-42), []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, -42, 0)
+	assertPackAnyPanic(t, int8(-42), 0)
+	assertPackAnyPanic(t, int16(-42), 0)
+	assertPackAnyPanic(t, int32(-42), 0)
+	assertPackAnyPanic(t, int64(-42), 0)
 
-	assertPackAny(t, uint(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uint8(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uint16(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uint32(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uint64(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uintptr(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, uint(42), 0)
+	assertPackAnyPanic(t, uint8(42), 0)
+	assertPackAnyPanic(t, uint16(42), 0)
+	assertPackAnyPanic(t, uint32(42), 0)
+	assertPackAnyPanic(t, uint64(42), 0)
+	assertPackAnyPanic(t, uintptr(42), 0)
 
-	assertPackAny(t, float32(-42.5), []byte{3, 0xc0, 0x45, 0x40, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, float32(-42.5), 0)
 	assertPackAny(t, -42.5, []byte{3, 0xc0, 0x45, 0x40, 0, 0, 0, 0, 0})
 
 	assertPackAny(t, []struct{}(nil), []byte{5, 0, 0, 0, 0, 0, 0, 0, 0})
@@ -107,7 +107,7 @@ func TestPackAny(t *testing.T) {
 		4, 0, 0, 0, 0, 0, 0, 0, 0,
 	})
 
-	assertPackAny(t, map[string]uint8{"": 42}, []byte{
+	assertPackAny(t, map[string]float64{"": 42}, []byte{
 		6, 0, 0, 0, 0, 0, 0, 0, 1,
 		0, 0, 0, 0, 0, 0, 0, 0,
 		3, 0x40, 0x45, 0, 0, 0, 0, 0, 0,
@@ -116,7 +116,7 @@ func TestPackAny(t *testing.T) {
 	assertPackAnyPanic(t, map[struct{}]struct{}{{}: {}}, 9)
 
 	assertPackAny(t, (*int)(nil), []byte{0})
-	assertPackAny(t, new(int), []byte{3, 0, 0, 0, 0, 0, 0, 0, 0})
+	assertPackAny(t, new(float64), []byte{3, 0, 0, 0, 0, 0, 0, 0, 0})
 
 	assertPackAny(t, "", []byte{4, 0, 0, 0, 0, 0, 0, 0, 0})
 	assertPackAny(t, "a", []byte{4, 0, 0, 0, 0, 0, 0, 0, 1, 'a'})
