@@ -49,6 +49,8 @@ func run() int {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
 	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
+	// Closing ha on exit ensures that this instance retracts its heartbeat
+	// from the database so that another instance can take over immediately.
 	defer ha.Close()
 	s := icingadb.NewSync(db, rc, logger)
 	hs := history.NewSync(db, rc, logger)
