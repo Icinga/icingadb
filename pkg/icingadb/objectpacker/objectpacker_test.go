@@ -113,6 +113,12 @@ func TestPackAny(t *testing.T) {
 		3, 0x40, 0x45, 0, 0, 0, 0, 0, 0,
 	})
 
+	assertPackAny(t, map[[1]byte]bool{[1]byte{42}: true}, []byte{
+		6, 0, 0, 0, 0, 0, 0, 0, 1,
+		0, 0, 0, 0, 0, 0, 0, 1, 42,
+		2,
+	})
+
 	assertPackAnyPanic(t, map[struct{}]struct{}{{}: {}}, 9)
 
 	assertPackAny(t, (*string)(nil), []byte{0})

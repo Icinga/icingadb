@@ -101,10 +101,30 @@ func packValue(in reflect.Value, out io.Writer) error {
 		{
 			iter := in.MapRange()
 			for iter.Next() {
-				// Not just stringify the key (below), but also pack it (here) - panics on disallowed type.
-				_ = packValue(iter.Key(), ioutil.Discard)
+				var packedKey []byte
+				if key := iter.Key(); key.Kind() == reflect.Array {
+					if typ := key.Type(); typ.Elem() == tByte {
+						if !key.CanAddr() {
+							vNewElem := reflect.New(typ).Elem()
+							vNewElem.Set(key)
+							key = vNewElem
+						}
 
-				sorted = append(sorted, kv{[]byte(fmt.Sprint(iter.Key().Interface())), iter.Value()})
+						packedKey = key.Slice(0, key.Len()).Interface().([]byte)
+					} else {
+						// Not just stringify the key (below), but also pack it (here) - panics on disallowed type.
+						_ = packValue(iter.Key(), ioutil.Discard)
+
+						packedKey = []byte(fmt.Sprint(key.Interface()))
+					}
+				} else {
+					// Not just stringify the key (below), but also pack it (here) - panics on disallowed type.
+					_ = packValue(iter.Key(), ioutil.Discard)
+
+					packedKey = []byte(fmt.Sprint(key.Interface()))
+				}
+
+				sorted = append(sorted, kv{packedKey, iter.Value()})
 			}
 		}
 
