@@ -1,0 +1,40 @@
+name: Integration Tests
+
+on:
+  push:
+    branches:
+      - master
+  pull_request: {}
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '^1.16' # icinga-testing uses go:embed which is available in Go 1.16+
+      - name: Build Icinga DB
+        run: go build ./cmd/icingadb
+        env:
+          CGO_ENABLED: 0
+      - name: Build Integration Tests
+        run: go test -o ../icingadb-test -c .
+        working-directory: tests/
+      - name: Run Integration Tests
+        run: ./icingadb-test -icingatesting.debuglog debug.log -test.v
+        env:
+          ICINGA_TESTING_ICINGADB_BINARY: ${{ github.workspace }}/icingadb
+          ICINGA_TESTING_ICINGADB_SCHEMA: ${{ github.workspace }}/schema/mysql/schema.sql
+      - name: Compress Debug Log
+        if: ${{ always() }}
+        run: xz -9 debug.log
+      - name: Upload Debug Log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: debug.log.xz
+          path: debug.log.xz
+          retention-days: 1
