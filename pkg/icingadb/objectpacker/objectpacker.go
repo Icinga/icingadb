@@ -72,8 +72,9 @@ func packValue(in reflect.Value, out io.Writer) error {
 			}
 		}
 
+		// If there aren't any values to pack, ...
 		if l < 1 {
-			// Disallow (panic) some types in array/slice values (recursively), too - even if none present
+			// ... create one and pack it - panics on disallowed type.
 			_ = packValue(reflect.Zero(in.Type().Elem()), ioutil.Discard)
 		}
 
@@ -100,7 +101,7 @@ func packValue(in reflect.Value, out io.Writer) error {
 		{
 			iter := in.MapRange()
 			for iter.Next() {
-				// Disallow (panic) some types in map keys (recursively), too
+				// Not just stringify the key (below), but also pack it (here) - panics on disallowed type.
 				_ = packValue(iter.Key(), ioutil.Discard)
 
 				sorted = append(sorted, kv{[]byte(fmt.Sprint(iter.Key().Interface())), iter.Value()})
@@ -123,10 +124,11 @@ func packValue(in reflect.Value, out io.Writer) error {
 			}
 		}
 
+		// If there aren't any key-value pairs to pack, ...
 		if l < 1 {
 			typ := in.Type()
 
-			// Disallow (panic) some types in map keys and values (recursively), too - even if none present
+			// ... create one and pack it - panics on disallowed type.
 			_ = packValue(reflect.Zero(typ.Key()), ioutil.Discard)
 			_ = packValue(reflect.Zero(typ.Elem()), ioutil.Discard)
 		}
@@ -136,7 +138,7 @@ func packValue(in reflect.Value, out io.Writer) error {
 		if in.IsNil() {
 			err := packValue(reflect.Value{}, out)
 
-			// Disallow (panic) some types in referenced value (recursively), too - even if none present
+			// Create a fictive referenced value and pack it - panics on disallowed type.
 			_ = packValue(reflect.Zero(in.Type().Elem()), ioutil.Discard)
 
 			return err
