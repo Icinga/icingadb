@@ -17,6 +17,7 @@ func PackAny(in interface{}, out io.Writer) error {
 	return packValue(reflect.ValueOf(in), out)
 }
 
+var tByte = reflect.TypeOf(byte(0))
 var tBytes = reflect.TypeOf([]uint8(nil))
 
 // packValue does the actual job of packAny and just exists for recursion w/o unneccessary reflect.ValueOf calls.
@@ -40,7 +41,7 @@ func packValue(in reflect.Value, out io.Writer) error {
 
 		return binary.Write(out, binary.BigEndian, in.Float())
 	case reflect.Array, reflect.Slice:
-		if typ := in.Type(); typ.Elem().Kind() == reflect.Uint8 {
+		if typ := in.Type(); typ.Elem() == tByte {
 			if kind == reflect.Array {
 				if !in.CanAddr() {
 					vNewElem := reflect.New(typ).Elem()

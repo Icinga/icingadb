@@ -133,6 +133,11 @@ func TestPackAny(t *testing.T) {
 		assertPackAny(t, types.Binary(binary[:]), append([]byte{4, 0, 0, 0, 0, 0, 0, 1, 0}, binary[:]...))
 	}
 
+	{
+		type myByte byte
+		assertPackAnyPanic(t, []myByte(nil), 9)
+	}
+
 	assertPackAnyPanic(t, complex64(0+0i), 0)
 	assertPackAnyPanic(t, 0+0i, 0)
 	assertPackAnyPanic(t, make(chan struct{}, 0), 0)
