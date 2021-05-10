@@ -12,7 +12,22 @@ import (
 
 // PackAny packs any JSON-encodable value (ex. structs, also ignores interfaces like encoding.TextMarshaler)
 // to a BSON-similar format suitable for consistent hashing. Spec:
-// https://github.com/Icinga/icinga2/blob/2cb995e/lib/base/object-packer.cpp#L222-L231
+//
+// PackAny(nil)            => 0x0
+// PackAny(false)          => 0x1
+// PackAny(true)           => 0x2
+// PackAny(float64(42))    => 0x3 ieee754_binary64_bigendian(42)
+// PackAny("exämple")      => 0x4 uint64_bigendian(len([]byte("exämple"))) []byte("exämple")
+// PackAny([]uint8{0x42})  => 0x4 uint64_bigendian(len([]uint8{0x42})) []uint8{0x42}
+// PackAny([1]uint8{0x42}) => 0x4 uint64_bigendian(len([1]uint8{0x42})) [1]uint8{0x42}
+// PackAny([]T{x,y})       => 0x5 uint64_bigendian(len([]T{x,y})) PackAny(x) PackAny(y)
+// PackAny(map[K]V{x:y})   => 0x6 uint64_bigendian(len(map[K]V{x:y})) len(map_key(x)) map_key(x) PackAny(y)
+// PackAny((*T)(nil))      => 0x0
+// PackAny((*T)(0x42))     => PackAny(*(*T)(0x42))
+// PackAny(x)              => panic()
+//
+// map_key([1]uint8{0x42}) => [1]uint8{0x42}
+// map_key(x)              => []byte(fmt.Sprint(x))
 func PackAny(in interface{}, out io.Writer) error {
 	return packValue(reflect.ValueOf(in), out)
 }
