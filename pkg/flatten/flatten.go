@@ -13,13 +13,11 @@ func Flatten(value interface{}, prefix string) map[string]interface{} {
 		switch value := value.(type) {
 		case map[string]interface{}:
 			for k, v := range value {
-				key += "." + k
-				flatten(key, v)
+				flatten(key+"."+k, v)
 			}
 		case []interface{}:
 			for i, v := range value {
-				key += "[" + strconv.Itoa(i) + "]"
-				flatten(key, v)
+				flatten(key+"["+strconv.Itoa(i)+"]", v)
 			}
 		default:
 			flattened[key] = value

@@ -11,7 +11,6 @@ var Factories = []contracts.EntityFactoryFunc{
 	NewCheckcommandCustomvar,
 	NewCheckcommandEnvvar,
 	NewComment,
-	NewCustomvar,
 	NewDowntime,
 	NewEndpoint,
 	NewEventcommand,

@@ -3,6 +3,7 @@ package icingadb
 import (
 	"context"
 	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/utils"
 	"go.uber.org/zap"
@@ -12,20 +13,20 @@ import (
 )
 
 type Delta struct {
-	Create       EntitiesById
-	Update       EntitiesById
-	Delete       EntitiesById
-	WithChecksum bool
-	done         chan error
-	err          error
-	logger       *zap.SugaredLogger
+	Create  EntitiesById
+	Update  EntitiesById
+	Delete  EntitiesById
+	Subject *common.SyncSubject
+	done    chan error
+	err     error
+	logger  *zap.SugaredLogger
 }
 
-func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, withChecksum bool, logger *zap.SugaredLogger) *Delta {
+func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subject *common.SyncSubject, logger *zap.SugaredLogger) *Delta {
 	delta := &Delta{
-		WithChecksum: withChecksum,
-		done:         make(chan error, 1),
-		logger:       logger,
+		Subject: subject,
+		done:    make(chan error, 1),
+		logger:  logger,
 	}
 
 	go delta.start(ctx, actual, desired)
@@ -33,7 +34,7 @@ func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, with
 	return delta
 }
 
-func (delta Delta) Wait() error {
+func (delta *Delta) Wait() error {
 	return <-delta.done
 }
 
@@ -41,7 +42,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 	defer close(delta.done)
 
 	var update EntitiesById
-	if delta.WithChecksum {
+	if delta.Subject.WithChecksum() {
 		update = EntitiesById{}
 	}
 	actual := EntitiesById{}
@@ -52,7 +53,8 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 	g.Go(func() error {
 		var cnt com.Counter
 		defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-			delta.logger.Debugf("Synced %d actual elements in %s", cnt.Val(), elapsed)
+			delta.logger.Debugf(
+				"Synced %d actual elements of type %s in %s", cnt.Val(), utils.Name(delta.Subject.Entity()), elapsed)
 		})
 		for {
 			select {
@@ -68,7 +70,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 					delete(desired, id)
 					mtx.Unlock()
 
-					if delta.WithChecksum && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
+					if delta.Subject.WithChecksum() && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
 						updateMtx.Lock()
 						update[id] = d
 						updateMtx.Unlock()
@@ -88,7 +90,8 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 	g.Go(func() error {
 		var cnt com.Counter
 		defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-			delta.logger.Debugf("Synced %d desired elements in %s", cnt.Val(), elapsed)
+			delta.logger.Debugf(
+				"Synced %d desired elements of type %s in %s", cnt.Val(), utils.Name(delta.Subject.Entity()), elapsed)
 		})
 		for {
 			select {
@@ -104,7 +107,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 					delete(actual, id)
 					mtx.Unlock()
 
-					if delta.WithChecksum && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
+					if delta.Subject.WithChecksum() && !a.(contracts.Checksumer).Checksum().Equal(d.(contracts.Checksumer).Checksum()) {
 						updateMtx.Lock()
 						update[id] = d
 						updateMtx.Unlock()
@@ -129,7 +132,7 @@ func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contra
 
 	delta.Create = desired
 	delta.Delete = actual
-	if delta.WithChecksum {
+	if delta.Subject.WithChecksum() {
 		delta.Update = update
 	}
 }

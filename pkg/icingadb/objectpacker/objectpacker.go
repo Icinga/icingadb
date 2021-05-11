@@ -10,6 +10,17 @@ import (
 	"sort"
 )
 
+// MustPackAny calls PackAny using in and panics if there was an error.
+func MustPackAny(in ...interface{}) []byte {
+	var buf bytes.Buffer
+
+	if err := PackAny(in, &buf); err != nil {
+		panic(err)
+	}
+
+	return buf.Bytes()
+}
+
 // PackAny packs any JSON-encodable value (ex. structs, also ignores interfaces like encoding.TextMarshaler)
 // to a BSON-similar format suitable for consistent hashing. Spec:
 //

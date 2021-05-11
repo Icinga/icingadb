@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/icinga/icingadb/internal/command"
+	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/common"
+	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
@@ -106,9 +109,68 @@ func run() int {
 							g.Go(func() error {
 								defer wg.Done()
 
-								return s.SyncAfterDump(synctx, factory.WithInit, dump)
+								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory.WithInit), dump)
 							})
 						}
+
+						wg.Add(1)
+						g.Go(func() error {
+							defer wg.Done()
+
+							<-dump.Done("icinga:customvar")
+
+							cv := common.NewSyncSubject(v1.NewCustomvar)
+
+							cvs, redisErrs := rc.YieldAll(synctx, cv)
+							// Let errors from Redis cancel our group.
+							com.ErrgroupReceive(g, redisErrs)
+
+							// Multiplex cvs to use them both for customvar and customvar_flat.
+							cvs1, cvs2 := make(chan contracts.Entity), make(chan contracts.Entity)
+							g.Go(func() error {
+								defer close(cvs1)
+								defer close(cvs2)
+								for {
+									select {
+									case cv, ok := <-cvs:
+										if !ok {
+											return nil
+										}
+
+										cvs1 <- cv
+										cvs2 <- cv
+									case <-synctx.Done():
+										return synctx.Err()
+									}
+								}
+							})
+
+							actualCvs, dbErrs := db.YieldAll(
+								ctx, cv.Factory(), db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
+							// Let errors from DB cancel our group.
+							com.ErrgroupReceive(g, dbErrs)
+
+							g.Go(func() error {
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logger))
+							})
+
+							cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
+
+							cvFlats, flattenErrs := v1.FlattenCustomvars(ctx, cvs2)
+							// Let errors from Flatten cancel our group.
+							com.ErrgroupReceive(g, flattenErrs)
+
+							actualCvFlats, dbErrs := db.YieldAll(
+								ctx, cvFlat.Factory(), db.BuildSelectStmt(cvFlat.Entity(), cvFlat.Entity().Fingerprint()))
+							// Let errors from DB cancel our group.
+							com.ErrgroupReceive(g, dbErrs)
+
+							g.Go(func() error {
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logger))
+							})
+
+							return nil
+						})
 
 						g.Go(func() error {
 							wg.Wait()
