@@ -2,6 +2,7 @@ package objectpacker
 
 import (
 	"bytes"
+	"github.com/icinga/icingadb/pkg/types"
 	"io"
 	"testing"
 	"unsafe"
@@ -61,24 +62,24 @@ func TestPackAny(t *testing.T) {
 	assertPackAny(t, false, []byte{1})
 	assertPackAny(t, true, []byte{2})
 
-	assertPackAny(t, -42, []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, int8(-42), []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, int16(-42), []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, int32(-42), []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, int64(-42), []byte{3, 0xc0, 0x45, 0, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, -42, 0)
+	assertPackAnyPanic(t, int8(-42), 0)
+	assertPackAnyPanic(t, int16(-42), 0)
+	assertPackAnyPanic(t, int32(-42), 0)
+	assertPackAnyPanic(t, int64(-42), 0)
 
-	assertPackAny(t, uint(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uint8(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uint16(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uint32(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uint64(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, uintptr(42), []byte{3, 0x40, 0x45, 0, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, uint(42), 0)
+	assertPackAnyPanic(t, uint8(42), 0)
+	assertPackAnyPanic(t, uint16(42), 0)
+	assertPackAnyPanic(t, uint32(42), 0)
+	assertPackAnyPanic(t, uint64(42), 0)
+	assertPackAnyPanic(t, uintptr(42), 0)
 
-	assertPackAny(t, float32(-42.5), []byte{3, 0xc0, 0x45, 0x40, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, float32(-42.5), 0)
 	assertPackAny(t, -42.5, []byte{3, 0xc0, 0x45, 0x40, 0, 0, 0, 0, 0})
 
-	assertPackAny(t, []struct{}(nil), []byte{5, 0, 0, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, []struct{}{}, []byte{5, 0, 0, 0, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, []struct{}(nil), 9)
+	assertPackAnyPanic(t, []struct{}{}, 9)
 
 	assertPackAny(t, []interface{}{nil, true, -42.5}, []byte{
 		5, 0, 0, 0, 0, 0, 0, 0, 3,
@@ -95,8 +96,8 @@ func TestPackAny(t *testing.T) {
 
 	assertPackAnyPanic(t, []interface{}{0 + 0i}, 9)
 
-	assertPackAny(t, map[struct{}]struct{}(nil), []byte{6, 0, 0, 0, 0, 0, 0, 0, 0})
-	assertPackAny(t, map[struct{}]struct{}{}, []byte{6, 0, 0, 0, 0, 0, 0, 0, 0})
+	assertPackAnyPanic(t, map[struct{}]struct{}(nil), 9)
+	assertPackAnyPanic(t, map[struct{}]struct{}{}, 9)
 
 	assertPackAny(t, map[interface{}]interface{}{true: "", "nil": -42.5}, []byte{
 		6, 0, 0, 0, 0, 0, 0, 0, 2,
@@ -106,20 +107,43 @@ func TestPackAny(t *testing.T) {
 		4, 0, 0, 0, 0, 0, 0, 0, 0,
 	})
 
-	assertPackAny(t, map[string]uint8{"": 42}, []byte{
+	assertPackAny(t, map[string]float64{"": 42}, []byte{
 		6, 0, 0, 0, 0, 0, 0, 0, 1,
 		0, 0, 0, 0, 0, 0, 0, 0,
 		3, 0x40, 0x45, 0, 0, 0, 0, 0, 0,
 	})
 
+	assertPackAny(t, map[[1]byte]bool{[1]byte{42}: true}, []byte{
+		6, 0, 0, 0, 0, 0, 0, 0, 1,
+		0, 0, 0, 0, 0, 0, 0, 1, 42,
+		2,
+	})
+
 	assertPackAnyPanic(t, map[struct{}]struct{}{{}: {}}, 9)
 
-	assertPackAny(t, (*int)(nil), []byte{0})
-	assertPackAny(t, new(int), []byte{3, 0, 0, 0, 0, 0, 0, 0, 0})
+	assertPackAny(t, (*string)(nil), []byte{0})
+	assertPackAnyPanic(t, (*int)(nil), 0)
+	assertPackAny(t, new(float64), []byte{3, 0, 0, 0, 0, 0, 0, 0, 0})
 
 	assertPackAny(t, "", []byte{4, 0, 0, 0, 0, 0, 0, 0, 0})
 	assertPackAny(t, "a", []byte{4, 0, 0, 0, 0, 0, 0, 0, 1, 'a'})
 	assertPackAny(t, "ä", []byte{4, 0, 0, 0, 0, 0, 0, 0, 2, 0xc3, 0xa4})
+
+	{
+		var binary [256]byte
+		for i := range binary {
+			binary[i] = byte(i)
+		}
+
+		assertPackAny(t, binary, append([]byte{4, 0, 0, 0, 0, 0, 0, 1, 0}, binary[:]...))
+		assertPackAny(t, binary[:], append([]byte{4, 0, 0, 0, 0, 0, 0, 1, 0}, binary[:]...))
+		assertPackAny(t, types.Binary(binary[:]), append([]byte{4, 0, 0, 0, 0, 0, 0, 1, 0}, binary[:]...))
+	}
+
+	{
+		type myByte byte
+		assertPackAnyPanic(t, []myByte(nil), 9)
+	}
 
 	assertPackAnyPanic(t, complex64(0+0i), 0)
 	assertPackAnyPanic(t, 0+0i, 0)
