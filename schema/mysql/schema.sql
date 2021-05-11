@@ -132,6 +132,7 @@ CREATE TABLE host_state (
   output mediumtext DEFAULT NULL,
   long_output mediumtext DEFAULT NULL,
   performance_data mediumtext DEFAULT NULL,
+  normalized_performance_data mediumtext DEFAULT NULL,
   check_commandline text DEFAULT NULL,
 
   is_problem enum('n', 'y') NOT NULL,
@@ -283,6 +284,8 @@ CREATE TABLE service_state (
   output mediumtext DEFAULT NULL,
   long_output mediumtext DEFAULT NULL,
   performance_data mediumtext DEFAULT NULL,
+  normalized_performance_data mediumtext DEFAULT NULL,
+
   check_commandline text DEFAULT NULL,
 
   is_problem enum('n', 'y') NOT NULL,
