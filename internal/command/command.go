@@ -41,7 +41,7 @@ func New() *Command {
 func (c Command) Database() *icingadb.DB {
 	db, err := c.Config.Database.Open(c.Logger)
 	if err != nil {
-		c.Logger.Fatal("can't create database connection pool from config", zap.Error(err))
+		c.Logger.Fatalw("can't create database connection pool from config", zap.Error(err))
 	}
 
 	return db
@@ -50,7 +50,7 @@ func (c Command) Database() *icingadb.DB {
 func (c Command) Redis() *icingaredis.Client {
 	rc, err := c.Config.Redis.NewClient(c.Logger)
 	if err != nil {
-		c.Logger.Fatal("can't create Redis client from config", zap.Error(err))
+		c.Logger.Fatalw("can't create Redis client from config", zap.Error(err))
 	}
 
 	return rc

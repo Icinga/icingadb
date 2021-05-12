@@ -47,9 +47,27 @@ func run() int {
 			}
 		}
 	}()
+
+	logger.Info("Starting Icinga DB")
+
 	db := cmd.Database()
 	defer db.Close()
+	{
+		logger.Info("Connecting to database")
+		err := db.Ping()
+		if err != nil {
+			panic(errors.Wrap(err, "can't connect to database"))
+		}
+	}
+
 	rc := cmd.Redis()
+	{
+		logger.Info("Connecting to Redis")
+		_, err := rc.Ping(context.Background()).Result()
+		if err != nil {
+			panic(errors.Wrap(err, "can't connect to Redis"))
+		}
+	}
 
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
@@ -71,6 +89,8 @@ func run() int {
 		for hactx.Err() == nil {
 			select {
 			case <-ha.Takeover():
+				logger.Info("Taking over")
+
 				go func() {
 					for hactx.Err() == nil {
 						synctx, cancelSynctx := context.WithCancel(hactx)
@@ -81,6 +101,8 @@ func run() int {
 
 						dump := icingadb.NewDumpSignals(rc, logger)
 						g.Go(func() error {
+							logger.Info("Staring config dump signal handling")
+
 							return dump.Listen(synctx)
 						})
 
@@ -101,13 +123,18 @@ func run() int {
 						})
 
 						g.Go(func() error {
+							logger.Info("Starting history sync")
+
 							return hs.Sync(synctx)
 						})
 
 						g.Go(func() error {
+							logger.Info("Starting overdue sync")
+
 							return ods.Sync(synctx)
 						})
 
+						logger.Info("Starting config sync")
 						for _, factory := range v1.Factories {
 							factory := factory
 
@@ -124,6 +151,8 @@ func run() int {
 							defer wg.Done()
 
 							<-dump.Done("icinga:customvar")
+
+							logger.Infof("Syncing customvar")
 
 							cv := common.NewSyncSubject(v1.NewCustomvar)
 
@@ -181,6 +210,8 @@ func run() int {
 						g.Go(func() error {
 							wg.Wait()
 
+							logger.Infof("Starting runtime updates sync")
+
 							return rt.Sync(synctx, v1.Factories, lastRuntimeStreamId)
 						})
 
@@ -190,6 +221,8 @@ func run() int {
 					}
 				}()
 			case <-ha.Handover():
+				logger.Warn("Handing over")
+
 				cancelHactx()
 			case <-hactx.Done():
 				// Nothing to do here, surrounding loop will terminate now.

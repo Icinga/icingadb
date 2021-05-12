@@ -105,6 +105,10 @@ func (h *HA) controller() {
 
 	oldInstancesRemoved := false
 
+	logTicker := time.NewTicker(time.Second * 60)
+	defer logTicker.Stop()
+	shouldLog := true
+
 	for {
 		select {
 		case m, ok := <-h.heartbeat.Beat():
@@ -122,7 +126,7 @@ func (h *HA) controller() {
 				h.logger.Debugw("Received heartbeat from future", "time", t)
 			}
 			if tt.Before(now.Add(-1 * timeout)) {
-				h.logger.Errorw("Received heartbeat from the past %s", "time", t)
+				h.logger.Errorw("Received heartbeat from the past", "time", t)
 				h.signalHandover()
 				continue
 			}
@@ -130,13 +134,21 @@ func (h *HA) controller() {
 			if err != nil {
 				h.abort(err)
 			}
-			if err = h.realize(s, t); err != nil {
+
+			select {
+			case <-logTicker.C:
+				shouldLog = true
+			default:
+			}
+			if err = h.realize(s, t, shouldLog); err != nil {
 				h.abort(err)
 			}
 			if !oldInstancesRemoved {
 				go h.removeOldInstances(s)
 				oldInstancesRemoved = true
 			}
+
+			shouldLog = false
 		case <-h.heartbeat.Lost():
 			h.logger.Error("Lost heartbeat")
 			h.signalHandover()
@@ -146,12 +158,13 @@ func (h *HA) controller() {
 	}
 }
 
-func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
+func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLog bool) error {
 	// boff := backoff.NewExponentialWithJitter(time.Millisecond*1, time.Second*1)
 	for attempt := 0; true; attempt++ {
 		// sleep := boff(uint64(attempt))
 		// h.logger.Debugf("Sleeping for %s..", sleep)
 		// time.Sleep(sleep)
+
 		ctx, cancel := context.WithCancel(h.ctx)
 		tx, err := h.db.BeginTxx(ctx, &sql.TxOptions{
 			Isolation: sql.LevelSerializable,
@@ -159,12 +172,22 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 		if err != nil {
 			return err
 		}
-		rows, err := tx.QueryxContext(ctx, `SELECT 1 FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND id != ? AND heartbeat > ?`, s.EnvironmentID(), "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
+		rows, err := tx.QueryxContext(ctx, `SELECT id, heartbeat FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND id != ? AND heartbeat > ?`, s.EnvironmentID(), "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
 		if err != nil {
 			return err
 		}
 		takeover := true
 		for rows.Next() {
+			instance := &v1.IcingadbInstance{}
+			err := rows.StructScan(instance)
+			if err != nil {
+				h.logger.Errorw("Can't scan currently active instance", zap.Error(err))
+				break
+			}
+
+			if shouldLog {
+				h.logger.Infow("Another instance is active", "instance_id", instance.Id, "heartbeat", instance.Heartbeat, zap.Duration("heartbeat_age", time.Now().Sub(instance.Heartbeat.Time())))
+			}
 			takeover = false
 			break
 		}
@@ -197,10 +220,10 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli) error {
 		if err != nil {
 			cancel()
 			if !utils.IsDeadlock(err) {
-				h.logger.Errorw("Can't Update or insert instance.", zap.Error(err))
+				h.logger.Errorw("Can't update or insert instance", zap.Error(err))
 				break
 			} else {
-				h.logger.Infow("Can't Update or insert instance. Retrying..", zap.Error(err))
+				h.logger.Infow("Can't update or insert instance. Retrying", zap.Error(err))
 				continue
 			}
 		}
@@ -248,7 +271,6 @@ func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
 
 func (h *HA) signalHandover() {
 	if h.responsible {
-		h.logger.Warn("Handing over..")
 		h.responsible = false
 		h.handover <- struct{}{}
 	}
@@ -256,7 +278,6 @@ func (h *HA) signalHandover() {
 
 func (h *HA) signalTakeover() {
 	if !h.responsible {
-		h.logger.Info("Taking over..")
 		h.responsible = true
 		h.takeover <- struct{}{}
 	}

@@ -40,8 +40,6 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 	stream := "icinga:runtime"
 	updateMessagesByKey := make(map[string]chan<- redis.XMessage)
 
-	r.logger.Infof("Syncing runtime updates")
-
 	for _, factoryFunc := range factoryFuncs {
 		factoryFunc = factoryFunc.WithInit
 
@@ -54,7 +52,7 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 
 		updateMessagesByKey[fmt.Sprintf("icinga:%s", utils.Key(name, ':'))] = updateMessages
 
-		r.logger.Infof("Syncing runtime updates of %s", name)
+		r.logger.Debugf("Syncing runtime updates of %s", name)
 		g.Go(structifyStream(ctx, updateMessages, upsertEntities, deleteIds, structify.MakeMapStructifier(reflect.TypeOf(v).Elem(), "json")))
 
 		g.Go(func() error {
