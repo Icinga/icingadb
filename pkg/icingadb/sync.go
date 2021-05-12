@@ -14,12 +14,6 @@ import (
 	"time"
 )
 
-var (
-	// Redis concurrency settings.
-	count      = 1 << 12
-	concurrent = 1 << 3
-)
-
 // Sync implements a rendezvous point for Icinga DB and Redis to synchronize their entities.
 type Sync struct {
 	db     *DB
@@ -108,8 +102,6 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 			pairs, errs := s.redis.HMYield(
 				ctx,
 				fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
-				count,
-				concurrent,
 				delta.Create.Keys()...)
 			// Let errors from Redis cancel our group.
 			com.ErrgroupReceive(g, errs)
@@ -135,8 +127,6 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		pairs, errs := s.redis.HMYield(
 			ctx,
 			fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
-			count,
-			concurrent,
 			delta.Update.Keys()...)
 		// Let errors from Redis cancel our group.
 		com.ErrgroupReceive(g, errs)

@@ -59,7 +59,8 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 		g.Go(func() error {
 			stmt, _ := r.db.BuildUpsertStmt(v)
 			// TODO(nh) Currently not possible to increase the count here: https://github.com/jmoiron/sqlx/issues/694
-			return r.db.NamedBulkExec(ctx, stmt, 1, 1, upsertEntities, nil)
+			sem := r.db.getSemaphoreForTable(utils.TableName(v))
+			return r.db.NamedBulkExec(ctx, stmt, 1, sem, upsertEntities, nil)
 		})
 		g.Go(func() error {
 			return r.db.DeleteStreamed(ctx, v, deleteIds)

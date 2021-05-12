@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"github.com/creasty/defaults"
 	"github.com/icinga/icingadb/pkg/driver"
@@ -16,12 +17,12 @@ var registerDriverOnce sync.Once
 
 // Database defines database client configuration.
 type Database struct {
-	Host           string `yaml:"host"`
-	Port           int    `yaml:"port"`
-	Database       string `yaml:"database"`
-	User           string `yaml:"user"`
-	Password       string `yaml:"password"`
-	MaxConnections int    `yaml:"max_connections" default:"16"`
+	Host             string `yaml:"host"`
+	Port             int    `yaml:"port"`
+	Database         string `yaml:"database"`
+	User             string `yaml:"user"`
+	Password         string `yaml:"password"`
+	icingadb.Options `yaml:",inline"`
 }
 
 // Open prepares the DSN string and driver configuration,
@@ -47,7 +48,7 @@ func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
 		return utils.Key(s, '_')
 	})
 
-	return icingadb.NewDb(db, logger), nil
+	return icingadb.NewDb(db, logger, &d.Options), nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -59,6 +60,10 @@ func (d *Database) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type self Database
 	if err := unmarshal((*self)(d)); err != nil {
 		return err
+	}
+
+	if d.MaxConnectionsPerTable < 1 {
+		return errors.New("max_connections_per_table must be at least 1")
 	}
 
 	return nil
