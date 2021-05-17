@@ -52,8 +52,8 @@ func (bas BadAcknowledgementState) Error() string {
 
 // acknowledgementStates maps all valid AcknowledgementState values to their SQL representation.
 var acknowledgementStates = map[AcknowledgementState]string{
-	0: "y",
-	1: "n",
+	0: "n",
+	1: "y",
 	2: "sticky",
 }
 
