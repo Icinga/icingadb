@@ -38,7 +38,7 @@ type TimeperiodOverrideExclude struct {
 
 type TimeperiodCustomvar struct {
 	CustomvarMeta `json:",inline"`
-	TimeperiodId  types.Binary `json:"object_id"`
+	TimeperiodId  types.Binary `json:"timeperiod_id"`
 }
 
 func NewTimeperiod() contracts.Entity {

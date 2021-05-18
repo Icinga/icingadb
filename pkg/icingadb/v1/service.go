@@ -12,12 +12,12 @@ type Service struct {
 
 type ServiceCustomvar struct {
 	CustomvarMeta `json:",inline"`
-	ServiceId     types.Binary `json:"object_id"`
+	ServiceId     types.Binary `json:"service_id"`
 }
 
 type ServiceState struct {
 	State     `json:",inline"`
-	ServiceId types.Binary `json:"object_id"`
+	ServiceId types.Binary `json:"service_id"`
 }
 
 type Servicegroup struct {
@@ -26,13 +26,13 @@ type Servicegroup struct {
 
 type ServicegroupCustomvar struct {
 	CustomvarMeta  `json:",inline"`
-	ServicegroupId types.Binary `json:"object_id"`
+	ServicegroupId types.Binary `json:"servicegroup_id"`
 }
 
 type ServicegroupMember struct {
 	MemberMeta     `json:",inline"`
-	ServiceId      types.Binary `json:"object_id"`
-	ServicegroupId types.Binary `json:"group_id"`
+	ServiceId      types.Binary `json:"service_id"`
+	ServicegroupId types.Binary `json:"servicegroup_id"`
 }
 
 func NewService() contracts.Entity {

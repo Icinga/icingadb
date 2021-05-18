@@ -66,12 +66,12 @@ func (ab Address6Bin) Value() (driver.Value, error) {
 
 type HostCustomvar struct {
 	CustomvarMeta `json:",inline"`
-	HostId        types.Binary `json:"object_id"`
+	HostId        types.Binary `json:"host_id"`
 }
 
 type HostState struct {
 	State  `json:",inline"`
-	HostId types.Binary `json:"object_id"`
+	HostId types.Binary `json:"host_id"`
 }
 
 type Hostgroup struct {
@@ -80,13 +80,13 @@ type Hostgroup struct {
 
 type HostgroupCustomvar struct {
 	CustomvarMeta `json:",inline"`
-	HostgroupId   types.Binary `json:"object_id"`
+	HostgroupId   types.Binary `json:"hostgroup_id"`
 }
 
 type HostgroupMember struct {
 	MemberMeta  `json:",inline"`
-	HostId      types.Binary `json:"object_id"`
-	HostgroupId types.Binary `json:"group_id"`
+	HostId      types.Binary `json:"host_id"`
+	HostgroupId types.Binary `json:"hostgroup_id"`
 }
 
 func NewHost() contracts.Entity {
