@@ -86,12 +86,14 @@ func (h Heartbeat) controller() {
 		// We expect heartbeats every second but only read them every 3 seconds
 		throttle := time.Tick(time.Second * 3)
 		for {
-			streams, err := h.client.XRead(ctx, &redis.XReadArgs{
+			cmd := h.client.XRead(ctx, &redis.XReadArgs{
 				Streams: []string{"icinga:stats", "$"},
 				Block:   0, // TODO(el): Might make sense to use a non-blocking variant here
-			}).Result()
+			})
+
+			streams, err := cmd.Result()
 			if err != nil {
-				return err
+				return WrapCmdErr(cmd)
 			}
 
 			select {

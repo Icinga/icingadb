@@ -89,9 +89,11 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 				Block:   0,
 			}
 
-			streams, err := r.redis.XRead(ctx, xra).Result()
+			cmd := r.redis.XRead(ctx, xra)
+			streams, err := cmd.Result()
+
 			if err != nil {
-				return err
+				return icingaredis.WrapCmdErr(cmd)
 			}
 
 			for _, stream := range streams {

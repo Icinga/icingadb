@@ -101,9 +101,11 @@ func (s Sync) xRead(ctx context.Context, redis2structs []chan<- redis.XMessage, 
 		}
 
 		for {
-			streams, err := s.redis.XRead(ctx, xra).Result()
+			cmd := s.redis.XRead(ctx, xra)
+			streams, err := cmd.Result()
+
 			if err != nil && err != redis.Nil {
-				return err
+				return icingaredis.WrapCmdErr(cmd)
 			}
 
 			for _, stream := range streams {
@@ -245,8 +247,9 @@ func (s Sync) cleanup(
 					case 1:
 						timeout = time.After(time.Second / 4)
 					case bulkSize:
-						if _, err := s.redis.XDel(ctx, stream, ids...).Result(); err != nil {
-							return err
+						cmd := s.redis.XDel(ctx, stream, ids...)
+						if _, err := cmd.Result(); err != nil {
+							return icingaredis.WrapCmdErr(cmd)
 						}
 
 						ids = nil
@@ -254,8 +257,9 @@ func (s Sync) cleanup(
 					}
 				}
 			case <-timeout:
-				if _, err := s.redis.XDel(ctx, stream, ids...).Result(); err != nil {
-					return err
+				cmd := s.redis.XDel(ctx, stream, ids...)
+				if _, err := cmd.Result(); err != nil {
+					return icingaredis.WrapCmdErr(cmd)
 				}
 
 				ids = nil

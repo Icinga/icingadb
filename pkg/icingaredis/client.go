@@ -63,9 +63,11 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 		g, ctx := errgroup.WithContext(ctx)
 
 		for {
-			page, cursor, err = c.HScan(ctx, key, cursor, "", int64(c.options.HScanCount)).Result()
+			cmd := c.HScan(ctx, key, cursor, "", int64(c.options.HScanCount))
+			page, cursor, err = cmd.Result()
+
 			if err != nil {
-				return err
+				return WrapCmdErr(cmd)
 			}
 
 			g.Go(func(page []string) func() error {
@@ -120,9 +122,11 @@ func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-c
 				return func() error {
 					defer sem.Release(1)
 
-					vals, err := c.HMGet(ctx, key, batch...).Result()
+					cmd := c.HMGet(ctx, key, batch...)
+					vals, err := cmd.Result()
+
 					if err != nil {
-						return err
+						return WrapCmdErr(cmd)
 					}
 
 					g.Go(func() error {
@@ -160,9 +164,11 @@ func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-c
 func (c *Client) StreamLastId(ctx context.Context, stream string) (string, error) {
 	lastId := "0-0"
 
-	messages, err := c.XRevRangeN(ctx, stream, "+", "-", 1).Result()
+	cmd := c.XRevRangeN(ctx, stream, "+", "-", 1)
+	messages, err := cmd.Result()
+
 	if err != nil {
-		return "", err
+		return "", WrapCmdErr(cmd)
 	}
 
 	for _, message := range messages {

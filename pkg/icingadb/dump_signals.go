@@ -56,12 +56,14 @@ func (s *DumpSignals) Listen(ctx context.Context) error {
 			return err
 		}
 
-		result, err := s.redis.XRead(ctx, &redis.XReadArgs{
+		cmd := s.redis.XRead(ctx, &redis.XReadArgs{
 			Streams: []string{"icinga:dump", lastStreamId},
 			Block:   0, // block indefinitely
-		}).Result()
+		})
+
+		result, err := cmd.Result()
 		if err != nil {
-			return err
+			return icingaredis.WrapCmdErr(cmd)
 		}
 
 		for _, entry := range result[0].Messages {
