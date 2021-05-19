@@ -9,6 +9,7 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
+	"github.com/icinga/icingadb/pkg/icingadb/overdue"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -59,6 +60,7 @@ func run() int {
 	s := icingadb.NewSync(db, rc, logger)
 	hs := history.NewSync(db, rc, logger)
 	rt := icingadb.NewRuntimeUpdates(db, rc, logger)
+	ods := overdue.NewSync(db, rc, logger)
 
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
@@ -100,6 +102,10 @@ func run() int {
 
 						g.Go(func() error {
 							return hs.Sync(synctx)
+						})
+
+						g.Go(func() error {
+							return ods.Sync(synctx)
 						})
 
 						for _, factory := range v1.Factories {
