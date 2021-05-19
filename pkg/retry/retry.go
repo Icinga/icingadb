@@ -14,7 +14,16 @@ type IsRetryable func(error) bool
 
 // WithBackoff retries the passed function if it fails and the error allows it to retry.
 // The specified backoff policy is used to determine how long to sleep between attempts.
-func WithBackoff(ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff) (err error) {
+// Once the specified timeout (if >0) elapses, WithBackoff gives up.
+func WithBackoff(
+	ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff, timeout time.Duration,
+) (err error) {
+	if timeout > 0 {
+		var cancel func()
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
+
 	for attempt := 0; ; /* true */ attempt++ {
 		if err = retryableFunc(ctx); err == nil {
 			// No error.

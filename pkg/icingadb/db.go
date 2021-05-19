@@ -167,7 +167,9 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 							return nil
 						},
 						IsRetryable,
-						backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second))
+						backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+						0,
+					)
 				}
 			}(b))
 		}
@@ -237,7 +239,9 @@ func (db *DB) NamedBulkExec(
 								return nil
 							},
 							IsRetryable,
-							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second))
+							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+							0,
+						)
 					}
 				}(b))
 			case <-ctx.Done():
@@ -305,7 +309,9 @@ func (db *DB) NamedBulkExecTx(
 								return nil
 							},
 							IsRetryable,
-							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second))
+							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+							0,
+						)
 					}
 				}(b))
 			case <-ctx.Done():

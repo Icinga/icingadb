@@ -67,6 +67,7 @@ func dial(ctx context.Context, network, addr string) (conn net.Conn, err error) 
 			return false
 		},
 		backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+		0,
 	)
 	return
 }
