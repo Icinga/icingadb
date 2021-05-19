@@ -7,7 +7,7 @@ import (
 )
 
 // RetryableFunc is a retryable function.
-type RetryableFunc func() error
+type RetryableFunc func(context.Context) error
 
 // IsRetryable checks whether a new attempt can be started based on the error passed.
 type IsRetryable func(error) bool
@@ -16,7 +16,7 @@ type IsRetryable func(error) bool
 // The specified backoff policy is used to determine how long to sleep between attempts.
 func WithBackoff(ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff) (err error) {
 	for attempt := 0; ; /* true */ attempt++ {
-		if err = retryableFunc(); err == nil {
+		if err = retryableFunc(ctx); err == nil {
 			// No error.
 			return
 		}

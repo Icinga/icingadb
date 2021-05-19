@@ -49,9 +49,9 @@ func dial(ctx context.Context, network, addr string) (conn net.Conn, err error) 
 
 	_ = retry.WithBackoff(
 		timeoutCtx,
-		func() error {
+		func(ctx context.Context) error {
 			prevErr := err
-			conn, err = dl.DialContext(timeoutCtx, network, addr)
+			conn, err = dl.DialContext(ctx, network, addr)
 
 			if prevErr != nil && errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 				err = prevErr
