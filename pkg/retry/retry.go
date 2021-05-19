@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"time"
 )
@@ -25,12 +26,20 @@ func WithBackoff(
 	}
 
 	for attempt := 0; ; /* true */ attempt++ {
+		prevErr := err
+
 		if err = retryableFunc(ctx); err == nil {
 			// No error.
 			return
 		}
 
-		if !retryable(err) {
+		isRetryable := retryable(err)
+
+		if prevErr != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
+			err = prevErr
+		}
+
+		if !isRetryable {
 			// Not retryable.
 			return
 		}
