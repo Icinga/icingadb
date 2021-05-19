@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icingadb/pkg/utils"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"reflect"
 )
 
@@ -58,8 +59,9 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 
 		g.Go(func() error {
 			stmt, _ := r.db.BuildUpsertStmt(v)
+			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
+			sem := semaphore.NewWeighted(1)
 			// TODO(nh) Currently not possible to increase the count here: https://github.com/jmoiron/sqlx/issues/694
-			sem := r.db.getSemaphoreForTable(utils.TableName(v))
 			return r.db.NamedBulkExec(ctx, stmt, 1, sem, upsertEntities, nil)
 		})
 		g.Go(func() error {
