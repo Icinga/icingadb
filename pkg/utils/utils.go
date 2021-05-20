@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"go.uber.org/zap"
+	"golang.org/x/exp/utf8string"
 	"io/ioutil"
 	"math"
 	"math/rand"
@@ -202,4 +203,19 @@ func RandomSleep(sugar *zap.SugaredLogger) {
 	d := time.Duration(n) * time.Millisecond
 	sugar.Info("Sleeping for ", d)
 	time.Sleep(d)
+}
+
+var ellipsis = utf8string.NewString("...")
+
+// Ellipsize shortens s to <=limit runes and indicates shortening by "...".
+func Ellipsize(s string, limit int) string {
+	utf8 := utf8string.NewString(s)
+	switch {
+	case utf8.RuneCount() <= limit:
+		return s
+	case utf8.RuneCount() <= ellipsis.RuneCount():
+		return ellipsis.String()
+	default:
+		return utf8.Slice(0, limit-ellipsis.RuneCount()) + ellipsis.String()
+	}
 }
