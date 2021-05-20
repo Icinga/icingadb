@@ -44,20 +44,11 @@ func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error
 func dial(ctx context.Context, network, addr string) (conn net.Conn, err error) {
 	var dl net.Dialer
 
-	timeoutCtx, cancelTimeoutCtx := context.WithTimeout(ctx, 5*time.Minute)
-	defer cancelTimeoutCtx()
-
-	_ = retry.WithBackoff(
-		timeoutCtx,
-		func(ctx context.Context) error {
-			prevErr := err
+	err = retry.WithBackoff(
+		ctx,
+		func(ctx context.Context) (err error) {
 			conn, err = dl.DialContext(ctx, network, addr)
-
-			if prevErr != nil && errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
-				err = prevErr
-			}
-
-			return err
+			return
 		},
 		func(err error) bool {
 			if op, ok := err.(*net.OpError); ok {
@@ -67,7 +58,7 @@ func dial(ctx context.Context, network, addr string) (conn net.Conn, err error) 
 			return false
 		},
 		backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-		0,
+		5*time.Minute,
 	)
 	return
 }
