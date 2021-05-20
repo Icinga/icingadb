@@ -21,7 +21,7 @@ type User struct {
 
 type UserCustomvar struct {
 	CustomvarMeta `json:",inline"`
-	UserId        types.Binary `json:"object_id"`
+	UserId        types.Binary `json:"user_id"`
 }
 
 type Usergroup struct {
@@ -30,13 +30,13 @@ type Usergroup struct {
 
 type UsergroupCustomvar struct {
 	CustomvarMeta `json:",inline"`
-	UsergroupId   types.Binary `json:"object_id"`
+	UsergroupId   types.Binary `json:"usergroup_id"`
 }
 
 type UsergroupMember struct {
 	MemberMeta  `json:",inline"`
 	UserId      types.Binary `json:"user_id"`
-	UsergroupId types.Binary `json:"group_id"`
+	UsergroupId types.Binary `json:"usergroup_id"`
 }
 
 func NewUser() contracts.Entity {

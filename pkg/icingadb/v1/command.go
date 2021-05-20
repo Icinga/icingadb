@@ -57,7 +57,7 @@ type CommandEnvvar struct {
 
 type CommandCustomvar struct {
 	CustomvarMeta `json:",inline"`
-	CommandId     types.Binary `json:"object_id"`
+	CommandId     types.Binary `json:"command_id"`
 }
 
 type Checkcommand struct {

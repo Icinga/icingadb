@@ -42,7 +42,7 @@ type NotificationRecipient struct {
 
 type NotificationCustomvar struct {
 	CustomvarMeta  `json:",inline"`
-	NotificationId types.Binary `json:"object_id"`
+	NotificationId types.Binary `json:"notification_id"`
 }
 
 func NewNotification() contracts.Entity {
