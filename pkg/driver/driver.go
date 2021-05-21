@@ -4,9 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
+	"github.com/icinga/icingadb/pkg/retry"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"log"
@@ -26,36 +26,16 @@ type Driver struct {
 
 // TODO(el): Test DNS.
 func (d Driver) Open(dsn string) (c driver.Conn, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	c, err = d.Driver.Open(dsn)
-	if err == nil {
-		// No error. Return immediately.
-		return
-	}
-
-	fmt.Println("Got error", err)
-
-	boff := backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1)
-
-	for attempt, retry := 0, shouldRetry(err); retry; attempt, retry = attempt+1, shouldRetry(err) {
-		sleep := boff(uint64(attempt))
-		d.Logger.Debugf("Sleeping for %s", sleep)
-		select {
-		case <-ctx.Done():
-			// Context canceled.
-			return nil, ctx.Err()
-		case <-time.After(sleep):
-			// Wait for backoff duration and continue.
-		}
-		c, err = d.Driver.Open(dsn)
-		if err == nil {
-			// No error. Break retry loop.
-			break
-		}
-	}
-
+	err = retry.WithBackoff(
+		context.Background(),
+		func(context.Context) (err error) {
+			c, err = d.Driver.Open(dsn)
+			return
+		},
+		shouldRetry,
+		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
+		timeout,
+	)
 	return
 }
 

@@ -150,7 +150,7 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 
 					return retry.WithBackoff(
 						ctx,
-						func() error {
+						func(context.Context) error {
 							query, args, err := sqlx.In(query, b)
 							if err != nil {
 								return err
@@ -167,7 +167,9 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 							return nil
 						},
 						IsRetryable,
-						backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second))
+						backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+						0,
+					)
 				}
 			}(b))
 		}
@@ -214,7 +216,7 @@ func (db *DB) NamedBulkExec(
 
 						return retry.WithBackoff(
 							ctx,
-							func() error {
+							func(ctx context.Context) error {
 								db.logger.Debugf("Executing %s with %d rows..", query, len(b))
 								_, err := db.NamedExecContext(ctx, query, b)
 								if err != nil {
@@ -237,7 +239,9 @@ func (db *DB) NamedBulkExec(
 								return nil
 							},
 							IsRetryable,
-							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second))
+							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+							0,
+						)
 					}
 				}(b))
 			case <-ctx.Done():
@@ -279,7 +283,7 @@ func (db *DB) NamedBulkExecTx(
 
 						return retry.WithBackoff(
 							ctx,
-							func() error {
+							func(ctx context.Context) error {
 								tx, err := db.BeginTxx(ctx, nil)
 								if err != nil {
 									return errors.Wrap(err, "can't start transaction")
@@ -305,7 +309,9 @@ func (db *DB) NamedBulkExecTx(
 								return nil
 							},
 							IsRetryable,
-							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second))
+							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+							0,
+						)
 					}
 				}(b))
 			case <-ctx.Done():
