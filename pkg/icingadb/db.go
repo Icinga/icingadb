@@ -157,7 +157,7 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 							}
 
 							query = db.Rebind(query)
-							_, err = db.Query(query, args...)
+							_, err = db.ExecContext(ctx, query, args...)
 							if err != nil {
 								return err
 							}
