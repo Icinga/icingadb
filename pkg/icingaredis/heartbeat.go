@@ -111,12 +111,22 @@ func (h Heartbeat) controller() {
 		for {
 			select {
 			case m := <-messages:
-				h.active = true // TODO(el): We might only want to set this once
+				if !h.active {
+					s, err := m.IcingaStatus()
+					if err != nil {
+						return err
+					}
+					h.logger.Infow("Received first Icinga 2 heartbeat", zap.String("environment", s.Environment))
+					h.active = true
+				}
 				h.beat <- m
 			case <-time.After(timeout):
 				if h.active {
+					h.logger.Warn("Lost Icinga 2 heartbeat", zap.Duration("timeout", timeout))
 					h.lost <- struct{}{}
 					h.active = false
+				} else {
+					h.logger.Warn("Waiting for Icinga 2 heartbeat")
 				}
 			case <-ctx.Done():
 				return ctx.Err()

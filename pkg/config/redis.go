@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"os"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -27,7 +28,7 @@ type Redis struct {
 func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error) {
 	c := redis.NewClient(&redis.Options{
 		Addr:        r.Address,
-		Dialer:      dial,
+		Dialer:      dialWithLogging(logger),
 		Password:    r.Password,
 		DB:          0, // Use default DB,
 		ReadTimeout: r.Timeout,
@@ -40,27 +41,36 @@ func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error
 	return icingaredis.NewClient(c, logger, &r.Options), nil
 }
 
-// dial behaves like net.Dialer#DialContext, but re-tries on syscall.ECONNREFUSED.
-func dial(ctx context.Context, network, addr string) (conn net.Conn, err error) {
-	var dl net.Dialer
+// dialWithLogging returns a Redis Dialer with logging capabilities.
+func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, string) (net.Conn, error) {
+	// dial behaves like net.Dialer#DialContext, but re-tries on syscall.ECONNREFUSED.
+	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
+		var dl net.Dialer
+		var logFirstError sync.Once
 
-	err = retry.WithBackoff(
-		ctx,
-		func(ctx context.Context) (err error) {
-			conn, err = dl.DialContext(ctx, network, addr)
-			return
-		},
-		func(err error) bool {
-			if op, ok := err.(*net.OpError); ok {
-				sys, ok := op.Err.(*os.SyscallError)
-				return ok && sys.Err == syscall.ECONNREFUSED
-			}
-			return false
-		},
-		backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-		5*time.Minute,
-	)
-	return
+		err = retry.WithBackoff(
+			ctx,
+			func(ctx context.Context) (err error) {
+				conn, err = dl.DialContext(ctx, network, addr)
+				logFirstError.Do(func() {
+					if err != nil {
+						logger.Warnw("Can't connect to Redis. Retrying", zap.Error(err))
+					}
+				})
+				return
+			},
+			func(err error) bool {
+				if op, ok := err.(*net.OpError); ok {
+					sys, ok := op.Err.(*os.SyscallError)
+					return ok && sys.Err == syscall.ECONNREFUSED
+				}
+				return false
+			},
+			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+			5*time.Minute,
+		)
+		return
+	}
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.

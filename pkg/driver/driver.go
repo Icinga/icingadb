@@ -12,6 +12,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -26,10 +27,16 @@ type Driver struct {
 
 // TODO(el): Test DNS.
 func (d Driver) Open(dsn string) (c driver.Conn, err error) {
+	var logFirstError sync.Once
 	err = retry.WithBackoff(
 		context.Background(),
 		func(context.Context) (err error) {
 			c, err = d.Driver.Open(dsn)
+			logFirstError.Do(func() {
+				if err != nil {
+					d.Logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
+				}
+			})
 			return
 		},
 		shouldRetry,
