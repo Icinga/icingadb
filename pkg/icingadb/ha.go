@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"github.com/google/uuid"
+	"github.com/icinga/icingadb/pkg/backoff"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
@@ -159,11 +160,10 @@ func (h *HA) controller() {
 }
 
 func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLog bool) error {
-	// boff := backoff.NewExponentialWithJitter(time.Millisecond*1, time.Second*1)
+	boff := backoff.NewExponentialWithJitter(time.Millisecond*256, time.Second*3)
 	for attempt := 0; true; attempt++ {
-		// sleep := boff(uint64(attempt))
-		// h.logger.Debugf("Sleeping for %s..", sleep)
-		// time.Sleep(sleep)
+		sleep := boff(uint64(attempt))
+		time.Sleep(sleep)
 
 		ctx, cancel := context.WithCancel(h.ctx)
 		tx, err := h.db.BeginTxx(ctx, &sql.TxOptions{
@@ -223,7 +223,12 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 				h.logger.Errorw("Can't update or insert instance", zap.Error(err))
 				break
 			} else {
-				h.logger.Infow("Can't update or insert instance. Retrying", zap.Error(err))
+				if attempt > 2 {
+					// Log with info level after third attempt
+					h.logger.Infow("Can't update or insert instance. Retrying", zap.Error(err), zap.Int("retry count", attempt))
+				} else {
+					h.logger.Debugw("Can't update or insert instance. Retrying", zap.Error(err), zap.Int("retry count", attempt))
+				}
 				continue
 			}
 		}
