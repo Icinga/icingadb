@@ -58,8 +58,8 @@ jobs:
         with:
           go-version: 1.16.x
 
-      - name: Run gofmt -s -d .
+      - name: Run gofmt -d .
         run: |
-            fmtvar="$(gofmt -s -d .)"
+            fmtvar="$(gofmt -d .)"
             echo "$fmtvar"
             test -z "$fmtvar"
