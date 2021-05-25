@@ -1,8 +1,0 @@
--- IcingaDB | (c) 2019 Icinga GmbH | GPLv2+
-
-DROP FUNCTION IF EXISTS unix_timestamp_ms;
-
-CREATE FUNCTION unix_timestamp_ms()
-  RETURNS BIGINT UNSIGNED
-  NO SQL
-  RETURN FLOOR((UNIX_TIMESTAMP(NOW(3)) * 1000));
