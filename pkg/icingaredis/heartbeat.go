@@ -112,7 +112,11 @@ func (h Heartbeat) controller() {
 			select {
 			case m := <-messages:
 				if !h.active {
-					h.logger.Info("Received first Icinga 2 heartbeat")
+					s, err := m.IcingaStatus()
+					if err != nil {
+						return err
+					}
+					h.logger.Infow("Received first Icinga 2 heartbeat", zap.String("environment", s.Environment))
 					h.active = true
 				}
 				h.beat <- m
