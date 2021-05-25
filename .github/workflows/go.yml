@@ -24,10 +24,8 @@ jobs:
 
       - run: go test -v -race ./...
 
-  lint-vet-fmt:
-
+  lint:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v2
 
@@ -40,11 +38,28 @@ jobs:
             go install honnef.co/go/tools/cmd/staticcheck@4dc1992c9bb4310ba1e98b30c8d7d46444891d3b
             staticcheck ./...
 
+  vet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.x
+
       - run: go vet ./...
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.x
 
       - name: Run gofmt -s -l .
         run: |
             fmtvar="$(gofmt -s -l .)"
             echo "$fmtvar"
             test -z "$fmtvar"
-
