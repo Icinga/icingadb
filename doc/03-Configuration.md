@@ -2,43 +2,37 @@
 
 ## Overview <a id="configuration-overview"></a>
 
-The configuration is stored in `/etc/icingadb/icingadb.ini`.
+The configuration is stored in `/etc/icingadb/icingadb.yml`.
 
-## General Configuration <a id="configuration-general"></a>
+## Redis Configuration <a id="configuration-redis"></a>
 
-### Redis Configuration <a id="configuration-general-redis"></a>
-
-Data resource where Icinga 2 is writing monitoring data.
+Configuration of the Redis that Icinga writes to.
 
 Option                   | Description
 -------------------------|-----------------------------------------------
-host                     | **Optional.** Redis host. Defaults to `127.0.0.1`.
-port                     | **Optional.** Redis port. Defaults to `6380`.
-password                 | **Optional.** Redis password. Not set by default.
-pool\_size               | **Optional.** Maximum number of socket connections. Defaults to `64`.
+address                  | **Required.** Redis host:port address.
 
-### MySQL Configuration <a id="configuration-general-mysql"></a>
+## Database Configuration <a id="configuration-database"></a>
 
-Data resource where IcingaDB stores synced data and historical events.
+Configuration of the database used by Icinga DB.
 
 Option                   | Description
 -------------------------|-----------------------------------------------
-host                     | **Optional.** MySQL host or absolute Unix socket path. Defaults to `127.0.0.1`.
-port                     | **Optional.** MySQL port. Defaults to `3306`.
-database                 | **Optional.** MySQL database. Defaults to `icingadb`.
-user                     | **Optional.** MySQL username.
-password                 | **Optional.** MySQL password.
-max\_open\_conns         | **Optional.** Maximum number of open connections. Defaults to `50`.
+host                     | **Required.** Database host or absolute Unix socket path.
+port                     | **Required.** Database port.
+database                 | **Required.** Database database.
+user                     | **Required.** Database username.
+password                 | **Required.** Database password.
 
-### Logging Configuration <a id="configuration-general-logging"></a>
+## Example Configuration <a id="configuration-example"></a>
 
-Option                   | Description
--------------------------|-----------------------------------------------
-level                    | **Optional.** Specifies the logging level. Can be set to `error`, `warn`, `info` or `debug`. See the [logrus spec](https://github.com/sirupsen/logrus#level-logging).
-
-### Prometheus Metrics Configuration <a id="configuration-general-metrics"></a>
-
-Option                   | Description
--------------------------|-----------------------------------------------
-host                     | **Optional.** Prometheus metrics endpoint host.
-port                     | **Optional.** Prometheus metrics endpoint port.
+```yaml
+database:
+  host: icingadb
+  port: 3306
+  database: icingadb
+  user: icingadb
+  password: icingadb
+redis:
+  address: redis:6380
+```
