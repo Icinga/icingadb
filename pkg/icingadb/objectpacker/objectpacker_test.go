@@ -158,8 +158,8 @@ func assertPackAny(t *testing.T, in interface{}, out []byte) {
 	{
 		buf := &bytes.Buffer{}
 		if err := PackAny(in, buf); err == nil {
-			if bytes.Compare(buf.Bytes(), out) != 0 {
-				t.Errorf("buf := &bytes.Buffer{}; packAny(%#v, buf); bytes.Compare(buf.Bytes(), %#v) != 0", in, out)
+			if !bytes.Equal(buf.Bytes(), out) {
+				t.Errorf("buf := &bytes.Buffer{}; packAny(%#v, buf); !bytes.Equal(buf.Bytes(), %#v)", in, out)
 			}
 		} else {
 			t.Errorf("packAny(%#v, &bytes.Buffer{}) != nil", in)
