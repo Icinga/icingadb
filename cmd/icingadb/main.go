@@ -82,7 +82,7 @@ func run() int {
 	rt := icingadb.NewRuntimeUpdates(db, rc, logger)
 	ods := overdue.NewSync(db, rc, logger)
 
-	sig := make(chan os.Signal)
+	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	// Main loop
