@@ -5,7 +5,6 @@ import (
 	"github.com/icinga/icingadb/pkg/types"
 	"io"
 	"testing"
-	"unsafe"
 )
 
 // limitedWriter allows writing a specific amount of data.
@@ -150,7 +149,7 @@ func TestPackAny(t *testing.T) {
 	assertPackAnyPanic(t, make(chan struct{}, 0), 0)
 	assertPackAnyPanic(t, func() {}, 0)
 	assertPackAnyPanic(t, struct{}{}, 0)
-	assertPackAnyPanic(t, unsafe.Pointer(uintptr(0)), 0)
+	assertPackAnyPanic(t, uintptr(0), 0)
 }
 
 func assertPackAny(t *testing.T, in interface{}, out []byte) {
