@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-var CondClosed = errors.New("condition closed")
+var ErrCondClosed = errors.New("condition closed")
 
 // Cond implements a condition variable, a rendezvous point
 // for goroutines waiting for or announcing the occurrence
@@ -64,7 +64,7 @@ func (c *Cond) Wait() <-chan struct{} {
 	case l := <-c.listeners:
 		return l
 	case <-c.ctx.Done():
-		panic(CondClosed)
+		panic(ErrCondClosed)
 	}
 }
 
@@ -73,7 +73,7 @@ func (c *Cond) Broadcast() {
 	select {
 	case c.broadcast <- struct{}{}:
 	case <-c.ctx.Done():
-		panic(CondClosed)
+		panic(ErrCondClosed)
 	}
 }
 
