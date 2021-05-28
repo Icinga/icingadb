@@ -357,7 +357,7 @@ CREATE TABLE icingadb_schema (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (1, CURRENT_TIMESTAMP() * 1000);
+  VALUES (2, CURRENT_TIMESTAMP() * 1000);
 
 CREATE TABLE checkcommand (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + type + name)',

@@ -30,3 +30,6 @@ ALTER TABLE user ADD INDEX idx_user_name (name) COMMENT 'User list filtered/orde
 ALTER TABLE usergroup ADD INDEX `idx_usergroup_display_name` (`display_name`) COMMENT 'Usergroup list filtered/ordered by display_name';
 ALTER TABLE usergroup ADD INDEX idx_usergroup_name_ci (name_ci) COMMENT 'Usergroup list filtered using quick search';
 ALTER TABLE usergroup ADD INDEX idx_usergroup_name (name) COMMENT 'Usergroup list filtered/ordered by name; Usergroup detail filter';
+
+INSERT INTO icingadb_schema (version, timestamp)
+  VALUES (2, CURRENT_TIMESTAMP() * 1000);
