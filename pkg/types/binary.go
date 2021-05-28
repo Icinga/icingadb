@@ -108,7 +108,7 @@ func (binary *Binary) Scan(src interface{}) error {
 		*binary = b
 
 	default:
-		return fmt.Errorf("Unable to scan type %T into Binary", src)
+		return fmt.Errorf("unable to scan type %T into Binary", src)
 	}
 
 	return nil
