@@ -117,8 +117,10 @@ CREATE TABLE hostgroup_customvar (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE host_state (
+  id binary(20) NOT NULL COMMENT 'host.id',
   host_id binary(20) NOT NULL COMMENT 'host.id',
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   state_type enum('hard', 'soft') NOT NULL,
   soft_state tinyint unsigned NOT NULL,
@@ -153,7 +155,7 @@ CREATE TABLE host_state (
   next_check bigint unsigned NOT NULL,
   next_update bigint unsigned NOT NULL,
 
-  PRIMARY KEY (host_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service (
@@ -265,8 +267,10 @@ CREATE TABLE servicegroup_customvar (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service_state (
+  id binary(20) NOT NULL COMMENT 'service.id',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   environment_id binary(20) NOT NULL COMMENT 'sha1(environment.name)',
+  properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   state_type enum('hard', 'soft') NOT NULL,
   soft_state tinyint unsigned NOT NULL,
@@ -301,7 +305,7 @@ CREATE TABLE service_state (
   next_check bigint unsigned NOT NULL,
   next_update bigint unsigned NOT NULL,
 
-  PRIMARY KEY (service_id)
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE endpoint (
