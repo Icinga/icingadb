@@ -70,6 +70,8 @@ func run() int {
 	}
 
 	ctx, cancelCtx := context.WithCancel(context.Background())
+	defer cancelCtx()
+
 	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
 	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
 	// Closing ha on exit ensures that this instance retracts its heartbeat
@@ -234,14 +236,18 @@ func run() int {
 					// otherwise there is no way to get Icinga DB back into a working state.
 					panic(errors.New("HA exited without an error but main context isn't cancelled"))
 				}
+
+				cancelHactx()
 				return ExitFailure
 			case <-ctx.Done():
 				panic(errors.New("main context closed unexpectedly"))
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
-				cancelCtx()
+				cancelHactx()
 				return ExitSuccess
 			}
 		}
+
+		cancelHactx()
 	}
 }

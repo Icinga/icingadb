@@ -170,10 +170,12 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 			Isolation: sql.LevelSerializable,
 		})
 		if err != nil {
+			cancel()
 			return err
 		}
 		rows, err := tx.QueryxContext(ctx, `SELECT id, heartbeat FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND id != ? AND heartbeat > ?`, s.EnvironmentID(), "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
 		if err != nil {
+			cancel()
 			return err
 		}
 		takeover := true
@@ -232,6 +234,9 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 				continue
 			}
 		}
+
+		cancel()
+
 		if err := tx.Commit(); err != nil {
 			return err
 		}
