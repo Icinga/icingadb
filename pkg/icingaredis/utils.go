@@ -70,7 +70,7 @@ func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksu
 					} else {
 						panic("no checksum")
 						// TODO(el): Error is not published
-						return errors.New("no checksum")
+						//return errors.New("no checksum")
 					}
 
 					select {
