@@ -12,7 +12,6 @@ type EntityBulker struct {
 	ch  chan []contracts.Entity
 	ctx context.Context
 	mu  sync.Mutex
-	err error
 }
 
 func NewEntityBulker(ctx context.Context, ch <-chan contracts.Entity, count int) *EntityBulker {

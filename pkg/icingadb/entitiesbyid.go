@@ -26,7 +26,7 @@ func (ebi EntitiesById) IDs() []interface{} {
 }
 
 func (ebi EntitiesById) Entities(ctx context.Context) <-chan contracts.Entity {
-	entities := make(chan contracts.Entity, 0)
+	entities := make(chan contracts.Entity)
 
 	go func() {
 		defer close(entities)

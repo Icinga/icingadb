@@ -11,7 +11,6 @@ type Bulker struct {
 	ch  chan []interface{}
 	ctx context.Context
 	mu  sync.Mutex
-	err error
 }
 
 func NewBulker(ctx context.Context, ch <-chan interface{}, count int) *Bulker {

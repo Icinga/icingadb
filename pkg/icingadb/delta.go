@@ -18,7 +18,6 @@ type Delta struct {
 	Delete  EntitiesById
 	Subject *common.SyncSubject
 	done    chan error
-	err     error
 	logger  *zap.SugaredLogger
 }
 

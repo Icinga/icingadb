@@ -170,26 +170,26 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 			Isolation: sql.LevelSerializable,
 		})
 		if err != nil {
+			cancel()
 			return err
 		}
 		rows, err := tx.QueryxContext(ctx, `SELECT id, heartbeat FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND id != ? AND heartbeat > ?`, s.EnvironmentID(), "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
 		if err != nil {
+			cancel()
 			return err
 		}
 		takeover := true
-		for rows.Next() {
+		if rows.Next() {
 			instance := &v1.IcingadbInstance{}
 			err := rows.StructScan(instance)
 			if err != nil {
 				h.logger.Errorw("Can't scan currently active instance", zap.Error(err))
-				break
+			} else {
+				if shouldLog {
+					h.logger.Infow("Another instance is active", "instance_id", instance.Id, zap.String("environment", s.Environment), "heartbeat", instance.Heartbeat, zap.Duration("heartbeat_age", time.Since(instance.Heartbeat.Time())))
+				}
+				takeover = false
 			}
-
-			if shouldLog {
-				h.logger.Infow("Another instance is active", "instance_id", instance.Id, zap.String("environment", s.Environment), "heartbeat", instance.Heartbeat, zap.Duration("heartbeat_age", time.Now().Sub(instance.Heartbeat.Time())))
-			}
-			takeover = false
-			break
 		}
 		_ = rows.Close()
 		i := v1.IcingadbInstance{
@@ -232,6 +232,9 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 				continue
 			}
 		}
+
+		cancel()
+
 		if err := tx.Commit(); err != nil {
 			return err
 		}

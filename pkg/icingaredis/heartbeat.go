@@ -84,7 +84,9 @@ func (h Heartbeat) controller() {
 	// Message producer loop
 	g.Go(func() error {
 		// We expect heartbeats every second but only read them every 3 seconds
-		throttle := time.Tick(time.Second * 3)
+		throttle := time.NewTicker(time.Second * 3)
+		defer throttle.Stop()
+
 		for {
 			cmd := h.client.XRead(ctx, &redis.XReadArgs{
 				Streams: []string{"icinga:stats", "$"},
@@ -102,7 +104,7 @@ func (h Heartbeat) controller() {
 				return ctx.Err()
 			}
 
-			<-throttle
+			<-throttle.C
 		}
 	})
 

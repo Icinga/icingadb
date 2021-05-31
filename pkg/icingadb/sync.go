@@ -46,7 +46,7 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 			s.logger.Infow("Waiting for dump done signal",
 				zap.String("type", typeName),
 				zap.String("key", key),
-				zap.Duration("duration", time.Now().Sub(startTime)))
+				zap.Duration("duration", time.Since(startTime)))
 			loggedWaiting = true
 		case <-dump.Done(key):
 			logFn := s.logger.Debugw
@@ -56,7 +56,7 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 			logFn("Starting sync",
 				zap.String("type", typeName),
 				zap.String("key", key),
-				zap.Duration("waited", time.Now().Sub(startTime)))
+				zap.Duration("waited", time.Since(startTime)))
 			return s.Sync(ctx, subject)
 		case <-ctx.Done():
 			return ctx.Err()

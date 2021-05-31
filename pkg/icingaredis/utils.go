@@ -13,7 +13,7 @@ import (
 )
 
 func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, pairs <-chan HPair, concurrent int) (<-chan contracts.Entity, <-chan error) {
-	entities := make(chan contracts.Entity, 0)
+	entities := make(chan contracts.Entity)
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -54,7 +54,7 @@ func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc
 }
 
 func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksums map[string]contracts.Entity, concurrent int) (<-chan contracts.Entity, <-chan error) {
-	entitiesWithChecksum := make(chan contracts.Entity, 0)
+	entitiesWithChecksum := make(chan contracts.Entity)
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -70,7 +70,7 @@ func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksu
 					} else {
 						panic("no checksum")
 						// TODO(el): Error is not published
-						return errors.New("no checksum")
+						//return errors.New("no checksum")
 					}
 
 					select {

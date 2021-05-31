@@ -5,7 +5,6 @@ import (
 	"github.com/icinga/icingadb/pkg/types"
 	"io"
 	"testing"
-	"unsafe"
 )
 
 // limitedWriter allows writing a specific amount of data.
@@ -113,7 +112,7 @@ func TestPackAny(t *testing.T) {
 		3, 0x40, 0x45, 0, 0, 0, 0, 0, 0,
 	})
 
-	assertPackAny(t, map[[1]byte]bool{[1]byte{42}: true}, []byte{
+	assertPackAny(t, map[[1]byte]bool{{42}: true}, []byte{
 		6, 0, 0, 0, 0, 0, 0, 0, 1,
 		0, 0, 0, 0, 0, 0, 0, 1, 42,
 		2,
@@ -147,10 +146,10 @@ func TestPackAny(t *testing.T) {
 
 	assertPackAnyPanic(t, complex64(0+0i), 0)
 	assertPackAnyPanic(t, 0+0i, 0)
-	assertPackAnyPanic(t, make(chan struct{}, 0), 0)
+	assertPackAnyPanic(t, make(chan struct{}), 0)
 	assertPackAnyPanic(t, func() {}, 0)
 	assertPackAnyPanic(t, struct{}{}, 0)
-	assertPackAnyPanic(t, unsafe.Pointer(uintptr(0)), 0)
+	assertPackAnyPanic(t, uintptr(0), 0)
 }
 
 func assertPackAny(t *testing.T, in interface{}, out []byte) {
@@ -159,8 +158,8 @@ func assertPackAny(t *testing.T, in interface{}, out []byte) {
 	{
 		buf := &bytes.Buffer{}
 		if err := PackAny(in, buf); err == nil {
-			if bytes.Compare(buf.Bytes(), out) != 0 {
-				t.Errorf("buf := &bytes.Buffer{}; packAny(%#v, buf); bytes.Compare(buf.Bytes(), %#v) != 0", in, out)
+			if !bytes.Equal(buf.Bytes(), out) {
+				t.Errorf("buf := &bytes.Buffer{}; packAny(%#v, buf); !bytes.Equal(buf.Bytes(), %#v)", in, out)
 			}
 		} else {
 			t.Errorf("packAny(%#v, &bytes.Buffer{}) != nil", in)
