@@ -214,7 +214,9 @@ func run() int {
 
 							logger.Infof("Starting runtime updates sync")
 
-							return rt.Sync(synctx, v1.Factories, lastRuntimeStreamId)
+							// @TODO(el): The customvar runtime update sync may change because the customvar flat
+							// runtime update sync is not yet implemented.
+							return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), lastRuntimeStreamId)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
