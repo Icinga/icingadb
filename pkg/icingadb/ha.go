@@ -280,14 +280,22 @@ func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
 
 func (h *HA) signalHandover() {
 	if h.responsible {
-		h.responsible = false
-		h.handover <- struct{}{}
+		select {
+		case h.handover <- struct{}{}:
+			h.responsible = false
+		case <-h.ctx.Done():
+			// Noop
+		}
 	}
 }
 
 func (h *HA) signalTakeover() {
 	if !h.responsible {
-		h.responsible = true
-		h.takeover <- struct{}{}
+		select {
+		case h.takeover <- struct{}{}:
+			h.responsible = true
+		case <-h.ctx.Done():
+			// Noop
+		}
 	}
 }
