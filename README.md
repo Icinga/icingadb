@@ -8,7 +8,7 @@ You will have to do the following steps to upgrade Icinga DB to the current mast
 2. Flush your Redis (`redis-cli flushall`) - We made a lot of changes to our Redis schema, so this is necessary
 3. Upgrade Icinga 2 to the latest snapshot/master
 4. Upgrade Icinga DB to latest master
-5. Upgrade the Icinga DB SQL schema (`mysql icingadb < schema/1.0.0-rc2.sql`)
+5. Upgrade the Icinga DB SQL schema (`mysql icingadb < schema/mysql/upgrades/1.0.0-rc2.sql`)
 6. Copy `config.yml.example` to `config.yml` and change it to your needs (The config file has changed and we don't use the old `icingadb.ini` config anymore)
 7. Start Icinga 2 and Icinga DB (For Icinga DB use `go run cmd/icingadb/main.go`)
 
