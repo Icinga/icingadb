@@ -233,14 +233,15 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 			}
 		}
 
-		cancel()
-
 		if err := tx.Commit(); err != nil {
+			cancel()
 			return err
 		}
 		if takeover {
 			h.signalTakeover()
 		}
+
+		cancel()
 		break
 	}
 
