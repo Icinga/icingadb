@@ -178,7 +178,7 @@ After creating the database you can import the Icinga DB schema using the
 following command. Enter the root password into the prompt when asked.
 
 ```
-cat /usr/share/icingadb/schema/mysql/mysql.schema.sql | mysql -uroot icingadb -p
+cat /usr/share/icingadb/schema/mysql/schema.sql | mysql -uroot icingadb -p
 ```
 
 ### Running Icinga DB <a id="running-icingadb"></a>
