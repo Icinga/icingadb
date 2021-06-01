@@ -26,7 +26,10 @@ func New() *Command {
 		utils.Fatal(err)
 	}
 
-	logger, err := zap.NewDevelopment()
+	loggerCfg := zap.NewDevelopmentConfig()
+	// Disable zap's automatic stack trace capturing, as we call errors.Wrap() before logging with "%+v".
+	loggerCfg.DisableStacktrace = true
+	logger, err := loggerCfg.Build()
 	if err != nil {
 		utils.Fatal(errors.Wrap(err, "can't create logger"))
 	}
@@ -42,7 +45,7 @@ func New() *Command {
 func (c Command) Database() *icingadb.DB {
 	db, err := c.Config.Database.Open(c.Logger)
 	if err != nil {
-		c.Logger.Fatalw("can't create database connection pool from config", zap.Error(err))
+		c.Logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
 	}
 
 	return db
@@ -51,7 +54,7 @@ func (c Command) Database() *icingadb.DB {
 func (c Command) Redis() *icingaredis.Client {
 	rc, err := c.Config.Redis.NewClient(c.Logger)
 	if err != nil {
-		c.Logger.Fatalw("can't create Redis client from config", zap.Error(err))
+		c.Logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
 	}
 
 	return rc
