@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"encoding/json"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/pkg/errors"
 )
@@ -23,26 +23,26 @@ func (m StatsMessage) IcingaStatus() (*IcingaStatus, error) {
 			} `json:"status"`
 		}
 
-		if err := json.Unmarshal([]byte(s), &envelope); err != nil {
-			return nil, errors.Wrap(err, "can't parse Icinga 2 status")
+		if err := internal.UnmarshalJSON([]byte(s), &envelope); err != nil {
+			return nil, err
 		}
 
 		return &envelope.Status.IcingaApplication.IcingaStatus, nil
 	}
 
-	return nil, errors.New("bad message")
+	return nil, errors.Errorf(`bad message %#v. "IcingaApplication" missing`, m)
 }
 
 func (m StatsMessage) Time() (*types.UnixMilli, error) {
 	if s, ok := m["timestamp"].(string); ok {
 		var t types.UnixMilli
 
-		if err := json.Unmarshal([]byte(s), &t); err != nil {
-			return nil, errors.Wrap(err, "can't parse timestamp")
+		if err := internal.UnmarshalJSON([]byte(s), &t); err != nil {
+			return nil, err
 		}
 
 		return &t, nil
 	}
 
-	return nil, errors.New("bad message")
+	return nil, errors.Errorf(`bad message %#v. "timestamp" missing`, m)
 }

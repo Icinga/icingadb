@@ -7,6 +7,7 @@ import (
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -115,7 +116,7 @@ func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-c
 
 		for batch := range batches {
 			if err := sem.Acquire(ctx, 1); err != nil {
-				return err
+				return errors.Wrap(err, "can't acquire semaphore")
 			}
 
 			g.Go(func(batch []string) func() error {

@@ -8,6 +8,7 @@ import (
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/structify"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"reflect"
@@ -144,7 +145,7 @@ func structifyStream(
 
 				ptr, err := structifier(message.Values)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "can't structify values %#v", message.Values)
 				}
 
 				ue := ptr.(v1.UpserterEntity)

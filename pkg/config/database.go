@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/creasty/defaults"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -59,7 +60,7 @@ func (d *Database) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Prevent recursion.
 	type self Database
 	if err := unmarshal((*self)(d)); err != nil {
-		return errors.Wrap(err, "can't parse database config")
+		return internal.CantUnmarshalYAML(err, d)
 	}
 
 	if d.MaxConnectionsPerTable < 1 {

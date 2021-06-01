@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
+	"github.com/icinga/icingadb/internal"
 	"github.com/pkg/errors"
 )
 
@@ -18,7 +19,7 @@ func (as *AcknowledgementState) UnmarshalText(bytes []byte) error {
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (as *AcknowledgementState) UnmarshalJSON(data []byte) error {
 	var i uint8
-	if err := json.Unmarshal(data, &i); err != nil {
+	if err := internal.UnmarshalJSON(data, &i); err != nil {
 		return err
 	}
 

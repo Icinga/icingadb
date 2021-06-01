@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
+	"github.com/icinga/icingadb/internal"
 	"github.com/pkg/errors"
 )
 
@@ -13,7 +14,7 @@ type NotificationStates uint8
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (nst *NotificationStates) UnmarshalJSON(bytes []byte) error {
 	var states []string
-	if err := json.Unmarshal(bytes, &states); err != nil {
+	if err := internal.UnmarshalJSON(bytes, &states); err != nil {
 		return err
 	}
 

@@ -5,6 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
 	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"sync"
@@ -116,7 +117,7 @@ func (h Heartbeat) controller() {
 				if !h.active {
 					s, err := m.IcingaStatus()
 					if err != nil {
-						return err
+						return errors.Wrapf(err, "can't parse Icinga 2 status from message %#v", m)
 					}
 					h.logger.Infow("Received first Icinga 2 heartbeat", zap.String("environment", s.Environment))
 					h.active = true
@@ -147,6 +148,6 @@ func (h Heartbeat) controller() {
 
 func (h *Heartbeat) setError(err error) {
 	h.mu.Lock()
-	h.err = err
+	h.err = errors.Wrap(err, "heartbeat failed")
 	h.mu.Unlock()
 }

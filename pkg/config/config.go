@@ -25,7 +25,7 @@ type Flags struct {
 func FromYAMLFile(name string) (*Config, error) {
 	f, err := os.Open(name)
 	if err != nil {
-		return nil, errors.Wrap(err, "can't open YAML file")
+		return nil, errors.Wrap(err, "can't open YAML file "+name)
 	}
 	defer f.Close()
 
@@ -43,11 +43,11 @@ func FromYAMLFile(name string) (*Config, error) {
 func ValidateFile(name string) error {
 	f, err := os.Stat(name)
 	if err != nil {
-		return errors.Wrap(err, "not a readable file")
+		return errors.Wrap(err, "can't read file "+name)
 	}
 
 	if f.IsDir() {
-		return errors.Errorf("'%s' is a directory", name)
+		return errors.New(name + " is a directory")
 	}
 
 	return nil
@@ -64,7 +64,7 @@ func ParseFlags() (*Flags, error) {
 	}
 
 	if err := ValidateFile(f.Config); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "invalid config file "+f.Config)
 	}
 
 	return f, nil

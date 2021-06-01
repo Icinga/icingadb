@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/creasty/defaults"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/retry"
@@ -81,12 +82,12 @@ func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, st
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (d *Redis) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := defaults.Set(d); err != nil {
-		return err
+		return errors.Wrapf(err, "can't set defaults %#v", d)
 	}
 	// Prevent recursion.
 	type self Redis
 	if err := unmarshal((*self)(d)); err != nil {
-		return err
+		return internal.CantUnmarshalYAML(err, d)
 	}
 
 	if d.MaxHMGetConnections < 1 {

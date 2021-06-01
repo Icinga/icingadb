@@ -7,8 +7,9 @@ import (
 	"encoding"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/pkg/errors"
 )
 
 // Binary nullable byte string. Hex as JSON.
@@ -52,7 +53,7 @@ func (binary *Binary) UnmarshalText(text []byte) error {
 	b := make([]byte, hex.DecodedLen(len(text)))
 	_, err := hex.Decode(b, text)
 	if err != nil {
-		return err
+		return internal.CantDecodeHex(err, string(text))
 	}
 	*binary = b
 
@@ -67,7 +68,7 @@ func (binary Binary) MarshalJSON() ([]byte, error) {
 		return nil, nil
 	}
 
-	return json.Marshal(binary.String())
+	return internal.MarshalJSON(binary.String())
 }
 
 // UnmarshalJSON implements a custom unmarshal function to decode
@@ -79,12 +80,12 @@ func (binary *Binary) UnmarshalJSON(data []byte) error {
 	}
 
 	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
+	if err := internal.UnmarshalJSON(data, &s); err != nil {
 		return err
 	}
 	b, err := hex.DecodeString(s)
 	if err != nil {
-		return err
+		return internal.CantDecodeHex(err, s)
 	}
 	*binary = b
 
@@ -108,7 +109,7 @@ func (binary *Binary) Scan(src interface{}) error {
 		*binary = b
 
 	default:
-		return fmt.Errorf("unable to scan type %T into Binary", src)
+		return errors.Errorf("unable to scan type %T into Binary", src)
 	}
 
 	return nil

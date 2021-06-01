@@ -3,11 +3,11 @@ package utils
 import (
 	"context"
 	"crypto/sha1"
-	"errors"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/exp/utf8string"
 	"io/ioutil"
@@ -133,23 +133,23 @@ func CreateOrRead(name string, callback func() []byte) ([]byte, error) {
 		if err := ioutil.WriteFile(name, b, 0660); err != nil {
 			defer os.Remove(name)
 
-			return nil, err
+			return nil, errors.Wrap(err, "can't write to file "+name)
 		}
 
 		return b, nil
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "can't read file "+name)
 	}
 
 	if info.IsDir() {
-		return nil, fmt.Errorf("'%s' is a directory", name)
+		return nil, errors.Errorf(name + " is a directory")
 	}
 
 	b, err := ioutil.ReadFile(name)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "can't read file "+name)
 	}
 
 	return b, nil

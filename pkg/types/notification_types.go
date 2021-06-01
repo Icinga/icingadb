@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
+	"github.com/icinga/icingadb/internal"
 	"github.com/pkg/errors"
 )
 
@@ -13,7 +14,7 @@ type NotificationTypes uint16
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (nt *NotificationTypes) UnmarshalJSON(bytes []byte) error {
 	var types []string
-	if err := json.Unmarshal(bytes, &types); err != nil {
+	if err := internal.UnmarshalJSON(bytes, &types); err != nil {
 		return err
 	}
 

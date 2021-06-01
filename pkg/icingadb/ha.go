@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"github.com/google/uuid"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -92,7 +93,7 @@ func (h *HA) Takeover() chan struct{} {
 func (h *HA) abort(err error) {
 	h.errOnce.Do(func() {
 		h.mu.Lock()
-		h.err = err
+		h.err = errors.Wrap(err, "HA aborted")
 		h.mu.Unlock()
 
 		h.cancel()
@@ -178,7 +179,7 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 		rows, err := tx.QueryxContext(ctx, query, s.EnvironmentID(), "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
 		if err != nil {
 			cancel()
-			return errors.Wrap(err, "can't perform "+query)
+			return internal.CantPerformQuery(err, query)
 		}
 		takeover := true
 		if rows.Next() {
@@ -220,8 +221,8 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 		_, err = tx.NamedExecContext(ctx, stmt, i)
 
 		if err != nil {
-			err = errors.Wrap(err, "can't perform "+stmt)
 			cancel()
+			err = internal.CantPerformQuery(err, stmt)
 			if !utils.IsDeadlock(err) {
 				h.logger.Errorw("Can't update or insert instance", zap.Error(err))
 				break
@@ -257,7 +258,7 @@ func (h *HA) removeInstance() {
 	query := "DELETE FROM icingadb_instance WHERE id = ?"
 	_, err := h.db.Exec(query, h.instanceId)
 	if err != nil {
-		h.logger.Warnw("Could not remove instance from database", zap.Error(errors.Wrap(err, "can't perform "+query)))
+		h.logger.Warnw("Could not remove instance from database", zap.Error(err), zap.String("query", query))
 	}
 }
 
@@ -268,18 +269,19 @@ func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
 	case <-time.After(timeout):
 		query := "DELETE FROM icingadb_instance " +
 			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?"
+		heartbeat := types.UnixMilli(time.Now().Add(-timeout))
 		result, err := h.db.ExecContext(h.ctx, query, h.instanceId, s.EnvironmentID(),
-			s.EndpointId, types.UnixMilli(time.Now().Add(-timeout)))
+			s.EndpointId, heartbeat)
 		if err != nil {
-			h.logger.Errorw("Can't remove rows of old instances", zap.Error(errors.Wrap(err, "can't perform "+query)))
+			h.logger.Errorw("Can't remove rows of old instances", zap.Error(err),
+				zap.String("query", query),
+				zap.String("id", h.instanceId.String()), zap.String("environment_id", s.EnvironmentID().String()),
+				zap.String("endpoint_id", s.EndpointId.String()), zap.Time("heartbeat", heartbeat.Time()))
 			return
 		}
 		affected, err := result.RowsAffected()
 		if err != nil {
-			h.logger.Errorw(
-				"Can't get number of removed old instances",
-				zap.Error(errors.Wrap(err, "can't get affected rows")),
-			)
+			h.logger.Errorw("Can't get number of removed old instances", zap.Error(err))
 			return
 		}
 		h.logger.Debugf("Removed %d old instances", affected)

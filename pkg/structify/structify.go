@@ -38,7 +38,12 @@ func MakeMapStructifier(t reflect.Type, tag string) MapStructifier {
 		}
 
 		vPtrElem := vPtr.Elem()
-		return ptr, structifyMapByTree(kv, tree, vPtrElem, vPtrElem, new([]int))
+		err := structifyMapByTree(kv, tree, vPtrElem, vPtrElem, new([]int))
+		if err != nil {
+			err = errors.Wrapf(err, "can't structify map %#v by tree %#v", kv, tree)
+		}
+
+		return ptr, err
 	}
 }
 
@@ -91,10 +96,8 @@ func structifyMapByTree(src map[string]interface{}, tree []structBranch, dest, r
 							typ = f.Type
 						}
 
-						return errors.Wrap(err, fmt.Sprintf(
-							"can't parse %s into the %s %s#%s: %s", branch.leaf,
-							typ.Name(), rt.Name(), strings.Join(path, "."), vs,
-						))
+						return errors.Wrapf(err, "can't parse %s into the %s %s#%s: %s",
+							branch.leaf, typ.Name(), rt.Name(), strings.Join(path, "."), vs)
 					}
 				}
 			}

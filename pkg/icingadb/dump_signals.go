@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -53,14 +54,13 @@ func (s *DumpSignals) Listen(ctx context.Context) error {
 
 	for {
 		if err := ctx.Err(); err != nil {
-			return err
+			return errors.Wrap(err, "can't listen for dump signals")
 		}
 
 		cmd := s.redis.XRead(ctx, &redis.XReadArgs{
 			Streams: []string{"icinga:dump", lastStreamId},
 			Block:   0, // block indefinitely
 		})
-
 		result, err := cmd.Result()
 		if err != nil {
 			return icingaredis.WrapCmdErr(cmd)
