@@ -155,7 +155,8 @@ CREATE TABLE host_state (
   next_check bigint unsigned NOT NULL,
   next_update bigint unsigned NOT NULL,
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE INDEX idx_host_state_host_id (host_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service (
@@ -305,7 +306,8 @@ CREATE TABLE service_state (
   next_check bigint unsigned NOT NULL,
   next_update bigint unsigned NOT NULL,
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE INDEX idx_service_state_service_id (service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE endpoint (
