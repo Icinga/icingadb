@@ -1,7 +1,6 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"github.com/creasty/defaults"
 	"github.com/icinga/icingadb/pkg/driver"
