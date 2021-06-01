@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
-	"fmt"
+	"github.com/pkg/errors"
 	"strconv"
 )
 
@@ -20,7 +20,7 @@ func (ct *CommentType) UnmarshalJSON(bytes []byte) error {
 
 	c := CommentType(i)
 	if _, ok := commentTypes[c]; !ok {
-		return BadCommentType{bytes}
+		return badCommentType(bytes)
 	}
 
 	*ct = c
@@ -39,11 +39,11 @@ func (ct *CommentType) UnmarshalText(bytes []byte) error {
 	c := CommentType(i)
 	if uint64(c) != i {
 		// Truncated due to above cast, obviously too high
-		return BadCommentType{text}
+		return badCommentType(text)
 	}
 
 	if _, ok := commentTypes[c]; !ok {
-		return BadCommentType{text}
+		return badCommentType(text)
 	}
 
 	*ct = c
@@ -55,18 +55,13 @@ func (ct CommentType) Value() (driver.Value, error) {
 	if v, ok := commentTypes[ct]; ok {
 		return v, nil
 	} else {
-		return nil, BadCommentType{ct}
+		return nil, badCommentType(ct)
 	}
 }
 
-// BadCommentType complains about a syntactically, but not semantically valid CommentType.
-type BadCommentType struct {
-	Type interface{}
-}
-
-// Error implements the error interface.
-func (bct BadCommentType) Error() string {
-	return fmt.Sprintf("bad comment type: %#v", bct.Type)
+// badCommentType returns an error about a syntactically, but not semantically valid CommentType.
+func badCommentType(t interface{}) error {
+	return errors.Errorf("bad comment type: %#v", t)
 }
 
 // commentTypes maps all valid CommentType values to their SQL representation.
@@ -77,7 +72,6 @@ var commentTypes = map[CommentType]string{
 
 // Assert interface compliance.
 var (
-	_ error                    = BadCommentType{}
 	_ json.Unmarshaler         = (*CommentType)(nil)
 	_ encoding.TextUnmarshaler = (*CommentType)(nil)
 	_ driver.Valuer            = CommentType(0)

@@ -3,7 +3,7 @@ package types
 import (
 	"database/sql/driver"
 	"encoding"
-	"fmt"
+	"github.com/pkg/errors"
 	"strconv"
 )
 
@@ -22,11 +22,11 @@ func (nt *NotificationType) UnmarshalText(bytes []byte) error {
 	n := NotificationType(i)
 	if uint64(n) != i {
 		// Truncated due to above cast, obviously too high
-		return BadNotificationType{text}
+		return badNotificationType(text)
 	}
 
 	if _, ok := notificationTypes[n]; !ok {
-		return BadNotificationType{text}
+		return badNotificationType(text)
 	}
 
 	*nt = n
@@ -38,18 +38,13 @@ func (nt NotificationType) Value() (driver.Value, error) {
 	if v, ok := notificationTypes[nt]; ok {
 		return v, nil
 	} else {
-		return nil, BadNotificationType{nt}
+		return nil, badNotificationType(nt)
 	}
 }
 
-// BadNotificationType complains about a syntactically, but not semantically valid NotificationType.
-type BadNotificationType struct {
-	Type interface{}
-}
-
-// Error implements the error interface.
-func (bnt BadNotificationType) Error() string {
-	return fmt.Sprintf("bad notification type: %#v", bnt.Type)
+// badNotificationType returns an error about a syntactically, but not semantically valid NotificationType.
+func badNotificationType(t interface{}) error {
+	return errors.Errorf("bad notification type: %#v", t)
 }
 
 // notificationTypes maps all valid NotificationType values to their SQL representation.
@@ -67,7 +62,6 @@ var notificationTypes = map[NotificationType]string{
 
 // Assert interface compliance.
 var (
-	_ error                    = BadNotificationType{}
 	_ encoding.TextUnmarshaler = (*NotificationType)(nil)
 	_ driver.Valuer            = NotificationType(0)
 )

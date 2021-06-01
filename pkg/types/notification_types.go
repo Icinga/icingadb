@@ -4,7 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
-	"fmt"
+	"github.com/pkg/errors"
 )
 
 // NotificationTypes specifies the set of reasons a notification may be sent for.
@@ -22,7 +22,7 @@ func (nt *NotificationTypes) UnmarshalJSON(bytes []byte) error {
 		if v, ok := notificationTypeNames[typ]; ok {
 			n |= v
 		} else {
-			return BadNotificationTypes{types}
+			return badNotificationTypes(nt)
 		}
 	}
 
@@ -40,18 +40,13 @@ func (nt NotificationTypes) Value() (driver.Value, error) {
 	if nt&^allNotificationTypes == 0 {
 		return int64(nt), nil
 	} else {
-		return nil, BadNotificationTypes{nt}
+		return nil, badNotificationTypes(nt)
 	}
 }
 
-// BadNotificationTypes complains about syntactically, but not semantically valid NotificationTypes.
-type BadNotificationTypes struct {
-	Types interface{}
-}
-
-// Error implements the error interface.
-func (bnt BadNotificationTypes) Error() string {
-	return fmt.Sprintf("bad notification types: %#v", bnt.Types)
+// badNotificationTypes returns an error about syntactically, but not semantically valid NotificationTypes.
+func badNotificationTypes(t interface{}) error {
+	return errors.Errorf("bad notification types: %#v", t)
 }
 
 // notificationTypeNames maps all valid NotificationTypes values to their SQL representation.
@@ -79,7 +74,6 @@ var allNotificationTypes = func() NotificationTypes {
 
 // Assert interface compliance.
 var (
-	_ error                    = BadNotificationTypes{}
 	_ json.Unmarshaler         = (*NotificationTypes)(nil)
 	_ encoding.TextUnmarshaler = (*NotificationTypes)(nil)
 	_ driver.Valuer            = NotificationTypes(0)
