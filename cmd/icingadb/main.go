@@ -212,7 +212,7 @@ func run() int {
 						g.Go(func() error {
 							wg.Wait()
 
-							logger.Infof("Starting runtime updates sync")
+							logger.Info("Starting runtime updates sync")
 
 							// @TODO(el): The customvar runtime update sync may change because the customvar flat
 							// runtime update sync is not yet implemented.
