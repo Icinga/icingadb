@@ -88,16 +88,12 @@ func (db *DB) BuildSelectStmt(from interface{}, into interface{}) string {
 
 func (db *DB) BuildUpdateStmt(update interface{}) string {
 	columns := db.BuildColumns(update)
-	set := make([]string, 0, len(columns))
-
-	for _, col := range columns {
-		set = append(set, fmt.Sprintf("%s = :%s", col, col))
-	}
 
 	return fmt.Sprintf(
-		`UPDATE %s SET %s WHERE id = :id`,
+		`REPLACE INTO %s (%s) VALUES (%s)`,
 		utils.TableName(update),
-		strings.Join(set, ", "),
+		strings.Join(columns, ", "),
+		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 	)
 }
 
@@ -394,7 +390,7 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Enti
 		return errors.Wrap(err, "can't copy first entity")
 	}
 	sem := db.getSemaphoreForTable(utils.TableName(first))
-	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(first), 1<<15, sem, forward)
+	return db.NamedBulkExec(ctx, db.BuildUpdateStmt(first), 1<<15/len(db.BuildColumns(first)), sem, forward, nil)
 }
 
 func (db *DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}) error {
