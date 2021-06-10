@@ -360,7 +360,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 			db.logger.Infof("Fetched %d elements of %s in %s", cnt.Val(), utils.Name(v), elapsed)
 		})
 
-		rows, err := db.Queryx(query, args...)
+		rows, err := db.QueryxContext(ctx, query, args...)
 		if err != nil {
 			return internal.CantPerformQuery(err, query)
 		}
