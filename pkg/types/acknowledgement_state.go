@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Acknowledgement specifies an acknowledgement state (yes, no, sticky).
+// AcknowledgementState specifies an acknowledgement state (yes, no, sticky).
 type AcknowledgementState uint8
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.

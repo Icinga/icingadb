@@ -2,7 +2,7 @@ package com
 
 import "sync/atomic"
 
-// Atomic counter.
+// Counter implements an atomic counter.
 type Counter uint64
 
 // Add adds the given delta to the counter.
