@@ -41,7 +41,7 @@ func (binary Binary) String() string {
 
 // MarshalText implements a custom marhsal function to encode
 // the Binary as hex. MarshalText implements the
-// enconding.TextMarshaler interface.
+// encoding.TextMarshaler interface.
 func (binary Binary) MarshalText() ([]byte, error) {
 	return []byte(binary.String()), nil
 }

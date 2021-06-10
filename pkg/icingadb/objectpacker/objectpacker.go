@@ -47,7 +47,7 @@ func PackAny(in interface{}, out io.Writer) error {
 var tByte = reflect.TypeOf(byte(0))
 var tBytes = reflect.TypeOf([]uint8(nil))
 
-// packValue does the actual job of packAny and just exists for recursion w/o unneccessary reflect.ValueOf calls.
+// packValue does the actual job of packAny and just exists for recursion w/o unnecessary reflect.ValueOf calls.
 func packValue(in reflect.Value, out io.Writer) error {
 	switch kind := in.Kind(); kind {
 	case reflect.Invalid: // nil
