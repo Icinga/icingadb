@@ -11,18 +11,6 @@ import (
 )
 
 var (
-	Yes = Bool{
-		Bool:  true,
-		Valid: true,
-	}
-
-	No = Bool{
-		Bool:  false,
-		Valid: true,
-	}
-)
-
-var (
 	enum = map[bool]string{
 		true:  "y",
 		false: "n",
