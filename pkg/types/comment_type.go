@@ -29,22 +29,22 @@ func (ct *CommentType) UnmarshalJSON(bytes []byte) error {
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
-func (ct *CommentType) UnmarshalText(bytes []byte) error {
-	text := string(bytes)
+func (ct *CommentType) UnmarshalText(text []byte) error {
+	s := string(text)
 
-	i, err := strconv.ParseUint(text, 10, 64)
+	i, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		return internal.CantParseUint64(err, text)
+		return internal.CantParseUint64(err, s)
 	}
 
 	c := CommentType(i)
 	if uint64(c) != i {
 		// Truncated due to above cast, obviously too high
-		return badCommentType(text)
+		return badCommentType(s)
 	}
 
 	if _, ok := commentTypes[c]; !ok {
-		return badCommentType(text)
+		return badCommentType(s)
 	}
 
 	*ct = c

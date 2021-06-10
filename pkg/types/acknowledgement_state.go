@@ -12,8 +12,8 @@ import (
 type AcknowledgementState uint8
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
-func (as *AcknowledgementState) UnmarshalText(bytes []byte) error {
-	return as.UnmarshalJSON(bytes)
+func (as *AcknowledgementState) UnmarshalText(text []byte) error {
+	return as.UnmarshalJSON(text)
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.

@@ -12,22 +12,22 @@ import (
 type NotificationType uint16
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
-func (nt *NotificationType) UnmarshalText(bytes []byte) error {
-	text := string(bytes)
+func (nt *NotificationType) UnmarshalText(text []byte) error {
+	s := string(text)
 
-	i, err := strconv.ParseUint(text, 10, 64)
+	i, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		return internal.CantParseUint64(err, text)
+		return internal.CantParseUint64(err, s)
 	}
 
 	n := NotificationType(i)
 	if uint64(n) != i {
 		// Truncated due to above cast, obviously too high
-		return badNotificationType(text)
+		return badNotificationType(s)
 	}
 
 	if _, ok := notificationTypes[n]; !ok {
-		return badNotificationType(text)
+		return badNotificationType(s)
 	}
 
 	*nt = n
