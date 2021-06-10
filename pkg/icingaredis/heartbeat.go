@@ -15,30 +15,30 @@ import (
 var timeout = 60 * time.Second
 
 type Heartbeat struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	client *Client
-	logger *zap.SugaredLogger
-	active bool
-	beat   chan v1.StatsMessage
-	lost   chan struct{}
-	done   chan struct{}
-	mu     *sync.Mutex
-	err    error
+	ctx       context.Context
+	cancelCtx context.CancelFunc
+	client    *Client
+	logger    *zap.SugaredLogger
+	active    bool
+	beat      chan v1.StatsMessage
+	lost      chan struct{}
+	done      chan struct{}
+	mu        *sync.Mutex
+	err       error
 }
 
 func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger) *Heartbeat {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancelCtx := context.WithCancel(ctx)
 
 	heartbeat := &Heartbeat{
-		ctx:    ctx,
-		cancel: cancel,
-		client: client,
-		logger: logger,
-		beat:   make(chan v1.StatsMessage),
-		lost:   make(chan struct{}),
-		done:   make(chan struct{}),
-		mu:     &sync.Mutex{},
+		ctx:       ctx,
+		cancelCtx: cancelCtx,
+		client:    client,
+		logger:    logger,
+		beat:      make(chan v1.StatsMessage),
+		lost:      make(chan struct{}),
+		done:      make(chan struct{}),
+		mu:        &sync.Mutex{},
 	}
 
 	go heartbeat.controller()
@@ -49,7 +49,7 @@ func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger
 // Close implements the io.Closer interface.
 func (h Heartbeat) Close() error {
 	// Cancel ctx.
-	h.cancel()
+	h.cancelCtx()
 	// Wait until the controller loop ended.
 	<-h.Done()
 	// And return an error, if any.
