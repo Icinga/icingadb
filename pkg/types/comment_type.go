@@ -13,15 +13,15 @@ import (
 type CommentType uint8
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
-func (ct *CommentType) UnmarshalJSON(bytes []byte) error {
+func (ct *CommentType) UnmarshalJSON(data []byte) error {
 	var i uint8
-	if err := internal.UnmarshalJSON(bytes, &i); err != nil {
+	if err := internal.UnmarshalJSON(data, &i); err != nil {
 		return err
 	}
 
 	c := CommentType(i)
 	if _, ok := commentTypes[c]; !ok {
-		return badCommentType(bytes)
+		return badCommentType(data)
 	}
 
 	*ct = c
