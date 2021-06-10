@@ -22,7 +22,7 @@ var timeout = 60 * time.Second
 
 type HA struct {
 	ctx         context.Context
-	cancel      context.CancelFunc
+	cancelCtx   context.CancelFunc
 	instanceId  types.Binary
 	db          *DB
 	heartbeat   *icingaredis.Heartbeat
@@ -37,13 +37,13 @@ type HA struct {
 }
 
 func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger *zap.SugaredLogger) *HA {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancelCtx := context.WithCancel(ctx)
 
 	instanceId := uuid.New()
 
 	ha := &HA{
 		ctx:        ctx,
-		cancel:     cancel,
+		cancelCtx:  cancelCtx,
 		instanceId: instanceId[:],
 		db:         db,
 		heartbeat:  heartbeat,
@@ -62,7 +62,7 @@ func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger
 // Close implements the io.Closer interface.
 func (h *HA) Close() error {
 	// Cancel ctx.
-	h.cancel()
+	h.cancelCtx()
 	// Wait until the controller loop ended.
 	<-h.Done()
 	// Remove our instance from the database.
@@ -96,7 +96,7 @@ func (h *HA) abort(err error) {
 		h.err = errors.Wrap(err, "HA aborted")
 		h.mu.Unlock()
 
-		h.cancel()
+		h.cancelCtx()
 	})
 }
 
@@ -168,18 +168,18 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 		sleep := boff(uint64(attempt))
 		time.Sleep(sleep)
 
-		ctx, cancel := context.WithCancel(h.ctx)
+		ctx, cancelCtx := context.WithCancel(h.ctx)
 		tx, err := h.db.BeginTxx(ctx, &sql.TxOptions{
 			Isolation: sql.LevelSerializable,
 		})
 		if err != nil {
-			cancel()
+			cancelCtx()
 			return errors.Wrap(err, "can't start transaction")
 		}
 		query := `SELECT id, heartbeat FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND id != ? AND heartbeat > ?`
 		rows, err := tx.QueryxContext(ctx, query, s.EnvironmentID(), "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
 		if err != nil {
-			cancel()
+			cancelCtx()
 			return internal.CantPerformQuery(err, query)
 		}
 		takeover := true
@@ -222,7 +222,7 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 		_, err = tx.NamedExecContext(ctx, stmt, i)
 
 		if err != nil {
-			cancel()
+			cancelCtx()
 			err = internal.CantPerformQuery(err, stmt)
 			if !utils.IsDeadlock(err) {
 				h.logger.Errorw("Can't update or insert instance", zap.Error(err))
@@ -239,14 +239,14 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 		}
 
 		if err := tx.Commit(); err != nil {
-			cancel()
+			cancelCtx()
 			return errors.Wrap(err, "can't commit transaction")
 		}
 		if takeover {
 			h.signalTakeover()
 		}
 
-		cancel()
+		cancelCtx()
 		break
 	}
 

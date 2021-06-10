@@ -20,9 +20,9 @@ func WithBackoff(
 	ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff, timeout time.Duration,
 ) (err error) {
 	if timeout > 0 {
-		var cancel func()
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
+		var cancelCtx context.CancelFunc
+		ctx, cancelCtx = context.WithTimeout(ctx, timeout)
+		defer cancelCtx()
 	}
 
 	for attempt := 0; ; /* true */ attempt++ {
