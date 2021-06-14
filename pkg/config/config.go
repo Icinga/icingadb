@@ -17,8 +17,6 @@ type Config struct {
 type Flags struct {
 	// Config is the path to the config file
 	Config string `short:"c" long:"config" description:"path to config file" required:"true" default:"./config.yml"`
-	// Datadir is the location of the data directory
-	Datadir string `long:"datadir" description:"path to the data directory" required:"true" default:"./"`
 }
 
 // FromYAMLFile returns a new Config value created from the given YAML config file.
