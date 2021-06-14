@@ -27,7 +27,7 @@ type Driver struct {
 // TODO(el): Test DNS.
 func (d Driver) Open(dsn string) (c driver.Conn, err error) {
 	var logFirstError sync.Once
-	err = retry.WithBackoff(
+	err = errors.Wrap(retry.WithBackoff(
 		context.Background(),
 		func(context.Context) (err error) {
 			c, err = d.Driver.Open(dsn)
@@ -41,10 +41,7 @@ func (d Driver) Open(dsn string) (c driver.Conn, err error) {
 		shouldRetry,
 		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
 		timeout,
-	)
-	if err != nil {
-		err = errors.Wrap(err, "can't connect to database")
-	}
+	), "can't connect to database")
 	return
 }
 
@@ -53,24 +50,18 @@ func shouldRetry(err error) bool {
 		return true
 	}
 
-	{
-		type temporary interface {
-			Temporary() bool
-		}
-		var t temporary
-		if errors.As(err, &t) {
-			return t.Temporary()
-		}
+	type temporary interface {
+		Temporary() bool
+	}
+	if t := temporary(nil); errors.As(err, &t) {
+		return t.Temporary()
 	}
 
-	{
-		type timeout interface {
-			Timeout() bool
-		}
-		var t timeout
-		if errors.As(err, &t) {
-			return t.Timeout()
-		}
+	type timeout interface {
+		Timeout() bool
+	}
+	if t := timeout(nil); errors.As(err, &t) {
+		return t.Timeout()
 	}
 
 	return false

@@ -41,12 +41,7 @@ func MustPackAny(in ...interface{}) []byte {
 // map_key([1]uint8{0x42}) => [1]uint8{0x42}
 // map_key(x)              => []byte(fmt.Sprint(x))
 func PackAny(in interface{}, out io.Writer) error {
-	err := packValue(reflect.ValueOf(in), out)
-	if err != nil {
-		err = errors.Wrapf(err, "can't pack %#v", in)
-	}
-
-	return err
+	return errors.Wrapf(packValue(reflect.ValueOf(in), out), "can't pack %#v", in)
 }
 
 var tByte = reflect.TypeOf(byte(0))

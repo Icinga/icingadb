@@ -38,10 +38,7 @@ func MakeMapStructifier(t reflect.Type, tag string) MapStructifier {
 		}
 
 		vPtrElem := vPtr.Elem()
-		err := structifyMapByTree(kv, tree, vPtrElem, vPtrElem, new([]int))
-		if err != nil {
-			err = errors.Wrapf(err, "can't structify map %#v by tree %#v", kv, tree)
-		}
+		err := errors.Wrapf(structifyMapByTree(kv, tree, vPtrElem, vPtrElem, new([]int)), "can't structify map %#v by tree %#v", kv, tree)
 
 		return ptr, err
 	}

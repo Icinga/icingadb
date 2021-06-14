@@ -367,10 +367,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
-		if err != nil {
-			return errors.Wrap(err, "can't copy first entity")
-		}
-		return nil
+		return errors.Wrap(err, "can't copy first entity")
 	}
 
 	sem := db.getSemaphoreForTable(utils.TableName(first))
@@ -380,10 +377,7 @@ func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Enti
 func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
-		if err != nil {
-			return errors.Wrap(err, "can't copy first entity")
-		}
-		return nil
+		return errors.Wrap(err, "can't copy first entity")
 	}
 
 	// TODO(ak): wait for https://github.com/jmoiron/sqlx/issues/694
@@ -397,10 +391,7 @@ func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Enti
 func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
-		if err != nil {
-			return errors.Wrap(err, "can't copy first entity")
-		}
-		return nil
+		return errors.Wrap(err, "can't copy first entity")
 	}
 	sem := db.getSemaphoreForTable(utils.TableName(first))
 	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(first), 1<<15, sem, forward)
