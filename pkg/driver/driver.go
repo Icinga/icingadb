@@ -11,8 +11,6 @@ import (
 	"go.uber.org/zap"
 	"io/ioutil"
 	"log"
-	"net"
-	"os"
 	"sync"
 	"syscall"
 	"time"
@@ -51,33 +49,28 @@ func (d Driver) Open(dsn string) (c driver.Conn, err error) {
 }
 
 func shouldRetry(err error) bool {
-	underlying := errors.Unwrap(err)
-	if underlying == nil {
-		underlying = err
-	}
-	if op, ok := underlying.(*net.OpError); ok {
-		underlying = op.Err
-	}
-	if sys, ok := underlying.(*os.SyscallError); ok {
-		underlying = sys.Err
-	}
-	switch underlying {
-	case driver.ErrBadConn, syscall.ECONNREFUSED:
+	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, syscall.ECONNREFUSED) {
 		return true
 	}
 
-	type temporary interface {
-		Temporary() bool
-	}
-	if t, ok := underlying.(temporary); ok {
-		return t.Temporary()
+	{
+		type temporary interface {
+			Temporary() bool
+		}
+		var t temporary
+		if errors.As(err, &t) {
+			return t.Temporary()
+		}
 	}
 
-	type timeout interface {
-		Timeout() bool
-	}
-	if t, ok := underlying.(timeout); ok {
-		return t.Timeout()
+	{
+		type timeout interface {
+			Timeout() bool
+		}
+		var t timeout
+		if errors.As(err, &t) {
+			return t.Timeout()
+		}
 	}
 
 	return false
