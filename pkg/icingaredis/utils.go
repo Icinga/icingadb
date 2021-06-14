@@ -87,9 +87,7 @@ func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksu
 					if checksumer, ok := checksums[entity.ID().String()]; ok {
 						entity.(contracts.Checksumer).SetChecksum(checksumer.(contracts.Checksumer).Checksum())
 					} else {
-						panic("no checksum")
-						// TODO(el): Error is not published
-						//return errors.New("no checksum")
+						return errors.Errorf("no checksum for %#v", entity)
 					}
 
 					select {
