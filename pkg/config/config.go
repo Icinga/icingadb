@@ -39,20 +39,6 @@ func FromYAMLFile(name string) (*Config, error) {
 	return c, nil
 }
 
-// ValidateFile checks whether the given file name is a readable file.
-func ValidateFile(name string) error {
-	f, err := os.Stat(name)
-	if err != nil {
-		return errors.Wrap(err, "can't read file "+name)
-	}
-
-	if f.IsDir() {
-		return errors.New(name + " is a directory")
-	}
-
-	return nil
-}
-
 // ParseFlags parses CLI flags and
 // returns a Flags value created from them.
 func ParseFlags() (*Flags, error) {
@@ -61,10 +47,6 @@ func ParseFlags() (*Flags, error) {
 
 	if _, err := parser.Parse(); err != nil {
 		return nil, errors.Wrap(err, "can't parse CLI flags")
-	}
-
-	if err := ValidateFile(f.Config); err != nil {
-		return nil, errors.Wrap(err, "invalid config file "+f.Config)
 	}
 
 	return f, nil
