@@ -33,5 +33,80 @@ ALTER TABLE usergroup ADD INDEX `idx_usergroup_display_name` (`display_name`) CO
 ALTER TABLE usergroup ADD INDEX idx_usergroup_name_ci (name_ci) COMMENT 'Usergroup list filtered using quick search';
 ALTER TABLE usergroup ADD INDEX idx_usergroup_name (name) COMMENT 'Usergroup list filtered/ordered by name; Usergroup detail filter';
 
+ALTER TABLE host
+    MODIFY active_checks_enabled enum('n','y') NOT NULL,
+    MODIFY passive_checks_enabled enum('n','y') NOT NULL,
+    MODIFY event_handler_enabled enum('n','y') NOT NULL,
+    MODIFY notifications_enabled enum('n','y') NOT NULL,
+    MODIFY flapping_enabled enum('n','y') NOT NULL,
+    MODIFY perfdata_enabled enum('n','y') NOT NULL,
+    MODIFY is_volatile enum('n','y') NOT NULL;
+ALTER TABLE host_state
+    MODIFY is_problem enum('n','y') NOT NULL,
+    MODIFY is_handled enum('n','y') NOT NULL,
+    MODIFY is_reachable enum('n','y') NOT NULL,
+    MODIFY is_flapping enum('n','y') NOT NULL,
+    MODIFY is_overdue enum('n','y') NOT NULL,
+    MODIFY is_acknowledged enum('n','y','sticky') NOT NULL,
+    MODIFY in_downtime enum('n','y') NOT NULL;
+ALTER TABLE service
+    MODIFY active_checks_enabled enum('n','y') NOT NULL,
+    MODIFY passive_checks_enabled enum('n','y') NOT NULL,
+    MODIFY event_handler_enabled enum('n','y') NOT NULL,
+    MODIFY notifications_enabled enum('n','y') NOT NULL,
+    MODIFY flapping_enabled enum('n','y') NOT NULL,
+    MODIFY perfdata_enabled enum('n','y') NOT NULL,
+    MODIFY is_volatile enum('n','y') NOT NULL;
+ALTER TABLE service_state
+    MODIFY is_problem enum('n','y') NOT NULL,
+    MODIFY is_handled enum('n','y') NOT NULL,
+    MODIFY is_reachable enum('n','y') NOT NULL,
+    MODIFY is_flapping enum('n','y') NOT NULL,
+    MODIFY is_overdue enum('n','y') NOT NULL,
+    MODIFY is_acknowledged enum('n','y','sticky') NOT NULL,
+    MODIFY in_downtime enum('n','y') NOT NULL;
+ALTER TABLE icingadb_instance
+    MODIFY responsible enum('n','y') NOT NULL,
+    MODIFY icinga2_notifications_enabled enum('n','y') NOT NULL,
+    MODIFY icinga2_active_service_checks_enabled enum('n','y') NOT NULL,
+    MODIFY icinga2_active_host_checks_enabled enum('n','y') NOT NULL,
+    MODIFY icinga2_event_handlers_enabled enum('n','y') NOT NULL,
+    MODIFY icinga2_flap_detection_enabled enum('n','y') NOT NULL,
+    MODIFY icinga2_performance_data_enabled enum('n','y') NOT NULL;
+ALTER TABLE checkcommand_argument
+    MODIFY repeat_key enum('n','y') NOT NULL,
+    MODIFY required enum('n','y') NOT NULL,
+    MODIFY skip_key enum('n','y') NOT NULL;
+ALTER TABLE eventcommand_argument
+    MODIFY repeat_key enum('n','y') NOT NULL,
+    MODIFY required enum('n','y') NOT NULL,
+    MODIFY skip_key enum('n','y') NOT NULL;
+ALTER TABLE notificationcommand_argument
+    MODIFY repeat_key enum('n','y') NOT NULL,
+    MODIFY required enum('n','y') NOT NULL,
+    MODIFY skip_key enum('n','y') NOT NULL;
+ALTER TABLE comment
+    MODIFY is_persistent enum('n','y') NOT NULL,
+    MODIFY is_sticky enum('n','y') NOT NULL;
+ALTER TABLE downtime
+    MODIFY is_flexible enum('n','y') NOT NULL,
+    MODIFY is_in_effect enum('n','y') NOT NULL;
+ALTER TABLE timeperiod
+    MODIFY prefer_includes enum('n','y') NOT NULL;
+ALTER TABLE user
+    MODIFY notifications_enabled enum('n','y') NOT NULL;
+ALTER TABLE zone
+    MODIFY is_global enum('n','y') NOT NULL;
+ALTER TABLE downtime_history
+    MODIFY is_flexible enum('n','y') NOT NULL,
+    MODIFY has_been_cancelled enum('n','y') NOT NULL;
+ALTER TABLE comment_history
+    MODIFY is_persistent enum('n','y') NOT NULL,
+    MODIFY is_sticky enum('n','y') NOT NULL,
+    MODIFY has_been_removed enum('n','y') NOT NULL;
+ALTER TABLE acknowledgement_history
+    MODIFY is_sticky enum('n','y') NOT NULL,
+    MODIFY is_persistent enum('n','y') NOT NULL;
+
 INSERT INTO icingadb_schema (version, timestamp)
   VALUES (2, CURRENT_TIMESTAMP() * 1000);
