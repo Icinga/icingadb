@@ -9,8 +9,9 @@ import (
 
 // Config defines Icinga DB config.
 type Config struct {
-	Database Database `yaml:"database"`
-	Redis    Redis    `yaml:"redis"`
+	Database *Database `yaml:"database"`
+	Redis    *Redis    `yaml:"redis"`
+	Cleanup  *Cleanup  `yaml:"cleanup"`
 }
 
 // Flags defines CLI flags.
