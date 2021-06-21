@@ -113,6 +113,7 @@ func run() int {
 							case <-dump.InProgress():
 								logger.Info("Icinga 2 started a new config dump, waiting for it to complete")
 								cancelSynctx()
+
 								return nil
 							case <-synctx.Done():
 								return synctx.Err()
@@ -237,14 +238,15 @@ func run() int {
 					// otherwise there is no way to get Icinga DB back into a working state.
 					logger.Fatalf("%+v", errors.New("HA exited without an error but main context isn't cancelled"))
 				}
-
 				cancelHactx()
+
 				return ExitFailure
 			case <-ctx.Done():
 				logger.Fatalf("%+v", errors.New("main context closed unexpectedly"))
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
 				cancelHactx()
+
 				return ExitSuccess
 			}
 		}
