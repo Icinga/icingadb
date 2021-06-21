@@ -9,12 +9,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// Command provides factories for creating Redis and Database connections from Config.
 type Command struct {
 	Flags  *config.Flags
 	Config *config.Config
 	Logger *zap.SugaredLogger
 }
 
+// New creates and returns a new Command, parses CLI flags and YAML the config, and initializes the logger.
 func New() *Command {
 	flags, err := config.ParseFlags()
 	if err != nil {
@@ -42,6 +44,7 @@ func New() *Command {
 	}
 }
 
+// Database creates and returns a new icingadb.DB connection from config.Config.
 func (c Command) Database() *icingadb.DB {
 	db, err := c.Config.Database.Open(c.Logger)
 	if err != nil {
@@ -51,6 +54,7 @@ func (c Command) Database() *icingadb.DB {
 	return db
 }
 
+// Redis creates and returns a new icingaredis.Client connection from config.Config.
 func (c Command) Redis() *icingaredis.Client {
 	rc, err := c.Config.Redis.NewClient(c.Logger)
 	if err != nil {
