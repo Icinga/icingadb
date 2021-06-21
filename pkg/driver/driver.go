@@ -9,8 +9,6 @@ import (
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"io/ioutil"
-	"log"
 	"sync"
 	"syscall"
 	"time"
@@ -75,14 +73,21 @@ func (d Driver) OpenConnector(name string) (driver.Connector, error) {
 // Register makes our database Driver available under the name "icingadb-mysql".
 func Register(logger *zap.SugaredLogger) {
 	sql.Register("icingadb-mysql", &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
-	// TODO(el): Don't discard but hide?
-	_ = mysql.SetLogger(log.New(ioutil.Discard, "", 0))
+	_ = mysql.SetLogger(mysqlLogger(func(v ...interface{}) { logger.Debug(v) }))
 }
 
 // ctxDriver helps ensure that we only support drivers that implement driver.Driver and driver.DriverContext.
 type ctxDriver interface {
 	driver.Driver
 	driver.DriverContext
+}
+
+// mysqlLogger is an adapter that allows ordinary functions to be used as a logger for mysql.SetLogger.
+type mysqlLogger func(v ...interface{})
+
+// Print implements the mysql.Logger interface.
+func (log mysqlLogger) Print(v ...interface{}) {
+	log(v)
 }
 
 func shouldRetry(err error) bool {
