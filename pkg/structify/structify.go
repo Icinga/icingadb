@@ -4,8 +4,10 @@ import (
 	"encoding"
 	"fmt"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/pkg/errors"
 	"reflect"
 	"strconv"
+	"strings"
 	"unsafe"
 )
 
@@ -35,7 +37,10 @@ func MakeMapStructifier(t reflect.Type, tag string) MapStructifier {
 			initer.Init()
 		}
 
-		return ptr, structifyMapByTree(kv, tree, vPtr.Elem())
+		vPtrElem := vPtr.Elem()
+		err := errors.Wrapf(structifyMapByTree(kv, tree, vPtrElem, vPtrElem, new([]int)), "can't structify map %#v by tree %#v", kv, tree)
+
+		return ptr, err
 	}
 }
 
@@ -65,17 +70,35 @@ func buildStructTree(t reflect.Type, tag string) []structBranch {
 }
 
 // structifyMapByTree parses src's string values into the struct dest according to tree's specification.
-func structifyMapByTree(src map[string]interface{}, tree []structBranch, dest reflect.Value) error {
+func structifyMapByTree(src map[string]interface{}, tree []structBranch, dest, root reflect.Value, stack *[]int) error {
+	*stack = append(*stack, 0)
+	defer func() {
+		*stack = (*stack)[:len(*stack)-1]
+	}()
+
 	for _, branch := range tree {
+		(*stack)[len(*stack)-1] = branch.field
+
 		if branch.subTree == nil {
 			if v, ok := src[branch.leaf]; ok {
 				if vs, ok := v.(string); ok {
 					if err := parseString(vs, dest.Field(branch.field).Addr().Interface()); err != nil {
-						return err
+						rt := root.Type()
+						typ := rt
+						var path []string
+
+						for _, i := range *stack {
+							f := typ.Field(i)
+							path = append(path, f.Name)
+							typ = f.Type
+						}
+
+						return errors.Wrapf(err, "can't parse %s into the %s %s#%s: %s",
+							branch.leaf, typ.Name(), rt.Name(), strings.Join(path, "."), vs)
 					}
 				}
 			}
-		} else if err := structifyMapByTree(src, branch.subTree, dest.Field(branch.field)); err != nil {
+		} else if err := structifyMapByTree(src, branch.subTree, dest.Field(branch.field), root, stack); err != nil {
 			return err
 		}
 	}

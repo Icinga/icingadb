@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/overdue"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"strconv"
@@ -50,7 +52,7 @@ func (s Sync) Sync(ctx context.Context) error {
 		})
 
 		if err := g.Wait(); err != nil {
-			return err
+			return errors.Wrap(err, "can't sync overdue indicators")
 		}
 	}
 
@@ -86,7 +88,7 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 	query := fmt.Sprintf("SELECT id FROM %s_state WHERE is_overdue='y'", objectType)
 
 	if err := s.db.SelectContext(ctx, &rows, query); err != nil {
-		return err
+		return internal.CantPerformQuery(err, query)
 	}
 
 	_, err := s.redis.Pipelined(ctx, func(pipe redis.Pipeliner) error {
@@ -114,6 +116,8 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 			"Refreshing %d already synced %s overdue indicators took %s",
 			len(rows), objectType, time.Since(start),
 		)
+	} else {
+		err = errors.Wrap(err, "can't execute Redis pipeline")
 	}
 
 	return err
@@ -179,7 +183,7 @@ func (s Sync) sync(ctx context.Context, objectType string, factory factory, coun
 	if rand, err := uuid.NewRandom(); err == nil {
 		keys[2] = rand.String()
 	} else {
-		return err
+		return errors.Wrap(err, "can't create random UUID")
 	}
 
 	const period = 2 * time.Second
@@ -195,7 +199,7 @@ func (s Sync) sync(ctx context.Context, objectType string, factory factory, coun
 				ctx, s.redis, keys[:], strconv.FormatInt(time.Now().Unix(), 10),
 			).Result()
 			if err != nil {
-				return err
+				return errors.Wrap(err, "can't execute Redis script")
 			}
 
 			root := overdues.([]interface{})
@@ -210,7 +214,7 @@ func (s Sync) sync(ctx context.Context, objectType string, factory factory, coun
 			})
 
 			if err := g.Wait(); err != nil {
-				return err
+				return errors.Wrap(err, "can't update overdue indicators")
 			}
 
 			// For the case that syncing has taken some time, delay the next sync.
@@ -234,7 +238,7 @@ func (s Sync) updateOverdue(
 	}
 
 	if err := s.updateDb(ctx, factory, ids, overdue); err != nil {
-		return err
+		return errors.Wrap(err, "can't update overdue indicators")
 	}
 
 	atomic.AddUint64(counter, uint64(len(ids)))
@@ -261,7 +265,7 @@ func (s Sync) updateDb(ctx context.Context, factory factory, ids []interface{}, 
 		for _, id := range ids {
 			e, err := factory(id.(string), overdue)
 			if err != nil {
-				return err
+				return errors.Wrap(err, "can't create entity")
 			}
 
 			select {

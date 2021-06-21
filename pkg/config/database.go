@@ -1,14 +1,15 @@
 package config
 
 import (
-	"errors"
 	"fmt"
 	"github.com/creasty/defaults"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -38,7 +39,7 @@ func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
 
 	db, err := sqlx.Open("icingadb-mysql", dsn)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "can't open database")
 	}
 
 	db.SetMaxIdleConns(d.MaxConnections / 3)
@@ -54,12 +55,12 @@ func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (d *Database) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if err := defaults.Set(d); err != nil {
-		return err
+		return errors.Wrap(err, "can't set default database config")
 	}
 	// Prevent recursion.
 	type self Database
 	if err := unmarshal((*self)(d)); err != nil {
-		return err
+		return internal.CantUnmarshalYAML(err, d)
 	}
 
 	if d.MaxConnectionsPerTable < 1 {

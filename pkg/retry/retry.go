@@ -2,8 +2,8 @@ package retry
 
 import (
 	"context"
-	"errors"
 	"github.com/icinga/icingadb/pkg/backoff"
+	"github.com/pkg/errors"
 	"time"
 )
 
@@ -41,6 +41,8 @@ func WithBackoff(
 
 		if !isRetryable {
 			// Not retryable.
+			err = errors.Wrap(err, "can't retry")
+
 			return
 		}
 
@@ -51,6 +53,8 @@ func WithBackoff(
 			if err == nil {
 				err = ctx.Err()
 			}
+			err = errors.Wrap(err, "can't retry")
+
 			return
 		case <-time.After(sleep):
 			// Wait for backoff duration and continue.

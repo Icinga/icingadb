@@ -8,6 +8,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -102,12 +103,12 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 
 					redisKey := message.Values["redis_key"]
 					if redisKey == nil {
-						return fmt.Errorf("stream message missing 'redis_key' key: %v", message.Values)
+						return errors.Errorf("stream message missing 'redis_key' key: %v", message.Values)
 					}
 
 					updateMessages := updateMessagesByKey[redisKey.(string)]
 					if updateMessages == nil {
-						return fmt.Errorf("no object type for redis key %s found", redisKey)
+						return errors.Errorf("no object type for redis key %s found", redisKey)
 					}
 
 					select {
@@ -140,14 +141,14 @@ func structifyStream(ctx context.Context, updateMessages <-chan redis.XMessage, 
 
 				ptr, err := structifier(message.Values)
 				if err != nil {
-					return err
+					return errors.Wrapf(err, "can't structify values %#v", message.Values)
 				}
 
 				entity := ptr.(contracts.Entity)
 
 				runtimeType := message.Values["runtime_type"]
 				if runtimeType == nil {
-					return fmt.Errorf("stream message missing 'runtime_type' key: %v", message.Values)
+					return errors.Errorf("stream message missing 'runtime_type' key: %v", message.Values)
 				}
 
 				if runtimeType == "upsert" {
@@ -163,7 +164,7 @@ func structifyStream(ctx context.Context, updateMessages <-chan redis.XMessage, 
 						return ctx.Err()
 					}
 				} else {
-					return fmt.Errorf("invalid runtime type: %s", runtimeType)
+					return errors.Errorf("invalid runtime type: %s", runtimeType)
 				}
 			case <-ctx.Done():
 				return ctx.Err()

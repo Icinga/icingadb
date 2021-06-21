@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
+	"github.com/icinga/icingadb/internal"
 )
 
 // String adds JSON support to sql.NullString.
@@ -21,7 +22,7 @@ func (s String) MarshalJSON() ([]byte, error) {
 		v = s.String
 	}
 
-	return json.Marshal(v)
+	return internal.MarshalJSON(v)
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
@@ -42,12 +43,13 @@ func (s *String) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	err := json.Unmarshal(data, &s.String)
-	if err == nil {
-		s.Valid = true
+	if err := internal.UnmarshalJSON(data, &s.String); err != nil {
+		return err
 	}
 
-	return err
+	s.Valid = true
+
+	return nil
 }
 
 // Assert interface compliance.

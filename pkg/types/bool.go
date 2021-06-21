@@ -5,7 +5,8 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
-	"errors"
+	"github.com/icinga/icingadb/internal"
+	"github.com/pkg/errors"
 	"strconv"
 )
 
@@ -40,14 +41,14 @@ func (b Bool) MarshalJSON() ([]byte, error) {
 		return nil, nil
 	}
 
-	return json.Marshal(b.Bool)
+	return internal.MarshalJSON(b.Bool)
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 func (b *Bool) UnmarshalText(text []byte) error {
 	parsed, err := strconv.ParseUint(string(text), 10, 64)
 	if err != nil {
-		return err
+		return internal.CantParseUint64(err, string(text))
 	}
 
 	*b = Bool{parsed != 0, true}
@@ -60,7 +61,7 @@ func (b *Bool) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	if err := json.Unmarshal(data, &b.Bool); err != nil {
+	if err := internal.UnmarshalJSON(data, &b.Bool); err != nil {
 		return err
 	}
 
@@ -79,7 +80,7 @@ func (b *Bool) Scan(src interface{}) error {
 
 	v, ok := src.([]byte)
 	if !ok {
-		return errors.New("bad []byte type assertion")
+		return errors.Errorf("bad []byte type assertion from %#v", src)
 	}
 
 	switch string(v) {
@@ -88,7 +89,7 @@ func (b *Bool) Scan(src interface{}) error {
 	case "n":
 		b.Bool = false
 	default:
-		return errors.New("bad bool")
+		return errors.Errorf("bad bool %#v", v)
 	}
 
 	b.Valid = true

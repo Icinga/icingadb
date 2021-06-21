@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -141,7 +142,7 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 
 		for b := range bulk {
 			if err := sem.Acquire(ctx, 1); err != nil {
-				return err
+				return errors.Wrap(err, "can't acquire semaphore")
 			}
 
 			g.Go(func(b []interface{}) func() error {
@@ -151,15 +152,15 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 					return retry.WithBackoff(
 						ctx,
 						func(context.Context) error {
-							query, args, err := sqlx.In(query, b)
+							stmt, args, err := sqlx.In(query, b)
 							if err != nil {
-								return err
+								return errors.Wrapf(err, "can't build placeholders for %q", query)
 							}
 
-							query = db.Rebind(query)
-							_, err = db.ExecContext(ctx, query, args...)
+							stmt = db.Rebind(stmt)
+							_, err = db.ExecContext(ctx, stmt, args...)
 							if err != nil {
-								return err
+								return internal.CantPerformQuery(err, query)
 							}
 
 							cnt.Add(uint64(len(b)))
@@ -207,7 +208,7 @@ func (db *DB) NamedBulkExec(
 				}
 
 				if err := sem.Acquire(ctx, 1); err != nil {
-					return err
+					return errors.Wrap(err, "can't acquire semaphore")
 				}
 
 				g.Go(func(b []contracts.Entity) func() error {
@@ -220,8 +221,7 @@ func (db *DB) NamedBulkExec(
 								db.logger.Debugf("Executing %s with %d rows..", query, len(b))
 								_, err := db.NamedExecContext(ctx, query, b)
 								if err != nil {
-									fmt.Println(err)
-									return err
+									return internal.CantPerformQuery(err, query)
 								}
 
 								cnt.Add(uint64(len(b)))
@@ -274,7 +274,7 @@ func (db *DB) NamedBulkExecTx(
 				}
 
 				if err := sem.Acquire(ctx, 1); err != nil {
-					return err
+					return errors.Wrap(err, "can't acquire semaphore")
 				}
 
 				g.Go(func(b []contracts.Entity) func() error {
@@ -339,7 +339,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 
 		rows, err := db.Queryx(query, args...)
 		if err != nil {
-			return err
+			return internal.CantPerformQuery(err, query)
 		}
 		defer rows.Close()
 
@@ -347,7 +347,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 			e := factoryFunc()
 
 			if err := rows.StructScan(e); err != nil {
-				return err
+				return errors.Wrapf(err, "can't store query result into a %T: %s", e, query)
 			}
 
 			select {
@@ -367,7 +367,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
-		return err
+		return errors.Wrap(err, "can't copy first entity")
 	}
 
 	sem := db.getSemaphoreForTable(utils.TableName(first))
@@ -377,12 +377,12 @@ func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Enti
 func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
-		return err
+		return errors.Wrap(err, "can't copy first entity")
 	}
 
 	// TODO(ak): wait for https://github.com/jmoiron/sqlx/issues/694
-	//stmt, placeholders := db.BuildUpsertStmt(first)
-	//return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
+	// stmt, placeholders := db.BuildUpsertStmt(first)
+	// return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
 	stmt, _ := db.BuildUpsertStmt(first)
 	sem := db.getSemaphoreForTable(utils.TableName(first))
 	return db.NamedBulkExec(ctx, stmt, 1, sem, forward, succeeded)
@@ -391,7 +391,7 @@ func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Enti
 func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
-		return err
+		return errors.Wrap(err, "can't copy first entity")
 	}
 	sem := db.getSemaphoreForTable(utils.TableName(first))
 	return db.NamedBulkExecTx(ctx, db.BuildUpdateStmt(first), 1<<15, sem, forward)
@@ -413,14 +413,12 @@ func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []int
 }
 
 func IsRetryable(err error) bool {
-	err = errors.Cause(err)
-
-	if err == mysql.ErrInvalidConn {
+	if errors.Is(err, mysql.ErrInvalidConn) {
 		return true
 	}
 
-	switch e := err.(type) {
-	case *mysql.MySQLError:
+	var e *mysql.MySQLError
+	if errors.As(err, &e) {
 		switch e.Number {
 		case 1053, 1205, 1213, 2006:
 			// 1053: Server shutdown in progress

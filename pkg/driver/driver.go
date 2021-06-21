@@ -7,11 +7,10 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/retry"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"io/ioutil"
 	"log"
-	"net"
-	"os"
 	"sync"
 	"syscall"
 	"time"
@@ -28,7 +27,7 @@ type Driver struct {
 // TODO(el): Test DNS.
 func (d Driver) Open(dsn string) (c driver.Conn, err error) {
 	var logFirstError sync.Once
-	err = retry.WithBackoff(
+	err = errors.Wrap(retry.WithBackoff(
 		context.Background(),
 		func(context.Context) (err error) {
 			c, err = d.Driver.Open(dsn)
@@ -42,34 +41,26 @@ func (d Driver) Open(dsn string) (c driver.Conn, err error) {
 		shouldRetry,
 		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
 		timeout,
-	)
+	), "can't connect to database")
 	return
 }
 
 func shouldRetry(err error) bool {
-	underlying := err
-	if op, ok := err.(*net.OpError); ok {
-		underlying = op.Err
-	}
-	if sys, ok := underlying.(*os.SyscallError); ok {
-		underlying = sys.Err
-	}
-	switch underlying {
-	case driver.ErrBadConn, syscall.ECONNREFUSED:
+	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, syscall.ECONNREFUSED) {
 		return true
 	}
 
 	type temporary interface {
 		Temporary() bool
 	}
-	if t, ok := err.(temporary); ok {
+	if t := temporary(nil); errors.As(err, &t) {
 		return t.Temporary()
 	}
 
 	type timeout interface {
 		Timeout() bool
 	}
-	if t, ok := err.(timeout); ok {
+	if t := timeout(nil); errors.As(err, &t) {
 		return t.Timeout()
 	}
 

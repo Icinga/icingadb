@@ -2,8 +2,8 @@ package icingaredis
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/types"
@@ -27,11 +27,11 @@ func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc
 					var id types.Binary
 
 					if err := id.UnmarshalText([]byte(pair.Field)); err != nil {
-						return err
+						return errors.Wrapf(err, "can't create ID from value %#v", pair.Field)
 					}
 
 					e := factoryFunc()
-					if err := json.Unmarshal([]byte(pair.Value), e); err != nil {
+					if err := internal.UnmarshalJSON([]byte(pair.Value), e); err != nil {
 						return err
 					}
 					e.SetID(id)
@@ -94,7 +94,7 @@ func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksu
 func WrapCmdErr(cmd redis.Cmder) error {
 	err := cmd.Err()
 	if err != nil {
-		err = errors.Wrap(err, "can't perform "+utils.Ellipsize(
+		err = errors.Wrapf(err, "can't perform %q", utils.Ellipsize(
 			redis.NewCmd(context.Background(), cmd.Args()).String(), // Omits error in opposite to cmd.String()
 			100,
 		))

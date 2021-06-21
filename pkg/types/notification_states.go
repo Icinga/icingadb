@@ -4,7 +4,8 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
-	"fmt"
+	"github.com/icinga/icingadb/internal"
+	"github.com/pkg/errors"
 )
 
 // NotificationStates specifies the set of states a notification may be sent for.
@@ -13,7 +14,7 @@ type NotificationStates uint8
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (nst *NotificationStates) UnmarshalJSON(bytes []byte) error {
 	var states []string
-	if err := json.Unmarshal(bytes, &states); err != nil {
+	if err := internal.UnmarshalJSON(bytes, &states); err != nil {
 		return err
 	}
 
@@ -22,7 +23,7 @@ func (nst *NotificationStates) UnmarshalJSON(bytes []byte) error {
 		if v, ok := notificationStateNames[state]; ok {
 			n |= v
 		} else {
-			return BadNotificationStates{states}
+			return badNotificationStates(states)
 		}
 	}
 
@@ -40,18 +41,13 @@ func (nst NotificationStates) Value() (driver.Value, error) {
 	if nst&^allNotificationStates == 0 {
 		return int64(nst), nil
 	} else {
-		return nil, BadNotificationStates{nst}
+		return nil, badNotificationStates(nst)
 	}
 }
 
-// BadNotificationStates complains about syntactically, but not semantically valid NotificationStates.
-type BadNotificationStates struct {
-	States interface{}
-}
-
-// Error implements the error interface.
-func (bns BadNotificationStates) Error() string {
-	return fmt.Sprintf("bad notification states: %#v", bns.States)
+// badNotificationStates returns an error about syntactically, but not semantically valid NotificationStates.
+func badNotificationStates(s interface{}) error {
+	return errors.Errorf("bad notification states: %#v", s)
 }
 
 // notificationStateNames maps all valid NotificationStates values to their SQL representation.
@@ -76,7 +72,6 @@ var allNotificationStates = func() NotificationStates {
 
 // Assert interface compliance.
 var (
-	_ error                    = BadNotificationStates{}
 	_ json.Unmarshaler         = (*NotificationStates)(nil)
 	_ encoding.TextUnmarshaler = (*NotificationStates)(nil)
 	_ driver.Valuer            = NotificationStates(0)

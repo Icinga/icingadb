@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
@@ -33,20 +32,9 @@ func main() {
 
 func run() int {
 	cmd := command.New()
+
 	logger := cmd.Logger
 	defer logger.Sync()
-	defer func() {
-		if err := recover(); err != nil {
-			type stackTracer interface {
-				StackTrace() errors.StackTrace
-			}
-			if err, ok := err.(stackTracer); ok {
-				for _, f := range err.StackTrace() {
-					fmt.Printf("%+s:%d\n", f, f)
-				}
-			}
-		}
-	}()
 
 	logger.Info("Starting Icinga DB")
 
@@ -56,7 +44,7 @@ func run() int {
 		logger.Info("Connecting to database")
 		err := db.Ping()
 		if err != nil {
-			panic(errors.Wrap(err, "can't connect to database"))
+			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
 		}
 	}
 
@@ -65,7 +53,7 @@ func run() int {
 		logger.Info("Connecting to Redis")
 		_, err := rc.Ping(context.Background()).Result()
 		if err != nil {
-			panic(errors.Wrap(err, "can't connect to Redis"))
+			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to Redis"))
 		}
 	}
 
@@ -110,7 +98,7 @@ func run() int {
 
 						lastRuntimeStreamId, err := rc.StreamLastId(ctx, "icinga:runtime")
 						if err != nil {
-							panic(err)
+							logger.Fatalf("%+v", err)
 						}
 
 						g.Go(func() error {
@@ -212,7 +200,7 @@ func run() int {
 						g.Go(func() error {
 							wg.Wait()
 
-							logger.Infof("Starting runtime updates sync")
+							logger.Info("Starting runtime updates sync")
 
 							// @TODO(el): The customvar runtime update sync may change because the customvar flat
 							// runtime update sync is not yet implemented.
@@ -220,7 +208,7 @@ func run() int {
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
-							panic(err)
+							logger.Fatalf("%+v", err)
 						}
 					}
 				}()
@@ -232,17 +220,17 @@ func run() int {
 				// Nothing to do here, surrounding loop will terminate now.
 			case <-ha.Done():
 				if err := ha.Err(); err != nil {
-					panic(errors.Wrap(err, "HA exited with an error"))
+					logger.Fatalf("%+v", errors.Wrap(err, "HA exited with an error"))
 				} else if ctx.Err() == nil {
 					// ha is created as a single instance once. It should only exit if the main context is cancelled,
 					// otherwise there is no way to get Icinga DB back into a working state.
-					panic(errors.New("HA exited without an error but main context isn't cancelled"))
+					logger.Fatalf("%+v", errors.New("HA exited without an error but main context isn't cancelled"))
 				}
 
 				cancelHactx()
 				return ExitFailure
 			case <-ctx.Done():
-				panic(errors.New("main context closed unexpectedly"))
+				logger.Fatalf("%+v", errors.New("main context closed unexpectedly"))
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
 				cancelHactx()

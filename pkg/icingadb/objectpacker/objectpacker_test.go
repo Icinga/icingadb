@@ -3,6 +3,7 @@ package objectpacker
 import (
 	"bytes"
 	"github.com/icinga/icingadb/pkg/types"
+	"github.com/pkg/errors"
 	"io"
 	"testing"
 )
@@ -43,7 +44,7 @@ func assertLimitedWriter_Write(t *testing.T, limitBefore int, p []byte, n int, e
 	lw := limitedWriter{limitBefore}
 	actualN, actualErr := lw.Write(p)
 
-	if actualErr != err {
+	if !errors.Is(actualErr, err) {
 		t.Errorf("_, err := (&limitedWriter{%d}).Write(%#v); err != %#v", limitBefore, p, err)
 	}
 
@@ -167,7 +168,7 @@ func assertPackAny(t *testing.T, in interface{}, out []byte) {
 	}
 
 	for i := 0; i < len(out); i++ {
-		if PackAny(in, &limitedWriter{i}) != io.EOF {
+		if !errors.Is(PackAny(in, &limitedWriter{i}), io.EOF) {
 			t.Errorf("packAny(%#v, &limitedWriter{%d}) != io.EOF", in, i)
 		}
 	}
@@ -177,7 +178,7 @@ func assertPackAnyPanic(t *testing.T, in interface{}, allowToWrite int) {
 	t.Helper()
 
 	for i := 0; i < allowToWrite; i++ {
-		if PackAny(in, &limitedWriter{i}) != io.EOF {
+		if !errors.Is(PackAny(in, &limitedWriter{i}), io.EOF) {
 			t.Errorf("packAny(%#v, &limitedWriter{%d}) != io.EOF", in, i)
 		}
 	}

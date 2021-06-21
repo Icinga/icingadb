@@ -8,6 +8,7 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"runtime"
@@ -90,7 +91,7 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 // ApplyDelta applies all changes from Delta to the database.
 func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	if err := delta.Wait(); err != nil {
-		return err
+		return errors.Wrap(err, "can't calculate delta")
 	}
 
 	g, ctx := errgroup.WithContext(ctx)

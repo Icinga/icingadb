@@ -2,8 +2,8 @@ package v1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/flatten"
@@ -51,7 +51,7 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 				for entity := range cvs {
 					var value interface{}
 					customvar := entity.(*Customvar)
-					if err := json.Unmarshal([]byte(customvar.Value), &value); err != nil {
+					if err := internal.UnmarshalJSON([]byte(customvar.Value), &value); err != nil {
 						return err
 					}
 
