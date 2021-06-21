@@ -94,6 +94,7 @@ func shouldRetry(err error) bool {
 	return false
 }
 
+// Register makes our database Driver available under the name "icingadb-mysql".
 func Register(logger *zap.SugaredLogger) {
 	sql.Register("icingadb-mysql", &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
 	// TODO(el): Don't discard but hide?
