@@ -77,6 +77,8 @@ func (h Heartbeat) Lost() <-chan struct{} {
 
 // controller loop.
 func (h Heartbeat) controller() {
+	h.logger.Info("Waiting for Icinga 2 heartbeat")
+
 	messages := make(chan v1.StatsMessage)
 	defer close(messages)
 
