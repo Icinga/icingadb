@@ -72,6 +72,19 @@ func (d Driver) OpenConnector(name string) (driver.Connector, error) {
 	}, nil
 }
 
+// Register makes our database Driver available under the name "icingadb-mysql".
+func Register(logger *zap.SugaredLogger) {
+	sql.Register("icingadb-mysql", &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
+	// TODO(el): Don't discard but hide?
+	_ = mysql.SetLogger(log.New(ioutil.Discard, "", 0))
+}
+
+// ctxDriver helps ensure that we only support drivers that implement driver.Driver and driver.DriverContext.
+type ctxDriver interface {
+	driver.Driver
+	driver.DriverContext
+}
+
 func shouldRetry(err error) bool {
 	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, syscall.ECONNREFUSED) {
 		return true
@@ -92,17 +105,4 @@ func shouldRetry(err error) bool {
 	}
 
 	return false
-}
-
-// Register makes our database Driver available under the name "icingadb-mysql".
-func Register(logger *zap.SugaredLogger) {
-	sql.Register("icingadb-mysql", &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
-	// TODO(el): Don't discard but hide?
-	_ = mysql.SetLogger(log.New(ioutil.Discard, "", 0))
-}
-
-// ctxDriver helps ensure that we only support drivers that implement driver.Driver and driver.DriverContext.
-type ctxDriver interface {
-	driver.Driver
-	driver.DriverContext
 }
