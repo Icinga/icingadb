@@ -53,30 +53,26 @@ func (c RetryConnector) Driver() driver.Driver {
 	return c.driver
 }
 
+type WrappedDriver interface {
+	driver.Driver
+	driver.DriverContext
+}
+
 // Driver wraps driver.Driver with logging capabilities and provides our RetryConnector.
 type Driver struct {
-	driver.Driver
+	WrappedDriver
 	Logger *zap.SugaredLogger
 }
 
 // OpenConnector implements the DriverContext interface.
 func (d Driver) OpenConnector(name string) (driver.Connector, error) {
-	var connector driver.Connector
-	if dc, ok := d.Driver.(driver.DriverContext); ok {
-		c, err := dc.OpenConnector(name)
-		if err != nil {
-			return nil, err
-		}
-		connector = c
-	} else {
-		connector = &ctxConnector{
-			driver: d.Driver,
-			name:   name,
-		}
+	connector, err := d.WrappedDriver.OpenConnector(name)
+	if err != nil {
+		return nil, err
 	}
 
 	return &RetryConnector{
-		driver: d,
+		driver:    d,
 		Connector: connector,
 	}, nil
 }
@@ -104,36 +100,7 @@ func shouldRetry(err error) bool {
 }
 
 func Register(logger *zap.SugaredLogger) {
-	sql.Register("icingadb-mysql", &Driver{Driver: &mysql.MySQLDriver{}, Logger: logger})
+	sql.Register("icingadb-mysql", &Driver{WrappedDriver: &mysql.MySQLDriver{}, Logger: logger})
 	// TODO(el): Don't discard but hide?
 	_ = mysql.SetLogger(log.New(ioutil.Discard, "", 0))
-}
-
-// ctxConnector adds driver.DriverContext support for drivers that do not implement it.
-type ctxConnector struct {
-	driver driver.Driver
-	name   string
-}
-
-// Connect implements part of the driver.Connector interface.
-func (c *ctxConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	conn, err := c.driver.Open(c.name)
-	if err != nil {
-		return nil, err
-	}
-
-	select {
-	default:
-	case <-ctx.Done():
-		conn.Close()
-
-		return nil, ctx.Err()
-	}
-
-	return conn, nil
-}
-
-// Driver implements part of the driver.Connector interface.
-func (c *ctxConnector) Driver() driver.Driver {
-	return c.driver
 }
