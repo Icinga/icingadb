@@ -28,7 +28,7 @@ func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subj
 		logger:  logger,
 	}
 
-	go delta.start(ctx, actual, desired)
+	go delta.run(ctx, actual, desired)
 
 	return delta
 }
@@ -37,7 +37,7 @@ func (delta *Delta) Wait() error {
 	return <-delta.done
 }
 
-func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contracts.Entity) {
+func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan contracts.Entity) {
 	defer close(delta.done)
 
 	var update EntitiesById
