@@ -31,6 +31,9 @@ func (s Streams) Option() []string {
 	return append(streams, ids...)
 }
 
+// CreateEntities streams and creates entities from the
+// given Redis field value pairs using the specified factory function,
+// and streams them on a returned channel.
 func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, pairs <-chan HPair, concurrent int) (<-chan contracts.Entity, <-chan error) {
 	entities := make(chan contracts.Entity)
 	g, ctx := errgroup.WithContext(ctx)
@@ -72,6 +75,9 @@ func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc
 	return entities, com.WaitAsync(g)
 }
 
+// SetChecksums concurrently streams from the given entities and
+// sets their checksums using the specified map and
+// streams the results on a returned channel.
 func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksums map[string]contracts.Entity, concurrent int) (<-chan contracts.Entity, <-chan error) {
 	entitiesWithChecksum := make(chan contracts.Entity)
 	g, ctx := errgroup.WithContext(ctx)
@@ -107,7 +113,8 @@ func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksu
 	return entitiesWithChecksum, com.WaitAsync(g)
 }
 
-// WrapCmdErr adds the command itself and the stack of the current goroutine to the command's error if any.
+// WrapCmdErr adds the command itself and
+// the stack of the current goroutine to the command's error if any.
 func WrapCmdErr(cmd redis.Cmder) error {
 	err := cmd.Err()
 	if err != nil {
