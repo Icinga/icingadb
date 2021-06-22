@@ -9,10 +9,12 @@ import (
 // StatsMessage represents a message from the Redis stream icinga:stats.
 type StatsMessage map[string]interface{}
 
+// Raw returns the key-value pairs of the message.
 func (m StatsMessage) Raw() map[string]interface{} {
 	return m
 }
 
+// IcingaStatus extracts Icinga status information from the message into IcingaStatus and returns it.
 func (m StatsMessage) IcingaStatus() (*IcingaStatus, error) {
 	if s, ok := m["IcingaApplication"].(string); ok {
 		var envelope struct {
@@ -33,6 +35,7 @@ func (m StatsMessage) IcingaStatus() (*IcingaStatus, error) {
 	return nil, errors.Errorf(`bad message %#v. "IcingaApplication" missing`, m)
 }
 
+// Time extracts the timestamp of the message into types.UnixMilli and returns it.
 func (m StatsMessage) Time() (*types.UnixMilli, error) {
 	if s, ok := m["timestamp"].(string); ok {
 		var t types.UnixMilli
