@@ -24,6 +24,7 @@ type Client struct {
 	options *Options
 }
 
+// Options define user configurable Redis options.
 type Options struct {
 	Timeout             time.Duration `yaml:"timeout"               default:"30s"`
 	MaxHMGetConnections int           `yaml:"max_hmget_connections" default:"4096"`
