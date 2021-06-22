@@ -32,8 +32,14 @@ type DB struct {
 	tableSemaphoresMu sync.Mutex
 }
 
+// Options define user configurable database options.
 type Options struct {
-	MaxConnections         int `yaml:"max_connections" default:"16"`
+	// Maximum number of open connections to the database.
+	MaxConnections int `yaml:"max_connections" default:"16"`
+
+	// Maximum number of connections per table,
+	// regardless of what the connection is actually doing,
+	// e.g. INSERT, UPDATE, DELETE.
 	MaxConnectionsPerTable int `yaml:"max_connections_per_table" default:"8"`
 }
 
@@ -47,6 +53,7 @@ func NewDb(db *sqlx.DB, logger *zap.SugaredLogger, options *Options) *DB {
 	}
 }
 
+// BuildColumns returns all columns of the given struct.
 func (db *DB) BuildColumns(subject interface{}) []string {
 	fields := db.Mapper.TypeMap(reflect.TypeOf(subject)).Names
 	columns := make([]string, 0, len(fields))
@@ -60,6 +67,7 @@ func (db *DB) BuildColumns(subject interface{}) []string {
 	return columns
 }
 
+// BuildDeleteStmt returns a DELETE statement for the given struct.
 func (db *DB) BuildDeleteStmt(from interface{}) string {
 	return fmt.Sprintf(
 		`DELETE FROM %s WHERE id IN (?)`,
@@ -67,6 +75,7 @@ func (db *DB) BuildDeleteStmt(from interface{}) string {
 	)
 }
 
+// BuildInsertStmt returns an INSERT INTO statement for the given struct.
 func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 	columns := db.BuildColumns(into)
 
@@ -78,14 +87,17 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 	), len(columns)
 }
 
-func (db *DB) BuildSelectStmt(from interface{}, into interface{}) string {
+// BuildSelectStmt returns a SELECT query that creates the FROM part from the given table struct
+// and the column list from the specified columns struct.
+func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
 	return fmt.Sprintf(
 		`SELECT %s FROM %s`,
-		strings.Join(db.BuildColumns(into), ", "),
-		utils.TableName(from),
+		strings.Join(db.BuildColumns(columns), ", "),
+		utils.TableName(table),
 	)
 }
 
+// BuildUpdateStmt returns an UPDATE statement for the given struct.
 func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 	columns := db.BuildColumns(update)
 	set := make([]string, 0, len(columns))
@@ -101,6 +113,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 	), len(columns) + 1 // +1 because of WHERE id = :id
 }
 
+// BuildUpsertStmt returns an upsert statement for the given struct.
 func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {
 	insertColumns := db.BuildColumns(subject)
 	var updateColumns []string
@@ -126,6 +139,11 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 	), len(insertColumns)
 }
 
+// BulkExec bulk executes queries with a single slice placeholder in the form of `IN (?)`.
+// Takes in up to the number of arguments specified in count from the arg stream,
+// derives and expands a query and executes it with this set of arguments until the arg stream has been processed.
+// The derived queries are executed in a separate goroutine with a weighting of 1
+// and can be executed concurrently to the extent allowed by the semaphore passed in sem.
 func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan interface{}) error {
 	var cnt com.Counter
 	g, ctx := errgroup.WithContext(ctx)
@@ -181,6 +199,12 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 	return g.Wait()
 }
 
+// NamedBulkExec bulk executes queries with named placeholders.
+// Takes in up to the number of entities specified in count from the arg stream,
+// and executes the query with this set of arguments until the arg stream has been processed.
+// The queries are executed in a separate goroutine with a weighting of 1
+// and can be executed concurrently to the extent allowed by the semaphore passed in sem.
+// Entities for which the query ran successfully will be streamed on the succeeded channel.
 func (db *DB) NamedBulkExec(
 	ctx context.Context, query string, count int, sem *semaphore.Weighted,
 	arg <-chan contracts.Entity, succeeded chan<- contracts.Entity,
@@ -195,11 +219,6 @@ func (db *DB) NamedBulkExec(
 	})
 
 	g.Go(func() error {
-		// stmt, err := db.PrepareNamedContext(ctx, query)
-		// if err != nil {
-		//     return err
-		// }
-
 		for {
 			select {
 			case b, ok := <-bulk:
@@ -253,6 +272,12 @@ func (db *DB) NamedBulkExec(
 	return g.Wait()
 }
 
+// NamedBulkExecTx bulk executes queries with named placeholders in separate transactions.
+// Takes in up to the number of entities specified in count from the arg stream,
+// executes a new query for each entity in the set of arguments in a new transaction,
+// until the arg stream has been processed.
+// The transactions are executed in a separate goroutine with a weighting of 1
+// and can be executed concurrently to the extent allowed by the semaphore passed in sem.
 func (db *DB) NamedBulkExecTx(
 	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan contracts.Entity,
 ) error {
@@ -323,6 +348,9 @@ func (db *DB) NamedBulkExecTx(
 	return g.Wait()
 }
 
+// YieldAll executes the query with the supplied args,
+// scans each resulting row into an entity returned by the factory function,
+// and streams them into a returned channel.
 func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, query string, args ...interface{}) (<-chan contracts.Entity, <-chan error) {
 	var cnt com.Counter
 	entities := make(chan contracts.Entity, 1)
@@ -364,6 +392,11 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 	return entities, com.WaitAsync(g)
 }
 
+// CreateStreamed bulk creates the specified entities via NamedBulkExec.
+// The insert statement is created using BuildInsertStmt with the first entity from the entities stream.
+// With MySQL, the bulk execution is done with up to 1,024 entities
+// taking into account that the placeholders for each statement do not exceed the limit of 16,384.
+// Concurrency is controlled via Options.MaxConnectionsPerTable.
 func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
@@ -376,6 +409,11 @@ func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Enti
 	return db.NamedBulkExec(ctx, stmt, utils.Min(1<<14/placeholders, 1<<10), sem, forward, nil)
 }
 
+// UpsertStreamed bulk upserts the specified entities via NamedBulkExec.
+// The upsert statement is created using BuildUpsertStmt with the first entity from the entities stream.
+// With MySQL, the bulk execution is done with up to 1,024 entities
+// taking into account that the placeholders for each statement do not exceed the limit of 16,384.
+// Concurrency is controlled via Options.MaxConnectionsPerTable.
 func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
@@ -388,6 +426,10 @@ func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Enti
 	return db.NamedBulkExec(ctx, stmt, utils.Min(1<<14/placeholders, 1<<10), sem, forward, succeeded)
 }
 
+// UpdateStreamed bulk updates the specified entities via NamedBulkExecTx.
+// The update statement is created using BuildUpdateStmt with the first entity from the entities stream.
+// Bulk execution is done with a maximum of 1,024 entities per transaction.
+// Concurrency is controlled via Options.MaxConnectionsPerTable.
 func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
@@ -399,11 +441,17 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Enti
 	return db.NamedBulkExecTx(ctx, stmt, 1<<10, sem, forward)
 }
 
+// DeleteStreamed bulk deletes the specified ids via BulkExec.
+// The delete statement is created using BuildDeleteStmt with the passed entityType.
+// For MySQL, the bulk execution is done with a maximum of 16,384 ids.
+// Concurrency is controlled via Options.MaxConnectionsPerTable.
 func (db *DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}) error {
 	sem := db.getSemaphoreForTable(utils.TableName(entityType))
 	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), 1<<14, sem, ids)
 }
 
+// Delete creates a channel from the specified ids and
+// bulk deletes them by passing the channel along with the entityType to DeleteStreamed.
 func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []interface{}) error {
 	idsCh := make(chan interface{}, len(ids))
 	for _, id := range ids {
@@ -414,6 +462,7 @@ func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []int
 	return db.DeleteStreamed(ctx, entityType, idsCh)
 }
 
+// IsRetryable checks whether the given error is retryable.
 func IsRetryable(err error) bool {
 	if errors.Is(err, mysql.ErrInvalidConn) {
 		return true
@@ -424,8 +473,8 @@ func IsRetryable(err error) bool {
 		switch e.Number {
 		case 1053, 1205, 1213, 2006:
 			// 1053: Server shutdown in progress
-			// 1205:
-			// 1213:
+			// 1205: Lock wait timeout
+			// 1213: Deadlock found when trying to get lock
 			// 2006: MySQL server has gone away
 			return true
 		}
