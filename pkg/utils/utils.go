@@ -65,10 +65,21 @@ func Key(name string, sep byte) string {
 	return b.String()
 }
 
+// Timed calls the given callback with the time that has elapsed since the start.
+//
+// Timed should be installed by defer:
+//
+//  func TimedExample(logger *zap.SugaredLogger) {
+//  	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
+//  		logger.Debugf("Executed job in %s", elapsed)
+//  	})
+//  	job()
+//  }
 func Timed(start time.Time, callback func(elapsed time.Duration)) {
 	callback(time.Since(start))
 }
 
+// BatchSliceOfStrings groups the given keys into chunks of size count and streams them into a returned channel.
 func BatchSliceOfStrings(ctx context.Context, keys []string, count int) <-chan []string {
 	batches := make(chan []string)
 
@@ -92,10 +103,12 @@ func BatchSliceOfStrings(ctx context.Context, keys []string, count int) <-chan [
 	return batches
 }
 
+// IsContextCanceled returns whether the given error is context.Canceled.
 func IsContextCanceled(err error) bool {
 	return errors.Is(err, context.Canceled)
 }
 
+// Checksum returns the SHA-1 checksum of the data.
 func Checksum(data interface{}) []byte {
 	var chksm [sha1.Size]byte
 
@@ -111,8 +124,8 @@ func Checksum(data interface{}) []byte {
 	return chksm[:]
 }
 
+// Fatal panics with the given error.
 func Fatal(err error) {
-	// TODO(el): Print stacktrace via some recover() magic?
 	panic(err)
 }
 
