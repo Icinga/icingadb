@@ -8,12 +8,14 @@ import (
 	"time"
 )
 
+// EntityBulker reads all entities from a channel and streams them in chunks into a Bulk channel.
 type EntityBulker struct {
 	ch  chan []contracts.Entity
 	ctx context.Context
 	mu  sync.Mutex
 }
 
+// NewEntityBulker returns a new EntityBulker and starts streaming.
 func NewEntityBulker(ctx context.Context, ch <-chan contracts.Entity, count int) *EntityBulker {
 	b := &EntityBulker{
 		ch:  make(chan []contracts.Entity),
@@ -90,6 +92,7 @@ func (b *EntityBulker) run(ch <-chan contracts.Entity, count int) {
 	_ = g.Wait()
 }
 
+// BulkEntities reads all entities from a channel and streams them in chunks into a returned channel.
 func BulkEntities(ctx context.Context, ch <-chan contracts.Entity, count int) <-chan []contracts.Entity {
 	return NewEntityBulker(ctx, ch, count).Bulk()
 }
