@@ -5,8 +5,10 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 )
 
+// EntitiesById is a map of key-contracts.Entity pairs.
 type EntitiesById map[string]contracts.Entity
 
+// Keys returns the keys.
 func (ebi EntitiesById) Keys() []string {
 	keys := make([]string, 0, len(ebi))
 	for k := range ebi {
@@ -16,6 +18,7 @@ func (ebi EntitiesById) Keys() []string {
 	return keys
 }
 
+// IDs returns the contracts.ID of the entities.
 func (ebi EntitiesById) IDs() []interface{} {
 	ids := make([]interface{}, 0, len(ebi))
 	for _, v := range ebi {
@@ -25,6 +28,7 @@ func (ebi EntitiesById) IDs() []interface{} {
 	return ids
 }
 
+// Entities streams the entities on a returned channel.
 func (ebi EntitiesById) Entities(ctx context.Context) <-chan contracts.Entity {
 	entities := make(chan contracts.Entity)
 
