@@ -20,6 +20,7 @@ import (
 
 var timeout = 60 * time.Second
 
+// HA provides high availability and indicates whether a Takeover or Handover must be made.
 type HA struct {
 	ctx         context.Context
 	cancelCtx   context.CancelFunc
@@ -36,6 +37,7 @@ type HA struct {
 	errOnce     sync.Once
 }
 
+// NewHA returns a new HA and starts the controller loop.
 func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger *zap.SugaredLogger) *HA {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
@@ -71,10 +73,12 @@ func (h *HA) Close() error {
 	return h.Err()
 }
 
+// Done returns a channel that's closed when the HA controller loop ended.
 func (h *HA) Done() <-chan struct{} {
 	return h.done
 }
 
+// Err returns an error if Done has been closed and there is an error. Otherwise returns nil.
 func (h *HA) Err() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -82,10 +86,12 @@ func (h *HA) Err() error {
 	return h.err
 }
 
+// Handover returns a channel with which handovers are signaled.
 func (h *HA) Handover() chan struct{} {
 	return h.handover
 }
 
+// Takeover returns a channel with which takeovers are signaled.
 func (h *HA) Takeover() chan struct{} {
 	return h.takeover
 }
