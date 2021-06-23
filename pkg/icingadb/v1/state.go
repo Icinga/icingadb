@@ -9,7 +9,7 @@ type State struct {
 	EnvironmentMeta          `json:",inline"`
 	AcknowledgementCommentId types.Binary               `json:"acknowledgement_comment_id"`
 	Attempt                  uint8                      `json:"check_attempt"`
-	CheckCommandline         types.String               `json:"commandline"`
+	CheckCommandline         types.Text                 `json:"commandline"`
 	CheckSource              types.String               `json:"check_source"`
 	ExecutionTime            float64                    `json:"execution_time"`
 	HardState                uint8                      `json:"hard_state"`
@@ -22,11 +22,11 @@ type State struct {
 	LastStateChange          types.UnixMilli            `json:"last_state_change"`
 	LastUpdate               types.UnixMilli            `json:"last_update"`
 	Latency                  float64                    `json:"latency"`
-	LongOutput               types.String               `json:"long_output"`
+	LongOutput               types.Output               `json:"long_output"`
 	NextCheck                types.UnixMilli            `json:"next_check"`
 	NextUpdate               types.UnixMilli            `json:"next_update"`
-	Output                   types.String               `json:"output"`
-	PerformanceData          types.String               `json:"performance_data"`
+	Output                   types.Output               `json:"output"`
+	PerformanceData          types.PerfData             `json:"performance_data"`
 	PreviousHardState        uint8                      `json:"previous_hard_state"`
 	Severity                 uint16                     `json:"severity"`
 	SoftState                uint8                      `json:"state"`

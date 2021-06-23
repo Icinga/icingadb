@@ -13,7 +13,7 @@ type Comment struct {
 	HostId             types.Binary      `json:"host_id"`
 	ServiceId          types.Binary      `json:"service_id"`
 	Author             string            `json:"author"`
-	Text               string            `json:"text"`
+	Text               types.Text        `json:"text"`
 	EntryType          types.CommentType `json:"entry_type"`
 	EntryTime          types.UnixMilli   `json:"entry_time"`
 	IsPersistent       types.Bool        `json:"is_persistent"`

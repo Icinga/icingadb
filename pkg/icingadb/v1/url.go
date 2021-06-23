@@ -1,11 +1,14 @@
 package v1
 
-import "github.com/icinga/icingadb/pkg/contracts"
+import (
+	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/types"
+)
 
 type ActionUrl struct {
 	EntityWithoutChecksum `json:",inline"`
 	EnvironmentMeta       `json:",inline"`
-	ActionUrl             string `json:"action_url"`
+	ActionUrl             types.Text `json:"action_url"`
 }
 
 type NotesUrl struct {

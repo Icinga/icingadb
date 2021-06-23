@@ -5,21 +5,19 @@ import (
 	"unicode/utf8"
 )
 
-// TruncPerfData truncates the string of performance data str to valid string of performance data of length less than or
-// equal to limit and also reports whether the performance data was truncated.
-func TruncPerfData(str string, limit int) (string, bool) {
-	if limit <= 0 {
-		return "", true
-	}
-
+// TruncatePerfData truncates the string of performance data string to `lim` or less bytes, such that the performance data
+// remains syntactically correct (till the last performance datum). It also reports whether the performance data
+// was truncated.
+func TruncatePerfData(str string, lim uint) (string, bool) {
 	lenStr := len(str)
+	limit := int(lim)
 
 	if lenStr > limit {
 		outString := str[:limit]
 
 		tempCutLen := 255
 
-		if lenStr < tempCutLen || limit < tempCutLen{
+		if lenStr < tempCutLen || limit < tempCutLen {
 			tempCutLen = limit
 		}
 		sliceStart := limit - tempCutLen
@@ -33,22 +31,22 @@ func TruncPerfData(str string, limit int) (string, bool) {
 			ql2 = strings.LastIndex(tempLastCutString[:ql], "'")
 
 			// tempLastCutString like "a=10 'b=" or "'a'=10 'b="
-			if ql2 < 0 || (string(str[ql + sliceStart - 1]) == " " && string(str[ql2 + sliceStart + 1]) == "=") {
-				lSpaceIdx := strings.LastIndex(str[:ql + sliceStart], " ")
+			if ql2 < 0 || (string(str[ql+sliceStart-1]) == " " && string(str[ql2+sliceStart+1]) == "=") {
+				lSpaceIdx := strings.LastIndex(str[:ql+sliceStart], " ")
 				outString = str[:lSpaceIdx]
 			} else {
 				// tempLastCutString like "'a'=10 'b'" or "'a'=10 'b'=" "'a=10 b'"
-				lSpaceIdx := strings.LastIndex(str[:limit + 1], " ")
+				lSpaceIdx := strings.LastIndex(str[:limit+1], " ")
 
 				// for case like 'b'=" "'a=10 b'"
-				if lSpaceIdx < ql + sliceStart {
-					lSpaceIdx = strings.LastIndex(str[:ql2 + sliceStart + 1], " ")
+				if lSpaceIdx < ql+sliceStart {
+					lSpaceIdx = strings.LastIndex(str[:ql2+sliceStart+1], " ")
 				}
 				outString = str[:lSpaceIdx]
 			}
 		} else {
 			// unquoted performance data or tempLastCutString[0] = "'"
-			lSpaceIdx := strings.LastIndex(str[:limit + 1], " ")
+			lSpaceIdx := strings.LastIndex(str[:limit+1], " ")
 			if lSpaceIdx < 0 {
 				outString = ""
 			} else {
@@ -60,12 +58,13 @@ func TruncPerfData(str string, limit int) (string, bool) {
 	return str, false
 }
 
-// TruncText truncates the string of text data str to valid string of text data of length less than or equal to limit
-// and also reports whether the text data was truncated.
-func TruncText(str string, limit int) (string, bool) {
-	boolValue := false
+// TruncateText truncates the string of text data to `lim` or less bytes such that the last character remains a valid
+// utf-8 character in the string. It also reports whether the text data was truncated.
+func TruncateText(str string, lim uint) (string, bool) {
+	truncated := false
+	limit := int(lim)
 	if len(str) >= limit {
-		boolValue = true
+		truncated = true
 		str = str[:limit]
 		for i := utf8.UTFMax; i > 0; i-- {
 			r, _ := utf8.DecodeLastRuneInString(str)
@@ -76,5 +75,5 @@ func TruncText(str string, limit int) (string, bool) {
 			str = str[:limit]
 		}
 	}
-	return str, boolValue
+	return str, truncated
 }

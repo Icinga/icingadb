@@ -43,7 +43,7 @@ type DowntimeHistory struct {
 	TriggeredById           types.Binary    `json:"triggered_by_id"`
 	EntryTime               types.UnixMilli `json:"entry_time"`
 	Author                  string          `json:"author"`
-	Comment                 string          `json:"comment"`
+	Comment                 types.Text      `json:"comment"`
 	IsFlexible              types.Bool      `json:"is_flexible"`
 	FlexibleDuration        uint64          `json:"flexible_duration"`
 	ScheduledStartTime      types.UnixMilli `json:"scheduled_start_time"`

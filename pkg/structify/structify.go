@@ -4,6 +4,7 @@ import (
 	"encoding"
 	"fmt"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/types"
 	"github.com/pkg/errors"
 	"reflect"
 	"strconv"
@@ -111,6 +112,15 @@ func parseString(src string, dest interface{}) error {
 	switch ptr := dest.(type) {
 	case encoding.TextUnmarshaler:
 		return ptr.UnmarshalText([]byte(src))
+	case *types.Text:
+		*ptr = types.Text(src)
+		return nil
+	case *types.Output:
+		*ptr = types.Output(src)
+		return nil
+	case *types.PerfData:
+		*ptr = types.PerfData(src)
+		return nil
 	case *string:
 		*ptr = src
 		return nil

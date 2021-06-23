@@ -25,7 +25,7 @@ type CustomvarFlat struct {
 	CustomvarMeta    `json:",inline"`
 	Flatname         string       `json:"flatname"`
 	FlatnameChecksum types.Binary `json:"flatname_checksum"`
-	Flatvalue        string       `json:"flatvalue"`
+	Flatvalue        types.Text   `json:"flatvalue"`
 }
 
 func NewCustomvar() contracts.Entity {
@@ -82,7 +82,7 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 							},
 							Flatname:         flatname,
 							FlatnameChecksum: utils.Checksum(flatname),
-							Flatvalue:        fv,
+							Flatvalue:        types.Text(fv),
 						}:
 						case <-ctx.Done():
 							return ctx.Err()

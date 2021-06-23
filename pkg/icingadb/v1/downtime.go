@@ -14,7 +14,7 @@ type Downtime struct {
 	HostId             types.Binary    `json:"host_id"`
 	ServiceId          types.Binary    `json:"service_id"`
 	Author             string          `json:"author"`
-	Comment            string          `json:"comment"`
+	Comment            types.Text      `json:"comment"`
 	EntryTime          types.UnixMilli `json:"entry_time"`
 	ScheduledStartTime types.UnixMilli `json:"scheduled_start_time"`
 	ScheduledEndTime   types.UnixMilli `json:"scheduled_end_time"`

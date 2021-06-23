@@ -10,7 +10,7 @@ type Command struct {
 	EnvironmentMeta    `json:",inline"`
 	NameCiMeta         `json:",inline"`
 	ZoneId             types.Binary `json:"zone_id"`
-	Command            string       `json:"command"`
+	Command            types.Text   `json:"command"`
 	Timeout            uint32       `json:"timeout"`
 }
 
@@ -19,9 +19,9 @@ type CommandArgument struct {
 	EnvironmentMeta     `json:",inline"`
 	CommandId           types.Binary `json:"command_id"`
 	ArgumentKey         string       `json:"argument_key"`
-	ArgumentValue       types.String `json:"value"`
+	ArgumentValue       types.Text   `json:"value"`
 	ArgumentOrder       types.Int    `json:"order"`
-	Description         types.String `json:"description"`
+	Description         types.Text   `json:"description"`
 	ArgumentKeyOverride types.String `json:"key"`
 	RepeatKey           types.Bool   `json:"repeat_key"`
 	Required            types.Bool   `json:"required"`
@@ -52,7 +52,7 @@ type CommandEnvvar struct {
 	EnvironmentMeta    `json:",inline"`
 	CommandId          types.Binary `json:"command_id"`
 	EnvvarKey          string       `json:"envvar_key"`
-	EnvvarValue        string       `json:"value"`
+	EnvvarValue        types.Text   `json:"value"`
 }
 
 type CommandCustomvar struct {

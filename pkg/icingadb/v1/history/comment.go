@@ -42,7 +42,7 @@ type CommentHistory struct {
 	CommentHistoryUpserter `json:",inline"`
 	EntryTime              types.UnixMilli   `json:"entry_time"`
 	Author                 string            `json:"author"`
-	Comment                string            `json:"comment"`
+	Comment                types.Text        `json:"comment"`
 	EntryType              types.CommentType `json:"entry_type"`
 	IsPersistent           types.Bool        `json:"is_persistent"`
 	IsSticky               types.Bool        `json:"is_sticky"`
