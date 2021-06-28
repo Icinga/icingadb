@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Database *Database `yaml:"database"`
 	Redis    *Redis    `yaml:"redis"`
+	Logging  *Logging  `yaml:"logging"`
 }
 
 // Flags defines CLI flags.
