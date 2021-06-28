@@ -3,6 +3,7 @@ package command
 import (
 	"fmt"
 	"github.com/icinga/icingadb/internal"
+	"github.com/icinga/icingadb/internal/logging"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -42,13 +43,8 @@ func New() *Command {
 		utils.Fatal(err)
 	}
 
-	loggerCfg := zap.NewDevelopmentConfig()
-	// Disable zap's automatic stack trace capturing, as we call errors.Wrap() before logging with "%+v".
-	loggerCfg.DisableStacktrace = true
-	logger, err := loggerCfg.Build()
-	if err != nil {
-		utils.Fatal(errors.Wrap(err, "can't create logger"))
-	}
+	logger := logging.NewLogger()
+
 	sugar := logger.Sugar()
 
 	return &Command{
@@ -59,8 +55,8 @@ func New() *Command {
 }
 
 // Database creates and returns a new icingadb.DB connection from config.Config.
-func (c Command) Database() *icingadb.DB {
-	db, err := c.Config.Database.Open(c.Logger)
+func (c Command) Database(logging2 *logging.Logging) *icingadb.DB {
+	db, err := c.Config.Database.Open(logging2.GetLogger("database"))
 	if err != nil {
 		c.Logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
 	}
@@ -69,10 +65,19 @@ func (c Command) Database() *icingadb.DB {
 }
 
 // Redis creates and returns a new icingaredis.Client connection from config.Config.
-func (c Command) Redis() *icingaredis.Client {
-	rc, err := c.Config.Redis.NewClient(c.Logger)
+func (c Command) Redis(logging2 *logging.Logging) *icingaredis.Client {
+	rc, err := c.Config.Redis.NewClient(logging2.GetLogger("redis"))
 	if err != nil {
 		c.Logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
+	}
+
+	return rc
+}
+
+func (c Command) Logging() *logging.Logging {
+	rc, err := c.Config.Logging.NewLogger()
+	if err != nil {
+		c.Logger.Fatalf("%+v", errors.Wrap(err, "can't create Logger from config"))
 	}
 
 	return rc

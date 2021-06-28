@@ -39,7 +39,8 @@ func run() int {
 
 	logger.Info("Starting Icinga DB")
 
-	db := cmd.Database()
+	cmdLogger := cmd.Logging()
+	db := cmd.Database(cmdLogger)
 	defer db.Close()
 	{
 		logger.Info("Connecting to database")
@@ -53,7 +54,8 @@ func run() int {
 		logger.Fatalf("%+v", err)
 	}
 
-	rc := cmd.Redis()
+	rc := cmd.Redis(cmdLogger)
+
 	{
 		logger.Info("Connecting to Redis")
 		_, err := rc.Ping(context.Background()).Result()
@@ -65,14 +67,15 @@ func run() int {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 
-	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
-	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
+	heartbeat := icingaredis.NewHeartbeat(ctx, rc, cmdLogger.GetLogger("heartbeat"))
+
+	ha := icingadb.NewHA(ctx, db, heartbeat, cmdLogger.GetLogger("ha"))
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
 	defer ha.Close()
 	s := icingadb.NewSync(db, rc, logger)
-	hs := history.NewSync(db, rc, logger)
-	rt := icingadb.NewRuntimeUpdates(db, rc, logger)
+	hs := history.NewSync(db, rc, cmdLogger.GetLogger("history"))
+	rt := icingadb.NewRuntimeUpdates(db, rc, cmdLogger.GetLogger("runtime_update"))
 	ods := overdue.NewSync(db, rc, logger)
 
 	sig := make(chan os.Signal, 1)
