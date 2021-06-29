@@ -73,6 +73,8 @@ func run() int {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
+	cu := cmd.Cleanup(db)
+
 	// Main loop
 	for {
 		hactx, cancelHactx := context.WithCancel(ctx)
@@ -205,6 +207,11 @@ func run() int {
 							// @TODO(el): The customvar runtime update sync may change because the customvar flat
 							// runtime update sync is not yet implemented.
 							return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), lastRuntimeStreamId)
+						})
+
+						// Start history tables cleanup routine
+						g.Go(func() error {
+							return cu.Start()
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
