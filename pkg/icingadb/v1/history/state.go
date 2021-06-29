@@ -15,8 +15,8 @@ type StateHistory struct {
 	PreviousSoftState  uint8           `json:"previous_soft_state"`
 	PreviousHardState  uint8           `json:"previous_hard_state"`
 	Attempt            uint8           `json:"attempt"`
-	Output             types.String    `json:"output"`
-	LongOutput         types.String    `json:"long_output"`
+	Output             types.Output    `json:"output"`
+	LongOutput         types.Output    `json:"long_output"`
 	MaxCheckAttempts   uint32          `json:"max_check_attempts"`
 	CheckSource        types.String    `json:"check_source"`
 }
