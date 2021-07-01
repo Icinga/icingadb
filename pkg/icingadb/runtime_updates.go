@@ -57,11 +57,10 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 		g.Go(structifyStream(ctx, updateMessages, upsertEntities, deleteIds, structify.MakeMapStructifier(reflect.TypeOf(v).Elem(), "json")))
 
 		g.Go(func() error {
-			stmt, _ := r.db.BuildUpsertStmt(v)
+			stmt, placeholders := r.db.BuildUpsertStmt(v)
 			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
 			sem := semaphore.NewWeighted(1)
-			// TODO(nh) Currently not possible to increase the count here: https://github.com/jmoiron/sqlx/issues/694
-			return r.db.NamedBulkExec(ctx, stmt, 1, sem, upsertEntities, nil)
+			return r.db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, sem, upsertEntities, nil)
 		})
 		g.Go(func() error {
 			return r.db.DeleteStreamed(ctx, v, deleteIds)
