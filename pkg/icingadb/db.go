@@ -114,7 +114,7 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 	set := make([]string, 0, len(updateColumns))
 
 	for _, col := range updateColumns {
-		set = append(set, fmt.Sprintf("%s = :%s", col, col))
+		set = append(set, fmt.Sprintf("%s = VALUES(%s)", col, col))
 	}
 
 	return fmt.Sprintf(
@@ -123,7 +123,7 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 		strings.Join(insertColumns, ","),
 		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
 		strings.Join(set, ","),
-	), len(insertColumns) + len(updateColumns)
+	), len(insertColumns)
 }
 
 func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan interface{}) error {
@@ -382,12 +382,10 @@ func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Enti
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
-	// TODO(ak): wait for https://github.com/jmoiron/sqlx/issues/694
-	// stmt, placeholders := db.BuildUpsertStmt(first)
-	// return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, 1<<3, forward, succeeded)
-	stmt, _ := db.BuildUpsertStmt(first)
 	sem := db.getSemaphoreForTable(utils.TableName(first))
-	return db.NamedBulkExec(ctx, stmt, 1, sem, forward, succeeded)
+	stmt, placeholders := db.BuildUpsertStmt(first)
+
+	return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, sem, forward, succeeded)
 }
 
 func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
