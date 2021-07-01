@@ -98,7 +98,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 		`UPDATE %s SET %s WHERE id = :id`,
 		utils.TableName(update),
 		strings.Join(set, ", "),
-	), len(columns)
+	), len(columns) + 1 // +1 because of WHERE id = :id
 }
 
 func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {

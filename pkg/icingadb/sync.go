@@ -140,10 +140,9 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		com.ErrgroupReceive(g, errs)
 
 		g.Go(func() error {
-			// TODO (el): This is very slow in high latency scenarios.
-			// Use strings.Repeat() on the query and create a stmt
-			// with a size near the default value of max_allowed_packet.
-			return s.db.UpdateStreamed(ctx, entities)
+			// Using upsert here on purpose as this is the fastest way to do bulk updates.
+			// However, there is a risk that errors in the sync implementation could silently insert new rows.
+			return s.db.UpsertStreamed(ctx, entities, nil)
 		})
 	}
 
