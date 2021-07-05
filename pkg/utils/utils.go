@@ -228,3 +228,35 @@ func Min(x, y int) int {
 
 	return y
 }
+
+// Periodic executes the specified callback after every tick.
+// Stops the ticker when the passed context is cancelled or when the returned cancel function is called:
+//
+//  func Work(ctx context.Context, logger *zap.SugaredLogger) {
+//  	var cnt com.Counter
+//  	cancelPeriodic := utils.Periodic(ctx, time.Second*10, func(elapsed time.Duration) {
+//  		logger.Debugf("Executed work with %d jobs in %s, cnt.Val(), elapsed)
+//  	})
+//  	defer cancelPeriodic()
+//  	work(cnt)
+//  }
+func Periodic(ctx context.Context, tick time.Duration, callback func(elapsed time.Duration)) context.CancelFunc {
+	ctx, cancelCtx := context.WithCancel(ctx)
+	start := time.Now()
+	ticker := time.NewTicker(tick)
+
+	go func() {
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				callback(time.Since(start))
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return cancelCtx
+}
