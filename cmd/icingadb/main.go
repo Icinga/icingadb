@@ -19,6 +19,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 )
 
 const (
@@ -125,6 +126,20 @@ func run() int {
 						})
 
 						logger.Info("Starting config sync")
+						g.Go(func() error {
+							defer utils.Timed(time.Now(), func(elapsed time.Duration) {
+								select {
+								case <-synctx.Done():
+									logger.Debugf("Aborted config sync after %s", elapsed)
+								default:
+									logger.Debugf("Finished config sync in %s", elapsed)
+								}
+							})
+
+							wg.Wait()
+
+							return nil
+						})
 						for _, factory := range v1.Factories {
 							factory := factory
 
