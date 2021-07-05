@@ -23,6 +23,9 @@ type Delta struct {
 
 func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subject *common.SyncSubject, logger *zap.SugaredLogger) *Delta {
 	delta := &Delta{
+		Create:  map[string]contracts.Entity{},
+		Update:  map[string]contracts.Entity{},
+		Delete:  map[string]contracts.Entity{},
 		Subject: subject,
 		done:    make(chan error, 1),
 		logger:  logger,
