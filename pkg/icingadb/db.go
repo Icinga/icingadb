@@ -132,10 +132,13 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 	// Use context from group.
 	bulk := com.Bulk(ctx, arg, count)
 
-	db.logger.Debugf("Executing %s", query)
+	db.logger.Debugf("Executing %s with up to %d rows", query, count)
 	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-		db.logger.Debugf("Executed %s with %d rows in %s", query, cnt.Val(), elapsed)
+		db.logger.Debugf("Finished executing %s with %d rows in %s", query, cnt.Val(), elapsed)
 	})
+	defer utils.Periodic(ctx, time.Second*10, func(elapsed time.Duration) {
+		db.logger.Debugf("Executed %s with %d rows in %s", query, cnt.Val(), elapsed)
+	})()
 
 	g.Go(func() error {
 		g, ctx := errgroup.WithContext(ctx)
@@ -152,6 +155,7 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 					return retry.WithBackoff(
 						ctx,
 						func(context.Context) error {
+							// db.logger.Debugf("Executing %s with %d rows..", query, len(b))
 							stmt, args, err := sqlx.In(query, b)
 							if err != nil {
 								return errors.Wrapf(err, "can't build placeholders for %q", query)
@@ -189,10 +193,13 @@ func (db *DB) NamedBulkExec(
 	g, ctx := errgroup.WithContext(ctx)
 	bulk := com.BulkEntities(ctx, arg, count)
 
-	db.logger.Debugf("Executing %s", query)
+	db.logger.Debugf("Executing %s with up to %d rows", query, count)
 	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-		db.logger.Debugf("Executed %s with %d rows in %s", query, cnt.Val(), elapsed)
+		db.logger.Debugf("Finished executing %s with %d rows in %s", query, cnt.Val(), elapsed)
 	})
+	defer utils.Periodic(ctx, time.Second*10, func(elapsed time.Duration) {
+		db.logger.Debugf("Executed %s with %d rows in %s", query, cnt.Val(), elapsed)
+	})()
 
 	g.Go(func() error {
 		// stmt, err := db.PrepareNamedContext(ctx, query)
@@ -218,7 +225,7 @@ func (db *DB) NamedBulkExec(
 						return retry.WithBackoff(
 							ctx,
 							func(ctx context.Context) error {
-								db.logger.Debugf("Executing %s with %d rows..", query, len(b))
+								// db.logger.Debugf("Executing %s with %d rows..", query, len(b))
 								_, err := db.NamedExecContext(ctx, query, b)
 								if err != nil {
 									return internal.CantPerformQuery(err, query)
@@ -260,10 +267,13 @@ func (db *DB) NamedBulkExecTx(
 	g, ctx := errgroup.WithContext(ctx)
 	bulk := com.BulkEntities(ctx, arg, count)
 
-	db.logger.Debugf("Executing %s", query)
+	db.logger.Debugf("Executing %s with up to %d rows per transaction", query, count)
 	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-		db.logger.Debugf("Executed %s with %d rows in %s", query, cnt.Val(), elapsed)
+		db.logger.Debugf("Finished executing %s with %d rows in %s", query, cnt.Val(), elapsed)
 	})
+	defer utils.Periodic(ctx, time.Second*10, func(elapsed time.Duration) {
+		db.logger.Debugf("Executed %s with %d rows in %s", query, cnt.Val(), elapsed)
+	})()
 
 	g.Go(func() error {
 		for {
@@ -284,6 +294,7 @@ func (db *DB) NamedBulkExecTx(
 						return retry.WithBackoff(
 							ctx,
 							func(ctx context.Context) error {
+								// db.logger.Debugf("Executing %s with %d rows in a new transaction..", query, len(b))
 								tx, err := db.BeginTxx(ctx, nil)
 								if err != nil {
 									return errors.Wrap(err, "can't start transaction")
