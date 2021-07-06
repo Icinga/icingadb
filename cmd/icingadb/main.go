@@ -22,8 +22,9 @@ import (
 )
 
 const (
-	ExitSuccess = 0
-	ExitFailure = 1
+	ExitSuccess           = 0
+	ExitFailure           = 1
+	expectedSchemaVersion = 2
 )
 
 func main() {
@@ -46,6 +47,10 @@ func run() int {
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
 		}
+	}
+
+	if err := checkDbSchema(context.Background(), db); err != nil {
+		logger.Fatalf("%+v", err)
 	}
 
 	rc := cmd.Redis()
@@ -240,4 +245,20 @@ func run() int {
 
 		cancelHactx()
 	}
+}
+
+// checkDbSchema asserts the database schema of the expected version being present.
+func checkDbSchema(ctx context.Context, db *icingadb.DB) error {
+	var version uint16
+
+	err := db.QueryRowxContext(ctx, "SELECT version FROM icingadb_schema ORDER BY id DESC LIMIT 1").Scan(&version)
+	if err != nil {
+		return errors.Wrap(err, "can't check database schema version")
+	}
+
+	if version != expectedSchemaVersion {
+		return errors.Errorf("expected database schema v%d, got v%d", expectedSchemaVersion, version)
+	}
+
+	return nil
 }
