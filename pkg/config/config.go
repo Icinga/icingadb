@@ -9,8 +9,8 @@ import (
 
 // Config defines Icinga DB config.
 type Config struct {
-	Database *Database `yaml:"database"`
-	Redis    *Redis    `yaml:"redis"`
+	Database Database `yaml:"database"`
+	Redis    Redis    `yaml:"redis"`
 }
 
 // Flags defines CLI flags.
@@ -32,7 +32,7 @@ func FromYAMLFile(name string) (*Config, error) {
 	c := &Config{}
 	d := yaml.NewDecoder(f)
 
-	if err := d.Decode(&c); err != nil {
+	if err := d.Decode(c); err != nil {
 		return nil, errors.Wrap(err, "can't parse YAML file "+name)
 	}
 
