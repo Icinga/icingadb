@@ -5,7 +5,6 @@ import (
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
@@ -142,56 +141,32 @@ func run() int {
 
 							<-dump.Done("icinga:customvar")
 
-							logger.Infof("Syncing customvar")
+							logger.Info("Syncing customvar")
+							logger.Info("Syncing customvar_flat")
 
 							cv := common.NewSyncSubject(v1.NewCustomvar)
 
-							cvs, redisErrs := rc.YieldAll(synctx, cv)
-							// Let errors from Redis cancel our group.
+							cvs, redisErrs := rc.YieldAll(ctx, cv)
 							com.ErrgroupReceive(g, redisErrs)
 
-							// Multiplex cvs to use them both for customvar and customvar_flat.
-							cvs1, cvs2 := make(chan contracts.Entity), make(chan contracts.Entity)
-							g.Go(func() error {
-								defer close(cvs1)
-								defer close(cvs2)
-								for {
-									select {
-									case cv, ok := <-cvs:
-										if !ok {
-											return nil
-										}
-
-										cvs1 <- cv
-										cvs2 <- cv
-									case <-synctx.Done():
-										return synctx.Err()
-									}
-								}
-							})
+							customvars, flatCustomvars, expandErrs := v1.ExpandCustomvars(synctx, cvs)
+							com.ErrgroupReceive(g, expandErrs)
 
 							actualCvs, dbErrs := db.YieldAll(
 								ctx, cv.Factory(), db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
-							// Let errors from DB cancel our group.
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logger))
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, customvars, cv, logger))
 							})
 
-							cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
-
-							cvFlats, flattenErrs := v1.FlattenCustomvars(ctx, cvs2)
-							// Let errors from Flatten cancel our group.
-							com.ErrgroupReceive(g, flattenErrs)
-
+							flatCv := common.NewSyncSubject(v1.NewCustomvarFlat)
 							actualCvFlats, dbErrs := db.YieldAll(
-								ctx, cvFlat.Factory(), db.BuildSelectStmt(cvFlat.Entity(), cvFlat.Entity().Fingerprint()))
-							// Let errors from DB cancel our group.
+								ctx, flatCv.Factory(), db.BuildSelectStmt(flatCv.Entity(), flatCv.Entity().Fingerprint()))
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logger))
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, flatCustomvars, flatCv, logger))
 							})
 
 							return nil
@@ -202,9 +177,7 @@ func run() int {
 
 							logger.Info("Starting runtime updates sync")
 
-							// @TODO(el): The customvar runtime update sync may change because the customvar flat
-							// runtime update sync is not yet implemented.
-							return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), lastRuntimeStreamId)
+							return rt.Sync(synctx, v1.Factories, lastRuntimeStreamId)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {

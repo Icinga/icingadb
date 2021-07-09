@@ -44,7 +44,7 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 	g.Go(func() error {
 		defer close(cvFlats)
 
-		g, _ := errgroup.WithContext(ctx)
+		g, ctx := errgroup.WithContext(ctx)
 
 		for i := 0; i < runtime.NumCPU(); i++ {
 			g.Go(func() error {
@@ -98,4 +98,33 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 	})
 
 	return cvFlats, com.WaitAsync(g)
+}
+
+func ExpandCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan contracts.Entity, <-chan contracts.Entity, <-chan error) {
+	g, ctx := errgroup.WithContext(ctx)
+
+	// Multiplex cvs to use them both for customvar and customvar_flat.
+	customvars, forward := make(chan contracts.Entity), make(chan contracts.Entity)
+	g.Go(func() error {
+		defer close(customvars)
+		defer close(forward)
+		for {
+			select {
+			case cv, ok := <-cvs:
+				if !ok {
+					return nil
+				}
+
+				customvars <- cv
+				forward <- cv
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	})
+
+	flatCustomvars, flattenErrs := FlattenCustomvars(ctx, forward)
+	com.ErrgroupReceive(g, flattenErrs)
+
+	return customvars, flatCustomvars, com.WaitAsync(g)
 }

@@ -414,6 +414,10 @@ func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []int
 	return db.DeleteStreamed(ctx, entityType, idsCh)
 }
 
+func (db *DB) Semaphored(subject contracts.Entity, fn func(sem *semaphore.Weighted) error) error {
+	return fn(db.getSemaphoreForTable(utils.TableName(subject)))
+}
+
 func IsRetryable(err error) bool {
 	if errors.Is(err, mysql.ErrInvalidConn) {
 		return true

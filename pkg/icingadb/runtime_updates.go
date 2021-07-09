@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
+	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -64,6 +66,78 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 		})
 		g.Go(func() error {
 			return r.db.DeleteStreamed(ctx, v, deleteIds)
+		})
+	}
+
+	{
+		updateMessages := make(chan redis.XMessage, bulkSize)
+		upsertEntities := make(chan contracts.Entity, bulkSize)
+		deleteIds := make(chan interface{}, bulkSize)
+
+		var cvFactoryFunc contracts.EntityFactoryFunc
+		cvFactoryFunc = v1.NewCustomvar
+		cvFactoryFunc = cvFactoryFunc.WithInit
+		cv := cvFactoryFunc()
+		name := utils.Name(cv)
+
+		r.logger.Debug("Syncing runtime updates of " + name)
+		r.logger.Debug("Syncing runtime updates of CustomvarFlat")
+
+		updateMessagesByKey["icinga:"+utils.Key(name, ':')] = updateMessages
+
+		g.Go(structifyStream(ctx, updateMessages, upsertEntities, deleteIds, structify.MakeMapStructifier(reflect.TypeOf(cv).Elem(), "json")))
+
+		customvars, flatCustomvars, errs := v1.ExpandCustomvars(ctx, upsertEntities)
+		com.ErrgroupReceive(g, errs)
+
+		g.Go(func() error {
+			stmt, _ := r.db.BuildUpsertStmt(cv)
+			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
+			sem := semaphore.NewWeighted(1)
+			// TODO(el) Currently not possible to increase the count here: https://github.com/jmoiron/sqlx/issues/694
+			return r.db.NamedBulkExec(ctx, stmt, 1, sem, customvars, nil)
+		})
+
+		g.Go(func() error {
+			stmt, _ := r.db.BuildUpsertStmt(v1.NewCustomvarFlat())
+			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
+			sem := semaphore.NewWeighted(1)
+			// TODO(el) Currently not possible to increase the count here: https://github.com/jmoiron/sqlx/issues/694
+			return r.db.NamedBulkExec(ctx, stmt, 1, sem, flatCustomvars, nil)
+		})
+
+		deleteCustomvars, deleteFlatCustomvars := make(chan interface{}), make(chan interface{})
+		g.Go(func() error {
+			defer close(deleteCustomvars)
+			defer close(deleteFlatCustomvars)
+			for {
+				select {
+				case id, ok := <-deleteIds:
+					if !ok {
+						return nil
+					}
+
+					deleteCustomvars <- id
+					deleteFlatCustomvars <- id
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
+		})
+
+		g.Go(func() error {
+			return r.db.DeleteStreamed(ctx, cv, deleteCustomvars)
+		})
+
+		var cvFlatFactoryFunc contracts.EntityFactoryFunc
+		cvFlatFactoryFunc = v1.NewCustomvarFlat
+		cvFlatFactoryFunc = cvFactoryFunc.WithInit
+		cvFlat := cvFlatFactoryFunc()
+
+		g.Go(func() error {
+			return r.db.Semaphored(cvFlat, func(sem *semaphore.Weighted) error {
+				return r.db.BulkExec(ctx, `DELETE FROM customvar_flat WHERE customvar_id IN (?)`, 1<<15, sem, deleteFlatCustomvars)
+			})
 		})
 	}
 
