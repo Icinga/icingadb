@@ -373,7 +373,7 @@ func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Enti
 	sem := db.getSemaphoreForTable(utils.TableName(first))
 	stmt, placeholders := db.BuildInsertStmt(first)
 
-	return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, sem, forward, nil)
+	return db.NamedBulkExec(ctx, stmt, utils.Min(1<<14/placeholders, 1<<10), sem, forward, nil)
 }
 
 func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
@@ -385,7 +385,7 @@ func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Enti
 	sem := db.getSemaphoreForTable(utils.TableName(first))
 	stmt, placeholders := db.BuildUpsertStmt(first)
 
-	return db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, sem, forward, succeeded)
+	return db.NamedBulkExec(ctx, stmt, utils.Min(1<<14/placeholders, 1<<10), sem, forward, succeeded)
 }
 
 func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
@@ -394,14 +394,14 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Enti
 		return errors.Wrap(err, "can't copy first entity")
 	}
 	sem := db.getSemaphoreForTable(utils.TableName(first))
-	stmt, placeholders := db.BuildUpdateStmt(first)
+	stmt, _ := db.BuildUpdateStmt(first)
 
-	return db.NamedBulkExecTx(ctx, stmt, 1<<15/placeholders, sem, forward)
+	return db.NamedBulkExecTx(ctx, stmt, 1<<10, sem, forward)
 }
 
 func (db *DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}) error {
 	sem := db.getSemaphoreForTable(utils.TableName(entityType))
-	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), 1<<15, sem, ids)
+	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), 1<<14, sem, ids)
 }
 
 func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []interface{}) error {

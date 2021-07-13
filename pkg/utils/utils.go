@@ -219,3 +219,12 @@ func Ellipsize(s string, limit int) string {
 		return utf8.Slice(0, limit-ellipsis.RuneCount()) + ellipsis.String()
 	}
 }
+
+// Min returns the smaller of x or y.
+func Min(x, y int) int {
+	if x < y {
+		return x
+	}
+
+	return y
+}
