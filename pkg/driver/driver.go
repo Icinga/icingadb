@@ -34,8 +34,13 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 			conn, err = c.Connector.Connect(ctx)
 
 			logFirstError.Do(func() {
-				if err != nil {
-					c.driver.Logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					if err != nil {
+						c.driver.Logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
+					}
 				}
 			})
 
