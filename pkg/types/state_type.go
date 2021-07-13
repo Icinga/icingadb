@@ -12,8 +12,8 @@ import (
 type StateType uint8
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
-func (st *StateType) UnmarshalText(bytes []byte) error {
-	return st.UnmarshalJSON(bytes)
+func (st *StateType) UnmarshalText(text []byte) error {
+	return st.UnmarshalJSON(text)
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.

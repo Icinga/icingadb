@@ -5,6 +5,7 @@ import (
 	"github.com/icinga/icingadb/pkg/types"
 )
 
+// IcingaStatus defines Icinga status information.
 type IcingaStatus struct {
 	Environment                string          `json:"environment"`
 	NodeName                   string          `json:"node_name"`
@@ -19,6 +20,7 @@ type IcingaStatus struct {
 	PerformanceDataEnabled     types.Bool      `json:"enable_perfdata"`
 }
 
+// EnvironmentID returns the environment ID.
 func (s *IcingaStatus) EnvironmentID() types.Binary {
 	chksm := sha1.Sum([]byte(s.Environment))
 

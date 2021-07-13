@@ -12,9 +12,9 @@ import (
 type NotificationTypes uint16
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
-func (nt *NotificationTypes) UnmarshalJSON(bytes []byte) error {
+func (nt *NotificationTypes) UnmarshalJSON(data []byte) error {
 	var types []string
-	if err := internal.UnmarshalJSON(bytes, &types); err != nil {
+	if err := internal.UnmarshalJSON(data, &types); err != nil {
 		return err
 	}
 

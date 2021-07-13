@@ -7,12 +7,14 @@ import (
 	"time"
 )
 
+// Bulker reads all values from a channel and streams them in chunks into a Bulk channel.
 type Bulker struct {
 	ch  chan []interface{}
 	ctx context.Context
 	mu  sync.Mutex
 }
 
+// NewBulker returns a new Bulker and starts streaming.
 func NewBulker(ctx context.Context, ch <-chan interface{}, count int) *Bulker {
 	b := &Bulker{
 		ch:  make(chan []interface{}),
@@ -89,6 +91,7 @@ func (b *Bulker) run(ch <-chan interface{}, count int) {
 	_ = g.Wait()
 }
 
+// Bulk reads all values from a channel and streams them in chunks into a returned channel.
 func Bulk(ctx context.Context, ch <-chan interface{}, count int) <-chan []interface{} {
 	return NewBulker(ctx, ch, count).Bulk()
 }

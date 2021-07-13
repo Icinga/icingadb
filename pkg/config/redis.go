@@ -78,23 +78,23 @@ func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, st
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (d *Redis) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := defaults.Set(d); err != nil {
-		return errors.Wrapf(err, "can't set defaults %#v", d)
+func (r *Redis) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	if err := defaults.Set(r); err != nil {
+		return errors.Wrapf(err, "can't set defaults %#v", r)
 	}
 	// Prevent recursion.
 	type self Redis
-	if err := unmarshal((*self)(d)); err != nil {
-		return internal.CantUnmarshalYAML(err, d)
+	if err := unmarshal((*self)(r)); err != nil {
+		return internal.CantUnmarshalYAML(err, r)
 	}
 
-	if d.MaxHMGetConnections < 1 {
+	if r.MaxHMGetConnections < 1 {
 		return errors.New("max_hmget_connections must be at least 1")
 	}
-	if d.HMGetCount < 1 {
+	if r.HMGetCount < 1 {
 		return errors.New("hmget_count must be at least 1")
 	}
-	if d.HScanCount < 1 {
+	if r.HScanCount < 1 {
 		return errors.New("hscan_count must be at least 1")
 	}
 

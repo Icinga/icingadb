@@ -14,31 +14,33 @@ import (
 
 var timeout = 60 * time.Second
 
+// Heartbeat periodically reads heartbeats from a Redis stream and forwards them to a Beat channel. Also propagates when the heartbeat is Lost.
 type Heartbeat struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-	client *Client
-	logger *zap.SugaredLogger
-	active bool
-	beat   chan v1.StatsMessage
-	lost   chan struct{}
-	done   chan struct{}
-	mu     *sync.Mutex
-	err    error
+	ctx       context.Context
+	cancelCtx context.CancelFunc
+	client    *Client
+	logger    *zap.SugaredLogger
+	active    bool
+	beat      chan v1.StatsMessage
+	lost      chan struct{}
+	done      chan struct{}
+	mu        *sync.Mutex
+	err       error
 }
 
+// NewHeartbeat returns a new Heartbeat and starts the heartbeat controller loop.
 func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger) *Heartbeat {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancelCtx := context.WithCancel(ctx)
 
 	heartbeat := &Heartbeat{
-		ctx:    ctx,
-		cancel: cancel,
-		client: client,
-		logger: logger,
-		beat:   make(chan v1.StatsMessage),
-		lost:   make(chan struct{}),
-		done:   make(chan struct{}),
-		mu:     &sync.Mutex{},
+		ctx:       ctx,
+		cancelCtx: cancelCtx,
+		client:    client,
+		logger:    logger,
+		beat:      make(chan v1.StatsMessage),
+		lost:      make(chan struct{}),
+		done:      make(chan struct{}),
+		mu:        &sync.Mutex{},
 	}
 
 	go heartbeat.controller()
@@ -49,17 +51,19 @@ func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger
 // Close implements the io.Closer interface.
 func (h Heartbeat) Close() error {
 	// Cancel ctx.
-	h.cancel()
+	h.cancelCtx()
 	// Wait until the controller loop ended.
 	<-h.Done()
 	// And return an error, if any.
 	return h.Err()
 }
 
+// Done returns a channel that's closed when the heartbeat controller loop ended.
 func (h Heartbeat) Done() <-chan struct{} {
 	return h.done
 }
 
+// Err returns an error if Done has been closed and there is an error. Otherwise returns nil.
 func (h Heartbeat) Err() error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -67,16 +71,20 @@ func (h Heartbeat) Err() error {
 	return h.err
 }
 
+// Beat returns a channel on which heartbeat messages are passed.
 func (h Heartbeat) Beat() <-chan v1.StatsMessage {
 	return h.beat
 }
 
+// Lost returns a channel in which heartbeat losses are passed on.
 func (h Heartbeat) Lost() <-chan struct{} {
 	return h.lost
 }
 
 // controller loop.
 func (h Heartbeat) controller() {
+	h.logger.Info("Waiting for Icinga 2 heartbeat")
+
 	messages := make(chan v1.StatsMessage)
 	defer close(messages)
 

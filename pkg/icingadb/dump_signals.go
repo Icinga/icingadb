@@ -9,6 +9,8 @@ import (
 	"sync"
 )
 
+// DumpSignals reads dump signals from a Redis stream via Listen.
+// Dump-done signals are passed on via Done channels, while InProgress must be checked for dump-wip signals.
 type DumpSignals struct {
 	redis        *icingaredis.Client
 	logger       *zap.SugaredLogger
@@ -18,6 +20,7 @@ type DumpSignals struct {
 	inProgressCh chan struct{}
 }
 
+// NewDumpSignals returns new DumpSignals.
 func NewDumpSignals(redis *icingaredis.Client, logger *zap.SugaredLogger) *DumpSignals {
 	return &DumpSignals{
 		redis:        redis,
