@@ -89,6 +89,7 @@ ALTER TABLE comment
     MODIFY is_persistent enum('n','y') NOT NULL,
     MODIFY is_sticky enum('n','y') NOT NULL;
 ALTER TABLE downtime
+    ADD COLUMN scheduled_by varchar(767) DEFAULT NULL AFTER end_time COMMENT 'The ScheduledDowntime which created this Downtime',
     MODIFY is_flexible enum('n','y') NOT NULL,
     MODIFY is_in_effect enum('n','y') NOT NULL;
 ALTER TABLE timeperiod

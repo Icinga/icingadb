@@ -588,6 +588,7 @@ CREATE TABLE downtime (
   is_in_effect enum('n', 'y') NOT NULL,
   start_time bigint unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
   end_time bigint unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + flexible_duration otherwise',
+  scheduled_by varchar(767) DEFAULT NULL COMMENT 'The ScheduledDowntime which created this Downtime',
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
