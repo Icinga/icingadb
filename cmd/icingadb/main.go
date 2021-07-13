@@ -215,11 +215,16 @@ func run() int {
 						g.Go(func() error {
 							wg.Wait()
 
-							logger.Info("Starting runtime updates sync")
+							select {
+							case <-ctx.Done():
+								return ctx.Err()
+							default:
+								logger.Info("Starting runtime updates sync")
 
-							// @TODO(el): The customvar runtime update sync may change because the customvar flat
-							// runtime update sync is not yet implemented.
-							return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), lastRuntimeStreamId)
+								// @TODO(el): The customvar runtime update sync may change because the customvar flat
+								// runtime update sync is not yet implemented.
+								return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), lastRuntimeStreamId)
+							}
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
