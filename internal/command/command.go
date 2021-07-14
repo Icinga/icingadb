@@ -10,7 +10,6 @@ import (
 	"github.com/icinga/icingadb/pkg/utils"
 	goflags "github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"os"
 )
 
@@ -18,7 +17,6 @@ import (
 type Command struct {
 	Flags  *config.Flags
 	Config *config.Config
-	Logger *zap.SugaredLogger
 }
 
 // New creates and returns a new Command, parses CLI flags and YAML the config, and initializes the logger.
@@ -43,22 +41,16 @@ func New() *Command {
 		utils.Fatal(err)
 	}
 
-	logger := logging.NewLogger()
-
-	sugar := logger.Sugar()
-
 	return &Command{
 		Flags:  flags,
-		Config: cfg,
-		Logger: sugar,
-	}
+		Config: cfg}
 }
 
 // Database creates and returns a new icingadb.DB connection from config.Config.
 func (c Command) Database(logging2 *logging.Logging) *icingadb.DB {
-	db, err := c.Config.Database.Open(logging2.GetLogger("database"))
+	db, err := c.Config.Database.Open(logging2.GetChildLogger("database"))
 	if err != nil {
-		c.Logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
+		logging2.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
 	}
 
 	return db
@@ -66,9 +58,9 @@ func (c Command) Database(logging2 *logging.Logging) *icingadb.DB {
 
 // Redis creates and returns a new icingaredis.Client connection from config.Config.
 func (c Command) Redis(logging2 *logging.Logging) *icingaredis.Client {
-	rc, err := c.Config.Redis.NewClient(logging2.GetLogger("redis"))
+	rc, err := c.Config.Redis.NewClient(logging2.GetChildLogger("redis"))
 	if err != nil {
-		c.Logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
+		logging2.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
 	}
 
 	return rc
@@ -77,7 +69,7 @@ func (c Command) Redis(logging2 *logging.Logging) *icingaredis.Client {
 func (c Command) Logging() *logging.Logging {
 	rc, err := c.Config.Logging.NewLogger()
 	if err != nil {
-		c.Logger.Fatalf("%+v", errors.Wrap(err, "can't create Logger from config"))
+		rc.Fatalf("%+v", errors.Wrap(err, "can't create Logger from config"))
 	}
 
 	return rc

@@ -1,15 +1,96 @@
 package logging
 
 import (
-	"github.com/icinga/icingadb/pkg/utils"
-	"github.com/pkg/errors"
+	"fmt"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
+	"sync"
+	"time"
 )
 
-const (
-	DefaultLogLevel = "info"
-)
+type Logging struct {
+	enabled *atomic.Bool
+	level   zap.AtomicLevel
+	logger  *zap.SugaredLogger
+	mu      sync.Mutex
+	loggers map[string]*zap.SugaredLogger
+	options Options
+}
+
+type Options map[string]string
+
+func NewLogging(level string, options Options) *Logging {
+	var lvl zapcore.Level
+	if err := lvl.Set(level); err != nil {
+		panic(err)
+	}
+	atom := zap.NewAtomicLevelAt(lvl)
+	enabled := atomic.NewBool(true)
+
+	logger := zap.New(zapcore.NewCore(
+		zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
+		zapcore.Lock(os.Stderr),
+		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+			// Always log fatals, but allow other levels to be completely disabled.
+			return zap.FatalLevel.Enabled(lvl) || enabled.Load() && atom.Enabled(lvl)
+		}),
+	))
+
+	return &Logging{
+		enabled: enabled,
+		level:   atom,
+		logger:  logger.Sugar(),
+		mu:      sync.Mutex{},
+		loggers: map[string]*zap.SugaredLogger{},
+		options: options,
+	}
+}
+
+func (l *Logging) GetChildLogger(name string) *zap.SugaredLogger {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	if logger, ok := l.loggers[name]; ok {
+		return logger
+	}
+	if level, found := l.options[name]; found {
+		logger := l.logger.Desugar().With(zap.Skip()).WithOptions(zap.WrapCore(func(c zapcore.Core) zapcore.Core {
+			childLvl := zapcore.LevelEnabler(levelMap[level])
+			io := zapcore.AddSync(os.Stderr)
+			return zapcore.NewCore(zapcore.NewConsoleEncoder(zap.NewDevelopmentConfig().EncoderConfig), io, childLvl)
+		})).Sugar().Named(name)
+		l.loggers[name] = logger
+		return logger
+	} else {
+		logger := l.logger.Named(name)
+		l.loggers[name] = logger
+		return logger
+	}
+}
+
+func (l *Logging) GetLogger() *zap.SugaredLogger {
+	return l.logger
+}
+
+func (l *Logging) Fatalf(template string, args ...interface{}) {
+	l.enabled.Store(false)
+
+	// Fatal would exit after write, but we want to sleep first.
+	logger := l.GetLogger().Desugar().WithOptions(zap.OnFatal(zapcore.WriteThenGoexit))
+
+	logged := make(chan struct{})
+	go func() {
+		defer close(logged)
+		defer logger.Sync()
+		logger.Fatal(fmt.Sprintf(template, args...))
+	}()
+	<-logged
+
+	time.Sleep(time.Millisecond * 1100)
+	os.Exit(1)
+}
 
 var levelMap = func() map[string]zapcore.Level {
 	logLvl := make(map[string]zapcore.Level)
@@ -27,61 +108,3 @@ var levelMap = func() map[string]zapcore.Level {
 	}
 	return logLvl
 }()
-
-type Logging struct {
-	Level string
-
-	Options Options
-	Map     logger
-}
-
-type logger map[string]*zap.SugaredLogger
-
-type Options map[string]string
-
-func NewLogging(level string, opts Options) *Logging {
-	return &Logging{
-		Level:   level,
-		Options: opts,
-		Map:     make(logger),
-	}
-}
-
-func (l Logging) GetLogger(component string) *zap.SugaredLogger {
-	var logger *zap.Logger
-	if logger, found := l.Map[component]; found {
-		return logger
-	}
-
-	if level, found := l.Options[component]; found {
-		logger = NewLogger(level)
-	} else {
-		logger = NewLogger(l.Level)
-	}
-
-	l.Map[component] = logger.Sugar()
-
-	return l.Map[component]
-}
-
-func NewLogger(lvl ...string) *zap.Logger {
-	var level zap.AtomicLevel
-	if len(lvl) > 0 {
-		level = zap.NewAtomicLevelAt(levelMap[lvl[0]])
-	} else {
-		level = zap.NewAtomicLevelAt(levelMap[DefaultLogLevel])
-	}
-
-	loggerCfg := zap.NewDevelopmentConfig()
-
-	loggerCfg.DisableStacktrace = true
-
-	loggerCfg.Level = level
-
-	logger, err := loggerCfg.Build()
-	if err != nil {
-		utils.Fatal(errors.Wrap(err, "can't create logger"))
-	}
-
-	return logger
-}
