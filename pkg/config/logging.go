@@ -8,15 +8,15 @@ import (
 
 // Logging defines Logger configuration.
 type Logging struct {
-	Level           string `yaml:"level" default:"info"`
+	Level           string `yaml:"level" default:"debug"`
 	logging.Options `yaml:"options,omitempty"`
 }
 
-// NewLogger prepares Cleanup configuration,
-// calls logging.NewLogger, but returns *logging.Logging.
-func (l *Logging) NewLogger() (*logging.Logging, error) {
+// NewLogging prepares Logging configuration,
+// calls logging.NewLogging, and returns *logging.Logging.
+func (l *Logging) NewLogging() *logging.Logging {
 	level := l.Level
-	return logging.NewLogging(level, l.Options), nil
+	return logging.NewLogging(level, l.Options)
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.

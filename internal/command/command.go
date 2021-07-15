@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icingadb/pkg/utils"
 	goflags "github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"os"
 )
 
@@ -43,34 +44,21 @@ func New() *Command {
 
 	return &Command{
 		Flags:  flags,
-		Config: cfg}
+		Config: cfg,
+	}
 }
 
 // Database creates and returns a new icingadb.DB connection from config.Config.
-func (c Command) Database(logging2 *logging.Logging) *icingadb.DB {
-	db, err := c.Config.Database.Open(logging2.GetChildLogger("database"))
-	if err != nil {
-		logging2.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
-	}
-
-	return db
+func (c Command) Database(l *zap.SugaredLogger) (*icingadb.DB, error) {
+	return c.Config.Database.Open(l)
 }
 
 // Redis creates and returns a new icingaredis.Client connection from config.Config.
-func (c Command) Redis(logging2 *logging.Logging) *icingaredis.Client {
-	rc, err := c.Config.Redis.NewClient(logging2.GetChildLogger("redis"))
-	if err != nil {
-		logging2.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
-	}
-
-	return rc
+func (c Command) Redis(l *zap.SugaredLogger) (*icingaredis.Client, error) {
+	return c.Config.Redis.NewClient(l)
 }
 
 func (c Command) Logging() *logging.Logging {
-	rc, err := c.Config.Logging.NewLogger()
-	if err != nil {
-		rc.Fatalf("%+v", errors.Wrap(err, "can't create Logger from config"))
-	}
 
-	return rc
+	return c.Config.Logging.NewLogging()
 }
