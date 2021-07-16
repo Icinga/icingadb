@@ -29,6 +29,11 @@ type AcknowledgementHistory struct {
 	IsSticky                 types.Bool      `json:"is_sticky"`
 }
 
+func (ah *AcknowledgementHistory) Init() {
+	ah.IsPersistent = types.Bool{Bool: false, Valid: true}
+	ah.IsSticky = types.Bool{Bool: false, Valid: true}
+}
+
 type HistoryAck struct {
 	HistoryMeta              `json:",inline"`
 	AcknowledgementHistoryId types.Binary `json:"id"`
@@ -74,6 +79,7 @@ func (et AckEventTime) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
+	_ contracts.Initer     = (*AcknowledgementHistory)(nil)
 	_ UpserterEntity       = (*AcknowledgementHistory)(nil)
 	_ contracts.Initer     = (*HistoryAck)(nil)
 	_ contracts.TableNamer = (*HistoryAck)(nil)
