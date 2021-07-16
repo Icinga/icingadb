@@ -3,7 +3,6 @@ package command
 import (
 	"fmt"
 	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/internal/logging"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -56,9 +55,4 @@ func (c Command) Database(l *zap.SugaredLogger) (*icingadb.DB, error) {
 // Redis creates and returns a new icingaredis.Client connection from config.Config.
 func (c Command) Redis(l *zap.SugaredLogger) (*icingaredis.Client, error) {
 	return c.Config.Redis.NewClient(l)
-}
-
-func (c Command) Logging() *logging.Logging {
-
-	return c.Config.Logging.NewLogging()
 }

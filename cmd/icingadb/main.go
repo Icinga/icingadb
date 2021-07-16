@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/icinga/icingadb/internal/command"
+	"github.com/icinga/icingadb/internal/logging"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -33,18 +34,20 @@ func main() {
 
 func run() int {
 	cmd := command.New()
-	// logging instance
-	logging := cmd.Logging()
+	logs := logging.NewLogging(
+		cmd.Config.Logging.Level,
+		cmd.Config.Logging.Output,
+		cmd.Config.Logging.Options,
+	)
 
-	// default logger
-	logger := logging.GetLogger()
+	logger := logs.GetLogger()
 	defer logger.Sync()
 
 	logger.Info("Starting Icinga DB")
 
-	db, err := cmd.Database(logging.GetChildLogger("database"))
+	db, err := cmd.Database(logs.GetChildLogger("database"))
 	if err != nil {
-		logging.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
+		logs.Fatal(errors.Wrap(err, "can't connect to database"))
 	}
 
 	defer db.Close()
@@ -52,40 +55,39 @@ func run() int {
 		logger.Info("Connecting to database")
 		err := db.Ping()
 		if err != nil {
-			logging.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
+			logs.Fatal(errors.Wrap(err, "can't connect to database"))
 		}
 	}
 
 	if err := checkDbSchema(context.Background(), db); err != nil {
-		logging.Fatalf("%+v", err)
+		logs.Fatal(err)
 	}
 
-	rc, err := cmd.Redis(logging.GetChildLogger("redis"))
+	rc, err := cmd.Redis(logs.GetChildLogger("redis"))
 	if err != nil {
-		logging.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
+		logs.Fatal(errors.Wrap(err, "can't connect to database"))
 	}
 
 	{
 		logger.Info("Connecting to Redis")
 		_, err := rc.Ping(context.Background()).Result()
 		if err != nil {
-			logging.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
+			logs.Fatal(errors.Wrap(err, "can't create Redis client from config"))
 		}
 	}
 
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 
-	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logging.GetChildLogger("heartbeat"))
-
-	ha := icingadb.NewHA(ctx, db, heartbeat, logging.GetChildLogger("ha"))
+	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logs.GetChildLogger("heartbeat"))
+	ha := icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("ha"))
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
 	defer ha.Close()
-	s := icingadb.NewSync(db, rc, logging.GetChildLogger("sync"))
-	hs := history.NewSync(db, rc, logging.GetChildLogger("history"))
-	rt := icingadb.NewRuntimeUpdates(db, rc, logging.GetChildLogger("runtime-update"))
-	ods := overdue.NewSync(db, rc, logging.GetChildLogger("overdue"))
+	s := icingadb.NewSync(db, rc, logs.GetChildLogger("config-sync"))
+	hs := history.NewSync(db, rc, logs.GetChildLogger("history"))
+	rt := icingadb.NewRuntimeUpdates(db, rc, logs.GetChildLogger("runtime-updates"))
+	ods := overdue.NewSync(db, rc, logs.GetChildLogger("overdue-sync"))
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
@@ -113,7 +115,7 @@ func run() int {
 							logger.Fatalf("%+v", err)
 						}
 
-						dump := icingadb.NewDumpSignals(rc, logging.GetChildLogger("dump-signals"))
+						dump := icingadb.NewDumpSignals(rc, logs.GetChildLogger("dump-signals"))
 						g.Go(func() error {
 							logger.Info("Staring config dump signal handling")
 
@@ -196,7 +198,7 @@ func run() int {
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logging.GetChildLogger("delta")))
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logs.GetChildLogger("delta")))
 							})
 
 							cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
@@ -211,7 +213,7 @@ func run() int {
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logging.GetChildLogger("delta")))
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logs.GetChildLogger("delta")))
 							})
 
 							return nil
@@ -232,7 +234,7 @@ func run() int {
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
-							logging.Fatalf("%+v", err)
+							logs.Fatal(err)
 						}
 					}
 				}()
@@ -244,17 +246,17 @@ func run() int {
 				// Nothing to do here, surrounding loop will terminate now.
 			case <-ha.Done():
 				if err := ha.Err(); err != nil {
-					logging.Fatalf("%+v", errors.Wrap(err, "HA exited with an error"))
+					logs.Fatal(errors.Wrap(err, "HA exited with an error"))
 				} else if ctx.Err() == nil {
 					// ha is created as a single instance once. It should only exit if the main context is cancelled,
 					// otherwise there is no way to get Icinga DB back into a working state.
-					logging.Fatalf("%+v", errors.New("HA exited without an error but main context isn't cancelled"))
+					logs.Fatal(errors.New("HA exited without an error but main context isn't cancelled"))
 				}
 				cancelHactx()
 
 				return ExitFailure
 			case <-ctx.Done():
-				logging.Fatalf("%+v", errors.New("main context closed unexpectedly"))
+				logs.Fatal(errors.New("main context closed unexpectedly"))
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
 				cancelHactx()

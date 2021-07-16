@@ -10,9 +10,9 @@ import (
 
 // Config defines Icinga DB config.
 type Config struct {
-	Database *Database `yaml:"database"`
-	Redis    *Redis    `yaml:"redis"`
-	Logging  *Logging  `yaml:"logging"`
+	Database Database `yaml:"database"`
+	Redis    Redis    `yaml:"redis"`
+	Logging  Logging  `yaml:"logging"`
 }
 
 // Validate checks constraints in the supplied configuration and returns an error if they are violated.

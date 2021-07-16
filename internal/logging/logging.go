@@ -10,34 +10,49 @@ import (
 	"time"
 )
 
-// Logging implements logging using: a switch to disable logging on Fatal log, default logger and level,
-// and stored child loggers and their options.
+// Logging implements access to a default logger and named child loggers.
+// Log levels can be configured per child via Options.
+// Logs either to the console or the systemd journal.
+// Provides Fatal log to stop all loggers before the error is logged and the program exits.
 type Logging struct {
-	// enabled implements a switch to disable logging on Fatal log.
+	// enabled implements a switch to disable logging on Fatal log during systemd-journal logging.
+	// This switch is added to overcome the race condition during systemd-journal logging.
+	// See: https://github.com/systemd/systemd/issues/2913.
 	enabled *atomic.Bool
-	// level defines default log-level.
-	level zap.AtomicLevel
-	// logger defines default logger.
-	logger *zap.SugaredLogger
-
-	mu sync.Mutex
-	// loggers stores named child loggers.
+	level   zap.AtomicLevel
+	output  string
+	logger  *zap.SugaredLogger
+	// encoder defines the zapcore.Encoder,
+	// which is used to create the default logger and the child loggers
+	encoder zapcore.Encoder
+	// syncer defines the zapcore.WriterSyncer,
+	// which is used to create the default logger and the child loggers
+	syncer  zapcore.WriteSyncer
+	mu      sync.Mutex
 	loggers map[string]*zap.SugaredLogger
 	options Options
 }
 
-// Options stores a `child-logger-name: level` pair mapping.
+// defaultEncConfig stores default zapcore.EncoderConfig for logging package.
+var defaultEncConfig = zapcore.EncoderConfig{
+	TimeKey:        "ts",
+	LevelKey:       "level",
+	NameKey:        "logger",
+	CallerKey:      "caller",
+	MessageKey:     "msg",
+	StacktraceKey:  "stacktrace",
+	LineEnding:     zapcore.DefaultLineEnding,
+	EncodeLevel:    zapcore.CapitalLevelEncoder,
+	EncodeTime:     zapcore.ISO8601TimeEncoder,
+	EncodeDuration: zapcore.StringDurationEncoder,
+	EncodeCaller:   zapcore.ShortCallerEncoder,
+}
+
+// Options define child loggers with their desired log level.
 type Options map[string]string
 
-// consoleEncoder initializes a console encoder using zap.NewDevelopmentEncoderConfig().
-var consoleEncoder = zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig())
-
-// syncer initializes WriteSyncer
-var syncer = zapcore.Lock(os.Stderr)
-
-// NewLogging returns a initialized Logging
-// using level and options from configuration file.
-func NewLogging(level string, options Options) *Logging {
+// NewLogging returns a new Logging.
+func NewLogging(level string, output string, options Options) *Logging {
 	var lvl zapcore.Level
 	if err := lvl.Set(level); err != nil {
 		panic(err)
@@ -45,8 +60,26 @@ func NewLogging(level string, options Options) *Logging {
 	atom := zap.NewAtomicLevelAt(lvl)
 	enabled := atomic.NewBool(true)
 
+	var encoder zapcore.Encoder
+	var syncer zapcore.WriteSyncer
+	switch output {
+	case "console":
+		encoder = zapcore.NewConsoleEncoder(defaultEncConfig)
+		syncer = zapcore.Lock(os.Stderr)
+	case "systemd-journal":
+		wr, err := newJournalWriter(os.Stderr, defaultEncConfig)
+
+		if err != nil {
+			panic(err)
+		}
+		encoder = zapcore.NewJSONEncoder(defaultEncConfig)
+		syncer = zapcore.AddSync(wr)
+	default:
+		panic(fmt.Sprintf("%s is not a valid logger output", output))
+	}
+
 	logger := zap.New(zapcore.NewCore(
-		consoleEncoder,
+		encoder,
 		syncer,
 		zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 			// Always log fatals, but allow other levels to be completely disabled.
@@ -57,74 +90,92 @@ func NewLogging(level string, options Options) *Logging {
 	return &Logging{
 		enabled: enabled,
 		level:   atom,
+		output:  output,
 		logger:  logger.Sugar(),
-		mu:      sync.Mutex{},
+		encoder: encoder,
+		syncer:  syncer,
 		loggers: map[string]*zap.SugaredLogger{},
 		options: options,
 	}
 }
 
-// GetChildLogger returns a named child sugared logger for the default logger `Logging.logger`.
+// GetChildLogger returns a named child logger.
+// Log levels for the named child loggers are obtained from Logging.options. if the level for the corresponding
+// component is not found in Logging.options then we set the named child logger to default logger and return it.
+// If the child logger is found in Logging.loggers then that corresponding named child logger is returned.
 func (l *Logging) GetChildLogger(name string) *zap.SugaredLogger {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	// if the logger is already stored then use the stored child logger.
 	if logger, ok := l.loggers[name]; ok {
 		return logger
 	}
 
 	if level, found := l.options[name]; found {
-		var childlvl zapcore.Level
-		if err := childlvl.Set(level); err != nil {
+		var lvl zapcore.Level
+		if err := lvl.Set(level); err != nil {
 			panic(err)
 		}
-		atom := zap.NewAtomicLevelAt(childlvl)
+		atom := zap.NewAtomicLevelAt(lvl)
 
-		// child logger cloned from default logger and using childlvl for LevelEnablerFunc.
-		logger := l.logger.Desugar().With(zap.Skip()).WithOptions(
+		logger := l.logger.Desugar().WithOptions(
 			zap.WrapCore(func(c zapcore.Core) zapcore.Core {
 				return zapcore.NewCore(
-					consoleEncoder,
-					syncer,
-					zap.LevelEnablerFunc(func(childlvl zapcore.Level) bool {
+					l.encoder,
+					l.syncer,
+					zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
 						// Always log fatals, but allow other levels to be completely disabled.
-						return zap.FatalLevel.Enabled(childlvl) || l.enabled.Load() && atom.Enabled(childlvl)
+						return zap.FatalLevel.Enabled(lvl) || l.enabled.Load() && atom.Enabled(lvl)
 					}))
 			})).Sugar().Named(name)
 
 		l.loggers[name] = logger
-		return logger
-	} else {
-		logger := l.logger.Named(name)
-		l.loggers[name] = logger
+
 		return logger
 	}
+
+	logger := l.logger.Named(name)
+	l.loggers[name] = logger
+
+	return logger
 }
 
-// GetLogger returns the default sugared logger for the initialized Logging instance.
+// GetLogger returns the default logger.
 func (l *Logging) GetLogger() *zap.SugaredLogger {
 	return l.logger
 }
 
-// Fatalf introduces a short buffer time between Fatal log and os.Exit(1) by sleeping
-// for a short interval after logging fatal message. This is done to avoid the loss of fatal level log messages
-// on exit on failure.
-func (l *Logging) Fatalf(template string, args ...interface{}) {
-	l.enabled.Store(false)
+const (
+	ExitFailure = 1
+)
 
-	// Fatal would exit after write, but we want to sleep first.
-	logger := l.GetLogger().Desugar().WithOptions(zap.OnFatal(zapcore.WriteThenGoexit))
+// Fatal introduces a short buffer time between Fatal log and os.Exit(1) by sleeping
+// for a short interval after logging fatal error in case of systemd-journal logging.
+// This is done to avoid the loss of fatal level log messages on exit on failure.
+func (l *Logging) Fatal(err error) {
+	logger := l.GetLogger().Desugar()
+
+	if l.output == "systemd-journal" {
+		l.enabled.Store(false)
+		// Fatal would exit after write, but we want to sleep first in case of systemd-journal logging.
+		logger = logger.WithOptions(zap.OnFatal(zapcore.WriteThenGoexit))
+	}
 
 	logged := make(chan struct{})
 	go func() {
 		defer close(logged)
 		defer logger.Sync()
-		logger.Fatal(fmt.Sprintf(template, args...))
+		logger.Fatal(fmt.Sprintf("%+v", err))
 	}()
 	<-logged
 
-	time.Sleep(time.Millisecond * 1100)
-	// exit on failure (ExitFailure).
-	os.Exit(1)
+	// a short buffer time between Fatal log and os.Exit(1) by sleeping in case of systemd-journal logging.
+	// This is done to overcome the race condition during systemd-journal logging, which causes systemd journal unable
+	// to attribute messages incoming from processes that exited to their cgroup.
+	// See: https://github.com/systemd/systemd/issues/2913.
+	if l.output == "systemd-journal" {
+		time.Sleep(time.Millisecond * 1100)
+	}
+
+	os.Exit(ExitFailure)
 }
