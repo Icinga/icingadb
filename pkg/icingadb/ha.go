@@ -276,7 +276,7 @@ func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
 	case <-time.After(timeout):
 		query := "DELETE FROM icingadb_instance " +
 			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?"
-		heartbeat := types.UnixMilli(time.Now().Add(-timeout))
+		heartbeat := types.UnixMilli{NullInt64: sql.NullInt64{Valid: true, Int64: utils.UnixMilli(time.Now().Add(-timeout))}}
 		result, err := h.db.ExecContext(h.ctx, query, h.instanceId, s.EnvironmentID(),
 			s.EndpointId, heartbeat)
 		if err != nil {

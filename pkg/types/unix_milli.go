@@ -13,31 +13,37 @@ import (
 )
 
 // UnixMilli is a nullable millisecond UNIX timestamp in databases and JSON.
-type UnixMilli time.Time
+type UnixMilli struct {
+	sql.NullInt64
+}
 
 // Time returns the time.Time conversion of UnixMilli.
 func (t UnixMilli) Time() time.Time {
-	return time.Time(t)
+	return utils.FromUnixMilli(t.Int64)
 }
 
 // MarshalJSON implements the json.Marshaler interface.
 // Marshals to milliseconds. Supports JSON null.
 func (t UnixMilli) MarshalJSON() ([]byte, error) {
-	if time.Time(t).IsZero() {
+	if !t.Valid {
 		return nil, nil
 	}
 
-	return []byte(strconv.FormatInt(utils.UnixMilli(time.Time(t)), 10)), nil
+	return []byte(strconv.FormatInt(t.Int64, 10)), nil
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 func (t *UnixMilli) UnmarshalText(text []byte) error {
-	parsed, err := strconv.ParseFloat(string(text), 64)
+	ms, err := strconv.ParseFloat(string(text), 64)
 	if err != nil {
 		return internal.CantParseFloat64(err, string(text))
 	}
 
-	*t = UnixMilli(utils.FromUnixMilli(int64(parsed)))
+	*t = UnixMilli{sql.NullInt64{
+		Int64: int64(ms),
+		Valid: true,
+	}}
+
 	return nil
 }
 
@@ -52,8 +58,11 @@ func (t *UnixMilli) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return internal.CantParseFloat64(err, string(data))
 	}
-	tt := utils.FromUnixMilli(int64(ms))
-	*t = UnixMilli(tt)
+
+	*t = UnixMilli{sql.NullInt64{
+		Int64: int64(ms),
+		Valid: true,
+	}}
 
 	return nil
 }
@@ -65,12 +74,15 @@ func (t *UnixMilli) Scan(src interface{}) error {
 		return nil
 	}
 
-	v, ok := src.(int64)
+	ms, ok := src.(int64)
 	if !ok {
 		return errors.Errorf("bad int64 type assertion from %#v", src)
 	}
-	tt := utils.FromUnixMilli(v)
-	*t = UnixMilli(tt)
+
+	*t = UnixMilli{sql.NullInt64{
+		Int64: ms,
+		Valid: true,
+	}}
 
 	return nil
 }
@@ -78,11 +90,11 @@ func (t *UnixMilli) Scan(src interface{}) error {
 // Value implements the driver.Valuer interface.
 // Returns milliseconds. Supports SQL NULL.
 func (t UnixMilli) Value() (driver.Value, error) {
-	if t.Time().IsZero() {
+	if !t.Valid {
 		return nil, nil
 	}
 
-	return utils.UnixMilli(t.Time()), nil
+	return t.Int64, nil
 }
 
 // Assert interface compliance.
