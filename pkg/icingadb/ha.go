@@ -114,11 +114,8 @@ func (h *HA) controller() {
 
 	for {
 		select {
-		case m, ok := <-h.heartbeat.Beat():
-			if !ok {
-				// Beat channel closed.
-				return
-			}
+		case <-h.heartbeat.Beat():
+			m := h.heartbeat.Message()
 			now := time.Now()
 			t, err := m.Time()
 			if err != nil {
@@ -126,10 +123,10 @@ func (h *HA) controller() {
 			}
 			tt := t.Time()
 			if tt.After(now.Add(1 * time.Second)) {
-				h.logger.Debugw("Received heartbeat from future", "time", t)
+				h.logger.Debugw("Received heartbeat from the future", zap.Time("time", tt))
 			}
 			if tt.Before(now.Add(-1 * timeout)) {
-				h.logger.Errorw("Received heartbeat from the past", "time", t)
+				h.logger.Errorw("Received heartbeat from the past", zap.Time("time", tt))
 				h.signalHandover()
 				continue
 			}
@@ -155,6 +152,10 @@ func (h *HA) controller() {
 		case <-h.heartbeat.Lost():
 			h.logger.Error("Lost heartbeat")
 			h.signalHandover()
+		case <-h.heartbeat.Done():
+			if err := h.heartbeat.Err(); err != nil {
+				h.abort(err)
+			}
 		case <-h.ctx.Done():
 			return
 		}
