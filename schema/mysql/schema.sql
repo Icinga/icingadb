@@ -572,6 +572,7 @@ CREATE TABLE downtime (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
 
   triggered_by_id binary(20) DEFAULT NULL COMMENT 'downtime.id',
+  parent_id binary(20) DEFAULT NULL COMMENT 'downtime.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
@@ -940,6 +941,7 @@ CREATE TABLE downtime_history (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   triggered_by_id binary(20) DEFAULT NULL COMMENT 'downtime.id',
+  parent_id binary(20) DEFAULT NULL COMMENT 'downtime.id',
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',

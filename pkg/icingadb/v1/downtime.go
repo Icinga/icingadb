@@ -10,6 +10,7 @@ type Downtime struct {
 	EnvironmentMeta    `json:",inline"`
 	NameMeta           `json:",inline"`
 	TriggeredById      types.Binary    `json:"triggered_by_id"`
+	ParentId           types.Binary    `json:"parent_id"`
 	ObjectType         string          `json:"object_type"`
 	HostId             types.Binary    `json:"host_id"`
 	ServiceId          types.Binary    `json:"service_id"`
