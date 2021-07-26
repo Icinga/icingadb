@@ -8,6 +8,7 @@ type State struct {
 	EntityWithChecksum        `json:",inline"`
 	EnvironmentMeta           `json:",inline"`
 	AcknowledgementCommentId  types.Binary               `json:"acknowledgement_comment_id"`
+	LastCommentId             types.Binary               `json:"last_comment_id"`
 	Attempt                   uint8                      `json:"check_attempt"`
 	CheckCommandline          types.String               `json:"commandline"`
 	CheckSource               types.String               `json:"check_source"`
