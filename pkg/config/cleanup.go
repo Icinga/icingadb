@@ -3,20 +3,12 @@ package config
 import (
 	"github.com/creasty/defaults"
 	"github.com/icinga/icingadb/pkg/cleanup"
-	"github.com/icinga/icingadb/pkg/icingadb"
-	"go.uber.org/zap"
 )
 
 // Cleanup configuration.
 type Cleanup struct {
-	HistoryTables   cleanup.Tables `yaml:"history,omitempty"`
-	cleanup.Options `yaml:"options"`
-}
-
-// NewCleanup prepares Cleanup configuration,
-// calls cleanup.NewClient, but returns *cleanup.Cleanup.
-func (cu *Cleanup) NewCleanup(db *icingadb.DB, logger *zap.SugaredLogger) *cleanup.Cleanup {
-	return cleanup.NewCleanup(db, cu.HistoryTables, &cu.Options, logger)
+	cleanup.HistoryRetention `yaml:"history"`
+	cleanup.Options          `yaml:"options"`
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
@@ -26,7 +18,7 @@ func (cu *Cleanup) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 	// Prevent recursion.
 	type self Cleanup
-	if err := unmarshal(&(*self)(cu).HistoryTables); err != nil {
+	if err := unmarshal((*self)(cu)); err != nil {
 		return err
 	}
 

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/icinga/icingadb/internal/command"
+	"github.com/icinga/icingadb/pkg/cleanup"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -33,7 +34,7 @@ func main() {
 
 func run() int {
 	cmd := command.New()
-
+	cfg := cmd.Config
 	logger := cmd.Logger
 	defer logger.Sync()
 
@@ -78,7 +79,7 @@ func run() int {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
-	cu := cmd.Cleanup(db)
+	cu := cleanup.NewCleanup(db, cfg.Cleanup.Options, logger)
 
 	// Main loop
 	for {
@@ -221,9 +222,10 @@ func run() int {
 							)
 						})
 
-						// Start history tables cleanup routine
 						g.Go(func() error {
-							return cu.Start()
+							logger.Info("Starting History cleanup")
+
+							return cu.History(ctx, cfg.Cleanup.HistoryRetention)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {

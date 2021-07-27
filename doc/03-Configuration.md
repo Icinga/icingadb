@@ -24,28 +24,29 @@ database                 | **Required.** Database database.
 user                     | **Required.** Database username.
 password                 | **Required.** Database password.
 
-## Cleanup Configuration
+## Cleanup Configuration <a id="configuration-cleanup"></a>
 
-This configuration is optional. If configured, the cleanup routine is called every 1 hour by default and 
-erases old entries from history tables. In the example the cleanup routine is configured to erase the entries from 
+This configuration is optional. If configured, the cleanup routine for the configured tables will be called every 1 hour by default and 
+the entries in the history tables older than retention period is erased. In the example the cleanup routine is configured to erase the entries from 
 history tables which are older than 10 days.
 
 Option                   | Description
 -------------------------|-----------------------------------------------
-history                  | **Required.** history table configuration as shown below.
+history                  | **Optional.** history table configuration as shown below.
+options                  | **Optional.** Interval and count.<br /> `Interval`:  time.Duration, at which the cleanup routine for each history table is repeated. <br /> `count`: Number of history records to delete at each cleanup from a table (int).
 
 ### History Configuration
 Option                   | Description
 -------------------------|-----------------------------------------------
-acknowledgement          | **Optional.** Duration string (E.g: 5h30m40s).
-comment                  | **Optional.** Duration string (E.g: 5h30m40s).
-database                 | **Optional.** Duration string (E.g: 5h30m40s).
-downtime                 | **Optional.** Duration string (E.g: 5h30m40s).
-flapping                 | **Optional.** Duration string (E.g: 5h30m40s).
-notification             | **Optional.** Duration string (E.g: 5h30m40s).
-state                    | **Optional.** Duration string (E.g: 5h30m40s).
+acknowledgement          | **Optional.** Days (uint).
+comment                  | **Optional.** Days (uint).
+database                 | **Optional.** Days (uint).
+downtime                 | **Optional.** Days (uint).
+flapping                 | **Optional.** Days (uint).
+notification             | **Optional.** Days (uint).
+state                    | **Optional.** Days (uint).
 
-The tables `history` and `user_notification_history` are child tables. Hence, deleting records from their parent tables
+The tables `history` and `user_notification_history` are child tables and have cascade-on-delete configured. Hence, deleting records from their parent tables
 automatically deletes the subsequent records in these tables as well. Therefore, they should not be configured in 
 cleanup configuration
 
@@ -62,10 +63,13 @@ redis:
   address: redis:6380
 cleanup:
   history:
-    acknowledgement: 2400h
-    comment: 2400h
-    downtime: 2400h
-    flapping: 2400h
-    notification: 2400h
-    state: 2400h
+    acknowledgement: 10
+    comment: 10
+    downtime: 10
+    flapping: 10
+    notification: 10
+    state: 10
+  options:
+    interval: 1h
+    count: 5000
 ```

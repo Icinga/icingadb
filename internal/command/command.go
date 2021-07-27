@@ -1,7 +1,6 @@
 package command
 
 import (
-	"github.com/icinga/icingadb/pkg/cleanup"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -63,10 +62,4 @@ func (c Command) Redis() *icingaredis.Client {
 	}
 
 	return rc
-}
-
-func (c Command) Cleanup(db *icingadb.DB) *cleanup.Cleanup {
-	cu := c.Config.Cleanup.NewCleanup(db, c.Logger)
-
-	return cu
 }

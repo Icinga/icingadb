@@ -9,8 +9,9 @@
 ## About
 
 The aim of housekeeping is to clean up history tables of old entries.
-The tables to be cleaned is configured under cleanup section in `config.yml` with duration. The records below 
-(current time - duration) will be erased from the configured tables. This cleanup routine is called every 1 hour by 
+The tables to be cleaned is configured under `cleanup` section in `config.yml` with duration in days. The records older than 
+[current time - retention period] will be erased from the configured tables after the cleanup routine is run. 
+This cleanup routine will be called every 1 hour by 
 default.
 
 ## Cleanup config
