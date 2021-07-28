@@ -33,12 +33,26 @@ func NewRuntimeUpdates(db *DB, redis *icingaredis.Client, logger *zap.SugaredLog
 
 const bulkSize = 1 << 14
 
-// Sync synchronizes Redis runtime streams from s.redis to s.db and deletes the original data on success.
+// Streams returns the stream key to ID mapping of the runtime update streams for later use in Sync.
+func (r *RuntimeUpdates) Streams(ctx context.Context) (icingaredis.Streams, error) {
+	keys := [...]string{"icinga:runtime", "icinga:runtime:state"}
+	streams := make(map[string]string, len(keys))
+	for _, key := range keys {
+		id, err := r.redis.StreamLastId(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		streams[key] = id
+	}
+
+	return streams, nil
+}
+
+// Sync synchronizes runtime update streams from s.redis to s.db and deletes the original data on success.
 // Note that Sync must be only be called configuration synchronization has been completed.
-func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.EntityFactoryFunc, lastStreamId string) error {
+func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.EntityFactoryFunc, streams icingaredis.Streams) error {
 	g, ctx := errgroup.WithContext(ctx)
 
-	stream := "icinga:runtime"
 	updateMessagesByKey := make(map[string]chan<- redis.XMessage)
 
 	for _, factoryFunc := range factoryFuncs {
@@ -67,14 +81,14 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 		})
 	}
 
-	g.Go(r.xRead(ctx, updateMessagesByKey, stream, lastStreamId))
+	g.Go(r.xRead(ctx, updateMessagesByKey, streams))
 
 	return g.Wait()
 }
 
-// xRead reads from the Redis stream and sends the data to the corresponding updateMessages channel.
+// xRead reads from the runtime update streams and sends the data to the corresponding updateMessages channel.
 // The updateMessages channel is determined by a "redis_key" on each redis message.
-func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[string]chan<- redis.XMessage, stream string, lastStreamId string) func() error {
+func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[string]chan<- redis.XMessage, streams icingaredis.Streams) func() error {
 	return func() error {
 		defer func() {
 			for _, updateMessages := range updateMessagesByKey {
@@ -84,21 +98,23 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 
 		for {
 			xra := &redis.XReadArgs{
-				Streams: []string{stream, lastStreamId},
+				Streams: streams.Option(),
 				Count:   bulkSize,
 				Block:   0,
 			}
 
 			cmd := r.redis.XRead(ctx, xra)
-			streams, err := cmd.Result()
+			rs, err := cmd.Result()
 
 			if err != nil {
 				return icingaredis.WrapCmdErr(cmd)
 			}
 
-			for _, stream := range streams {
+			for _, stream := range rs {
+				var id string
+
 				for _, message := range stream.Messages {
-					lastStreamId = message.ID
+					id = message.ID
 
 					redisKey := message.Values["redis_key"]
 					if redisKey == nil {
@@ -116,6 +132,7 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 						return ctx.Err()
 					}
 				}
+				streams[stream.Stream] = id
 			}
 		}
 	}

@@ -101,7 +101,7 @@ func run() int {
 							return dump.Listen(synctx)
 						})
 
-						lastRuntimeStreamId, err := rc.StreamLastId(ctx, "icinga:runtime")
+						runtimeUpdateStreams, err := rt.Streams(ctx)
 						if err != nil {
 							logger.Fatalf("%+v", err)
 						}
@@ -209,7 +209,7 @@ func run() int {
 
 							// @TODO(el): The customvar runtime update sync may change because the customvar flat
 							// runtime update sync is not yet implemented.
-							return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), lastRuntimeStreamId)
+							return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), runtimeUpdateStreams)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
