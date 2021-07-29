@@ -211,7 +211,11 @@ func run() int {
 
 							// @TODO(el): The customvar runtime update sync may change because the customvar flat
 							// runtime update sync is not yet implemented.
-							return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), runtimeUpdateStreams)
+							return rt.Sync(
+								synctx,
+								append([]contracts.EntityFactoryFunc{v1.NewCustomvar}, v1.Factories...),
+								runtimeUpdateStreams,
+							)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
