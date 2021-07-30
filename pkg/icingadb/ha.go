@@ -264,12 +264,41 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 			cancelCtx()
 			return errors.Wrap(err, "can't commit transaction")
 		}
+
 		if takeover {
+			// Insert the environment after each heartbeat takeover if it does not already exist in the database
+			// as the environment may have changed, although this is likely to happen very rarely.
+			if err := h.insertEnvironment(s); err != nil {
+				cancelCtx()
+				return errors.Wrap(err, "can't insert environment")
+			}
+
 			h.signalTakeover()
 		}
 
 		cancelCtx()
 		break
+	}
+
+	return nil
+}
+
+// insertEnvironment inserts the environment from the specified state into the database if it does not already exist.
+func (h *HA) insertEnvironment(s *icingaredisv1.IcingaStatus) error {
+	e := v1.Environment{
+		EntityWithoutChecksum: v1.EntityWithoutChecksum{
+			IdMeta: v1.IdMeta{
+				Id: s.EnvironmentID(),
+			},
+		},
+		Name: s.Environment,
+	}
+
+	// Instead of checking whether the environment already exists, use an INSERT statement that does nothing if it does.
+	stmt, _ := h.db.BuildInsertIgnoreStmt(e)
+
+	if _, err := h.db.NamedExecContext(h.ctx, stmt, e); err != nil {
+		return internal.CantPerformQuery(err, stmt)
 	}
 
 	return nil
