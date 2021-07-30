@@ -60,7 +60,7 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 			stmt, placeholders := r.db.BuildUpsertStmt(v)
 			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
 			sem := semaphore.NewWeighted(1)
-			return r.db.NamedBulkExec(ctx, stmt, 1<<15/placeholders, sem, upsertEntities, nil)
+			return r.db.NamedBulkExec(ctx, stmt, r.db.BatchSizeByPlaceholders(placeholders), sem, upsertEntities, nil)
 		})
 		g.Go(func() error {
 			return r.db.DeleteStreamed(ctx, v, deleteIds)
