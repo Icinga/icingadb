@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/cmd/internal"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/jessevdk/go-flags"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -80,8 +82,63 @@ func run() int {
 		_ = eg.Wait()
 	}
 
+	var types = []struct {
+		name     string
+		idoTable string
+		snapshot *sqlx.Tx
+	}{
+		{"acknowledgement", "icinga_acknowledgements", nil}, {"comment", "icinga_commenthistory", nil},
+		{"downtime", "icinga_downtimehistory", nil}, {"flapping", "icinga_flappinghistory", nil},
+		{"notification", "icinga_notifications", nil}, {"state", "icinga_statehistory", nil},
+	}
+
+	{
+		eg, _ := errgroup.WithContext(context.Background())
+		for i := range types {
+			i := i
+
+			eg.Go(func() error {
+				tx, err := ido.BeginTxx(context.Background(), &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
+				if err != nil {
+					log.Fatalf("%+v", errors.Wrap(err, "can't begin snapshot transaction"))
+				}
+
+				types[i].snapshot = tx
+				return nil
+			})
+		}
+
+		_ = eg.Wait()
+	}
+
+	log.Info("Computing progress")
+
+	{
+		eg, _ := errgroup.WithContext(context.Background())
+		for i := range types {
+			i := i
+
+			eg.Go(func() error {
+				var count uint64
+
+				err := types[i].snapshot.Get(
+					&count,
+					"SELECT COUNT(*) FROM "+types[i].idoTable+
+						" xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id",
+				)
+				if err != nil {
+					log.Fatalf("%+v", errors.Wrap(err, "can't count query"))
+				}
+
+				log.With("type", types[i].name, "amount", count).Info("Counted total IDO events")
+				return nil
+			})
+		}
+
+		_ = eg.Wait()
+	}
+
 	// TODO
-	_ = ido
 	_ = idb
 
 	return internal.ExitSuccess
