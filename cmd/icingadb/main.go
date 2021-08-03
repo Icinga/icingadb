@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/cmd/internal"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/driver"
@@ -25,8 +26,6 @@ import (
 )
 
 const (
-	ExitSuccess                   = 0
-	ExitFailure                   = 1
 	expectedRedisSchemaVersion    = "4"
 	expectedMysqlSchemaVersion    = 3
 	expectedPostgresSchemaVersion = 1
@@ -324,14 +323,14 @@ func run() int {
 				}
 				cancelHactx()
 
-				return ExitFailure
+				return internal.ExitFailure
 			case <-ctx.Done():
 				logger.Fatalf("%+v", errors.New("main context closed unexpectedly"))
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
 				cancelHactx()
 
-				return ExitSuccess
+				return internal.ExitSuccess
 			}
 		}
 
