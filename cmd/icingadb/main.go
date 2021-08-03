@@ -94,17 +94,19 @@ func run() int {
 						// Runtime updates must wait for configuration synchronization to complete.
 						wg := sync.WaitGroup{}
 
+						// Get the last IDs of the runtime update streams before starting anything else,
+						// otherwise updates may be lost.
+						runtimeUpdateStreams, err := rt.Streams(ctx)
+						if err != nil {
+							logger.Fatalf("%+v", err)
+						}
+
 						dump := icingadb.NewDumpSignals(rc, logger)
 						g.Go(func() error {
 							logger.Info("Staring config dump signal handling")
 
 							return dump.Listen(synctx)
 						})
-
-						lastRuntimeStreamId, err := rc.StreamLastId(ctx, "icinga:runtime")
-						if err != nil {
-							logger.Fatalf("%+v", err)
-						}
 
 						g.Go(func() error {
 							select {
@@ -209,7 +211,7 @@ func run() int {
 
 							// @TODO(el): The customvar runtime update sync may change because the customvar flat
 							// runtime update sync is not yet implemented.
-							return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), lastRuntimeStreamId)
+							return rt.Sync(synctx, append(v1.Factories, v1.NewCustomvar), runtimeUpdateStreams)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
