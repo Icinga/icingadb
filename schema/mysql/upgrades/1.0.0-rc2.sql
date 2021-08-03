@@ -43,6 +43,7 @@ ALTER TABLE host
     MODIFY is_volatile enum('n','y') NOT NULL;
 ALTER TABLE host_state
     ADD COLUMN normalized_performance_data mediumtext DEFAULT NULL AFTER performance_data,
+    ADD COLUMN last_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id' AFTER acknowledgement_comment_id,
     MODIFY is_problem enum('n','y') NOT NULL,
     MODIFY is_handled enum('n','y') NOT NULL,
     MODIFY is_reachable enum('n','y') NOT NULL,
@@ -60,6 +61,7 @@ ALTER TABLE service
     MODIFY is_volatile enum('n','y') NOT NULL;
 ALTER TABLE service_state
     ADD COLUMN normalized_performance_data mediumtext DEFAULT NULL AFTER performance_data,
+    ADD COLUMN last_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id' AFTER acknowledgement_comment_id,
     MODIFY is_problem enum('n','y') NOT NULL,
     MODIFY is_handled enum('n','y') NOT NULL,
     MODIFY is_reachable enum('n','y') NOT NULL,

@@ -143,6 +143,7 @@ CREATE TABLE host_state (
 
   is_acknowledged enum('n', 'y', 'sticky') NOT NULL,
   acknowledgement_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
+  last_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
 
   in_downtime enum('n', 'y') NOT NULL,
 
@@ -296,6 +297,7 @@ CREATE TABLE service_state (
 
   is_acknowledged enum('n', 'y', 'sticky') NOT NULL,
   acknowledgement_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
+  last_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
 
   in_downtime enum('n', 'y') NOT NULL,
 
