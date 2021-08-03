@@ -1,11 +1,16 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/cmd/internal"
 	"github.com/icinga/icingadb/pkg/config"
+	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/jessevdk/go-flags"
+	"github.com/pkg/errors"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"os"
 )
 
@@ -49,6 +54,48 @@ func run() int {
 		}
 	}
 
+	logger, _ := zap.NewDevelopmentConfig().Build()
+
+	log := logger.Sugar()
+	defer log.Sync()
+
+	log.Info("Starting IDO to Icinga DB history migration")
+
+	log.Info("Connecting to databases")
+	var ido, idb *icingadb.DB
+
+	{
+		eg, _ := errgroup.WithContext(context.Background())
+
+		eg.Go(func() error {
+			ido = connect(log, "IDO", &c.IDO)
+			return nil
+		})
+
+		eg.Go(func() error {
+			idb = connect(log, "Icinga DB", &c.IcingaDB)
+			return nil
+		})
+
+		_ = eg.Wait()
+	}
+
 	// TODO
+	_ = ido
+	_ = idb
+
 	return internal.ExitSuccess
+}
+
+func connect(log *zap.SugaredLogger, which string, cfg *config.Database) *icingadb.DB {
+	db, err := cfg.Open(log)
+	if err != nil {
+		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
+	}
+
+	if err := db.Ping(); err != nil {
+		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
+	}
+
+	return db
 }
