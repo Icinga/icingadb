@@ -1,7 +1,7 @@
 -- IcingaDB | (c) 2019 Icinga GmbH | GPLv2+
 
-SET sql_mode = 'STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION';
-SET innodb_strict_mode = 1;
+SET SESSION sql_mode = 'STRICT_ALL_TABLES,NO_ENGINE_SUBSTITUTION';
+SET SESSION innodb_strict_mode = 1;
 
 CREATE TABLE host (
   id binary(20) NOT NULL COMMENT 'sha1(environment.name + name)',
