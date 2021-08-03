@@ -111,6 +111,20 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 	), len(columns)
 }
 
+// BuildInsertIgnoreStmt returns an INSERT statement for the specified struct for
+// which the database ignores rows that have already been inserted.
+func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
+	columns := db.BuildColumns(into)
+
+	return fmt.Sprintf(
+		// MySQL treats UPDATE id = id as a no-op.
+		`INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE id = id`,
+		utils.TableName(into),
+		strings.Join(columns, ", "),
+		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
+	), len(columns)
+}
+
 // BuildSelectStmt returns a SELECT query that creates the FROM part from the given table struct
 // and the column list from the specified columns struct.
 func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
