@@ -291,7 +291,10 @@ func (h *HA) insertEnvironment(s *icingaredisv1.IcingaStatus) error {
 				Id: s.EnvironmentID(),
 			},
 		},
-		Name: s.Environment,
+		Name: types.String{NullString: sql.NullString{
+			String: s.Environment,
+			Valid:  true,
+		}},
 	}
 
 	// Instead of checking whether the environment already exists, use an INSERT statement that does nothing if it does.
