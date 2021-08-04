@@ -231,6 +231,10 @@ func run() int {
 				logger.Warn("Handing over")
 
 				cancelHactx()
+			case <-ha.Restart():
+				logger.Info("Restarting HA")
+
+				cancelHactx()
 			case <-hactx.Done():
 				// Nothing to do here, surrounding loop will terminate now.
 			case <-ha.Done():

@@ -26,11 +26,13 @@ type HA struct {
 	cancelCtx   context.CancelFunc
 	instanceId  types.Binary
 	db          *DB
+	environment *v1.Environment
 	heartbeat   *icingaredis.Heartbeat
 	logger      *zap.SugaredLogger
 	responsible bool
 	handover    chan struct{}
 	takeover    chan struct{}
+	restart     chan struct{}
 	done        chan struct{}
 	mu          *sync.Mutex
 	err         error
@@ -52,6 +54,7 @@ func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger
 		logger:     logger,
 		handover:   make(chan struct{}),
 		takeover:   make(chan struct{}),
+		restart:    make(chan struct{}),
 		done:       make(chan struct{}),
 		mu:         &sync.Mutex{},
 	}
@@ -94,6 +97,11 @@ func (h *HA) Handover() chan struct{} {
 // Takeover returns a channel with which takeovers are signaled.
 func (h *HA) Takeover() chan struct{} {
 	return h.takeover
+}
+
+// Restart returns a channel with which restarts are signaled.
+func (h *HA) Restart() chan struct{} {
+	return h.restart
 }
 
 func (h *HA) abort(err error) {
@@ -139,6 +147,30 @@ func (h *HA) controller() {
 				s, err := m.Stats().IcingaStatus()
 				if err != nil {
 					h.abort(err)
+				}
+
+				if h.environment == nil || h.environment.Name.String != s.Environment {
+					var restart bool
+
+					if h.environment != nil {
+						h.logger.Warnw("Got new environment", zap.String("current", h.environment.Name.String), zap.String("new", s.Environment))
+						restart = true
+					}
+
+					h.environment = &v1.Environment{
+						EntityWithoutChecksum: v1.EntityWithoutChecksum{IdMeta: v1.IdMeta{
+							Id: s.EnvironmentID(),
+						}},
+						Name: types.String{NullString: sql.NullString{
+							String: s.Environment,
+							Valid:  true,
+						}},
+					}
+
+					if restart {
+						h.signalRestart()
+						continue
+					}
 				}
 
 				select {
@@ -268,7 +300,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 		if takeover {
 			// Insert the environment after each heartbeat takeover if it does not already exist in the database
 			// as the environment may have changed, although this is likely to happen very rarely.
-			if err := h.insertEnvironment(s); err != nil {
+			if err := h.insertEnvironment(); err != nil {
 				cancelCtx()
 				return errors.Wrap(err, "can't insert environment")
 			}
@@ -284,23 +316,11 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 }
 
 // insertEnvironment inserts the environment from the specified state into the database if it does not already exist.
-func (h *HA) insertEnvironment(s *icingaredisv1.IcingaStatus) error {
-	e := v1.Environment{
-		EntityWithoutChecksum: v1.EntityWithoutChecksum{
-			IdMeta: v1.IdMeta{
-				Id: s.EnvironmentID(),
-			},
-		},
-		Name: types.String{NullString: sql.NullString{
-			String: s.Environment,
-			Valid:  true,
-		}},
-	}
-
+func (h *HA) insertEnvironment() error {
 	// Instead of checking whether the environment already exists, use an INSERT statement that does nothing if it does.
-	stmt, _ := h.db.BuildInsertIgnoreStmt(e)
+	stmt, _ := h.db.BuildInsertIgnoreStmt(h.environment)
 
-	if _, err := h.db.NamedExecContext(h.ctx, stmt, e); err != nil {
+	if _, err := h.db.NamedExecContext(h.ctx, stmt, h.environment); err != nil {
 		return internal.CantPerformQuery(err, stmt)
 	}
 
@@ -362,5 +382,14 @@ func (h *HA) signalTakeover() {
 		case <-h.ctx.Done():
 			// Noop
 		}
+	}
+}
+
+func (h *HA) signalRestart() {
+	select {
+	case h.restart <- struct{}{}:
+		h.responsible = false
+	case <-h.ctx.Done():
+		// Noop
 	}
 }
