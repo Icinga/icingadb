@@ -81,3 +81,10 @@ type Upserter interface {
 type TableNamer interface {
 	TableName() string // TableName tells the table.
 }
+
+// Scoper implements the Scope method,
+// which returns a struct specifying the WHERE conditions that
+// entities must satisfy in order to be SELECTed.
+type Scoper interface {
+	Scope() interface{}
+}

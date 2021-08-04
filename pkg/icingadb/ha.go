@@ -22,21 +22,22 @@ var timeout = 60 * time.Second
 
 // HA provides high availability and indicates whether a Takeover or Handover must be made.
 type HA struct {
-	ctx         context.Context
-	cancelCtx   context.CancelFunc
-	instanceId  types.Binary
-	db          *DB
-	environment *v1.Environment
-	heartbeat   *icingaredis.Heartbeat
-	logger      *zap.SugaredLogger
-	responsible bool
-	handover    chan struct{}
-	takeover    chan struct{}
-	restart     chan struct{}
-	done        chan struct{}
-	mu          *sync.Mutex
-	err         error
-	errOnce     sync.Once
+	ctx           context.Context
+	cancelCtx     context.CancelFunc
+	instanceId    types.Binary
+	db            *DB
+	environmentMu sync.Mutex
+	environment   *v1.Environment
+	heartbeat     *icingaredis.Heartbeat
+	logger        *zap.SugaredLogger
+	responsible   bool
+	handover      chan struct{}
+	takeover      chan struct{}
+	restart       chan struct{}
+	done          chan struct{}
+	errOnce       sync.Once
+	errMu         sync.Mutex
+	err           error
 }
 
 // NewHA returns a new HA and starts the controller loop.
@@ -56,7 +57,6 @@ func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger
 		takeover:   make(chan struct{}),
 		restart:    make(chan struct{}),
 		done:       make(chan struct{}),
-		mu:         &sync.Mutex{},
 	}
 
 	go ha.controller()
@@ -81,10 +81,18 @@ func (h *HA) Done() <-chan struct{} {
 	return h.done
 }
 
+// Environment returns the current environment.
+func (h *HA) Environment() *v1.Environment {
+	h.environmentMu.Lock()
+	defer h.environmentMu.Unlock()
+
+	return h.environment
+}
+
 // Err returns an error if Done has been closed and there is an error. Otherwise returns nil.
 func (h *HA) Err() error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	h.errMu.Lock()
+	defer h.errMu.Unlock()
 
 	return h.err
 }
@@ -106,9 +114,9 @@ func (h *HA) Restart() chan struct{} {
 
 func (h *HA) abort(err error) {
 	h.errOnce.Do(func() {
-		h.mu.Lock()
+		h.errMu.Lock()
 		h.err = errors.Wrap(err, "HA aborted")
-		h.mu.Unlock()
+		h.errMu.Unlock()
 
 		h.cancelCtx()
 	})

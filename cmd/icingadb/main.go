@@ -133,7 +133,7 @@ func run() int {
 
 				go func() {
 					for hactx.Err() == nil {
-						synctx, cancelSynctx := context.WithCancel(hactx)
+						synctx, cancelSynctx := context.WithCancel(ha.Environment().NewContext(hactx))
 						g, synctx := errgroup.WithContext(synctx)
 						// WaitGroups for initial synchronization.
 						// Runtime updates must wait for initial synchronization to complete.

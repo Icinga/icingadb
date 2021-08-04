@@ -78,8 +78,13 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 	// Let errors from Redis cancel our group.
 	com.ErrgroupReceive(g, redisErrs)
 
+	e, ok := v1.EnvironmentFromContext(ctx)
+	if !ok {
+		return errors.New("can't get environment from context")
+	}
+
 	actual, dbErrs := s.db.YieldAll(
-		ctx, subject.Factory(), s.db.BuildSelectStmt(subject.Entity(), subject.Entity().Fingerprint()))
+		ctx, subject.Factory(), s.db.BuildSelectStmt(NewScopedEntity(subject.Entity(), e.Meta()), subject.Entity().Fingerprint()), e.Meta())
 	// Let errors from DB cancel our group.
 	com.ErrgroupReceive(g, dbErrs)
 
@@ -164,6 +169,11 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	s.logger.Info("Syncing customvar")
 	s.logger.Info("Syncing customvar_flat")
 
+	e, ok := v1.EnvironmentFromContext(ctx)
+	if !ok {
+		return errors.New("can't get environment from context")
+	}
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	cv := common.NewSyncSubject(v1.NewCustomvar)
@@ -175,7 +185,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	com.ErrgroupReceive(g, errs)
 
 	actualCvs, errs := s.db.YieldAll(
-		ctx, cv.Factory(), s.db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
+		ctx, cv.Factory(), s.db.BuildSelectStmt(NewScopedEntity(cv.Entity(), e.Meta()), cv.Entity().Fingerprint()), e.Meta())
 	com.ErrgroupReceive(g, errs)
 
 	g.Go(func() error {
@@ -185,7 +195,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	flatCv := common.NewSyncSubject(v1.NewCustomvarFlat)
 
 	actualFlatCvs, errs := s.db.YieldAll(
-		ctx, flatCv.Factory(), s.db.BuildSelectStmt(flatCv.Entity(), flatCv.Entity().Fingerprint()))
+		ctx, flatCv.Factory(), s.db.BuildSelectStmt(NewScopedEntity(flatCv.Entity(), e.Meta()), flatCv.Entity().Fingerprint()), e.Meta())
 	com.ErrgroupReceive(g, errs)
 
 	g.Go(func() error {
