@@ -88,7 +88,7 @@ func run() int {
 
 				go func() {
 					for hactx.Err() == nil {
-						synctx, cancelSynctx := context.WithCancel(hactx)
+						synctx, cancelSynctx := context.WithCancel(ha.Environment().NewContext(hactx))
 						g, synctx := errgroup.WithContext(synctx)
 						// WaitGroup for configuration synchronization.
 						// Runtime updates must wait for configuration synchronization to complete.
@@ -178,8 +178,13 @@ func run() int {
 								}
 							})
 
+							e, ok := v1.EnvironmentFromContext(synctx)
+							if !ok {
+								return errors.New("can't get environment from context")
+							}
+
 							actualCvs, dbErrs := db.YieldAll(
-								synctx, cv.Factory(), db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
+								synctx, cv.Factory(), db.BuildSelectStmt(icingadb.NewScopedEntity(cv.Entity(), e.Meta()), cv.Entity().Fingerprint()), e.Meta())
 							// Let errors from DB cancel our group.
 							com.ErrgroupReceive(g, dbErrs)
 
@@ -194,7 +199,7 @@ func run() int {
 							com.ErrgroupReceive(g, flattenErrs)
 
 							actualCvFlats, dbErrs := db.YieldAll(
-								synctx, cvFlat.Factory(), db.BuildSelectStmt(cvFlat.Entity(), cvFlat.Entity().Fingerprint())))
+								synctx, cvFlat.Factory(), db.BuildSelectStmt(icingadb.NewScopedEntity(cvFlat.Entity(), e.Meta()), cvFlat.Entity().Fingerprint()), e.Meta())
 							// Let errors from DB cancel our group.
 							com.ErrgroupReceive(g, dbErrs)
 

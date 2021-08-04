@@ -6,6 +6,7 @@ import (
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -77,8 +78,13 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 	// Let errors from Redis cancel our group.
 	com.ErrgroupReceive(g, redisErrs)
 
+	e, ok := v1.EnvironmentFromContext(ctx)
+	if !ok {
+		return errors.New("can't get environment from context")
+	}
+
 	actual, dbErrs := s.db.YieldAll(
-		ctx, subject.Factory(), s.db.BuildSelectStmt(subject.Entity(), subject.Entity().Fingerprint()))
+		ctx, subject.Factory(), s.db.BuildSelectStmt(NewScopedEntity(subject.Entity(), e.Meta()), subject.Entity().Fingerprint()), e.Meta())
 	// Let errors from DB cancel our group.
 	com.ErrgroupReceive(g, dbErrs)
 
