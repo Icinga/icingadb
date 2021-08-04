@@ -96,7 +96,7 @@ func run() int {
 
 						// Get the last IDs of the runtime update streams before starting anything else,
 						// otherwise updates may be lost.
-						runtimeUpdateStreams, err := rt.Streams(ctx)
+						runtimeUpdateStreams, err := rt.Streams(synctx)
 						if err != nil {
 							logger.Fatalf("%+v", err)
 						}
@@ -179,27 +179,27 @@ func run() int {
 							})
 
 							actualCvs, dbErrs := db.YieldAll(
-								ctx, cv.Factory(), db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
+								synctx, cv.Factory(), db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
 							// Let errors from DB cancel our group.
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logger))
+								return s.ApplyDelta(synctx, icingadb.NewDelta(synctx, actualCvs, cvs1, cv, logger))
 							})
 
 							cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
 
-							cvFlats, flattenErrs := v1.FlattenCustomvars(ctx, cvs2)
+							cvFlats, flattenErrs := v1.FlattenCustomvars(synctx, cvs2)
 							// Let errors from Flatten cancel our group.
 							com.ErrgroupReceive(g, flattenErrs)
 
 							actualCvFlats, dbErrs := db.YieldAll(
-								ctx, cvFlat.Factory(), db.BuildSelectStmt(cvFlat.Entity(), cvFlat.Entity().Fingerprint()))
+								synctx, cvFlat.Factory(), db.BuildSelectStmt(cvFlat.Entity(), cvFlat.Entity().Fingerprint())))
 							// Let errors from DB cancel our group.
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logger))
+								return s.ApplyDelta(synctx, icingadb.NewDelta(synctx, actualCvFlats, cvFlats, cvFlat, logger))
 							})
 
 							return nil
