@@ -1013,12 +1013,12 @@ CREATE TABLE acknowledgement_history (
 
   set_time bigint unsigned NOT NULL,
   clear_time bigint unsigned DEFAULT NULL,
-  author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
+  author varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
   cleared_by varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci,
-  comment text DEFAULT NULL,
+  comment text DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
   expire_time bigint unsigned DEFAULT NULL,
-  is_sticky enum('n', 'y') NOT NULL,
-  is_persistent enum('n', 'y') NOT NULL,
+  is_sticky enum('n', 'y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
+  is_persistent enum('n', 'y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;

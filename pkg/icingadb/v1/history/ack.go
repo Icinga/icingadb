@@ -22,7 +22,7 @@ type AcknowledgementHistory struct {
 	HistoryTableMeta         `json:",inline"`
 	AckHistoryUpserter       `json:",inline"`
 	SetTime                  types.UnixMilli `json:"set_time"`
-	Author                   string          `json:"author"`
+	Author                   types.String    `json:"author"`
 	Comment                  types.String    `json:"comment"`
 	ExpireTime               types.UnixMilli `json:"expire_time"`
 	IsPersistent             types.Bool      `json:"is_persistent"`
