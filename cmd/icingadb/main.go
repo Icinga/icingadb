@@ -142,7 +142,7 @@ func run() int {
 
 						// Get the last IDs of the runtime update streams before starting anything else,
 						// otherwise updates may be lost.
-						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.Streams(ctx)
+						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.Streams(synctx)
 						if err != nil {
 							logger.Fatalf("%+v", err)
 						}
