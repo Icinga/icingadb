@@ -2,9 +2,7 @@ package config
 
 import (
 	"context"
-	"github.com/creasty/defaults"
 	"github.com/go-redis/redis/v8"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/retry"
@@ -40,20 +38,6 @@ func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error
 	c = redis.NewClient(opts)
 
 	return icingaredis.NewClient(c, logger, &r.Options), nil
-}
-
-// UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (r *Redis) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := defaults.Set(r); err != nil {
-		return errors.Wrapf(err, "can't set defaults %#v", r)
-	}
-	// Prevent recursion.
-	type self Redis
-	if err := unmarshal((*self)(r)); err != nil {
-		return internal.CantUnmarshalYAML(err, r)
-	}
-
-	return nil
 }
 
 // dialWithLogging returns a Redis Dialer with logging capabilities.
