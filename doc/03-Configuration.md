@@ -24,6 +24,16 @@ database                 | **Required.** Database database.
 user                     | **Required.** Database username.
 password                 | **Required.** Database password.
 
+## Logging Configuration <a id="configuration-database"></a>
+
+Configuration of the logging component used by Icinga DB.
+
+Option                   | Description
+-------------------------|-----------------------------------------------
+level                    | **Optional.** Logger default level.
+output                   | **Optional.** Write log messages to `console` or send it to `systemd-journal`.
+options                  | **Optional.** `Icinga Db component` => `logging level` map.
+
 ## Example Configuration <a id="configuration-example"></a>
 
 ```yaml
@@ -35,4 +45,10 @@ database:
   password: icingadb
 redis:
   address: redis:6380
+logging:
+  level: debug
+  output: console
+  options:
+    database: debug
+    redis: debug
 ```

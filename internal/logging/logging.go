@@ -149,9 +149,13 @@ const (
 	ExitFailure = 1
 )
 
-// Fatal introduces a short buffer time between Fatal log and os.Exit(1) by sleeping
-// for a short interval after logging fatal error in case of systemd-journal logging.
-// This is done to avoid the loss of fatal level log messages on exit on failure.
+// Fatal logs fatal IcingaDb messages.
+// In case of fatal errors panic() does not seem to function properly, neither when the log messages are written to
+// console nor when they are sent to systemd-journal (i.e, the some of the error message is lost). Similarly,
+// the process exits without showing the entire error message while using zap.logger.Fatal().
+// Hence, a custom Fatal method has been written by introducing a short buffer time between Fatal log and os.Exit(1)
+// by sleeping for a short interval after logging fatal error in case of systemd-journal logging and then the process
+// is exited. Hence avoiding the loss of fatal level log messages on exit on failure.
 func (l *Logging) Fatal(err error) {
 	logger := l.GetLogger().Desugar()
 
@@ -169,7 +173,7 @@ func (l *Logging) Fatal(err error) {
 	}()
 	<-logged
 
-	// a short buffer time between Fatal log and os.Exit(1) by sleeping in case of systemd-journal logging.
+	// A short buffer time between Fatal log and os.Exit(1) by sleeping in case of systemd-journal logging.
 	// This is done to overcome the race condition during systemd-journal logging, which causes systemd journal unable
 	// to attribute messages incoming from processes that exited to their cgroup.
 	// See: https://github.com/systemd/systemd/issues/2913.
