@@ -42,6 +42,30 @@ func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error
 	return icingaredis.NewClient(c, logger, &r.Options), nil
 }
 
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (r *Redis) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	if err := defaults.Set(r); err != nil {
+		return errors.Wrapf(err, "can't set defaults %#v", r)
+	}
+	// Prevent recursion.
+	type self Redis
+	if err := unmarshal((*self)(r)); err != nil {
+		return internal.CantUnmarshalYAML(err, r)
+	}
+
+	if r.MaxHMGetConnections < 1 {
+		return errors.New("max_hmget_connections must be at least 1")
+	}
+	if r.HMGetCount < 1 {
+		return errors.New("hmget_count must be at least 1")
+	}
+	if r.HScanCount < 1 {
+		return errors.New("hscan_count must be at least 1")
+	}
+
+	return nil
+}
+
 // dialWithLogging returns a Redis Dialer with logging capabilities.
 func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, string) (net.Conn, error) {
 	// dial behaves like net.Dialer#DialContext, but re-tries on syscall.ECONNREFUSED.
@@ -75,28 +99,4 @@ func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, st
 
 		return
 	}
-}
-
-// UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (r *Redis) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := defaults.Set(r); err != nil {
-		return errors.Wrapf(err, "can't set defaults %#v", r)
-	}
-	// Prevent recursion.
-	type self Redis
-	if err := unmarshal((*self)(r)); err != nil {
-		return internal.CantUnmarshalYAML(err, r)
-	}
-
-	if r.MaxHMGetConnections < 1 {
-		return errors.New("max_hmget_connections must be at least 1")
-	}
-	if r.HMGetCount < 1 {
-		return errors.New("hmget_count must be at least 1")
-	}
-	if r.HScanCount < 1 {
-		return errors.New("hscan_count must be at least 1")
-	}
-
-	return nil
 }
