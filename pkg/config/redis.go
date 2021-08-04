@@ -19,9 +19,9 @@ import (
 
 // Redis defines Redis client configuration.
 type Redis struct {
-	Address             string `yaml:"address"`
-	Password            string `yaml:"password"`
-	icingaredis.Options `yaml:",inline"`
+	Address  string              `yaml:"address"`
+	Password string              `yaml:"password"`
+	Options  icingaredis.Options `yaml:"options"`
 }
 
 // NewClient prepares Redis client configuration,
@@ -32,7 +32,7 @@ func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error
 		Dialer:      dialWithLogging(logger),
 		Password:    r.Password,
 		DB:          0, // Use default DB,
-		ReadTimeout: r.Timeout,
+		ReadTimeout: r.Options.Timeout,
 	})
 
 	opts := c.Options()
@@ -51,16 +51,6 @@ func (r *Redis) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	type self Redis
 	if err := unmarshal((*self)(r)); err != nil {
 		return internal.CantUnmarshalYAML(err, r)
-	}
-
-	if r.MaxHMGetConnections < 1 {
-		return errors.New("max_hmget_connections must be at least 1")
-	}
-	if r.HMGetCount < 1 {
-		return errors.New("hmget_count must be at least 1")
-	}
-	if r.HScanCount < 1 {
-		return errors.New("hscan_count must be at least 1")
 	}
 
 	return nil
