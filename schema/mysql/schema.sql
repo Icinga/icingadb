@@ -1015,7 +1015,7 @@ CREATE TABLE acknowledgement_history (
   clear_time bigint unsigned DEFAULT NULL,
   author varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
   cleared_by varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci,
-  comment text DEFAULT NULL,
+  comment text DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
   expire_time bigint unsigned DEFAULT NULL,
   is_sticky enum('n', 'y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
   is_persistent enum('n', 'y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',

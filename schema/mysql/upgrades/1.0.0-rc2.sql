@@ -110,6 +110,7 @@ ALTER TABLE comment_history
     MODIFY has_been_removed enum('n','y') NOT NULL;
 ALTER TABLE acknowledgement_history
     MODIFY author varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
+    MODIFY comment text DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
     MODIFY is_sticky enum('n','y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
     MODIFY is_persistent enum('n','y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording';
 
