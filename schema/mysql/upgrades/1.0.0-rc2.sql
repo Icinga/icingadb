@@ -109,8 +109,9 @@ ALTER TABLE comment_history
     MODIFY is_sticky enum('n','y') NOT NULL,
     MODIFY has_been_removed enum('n','y') NOT NULL;
 ALTER TABLE acknowledgement_history
-    MODIFY is_sticky enum('n','y') NOT NULL,
-    MODIFY is_persistent enum('n','y') NOT NULL;
+    MODIFY author varchar(255) DEFAULT NULL COLLATE utf8mb4_unicode_ci COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
+    MODIFY is_sticky enum('n','y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
+    MODIFY is_persistent enum('n','y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording';
 
 INSERT INTO icingadb_schema (version, timestamp)
   VALUES (2, CURRENT_TIMESTAMP() * 1000);
