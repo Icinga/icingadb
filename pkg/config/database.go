@@ -2,8 +2,6 @@ package config
 
 import (
 	"fmt"
-	"github.com/creasty/defaults"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -50,18 +48,4 @@ func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
 	})
 
 	return icingadb.NewDb(db, logger, &d.Options), nil
-}
-
-// UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (d *Database) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := defaults.Set(d); err != nil {
-		return errors.Wrap(err, "can't set default database config")
-	}
-	// Prevent recursion.
-	type self Database
-	if err := unmarshal((*self)(d)); err != nil {
-		return internal.CantUnmarshalYAML(err, d)
-	}
-
-	return nil
 }
