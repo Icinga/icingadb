@@ -1,12 +1,15 @@
 package command
 
 import (
+	"fmt"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"os"
 )
 
 type Command struct {
@@ -19,6 +22,11 @@ func New() *Command {
 	flags, err := config.ParseFlags()
 	if err != nil {
 		utils.Fatal(err)
+	}
+
+	if flags.Version {
+		fmt.Println("Icinga DB version:", internal.Version)
+		os.Exit(0)
 	}
 
 	cfg, err := config.FromYAMLFile(flags.Config)
