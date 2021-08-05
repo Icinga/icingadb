@@ -112,7 +112,7 @@ func run() int {
 						// otherwise updates may be lost.
 						runtimeUpdateStreams, err := rt.Streams(ctx)
 						if err != nil {
-							logger.Fatalf("%+v", err)
+							logs.Fatal(err)
 						}
 
 						dump := icingadb.NewDumpSignals(rc, logs.GetChildLogger("dump-signals"))
