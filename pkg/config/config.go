@@ -65,9 +65,5 @@ func ParseFlags() (*Flags, error) {
 		return nil, errors.Wrap(err, "can't parse CLI flags")
 	}
 
-	if err := ValidateFile(f.Config); err != nil {
-		return nil, errors.Wrap(err, "invalid config file "+f.Config)
-	}
-
 	return f, nil
 }
