@@ -24,15 +24,14 @@ database                 | **Required.** Database database.
 user                     | **Required.** Database username.
 password                 | **Required.** Database password.
 
-## Logging Configuration <a id="configuration-database"></a>
+## Logging Configuration <a id="configuration-logging"></a>
 
 Configuration of the logging component used by Icinga DB.
 
 Option                   | Description
 -------------------------|-----------------------------------------------
-level                    | **Optional.** Logger default level.
-output                   | **Optional.** Write log messages to `console` or send it to `systemd-journal`.
-options                  | **Optional.** `Icinga Db component` => `logging level` map.
+level                    | **Required.** Logger default level (debug, info, warn, error, dpanic, panic or fatal). Usually set to `debug` by default.
+options                  | **Optional.** Child loggers, with `Icinga Db component` => `logging level` map.<br /> `Icinga Db component`: database, redis, heartbeat, high-availability, config-sync, history, runtime-updates, overdue-sync, dump-signals, delta. <br /> `logging level`: debug, info, warn, error, dpanic, panic or fatal.
 
 ## Example Configuration <a id="configuration-example"></a>
 
@@ -47,7 +46,6 @@ redis:
   address: redis:6380
 logging:
   level: debug
-  output: console
   options:
     database: debug
     redis: debug

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/coreos/go-systemd/daemon"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/internal/logging"
 	"github.com/icinga/icingadb/pkg/com"
@@ -34,11 +35,23 @@ func main() {
 
 func run() int {
 	cmd := command.New()
-	logs := logging.NewLogging(
+	_, _ = daemon.SdNotify(false, daemon.SdNotifyReady)
+	var output string
+	if _, ok := os.LookupEnv("NOTIFY_SOCKET"); ok {
+		output = "systemd-journal"
+	} else {
+		output = "console"
+	}
+
+	logs, err := logging.NewLogging(
 		cmd.Config.Logging.Level,
-		cmd.Config.Logging.Output,
+		output,
 		cmd.Config.Logging.Options,
 	)
+
+	if err != nil {
+		logs.Fatal(err)
+	}
 
 	logger := logs.GetLogger()
 	defer logger.Sync()
@@ -80,7 +93,7 @@ func run() int {
 	defer cancelCtx()
 
 	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logs.GetChildLogger("heartbeat"))
-	ha := icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("ha"))
+	ha := icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
 	defer ha.Close()

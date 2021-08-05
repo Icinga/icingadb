@@ -3,6 +3,7 @@ module github.com/icinga/icingadb
 go 1.16
 
 require (
+	github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e
 	github.com/coreos/go-systemd/v22 v22.3.2
 	github.com/creasty/defaults v1.5.2
 	github.com/go-redis/redis/v8 v8.11.3

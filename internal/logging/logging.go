@@ -11,13 +11,16 @@ import (
 )
 
 // Logging implements access to a default logger and named child loggers.
-// Log levels can be configured per child via Options.
-// Logs either to the console or the systemd journal.
-// Provides Fatal log to stop all loggers before the error is logged and the program exits.
+// Log levels can be configured per named child via Options which, if not configured,
+// fall back on a default log level.
+// Logs either to the console or to the systemd journal.
+// Provides Fatal log for consistent handling of fatal errors that
+// exit the program after being logged.
 type Logging struct {
-	// enabled implements a switch to disable logging on Fatal log during systemd-journal logging.
-	// This switch is added to overcome the race condition during systemd-journal logging.
-	// See: https://github.com/systemd/systemd/issues/2913.
+	// enabled implements a switch to disable logging during Fatal log if
+	// the output is set to the systemd journal, because we then sleep after logging and
+	// before exiting the program, which could otherwise add further log messages during this time.
+	// See Fatal for details.
 	enabled *atomic.Bool
 	level   zap.AtomicLevel
 	output  string
@@ -33,7 +36,7 @@ type Logging struct {
 	options Options
 }
 
-// defaultEncConfig stores default zapcore.EncoderConfig for logging package.
+// defaultEncConfig stores default zapcore.EncoderConfig for this package.
 var defaultEncConfig = zapcore.EncoderConfig{
 	TimeKey:        "ts",
 	LevelKey:       "level",
@@ -51,8 +54,9 @@ var defaultEncConfig = zapcore.EncoderConfig{
 // Options define child loggers with their desired log level.
 type Options map[string]string
 
-// NewLogging returns a new Logging.
-func NewLogging(level string, output string, options Options) *Logging {
+// NewLogging takes log level for default logger, output where log messages are written to
+// and options having log levels for named child loggers and initializes a new Logging.
+func NewLogging(level string, output string, options Options) (*Logging, error) {
 	var lvl zapcore.Level
 	if err := lvl.Set(level); err != nil {
 		panic(err)
@@ -68,14 +72,28 @@ func NewLogging(level string, output string, options Options) *Logging {
 		syncer = zapcore.Lock(os.Stderr)
 	case "systemd-journal":
 		wr, err := newJournalWriter(os.Stderr, defaultEncConfig)
-
 		if err != nil {
 			panic(err)
 		}
 		encoder = zapcore.NewJSONEncoder(defaultEncConfig)
 		syncer = zapcore.AddSync(wr)
 	default:
-		panic(fmt.Sprintf("%s is not a valid logger output", output))
+		logger := zap.New(zapcore.NewCore(
+			zapcore.NewConsoleEncoder(defaultEncConfig),
+			zapcore.Lock(os.Stderr),
+			zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
+				// Always log fatals, but allow other levels to be completely disabled.
+				return zap.FatalLevel.Enabled(lvl) || enabled.Load() && atom.Enabled(lvl)
+			}),
+		))
+		return &Logging{
+				enabled: enabled,
+				level:   atom,
+				output:  output,
+				logger:  logger.Sugar(),
+				loggers: map[string]*zap.SugaredLogger{},
+			},
+			fmt.Errorf("%s is not a valid logger output", output)
 	}
 
 	logger := zap.New(zapcore.NewCore(
@@ -88,21 +106,21 @@ func NewLogging(level string, output string, options Options) *Logging {
 	))
 
 	return &Logging{
-		enabled: enabled,
-		level:   atom,
-		output:  output,
-		logger:  logger.Sugar(),
-		encoder: encoder,
-		syncer:  syncer,
-		loggers: map[string]*zap.SugaredLogger{},
-		options: options,
-	}
+			enabled: enabled,
+			level:   atom,
+			output:  output,
+			logger:  logger.Sugar(),
+			encoder: encoder,
+			syncer:  syncer,
+			loggers: map[string]*zap.SugaredLogger{},
+			options: options,
+		},
+		nil
 }
 
 // GetChildLogger returns a named child logger.
-// Log levels for the named child loggers are obtained from Logging.options. if the level for the corresponding
-// component is not found in Logging.options then we set the named child logger to default logger and return it.
-// If the child logger is found in Logging.loggers then that corresponding named child logger is returned.
+// Log levels for named child loggers are obtained from the logging options and, if not found,
+// set to the default log level.
 func (l *Logging) GetChildLogger(name string) *zap.SugaredLogger {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -149,13 +167,24 @@ const (
 	ExitFailure = 1
 )
 
-// Fatal logs fatal IcingaDb messages.
-// In case of fatal errors panic() does not seem to function properly, neither when the log messages are written to
-// console nor when they are sent to systemd-journal (i.e, the some of the error message is lost). Similarly,
-// the process exits without showing the entire error message while using zap.logger.Fatal().
-// Hence, a custom Fatal method has been written by introducing a short buffer time between Fatal log and os.Exit(1)
-// by sleeping for a short interval after logging fatal error in case of systemd-journal logging and then the process
-// is exited. Hence avoiding the loss of fatal level log messages on exit on failure.
+// Fatal logs fatal errors and exits afterwards.
+//
+// Sleeps for a short time before exiting if the output is set to systemd-journal,
+// as systemd may not correctly attribute all or part of the log message due to a race condition
+// and therefore it is missing when checking logs via journalctl -u icingadb:
+// https://github.com/systemd/systemd/issues/2913
+//
+// Without sleep, we observed the following exit behavior when starting Icinga DB via systemd:
+//
+// • All or part of the log message is lost,
+//  regardless of whether it is logged to stderr or to the journal.
+//
+// • When logging to stderr after also logging to the journal,
+//   the message seems to be attributed correctly,
+//   but this is actually not an option,
+//   as we only want to log to the journal.
+//
+// • Sleep before exiting helps systemd to attribute the message correctly.
 func (l *Logging) Fatal(err error) {
 	logger := l.GetLogger().Desugar()
 
@@ -173,9 +202,9 @@ func (l *Logging) Fatal(err error) {
 	}()
 	<-logged
 
-	// A short buffer time between Fatal log and os.Exit(1) by sleeping in case of systemd-journal logging.
-	// This is done to overcome the race condition during systemd-journal logging, which causes systemd journal unable
-	// to attribute messages incoming from processes that exited to their cgroup.
+	// A short buffer time between Fatal log and os.Exit() by sleeping in case of systemd-journal logging.
+	// This is done to overcome a race condition that results in systemd no longer attributing messages from processes
+	// that have exited to their cgroup.
 	// See: https://github.com/systemd/systemd/issues/2913.
 	if l.output == "systemd-journal" {
 		time.Sleep(time.Millisecond * 1100)
