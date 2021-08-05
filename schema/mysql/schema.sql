@@ -551,7 +551,7 @@ CREATE TABLE comment (
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL,
-  name varchar(255) NOT NULL,
+  name varchar(548) NOT NULL COMMENT '255+1+255+1+36, i.e. "host.name!service.name!UUID"',
 
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   text text NOT NULL,
@@ -580,7 +580,7 @@ CREATE TABLE downtime (
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
-  name varchar(255) NOT NULL,
+  name varchar(548) NOT NULL COMMENT '255+1+255+1+36, i.e. "host.name!service.name!UUID"',
 
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
   comment text NOT NULL,

@@ -90,9 +90,11 @@ ALTER TABLE notificationcommand_argument
     MODIFY required enum('n','y') NOT NULL,
     MODIFY skip_key enum('n','y') NOT NULL;
 ALTER TABLE comment
+    MODIFY name varchar(548) NOT NULL COMMENT '255+1+255+1+36, i.e. "host.name!service.name!UUID"',
     MODIFY is_persistent enum('n','y') NOT NULL,
     MODIFY is_sticky enum('n','y') NOT NULL;
 ALTER TABLE downtime
+    MODIFY name varchar(548) NOT NULL COMMENT '255+1+255+1+36, i.e. "host.name!service.name!UUID"',
     MODIFY is_flexible enum('n','y') NOT NULL,
     MODIFY is_in_effect enum('n','y') NOT NULL;
 ALTER TABLE timeperiod
