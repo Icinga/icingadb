@@ -52,16 +52,12 @@ var defaultEncConfig = zapcore.EncoderConfig{
 }
 
 // Options define child loggers with their desired log level.
-type Options map[string]string
+type Options map[string]zapcore.Level
 
 // NewLogging takes log level for default logger, output where log messages are written to
 // and options having log levels for named child loggers and initializes a new Logging.
-func NewLogging(level string, output string, options Options) (*Logging, error) {
-	var lvl zapcore.Level
-	if err := lvl.Set(level); err != nil {
-		panic(err)
-	}
-	atom := zap.NewAtomicLevelAt(lvl)
+func NewLogging(level zapcore.Level, output string, options Options) (*Logging, error) {
+	atom := zap.NewAtomicLevelAt(level)
 	enabled := atomic.NewBool(true)
 
 	var encoder zapcore.Encoder
@@ -73,27 +69,13 @@ func NewLogging(level string, output string, options Options) (*Logging, error) 
 	case "systemd-journal":
 		wr, err := newJournalWriter(os.Stderr, defaultEncConfig)
 		if err != nil {
-			panic(err)
+			return nil, err
 		}
+
 		encoder = zapcore.NewJSONEncoder(defaultEncConfig)
 		syncer = zapcore.AddSync(wr)
 	default:
-		logger := zap.New(zapcore.NewCore(
-			zapcore.NewConsoleEncoder(defaultEncConfig),
-			zapcore.Lock(os.Stderr),
-			zap.LevelEnablerFunc(func(lvl zapcore.Level) bool {
-				// Always log fatals, but allow other levels to be completely disabled.
-				return zap.FatalLevel.Enabled(lvl) || enabled.Load() && atom.Enabled(lvl)
-			}),
-		))
-		return &Logging{
-				enabled: enabled,
-				level:   atom,
-				output:  output,
-				logger:  logger.Sugar(),
-				loggers: map[string]*zap.SugaredLogger{},
-			},
-			fmt.Errorf("%s is not a valid logger output", output)
+		return nil, fmt.Errorf("%s is not a valid logger output", output)
 	}
 
 	logger := zap.New(zapcore.NewCore(
@@ -130,11 +112,7 @@ func (l *Logging) GetChildLogger(name string) *zap.SugaredLogger {
 	}
 
 	if level, found := l.options[name]; found {
-		var lvl zapcore.Level
-		if err := lvl.Set(level); err != nil {
-			panic(err)
-		}
-		atom := zap.NewAtomicLevelAt(lvl)
+		atom := zap.NewAtomicLevelAt(level)
 
 		logger := l.logger.Desugar().WithOptions(
 			zap.WrapCore(func(c zapcore.Core) zapcore.Core {
@@ -171,20 +149,23 @@ const (
 //
 // Sleeps for a short time before exiting if the output is set to systemd-journal,
 // as systemd may not correctly attribute all or part of the log message due to a race condition
-// and therefore it is missing when checking logs via journalctl -u icingadb:
+// and therefore it would be missing when checking logs via journalctl -u icingadb:
 // https://github.com/systemd/systemd/issues/2913
 //
 // Without sleep, we observed the following exit behavior when starting Icinga DB via systemd:
 //
 // • All or part of the log message is lost,
-//  regardless of whether it is logged to stderr or to the journal.
+// regardless of whether it is logged to stderr or to the journal.
 //
-// • When logging to stderr after also logging to the journal,
-//   the message seems to be attributed correctly,
-//   but this is actually not an option,
-//   as we only want to log to the journal.
+// • When writing to stderr after also writing to the journal,
+// the message seems to be attributed correctly,
+// which is good for panics not under our control as they print to stderr.
+// For messages under our control,
+// this is actually not an option,
+// as we only want to log to the journal.
 //
-// • Sleep before exiting helps systemd to attribute the message correctly.
+// • Sleep before exiting helps systemd to attribute the message correctly,
+// regardless of whether it is written to the journal or stderr.
 func (l *Logging) Fatal(err error) {
 	logger := l.GetLogger().Desugar()
 

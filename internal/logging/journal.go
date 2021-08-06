@@ -83,7 +83,7 @@ func (w *journalWriter) Write(p []byte) (int, error) {
 		"SYSLOG_IDENTIFIER": filepath.Base(os.Args[0]),
 	})
 	if err != nil {
-		// writer falls back to stderr, and timestamp is needed for stderr
+		// writer falls back to stderr, and timestamp needed for stderr is parsed from line.Time string.
 		tm, err := time.Parse("2006-01-02T15:04:05.000-0700", line.Time)
 		if err != nil {
 			panic(err)

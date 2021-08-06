@@ -30,8 +30,24 @@ Configuration of the logging component used by Icinga DB.
 
 Option                   | Description
 -------------------------|-----------------------------------------------
-level                    | **Required.** Logger default level (debug, info, warn, error, dpanic, panic or fatal). Usually set to `debug` by default.
-options                  | **Optional.** Child loggers, with `Icinga Db component` => `logging level` map.<br /> `Icinga Db component`: database, redis, heartbeat, high-availability, config-sync, history, runtime-updates, overdue-sync, dump-signals, delta. <br /> `logging level`: debug, info, warn, error, dpanic, panic or fatal.
+level                    | **Optional.** Specifies the default logging level. Can be set to `fatal`, `error`, `warning`, `info` or `debug`. Defaults to `debug`.
+options                  | **Optional.** Map of component name to logging level in order to set a different logging level for each component instead of the default one. See [logging components](#logging-components) for details. 
+
+
+### Logging Components <a id="logging-components"></a>
+
+Component                | Description
+-------------------------|-----------------------------------------------
+database                 | MySQL connection status and queries.
+redis                    | Redis connection status and queries.
+heartbeat                | Icinga 2 heartbeats received via Redis channel.
+high-availability        | Manages responsibility of Icinga DB instances.
+config-sync              | Config object synchronization between Redis and MySQL.
+history                  | Synchronization of history entries from Redis to MySQL.
+runtime-updates          | Updates of config objects after the initial config synchronization.
+overdue-sync             | Calculation and synchronization of the overdue status of checkables.
+dump-signals             | Dump signals received from Icinga 2.
+delta                    | Delta (Insert, Update, Delete) calculation of objects read from Redis compared to the objects currently in MySQL.
 
 ## Example Configuration <a id="configuration-example"></a>
 
@@ -45,8 +61,5 @@ database:
 redis:
   address: redis:6380
 logging:
-  level: debug
-  options:
-    database: debug
-    redis: debug
+  level: info
 ```

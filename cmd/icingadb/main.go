@@ -35,22 +35,26 @@ func main() {
 
 func run() int {
 	cmd := command.New()
+	// When started by systemd, NOTIFY_SOCKET is set by systemd for Type=notify supervised services, which is the
+	// default setting for the Icinga DB service. So we notify that Icinga DB finished starting up and also configure
+	// logging into the systemd journal instead of stderr.
+	// Always add this line before output assignment
 	_, _ = daemon.SdNotify(false, daemon.SdNotifyReady)
 	var output string
+	// When the type in icingadb.service is set to notify then set output to "systemd-journal",
+	// else set it to console, that is write log messages to stdErr.
 	if _, ok := os.LookupEnv("NOTIFY_SOCKET"); ok {
 		output = "systemd-journal"
 	} else {
 		output = "console"
 	}
-
 	logs, err := logging.NewLogging(
 		cmd.Config.Logging.Level,
 		output,
 		cmd.Config.Logging.Options,
 	)
-
 	if err != nil {
-		logs.Fatal(err)
+		utils.Fatal(errors.Wrap(err, "can't configure logging"))
 	}
 
 	logger := logs.GetLogger()
@@ -60,7 +64,7 @@ func run() int {
 
 	db, err := cmd.Database(logs.GetChildLogger("database"))
 	if err != nil {
-		logs.Fatal(errors.Wrap(err, "can't connect to database"))
+		logs.Fatal(errors.Wrap(err, "can't create database connection pool from config"))
 	}
 
 	defer db.Close()
@@ -78,14 +82,14 @@ func run() int {
 
 	rc, err := cmd.Redis(logs.GetChildLogger("redis"))
 	if err != nil {
-		logs.Fatal(errors.Wrap(err, "can't connect to database"))
+		logs.Fatal(errors.Wrap(err, "can't create Redis client from config"))
 	}
 
 	{
 		logger.Info("Connecting to Redis")
 		_, err := rc.Ping(context.Background()).Result()
 		if err != nil {
-			logs.Fatal(errors.Wrap(err, "can't create Redis client from config"))
+			logs.Fatal(errors.Wrap(err, "can't connect to Redis"))
 		}
 	}
 

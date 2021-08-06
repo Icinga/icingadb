@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/creasty/defaults"
+	"github.com/icinga/icingadb/internal"
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -71,4 +72,18 @@ func ParseFlags() (*Flags, error) {
 	}
 
 	return f, nil
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (c *Config) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	if err := defaults.Set(c); err != nil {
+		return errors.Wrap(err, "can't set default config")
+	}
+	// Prevent recursion.
+	type self Config
+	if err := unmarshal((*self)(c)); err != nil {
+		return internal.CantUnmarshalYAML(err, c)
+	}
+
+	return nil
 }

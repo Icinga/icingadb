@@ -6,3 +6,5 @@ database:
   password: icingadb
 redis:
   address: redis:6380
+logging:
+  level: info
