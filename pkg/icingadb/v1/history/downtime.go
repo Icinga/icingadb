@@ -41,6 +41,7 @@ type DowntimeHistory struct {
 	HistoryTableMeta        `json:",inline"`
 	DowntimeHistoryUpserter `json:",inline"`
 	TriggeredById           types.Binary    `json:"triggered_by_id"`
+	ParentId                types.Binary    `json:"parent_id"`
 	EntryTime               types.UnixMilli `json:"entry_time"`
 	Author                  string          `json:"author"`
 	Comment                 string          `json:"comment"`
