@@ -2,6 +2,7 @@ package icingadb
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/internal"
@@ -437,6 +438,10 @@ func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []int
 }
 
 func IsRetryable(err error) bool {
+	if errors.Is(err, driver.ErrBadConn) {
+		return true
+	}
+
 	if errors.Is(err, mysql.ErrInvalidConn) {
 		return true
 	}
