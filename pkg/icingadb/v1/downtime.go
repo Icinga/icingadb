@@ -24,6 +24,7 @@ type Downtime struct {
 	IsInEffect         types.Bool      `json:"is_in_effect"`
 	StartTime          types.UnixMilli `json:"start_time"`
 	EndTime            types.UnixMilli `json:"end_time"`
+	ScheduledBy        types.String    `json:"scheduled_by"`
 	ZoneId             types.Binary    `json:"zone_id"`
 }
 
