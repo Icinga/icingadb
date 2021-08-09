@@ -5,11 +5,13 @@ import (
 	"github.com/icinga/icingadb/pkg/types"
 )
 
+// UpserterEntity provides upsert for entities.
 type UpserterEntity interface {
 	contracts.Upserter
 	contracts.Entity
 }
 
+// HistoryTableEntity is embedded by every concrete history type that has its own table.
 type HistoryTableEntity struct {
 	Id types.UUID `json:"id"`
 }
@@ -35,6 +37,7 @@ func (hte HistoryTableEntity) Upsert() interface{} {
 	return hte
 }
 
+// HistoryEntity is embedded by every concrete history type.
 type HistoryEntity struct {
 	Id types.UUID `json:"event_id"`
 }
@@ -60,6 +63,7 @@ func (he HistoryEntity) Upsert() interface{} {
 	return he
 }
 
+// HistoryTableMeta is embedded by every concrete history type that has its own table.
 type HistoryTableMeta struct {
 	EnvironmentId types.Binary `json:"environment_id"`
 	EndpointId    types.Binary `json:"endpoint_id"`
@@ -68,6 +72,7 @@ type HistoryTableMeta struct {
 	ServiceId     types.Binary `json:"service_id"`
 }
 
+// HistoryMeta is embedded by every concrete history type that belongs to the history table.
 type HistoryMeta struct {
 	HistoryEntity `json:",inline"`
 	EnvironmentId types.Binary `json:"environment_id"`

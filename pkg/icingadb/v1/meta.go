@@ -57,12 +57,14 @@ func (n *NameCiMeta) Init() {
 	n.NameCi = &n.Name
 }
 
+// CustomvarMeta is embedded by every type with custom variables.
 type CustomvarMeta struct {
 	EntityWithoutChecksum `json:",inline"`
 	EnvironmentMeta       `json:",inline"`
 	CustomvarId           types.Binary `json:"customvar_id"`
 }
 
+// GroupMeta is embedded by every type that represents a specific group.
 type GroupMeta struct {
 	EntityWithChecksum `json:",inline"`
 	EnvironmentMeta    `json:",inline"`
@@ -71,6 +73,7 @@ type GroupMeta struct {
 	ZoneId             types.Binary `json:"zone_id"`
 }
 
+// MemberMeta is embedded by every type that represents members of a specific group.
 type MemberMeta struct {
 	EntityWithoutChecksum `json:",inline"`
 	EnvironmentMeta       `json:",inline"`

@@ -20,16 +20,15 @@ func WithBackoff(
 	ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff, timeout time.Duration,
 ) (err error) {
 	if timeout > 0 {
-		var cancel func()
-		ctx, cancel = context.WithTimeout(ctx, timeout)
-		defer cancel()
+		var cancelCtx context.CancelFunc
+		ctx, cancelCtx = context.WithTimeout(ctx, timeout)
+		defer cancelCtx()
 	}
 
 	for attempt := 0; ; /* true */ attempt++ {
 		prevErr := err
 
 		if err = retryableFunc(ctx); err == nil {
-			// No error.
 			return
 		}
 
@@ -40,7 +39,6 @@ func WithBackoff(
 		}
 
 		if !isRetryable {
-			// Not retryable.
 			err = errors.Wrap(err, "can't retry")
 
 			return
@@ -49,7 +47,6 @@ func WithBackoff(
 		sleep := b(uint64(attempt))
 		select {
 		case <-ctx.Done():
-			// Context canceled. Return last known error.
 			if err == nil {
 				err = ctx.Err()
 			}
@@ -57,7 +54,6 @@ func WithBackoff(
 
 			return
 		case <-time.After(sleep):
-			// Wait for backoff duration and continue.
 		}
 	}
 }

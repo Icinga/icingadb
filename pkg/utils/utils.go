@@ -5,17 +5,11 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
-	"github.com/google/uuid"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/exp/utf8string"
-	"io/ioutil"
 	"math"
-	"math/rand"
-	"os"
 	"strings"
-	"sync"
 	"time"
 	"unicode"
 )
@@ -71,10 +65,21 @@ func Key(name string, sep byte) string {
 	return b.String()
 }
 
+// Timed calls the given callback with the time that has elapsed since the start.
+//
+// Timed should be installed by defer:
+//
+//  func TimedExample(logger *zap.SugaredLogger) {
+//  	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
+//  		logger.Debugf("Executed job in %s", elapsed)
+//  	})
+//  	job()
+//  }
 func Timed(start time.Time, callback func(elapsed time.Duration)) {
 	callback(time.Since(start))
 }
 
+// BatchSliceOfStrings groups the given keys into chunks of size count and streams them into a returned channel.
 func BatchSliceOfStrings(ctx context.Context, keys []string, count int) <-chan []string {
 	batches := make(chan []string)
 
@@ -98,69 +103,12 @@ func BatchSliceOfStrings(ctx context.Context, keys []string, count int) <-chan [
 	return batches
 }
 
-func BatchSliceOfInterfaces(ctx context.Context, keys []interface{}, count int) <-chan []interface{} {
-	batches := make(chan []interface{})
-
-	go func() {
-		defer close(batches)
-
-		for i := 0; i < len(keys); i += count {
-			end := i + count
-			if end > len(keys) {
-				end = len(keys)
-			}
-
-			select {
-			case batches <- keys[i:end]:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
-	return batches
-}
-
+// IsContextCanceled returns whether the given error is context.Canceled.
 func IsContextCanceled(err error) bool {
 	return errors.Is(err, context.Canceled)
 }
 
-func CreateOrRead(name string, callback func() []byte) ([]byte, error) {
-	info, err := os.Stat(name)
-
-	if os.IsNotExist(err) {
-		b := callback()
-		if err := ioutil.WriteFile(name, b, 0660); err != nil {
-			defer os.Remove(name)
-
-			return nil, errors.Wrap(err, "can't write to file "+name)
-		}
-
-		return b, nil
-	}
-
-	if err != nil {
-		return nil, errors.Wrap(err, "can't read file "+name)
-	}
-
-	if info.IsDir() {
-		return nil, errors.Errorf(name + " is a directory")
-	}
-
-	b, err := ioutil.ReadFile(name)
-	if err != nil {
-		return nil, errors.Wrap(err, "can't read file "+name)
-	}
-
-	return b, nil
-}
-
-func Uuid() []byte {
-	u := uuid.New()
-
-	return u[:]
-}
-
+// Checksum returns the SHA-1 checksum of the data.
 func Checksum(data interface{}) []byte {
 	var chksm [sha1.Size]byte
 
@@ -176,8 +124,8 @@ func Checksum(data interface{}) []byte {
 	return chksm[:]
 }
 
+// Fatal panics with the given error.
 func Fatal(err error) {
-	// TODO(el): Print stacktrace via some recover() magic?
 	panic(err)
 }
 
@@ -192,17 +140,6 @@ func IsDeadlock(err error) bool {
 	}
 
 	return false
-}
-
-func RandomSleep(sugar *zap.SugaredLogger) {
-	once := sync.Once{}
-	once.Do(func() {
-		rand.Seed(time.Now().UnixNano())
-	})
-	n := rand.Intn(100)
-	d := time.Duration(n) * time.Millisecond
-	sugar.Info("Sleeping for ", d)
-	time.Sleep(d)
 }
 
 var ellipsis = utf8string.NewString("...")

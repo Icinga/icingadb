@@ -22,7 +22,7 @@ var timeout = 60 * time.Second
 type Heartbeat struct {
 	active    bool
 	beat      *com.Cond
-	cancel    context.CancelFunc
+	cancelCtx context.CancelFunc
 	client    *Client
 	done      chan struct{}
 	errMu     sync.Mutex
@@ -35,15 +35,15 @@ type Heartbeat struct {
 
 // NewHeartbeat returns a new Heartbeat and starts the heartbeat controller loop.
 func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger) *Heartbeat {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancelCtx := context.WithCancel(ctx)
 
 	heartbeat := &Heartbeat{
-		beat:   com.NewCond(ctx),
-		cancel: cancel,
-		client: client,
-		done:   make(chan struct{}),
-		logger: logger,
-		lost:   com.NewCond(ctx),
+		beat:      com.NewCond(ctx),
+		cancelCtx: cancelCtx,
+		client:    client,
+		done:      make(chan struct{}),
+		logger:    logger,
+		lost:      com.NewCond(ctx),
 	}
 
 	go heartbeat.controller(ctx)
@@ -59,7 +59,7 @@ func (h *Heartbeat) Beat() <-chan struct{} {
 // Close stops the heartbeat controller loop, waits for it to finish, and returns an error if any.
 // Implements the io.Closer interface.
 func (h *Heartbeat) Close() error {
-	h.cancel()
+	h.cancelCtx()
 	<-h.Done()
 
 	return h.Err()

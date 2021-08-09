@@ -22,6 +22,7 @@ type Sync struct {
 	logger *zap.SugaredLogger
 }
 
+// NewSync returns a new Sync.
 func NewSync(db *DB, redis *icingaredis.Client, logger *zap.SugaredLogger) *Sync {
 	return &Sync{
 		db:     db,

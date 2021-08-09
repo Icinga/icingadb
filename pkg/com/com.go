@@ -36,16 +36,6 @@ func ErrgroupReceive(g *errgroup.Group, err <-chan error) {
 	})
 }
 
-// PipeError forwards the first non-nil error from in to out
-// using a separate goroutine.
-func PipeError(in <-chan error, out chan<- error) {
-	go func() {
-		if e := <-in; e != nil {
-			out <- e
-		}
-	}()
-}
-
 // CopyFirst asynchronously forwards all items from input to forward and synchronously returns the first item.
 func CopyFirst(
 	ctx context.Context, input <-chan contracts.Entity,

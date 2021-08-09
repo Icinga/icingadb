@@ -12,6 +12,7 @@ import (
 	"time"
 )
 
+// Delta calculates the delta of actual and desired entities, and stores which entities need to be created, updated, and deleted.
 type Delta struct {
 	Create  EntitiesById
 	Update  EntitiesById
@@ -21,6 +22,7 @@ type Delta struct {
 	logger  *zap.SugaredLogger
 }
 
+// NewDelta creates a new Delta and starts calculating it.
 func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subject *common.SyncSubject, logger *zap.SugaredLogger) *Delta {
 	delta := &Delta{
 		Subject: subject,
@@ -28,16 +30,17 @@ func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subj
 		logger:  logger,
 	}
 
-	go delta.start(ctx, actual, desired)
+	go delta.run(ctx, actual, desired)
 
 	return delta
 }
 
+// Wait waits for the delta calculation to complete and returns an error, if any.
 func (delta *Delta) Wait() error {
 	return <-delta.done
 }
 
-func (delta *Delta) start(ctx context.Context, actualCh, desiredCh <-chan contracts.Entity) {
+func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan contracts.Entity) {
 	defer close(delta.done)
 
 	var update EntitiesById
