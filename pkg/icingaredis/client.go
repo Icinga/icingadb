@@ -45,6 +45,9 @@ func (o *Options) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return internal.CantUnmarshalYAML(err, o)
 	}
 
+	if o.Timeout == 0 {
+		return errors.New("timeout cannot be 0. Configure a value greater than zero, or use -1 for no timeout")
+	}
 	if o.MaxHMGetConnections < 1 {
 		return errors.New("max_hmget_connections must be at least 1")
 	}
