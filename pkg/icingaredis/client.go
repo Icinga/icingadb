@@ -2,7 +2,9 @@ package icingaredis
 
 import (
 	"context"
+	"github.com/creasty/defaults"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -30,6 +32,33 @@ type Options struct {
 	MaxHMGetConnections int           `yaml:"max_hmget_connections" default:"4096"`
 	HMGetCount          int           `yaml:"hmget_count"           default:"4096"`
 	HScanCount          int           `yaml:"hscan_count"           default:"4096"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (o *Options) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	if err := defaults.Set(o); err != nil {
+		return errors.Wrapf(err, "can't set defaults %#v", o)
+	}
+	// Prevent recursion.
+	type self Options
+	if err := unmarshal((*self)(o)); err != nil {
+		return internal.CantUnmarshalYAML(err, o)
+	}
+
+	if o.Timeout == 0 {
+		return errors.New("timeout cannot be 0. Configure a value greater than zero, or use -1 for no timeout")
+	}
+	if o.MaxHMGetConnections < 1 {
+		return errors.New("max_hmget_connections must be at least 1")
+	}
+	if o.HMGetCount < 1 {
+		return errors.New("hmget_count must be at least 1")
+	}
+	if o.HScanCount < 1 {
+		return errors.New("hscan_count must be at least 1")
+	}
+
+	return nil
 }
 
 // NewClient returns a new icingaredis.Client wrapper for a pre-existing *redis.Client.

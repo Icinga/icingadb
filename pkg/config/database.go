@@ -2,8 +2,6 @@ package config
 
 import (
 	"fmt"
-	"github.com/creasty/defaults"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -18,12 +16,12 @@ var registerDriverOnce sync.Once
 
 // Database defines database client configuration.
 type Database struct {
-	Host             string `yaml:"host"`
-	Port             int    `yaml:"port"`
-	Database         string `yaml:"database"`
-	User             string `yaml:"user"`
-	Password         string `yaml:"password"`
-	icingadb.Options `yaml:",inline"`
+	Host     string           `yaml:"host"`
+	Port     int              `yaml:"port"`
+	Database string           `yaml:"database"`
+	User     string           `yaml:"user"`
+	Password string           `yaml:"password"`
+	Options  icingadb.Options `yaml:"options"`
 }
 
 // Open prepares the DSN string and driver configuration,
@@ -42,30 +40,12 @@ func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
 		return nil, errors.Wrap(err, "can't open database")
 	}
 
-	db.SetMaxIdleConns(d.MaxConnections / 3)
-	db.SetMaxOpenConns(d.MaxConnections)
+	db.SetMaxIdleConns(d.Options.MaxConnections / 3)
+	db.SetMaxOpenConns(d.Options.MaxConnections)
 
 	db.Mapper = reflectx.NewMapperFunc("db", func(s string) string {
 		return utils.Key(s, '_')
 	})
 
 	return icingadb.NewDb(db, logger, &d.Options), nil
-}
-
-// UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (d *Database) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := defaults.Set(d); err != nil {
-		return errors.Wrap(err, "can't set default database config")
-	}
-	// Prevent recursion.
-	type self Database
-	if err := unmarshal((*self)(d)); err != nil {
-		return internal.CantUnmarshalYAML(err, d)
-	}
-
-	if d.MaxConnectionsPerTable < 1 {
-		return errors.New("max_connections_per_table must be at least 1")
-	}
-
-	return nil
 }
