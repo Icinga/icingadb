@@ -67,6 +67,9 @@ func (o *Options) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		return internal.CantUnmarshalYAML(err, o)
 	}
 
+	if o.MaxConnections == 0 {
+		return errors.New("max_connections cannot be 0. Configure a value greater than zero, or use -1 for no connection limit")
+	}
 	if o.MaxConnectionsPerTable < 1 {
 		return errors.New("max_connections_per_table must be at least 1")
 	}
