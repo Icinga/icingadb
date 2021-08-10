@@ -16,7 +16,7 @@ func (c *Counter) Inc() {
 }
 
 // Val returns the counter value.
-func (c Counter) Val() uint64 {
+func (c *Counter) Val() uint64 {
 	return atomic.LoadUint64(c.ptr())
 }
 
