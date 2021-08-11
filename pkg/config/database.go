@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"github.com/creasty/defaults"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
@@ -18,12 +17,12 @@ var registerDriverOnce sync.Once
 
 // Database defines database client configuration.
 type Database struct {
-	Host     string           `yaml:"host"`
-	Port     int              `yaml:"port"`
-	Database string           `yaml:"database"`
-	User     string           `yaml:"user"`
-	Password string           `yaml:"password"`
-	Options  icingadb.Options `yaml:"options"`
+	Host     string            `yaml:"host"`
+	Port     int               `yaml:"port"`
+	Database string            `yaml:"database"`
+	User     string            `yaml:"user"`
+	Password string            `yaml:"password"`
+	Options  *icingadb.Options `yaml:"options"`
 }
 
 // Open prepares the DSN string and driver configuration,
@@ -49,18 +48,25 @@ func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
 		return utils.Key(s, '_')
 	})
 
-	return icingadb.NewDb(db, logger, &d.Options), nil
+	return icingadb.NewDb(db, logger, d.Options), nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (d *Database) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := defaults.Set(d); err != nil {
-		return errors.Wrap(err, "can't set default database config")
-	}
 	// Prevent recursion.
-	type self Database
-	if err := unmarshal((*self)(d)); err != nil {
+	type T Database
+	self := (*T)(d)
+
+	if err := unmarshal(&self); err != nil {
 		return internal.CantUnmarshalYAML(err, d)
+	}
+	if self.Options == nil {
+		// Options is nil if no option is set in the configuration.
+		// in order for the default values to be set.
+		// We have to call unmarshal ourselves to trigger the Options.UnmarshalYAML call
+		if err := unmarshal(&self.Options); err != nil {
+			return internal.CantUnmarshalYAML(err, d)
+		}
 	}
 
 	return nil

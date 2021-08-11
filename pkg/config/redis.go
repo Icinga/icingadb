@@ -2,7 +2,6 @@ package config
 
 import (
 	"context"
-	"github.com/creasty/defaults"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
@@ -19,9 +18,9 @@ import (
 
 // Redis defines Redis client configuration.
 type Redis struct {
-	Address  string              `yaml:"address"`
-	Password string              `yaml:"password"`
-	Options  icingaredis.Options `yaml:"options"`
+	Address  string               `yaml:"address"`
+	Password string               `yaml:"password"`
+	Options  *icingaredis.Options `yaml:"options"`
 }
 
 // NewClient prepares Redis client configuration,
@@ -39,18 +38,25 @@ func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error
 	opts.MaxRetries = opts.PoolSize + 1 // https://github.com/go-redis/redis/issues/1737
 	c = redis.NewClient(opts)
 
-	return icingaredis.NewClient(c, logger, &r.Options), nil
+	return icingaredis.NewClient(c, logger, r.Options), nil
 }
 
 // UnmarshalYAML implements the yaml.Unmarshaler interface.
 func (r *Redis) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := defaults.Set(r); err != nil {
-		return errors.Wrapf(err, "can't set defaults %#v", r)
-	}
 	// Prevent recursion.
-	type self Redis
-	if err := unmarshal((*self)(r)); err != nil {
+	type T Redis
+	self := (*T)(r)
+
+	if err := unmarshal(&self); err != nil {
 		return internal.CantUnmarshalYAML(err, r)
+	}
+	if self.Options == nil {
+		// Options is nil if no option is set in the configuration.
+		// in order for the default values to be set.
+		// We have to call unmarshal ourselves to trigger the Options.UnmarshalYAML call
+		if err := unmarshal(&self.Options); err != nil {
+			return internal.CantUnmarshalYAML(err, r)
+		}
 	}
 
 	return nil
