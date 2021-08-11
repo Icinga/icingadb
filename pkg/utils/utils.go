@@ -5,9 +5,11 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
+	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/utf8string"
+	"golang.org/x/sync/errgroup"
 	"math"
 	"strings"
 	"time"
@@ -155,4 +157,61 @@ func Ellipsize(s string, limit int) string {
 	default:
 		return utf8.Slice(0, limit-ellipsis.RuneCount()) + ellipsis.String()
 	}
+}
+
+// Periodic executes the specified callback after every tick.
+// Stops the ticker when the passed context is cancelled or when the returned cancel function is called:
+//
+//  func Work(ctx context.Context, logger *zap.SugaredLogger) {
+//  	var cnt com.Counter
+//  	cancelPeriodic := utils.Periodic(ctx, time.Second*10, func(elapsed time.Duration) {
+//  		logger.Debugf("Executed work with %d jobs in %s, cnt.Val(), elapsed)
+//  	})
+//  	defer cancelPeriodic()
+//  	work(cnt)
+//  }
+func Periodic(ctx context.Context, tick time.Duration, callback func(elapsed time.Duration)) context.CancelFunc {
+	ctx, cancelCtx := context.WithCancel(ctx)
+	start := time.Now()
+	ticker := time.NewTicker(tick)
+
+	go func() {
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				callback(time.Since(start))
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return cancelCtx
+}
+
+func StablePeriodic(ctx context.Context, tick time.Duration, callback func(ctx context.Context, time time.Time) error) (context.CancelFunc, <-chan error) {
+	ctx, cancelCtx := context.WithCancel(ctx)
+	g, ctx := errgroup.WithContext(ctx)
+	ticker := time.NewTicker(tick)
+
+	g.Go(func() error {
+		defer ticker.Stop()
+
+		for {
+			select {
+			case t := <-ticker.C:
+				if err := callback(ctx, t); err != nil {
+					return err
+				}
+
+				ticker.Reset(tick)
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	})
+
+	return cancelCtx, com.WaitAsync(g)
 }

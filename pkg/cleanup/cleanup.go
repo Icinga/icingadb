@@ -2,12 +2,15 @@ package cleanup
 
 import (
 	"context"
+	"fmt"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"strconv"
 	"time"
 )
 
@@ -36,123 +39,120 @@ func NewCleanup(db *icingadb.DB, opts Options, logger *zap.SugaredLogger) *Clean
 	}
 }
 
-type where struct {
-	Time types.UnixMilli
-}
-
 // History starts the history cleanup routine for the configured history tables.
 func (c *Cleanup) History(ctx context.Context, tables HistoryRetention) error {
-	if tables != nil {
-		// statements map tables to corresponding delete queries.
-		var statements = map[string]string{
-			"acknowledgement": "DELETE FROM acknowledgement_history WHERE set_time < :time AND (clear_time IS NOT NULL AND clear_time < :time)",
-			"comment":         "DELETE FROM comment_history WHERE entry_time < :time AND (remove_time IS NOT NULL AND remove_time < :time)",
-			"downtime":        "DELETE FROM downtime_history WHERE start_time < :time AND (end_time IS NOT NULL AND end_time < :time)",
-			"flapping":        "DELETE FROM flapping_history WHERE start_time < :time AND (end_time IS NOT NULL AND end_time < :time)",
-			"notification":    "DELETE FROM notification_history WHERE send_time < :time",
-			"state":           "DELETE FROM state_history WHERE event_time < :time",
-		}
-
-		g, ctx := errgroup.WithContext(ctx)
-		for table, period := range tables {
-			g.Go(func() error {
-				cancel, errcchan := c.controller(ctx, table, period, statements[table])
-				defer cancel()
-
-				select {
-				case err := <-errcchan:
-					return err
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			})
-		}
-
-		return g.Wait()
-	}
-
-	c.logger.Warn("Cleanup is not run as no history tables are configured to cleanup.")
-	return nil
-}
-
-// controller calls the cleanup method periodically after c.options.Interval.
-func (c *Cleanup) controller(ctx context.Context, table string, period uint, statement string) (context.CancelFunc, <-chan error) {
-	ctx, cancel := context.WithCancel(ctx)
-
 	g, ctx := errgroup.WithContext(ctx)
-	// Calling NewTicker method.
-	ticker := time.NewTicker(c.options.Interval)
+	for table, period := range tables {
+		stmt, ok := statements[table]
+		if !ok {
+			return errors.Errorf("invalid table %s for history retention", table)
+		}
 
-	g.Go(func() error {
-		defer ticker.Stop()
-		for {
+		g.Go(func() error {
+			cancel, errs := utils.StablePeriodic(ctx, c.options.Interval, func(ctx context.Context, time time.Time) error {
+				return c.cleanup(ctx, stmt, time.AddDate(0, 0, -int(period)))
+			})
+			defer cancel()
+
 			select {
-			case <-ticker.C:
-				// call cleanup method for the table.
-				if _, err := c.cleanup(ctx, table, period, statement); err != nil {
-					return err
-				}
-
-				ticker.Reset(c.options.Interval)
+			case err := <-errs:
+				return err
 			case <-ctx.Done():
 				return ctx.Err()
 			}
-		}
-	})
+		})
+	}
 
-	return cancel, com.WaitAsync(g)
+	return g.Wait()
 }
 
 // cleanup calls the clean up method for the corresponding history table.
-func (c *Cleanup) cleanup(ctx context.Context, table string, period uint, statement string) (int, error) {
-	redo := true
-	cuCtx, cancel := context.WithCancel(ctx)
+func (c *Cleanup) cleanup(ctx context.Context, statement string, olderThan time.Time) error {
+	r := &result{}
+	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
+		c.logger.Debugf("Finished %s with %d rows and %d rounds in %s", statement, r.cnt.Val(), r.rounds.Val(), elapsed)
+	})
+	cancel := utils.Periodic(ctx, time.Second*10, func(elapsed time.Duration) {
+		c.logger.Debugf("Executed %s with %d rows and %d rounds in %s", statement, r.cnt.Val(), r.rounds.Val(), elapsed)
+	})
 	defer cancel()
 
-	cleanTime := time.Now().AddDate(0, 0, int(-period))
-	rowsAffected := make(chan int64, 1)
-	defer close(rowsAffected)
+	affectedRows := make(chan int64, 1)
+	defer close(affectedRows)
 
-	errs := make(chan error, 1)
-	defer close(errs)
-	limit := c.options.Count
+	for limit, stop := c.options.Count, false; !stop; {
+		deleteCtx, cancelDeleteCtx := context.WithCancel(ctx)
+		g, ctx := errgroup.WithContext(ctx)
 
-	// numdel counts number of times delete statement executed.
-	numdel := 0
-	for redo {
-		go func() {
-			result, err := c.db.NamedExecContext(cuCtx, statement+" LIMIT "+strconv.Itoa(int(limit)), &where{Time: types.UnixMilli(cleanTime)})
-
+		g.Go(func() error {
+			q := fmt.Sprintf("%s LIMIT %d", statement, limit)
+			rs, err := c.db.NamedExecContext(deleteCtx, q, &where{Time: types.UnixMilli(olderThan)})
 			if err != nil {
-				errs <- err
-				return
+				if !utils.IsContextCanceled(err) {
+					return internal.CantPerformQuery(err, q)
+				}
+				// Returns nil if only deleteCtx was canceled.
+				return ctx.Err()
 			}
-			affected, err := result.RowsAffected()
 
+			n, err := rs.RowsAffected()
 			if err != nil {
-				errs <- err
-				return
+				return err
 			}
-			c.logger.Infof("Rows affected in %s: %v", table, affected)
-			rowsAffected <- affected
-		}()
 
-		select {
-		case affected := <-rowsAffected:
-			numdel++
-			if affected < int64(limit) {
-				redo = false
+			select {
+			case affectedRows <- n:
+				return nil
+			case <-ctx.Done():
+				return ctx.Err()
 			}
-			limit = c.options.Count
-		case <-time.After(time.Second): // if time taken to delete exceeds 1 second then limit is halved.
-			cancel()
-			c.logger.Warnf("Time taken to cleanup %s exceeded 1 second; the number of records to cleanup is halved.", table)
-			limit = limit / 2
-			cuCtx, cancel = context.WithCancel(ctx)
-			defer cancel()
-		case err := <-errs:
-			return numdel, err
+		})
+
+		g.Go(func() error {
+			select {
+			case n := <-affectedRows:
+				r.rounds.Inc()
+				r.cnt.Add(uint64(n))
+
+				if n < int64(limit) {
+					stop = true
+				} else {
+					limit = c.options.Count
+				}
+			case <-time.After(time.Second):
+				limit = limit / 2
+				c.logger.Warnf("Time taken to execute \"%s\" exceeded 1 second. Hence the limit is halved and the delete statement is re-executed with the new limit")
+				cancelDeleteCtx()
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+
+			return nil
+		})
+
+		if err := g.Wait(); err != nil {
+			return err
 		}
 	}
-	return numdel, nil
+
+	return nil
+}
+
+// statements map tables to corresponding delete queries.
+var statements = map[string]string{
+	"acknowledgement": "DELETE FROM acknowledgement_history WHERE set_time < :time AND (clear_time IS NOT NULL AND clear_time < :time)",
+	"comment":         "DELETE FROM comment_history WHERE entry_time < :time AND (remove_time IS NOT NULL AND remove_time < :time)",
+	"downtime":        "DELETE FROM downtime_history WHERE start_time < :time AND (end_time IS NOT NULL AND end_time < :time)",
+	"flapping":        "DELETE FROM flapping_history WHERE start_time < :time AND (end_time IS NOT NULL AND end_time < :time)",
+	"notification":    "DELETE FROM notification_history WHERE send_time < :time",
+	"state":           "DELETE FROM state_history WHERE event_time < :time",
+}
+
+type result struct {
+	cnt    com.Counter
+	rounds com.Counter
+}
+
+type where struct {
+	Time types.UnixMilli
 }
