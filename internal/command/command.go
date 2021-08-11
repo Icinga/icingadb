@@ -7,6 +7,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
+	goflags "github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"os"
@@ -23,7 +24,12 @@ type Command struct {
 func New() *Command {
 	flags, err := config.ParseFlags()
 	if err != nil {
-		utils.Fatal(err)
+		var cliErr *goflags.Error
+		if errors.As(err, &cliErr) && cliErr.Type == goflags.ErrHelp {
+			os.Exit(0)
+		}
+
+		os.Exit(2)
 	}
 
 	if flags.Version {
