@@ -11,11 +11,11 @@ import (
 	"sort"
 )
 
-// MustPackAny calls PackAny using in and panics if there was an error.
-func MustPackAny(in ...interface{}) []byte {
+// MustPackSlice calls PackAny using items and panics if there was an error.
+func MustPackSlice(items ...interface{}) []byte {
 	var buf bytes.Buffer
 
-	if err := PackAny(in, &buf); err != nil {
+	if err := PackAny(items, &buf); err != nil {
 		panic(err)
 	}
 
