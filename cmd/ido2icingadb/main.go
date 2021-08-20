@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -11,9 +12,13 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"github.com/vbauerster/mpb/v6"
+	"github.com/vbauerster/mpb/v6/decor"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"os"
+	"strings"
+	"time"
 )
 
 // Flags defines the CLI flags.
@@ -26,6 +31,9 @@ type Flags struct {
 type Config struct {
 	IDO      config.Database `yaml:"ido"`
 	IcingaDB config.Database `yaml:"icingadb"`
+	Icinga2  struct {
+		Env string `yaml:"env"`
+	} `yaml:"icinga2"`
 }
 
 func main() {
@@ -82,16 +90,6 @@ func run() int {
 		_ = eg.Wait()
 	}
 
-	var types = []struct {
-		name     string
-		idoTable string
-		snapshot *sqlx.Tx
-	}{
-		{"acknowledgement", "icinga_acknowledgements", nil}, {"comment", "icinga_commenthistory", nil},
-		{"downtime", "icinga_downtimehistory", nil}, {"flapping", "icinga_flappinghistory", nil},
-		{"notification", "icinga_notifications", nil}, {"state", "icinga_statehistory", nil},
-	}
-
 	{
 		eg, _ := errgroup.WithContext(context.Background())
 		for i := range types {
@@ -119,10 +117,8 @@ func run() int {
 			i := i
 
 			eg.Go(func() error {
-				var count uint64
-
 				err := types[i].snapshot.Get(
-					&count,
+					&types[i].total,
 					"SELECT COUNT(*) FROM "+types[i].idoTable+
 						" xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id",
 				)
@@ -130,7 +126,7 @@ func run() int {
 					log.Fatalf("%+v", errors.Wrap(err, "can't count query"))
 				}
 
-				log.With("type", types[i].name, "amount", count).Info("Counted total IDO events")
+				log.With("type", types[i].name, "amount", types[i].total).Info("Counted total IDO events")
 				return nil
 			})
 		}
@@ -138,8 +134,141 @@ func run() int {
 		_ = eg.Wait()
 	}
 
-	// TODO
-	_ = idb
+	log.Sync()
+
+	{
+		progress := mpb.New()
+		for i := range types {
+			typ := &types[i]
+
+			typ.bar = progress.AddBar(
+				typ.total,
+				mpb.BarFillerClearOnComplete(),
+				mpb.PrependDecorators(
+					decor.Name(typ.name, decor.WC{W: len(typ.name) + 1, C: decor.DidentRight}),
+					decor.Percentage(decor.WC{W: 5}),
+				),
+				mpb.AppendDecorators(decor.EwmaETA(decor.ET_STYLE_GO, 6000000, decor.WC{W: 4})),
+			)
+		}
+
+		eg, _ := errgroup.WithContext(context.Background())
+		for i := range types {
+			typ := &types[i]
+
+			if typ.total == 0 {
+				typ.bar.SetTotal(typ.bar.Current(), true)
+			} else {
+				eg.Go(func() error {
+					query := "SELECT xh." +
+						strings.Join(append(append([]string(nil), typ.idoColumns...), typ.idoIdColumn), ", xh.") +
+						" id FROM " + typ.idoTable +
+						" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE " +
+						typ.idoIdColumn + " > ? ORDER BY xh." + typ.idoIdColumn + " LIMIT 10000"
+
+					stmt, err := typ.snapshot.Preparex(query)
+					if err != nil {
+						log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
+					}
+					defer stmt.Close()
+
+					var lastRowsLen int
+					var lastQuery string
+					var lastStmt *sqlx.Stmt
+					start := time.Now()
+
+					defer func() {
+						if lastStmt != nil {
+							lastStmt.Close()
+						}
+					}()
+
+				Queries:
+					for {
+						var rows []ProgressRow
+						if err := stmt.Select(&rows, typ.lastId); err != nil {
+							log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+						}
+
+						if len(rows) < 1 {
+							break
+						}
+
+						if len(rows) != lastRowsLen {
+							if lastStmt != nil {
+								lastStmt.Close()
+							}
+
+							buf := &bytes.Buffer{}
+							fmt.Fprintf(
+								buf, "SELECT %s FROM %s WHERE %s IN (?", typ.idbIdColumn, typ.idbTable, typ.idbIdColumn,
+							)
+
+							for i := 1; i < len(rows); i++ {
+								buf.Write([]byte(",?"))
+							}
+
+							buf.Write([]byte(")"))
+							lastRowsLen = len(rows)
+							lastQuery = buf.String()
+
+							var err error
+							lastStmt, err = idb.Preparex(lastQuery)
+
+							if err != nil {
+								log.With("query", lastQuery).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
+							}
+						}
+
+						ids := make([]interface{}, 0, len(rows))
+						converted := make([]convertedId, 0, len(rows))
+
+						for _, row := range rows {
+							conv := typ.convertId(row, c.Icinga2.Env)
+							ids = append(ids, conv)
+							converted = append(converted, convertedId{row.Id, conv})
+						}
+
+						var present [][]byte
+						if err := lastStmt.Select(&present, ids...); err != nil {
+							log.With("query", lastQuery).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+						}
+
+						presentSet := map[[20]byte]struct{}{}
+						for _, row := range present {
+							var key [20]byte
+							copy(key[:], row)
+							presentSet[key] = struct{}{}
+						}
+
+						for _, conv := range converted {
+							var key [20]byte
+							copy(key[:], conv.idb)
+
+							if _, ok := presentSet[key]; !ok {
+								break Queries
+							}
+
+							typ.lastId = conv.ido
+						}
+
+						prev := start
+						now := time.Now()
+						start = now
+
+						typ.bar.IncrBy(len(rows))
+						typ.bar.DecoratorEwmaUpdate(now.Sub(prev))
+					}
+
+					typ.bar.SetTotal(typ.bar.Current(), true)
+					return nil
+				})
+			}
+		}
+
+		_ = eg.Wait()
+		progress.Wait()
+	}
 
 	return internal.ExitSuccess
 }
