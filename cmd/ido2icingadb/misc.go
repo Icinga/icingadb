@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/binary"
 	"github.com/google/uuid"
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	"github.com/jmoiron/sqlx"
 	"github.com/vbauerster/mpb/v6"
+	"golang.org/x/sync/errgroup"
 )
 
 type ProgressRow struct {
@@ -73,7 +75,7 @@ func calcObjectId(env, name1 string) []byte {
 	return hashAny([2]string{env, name1})
 }
 
-var types = [6]struct {
+type historyType struct {
 	name        string
 	idoTable    string
 	idoIdColumn string
@@ -85,7 +87,24 @@ var types = [6]struct {
 	total       int64
 	bar         *mpb.Bar
 	lastId      uint64
-}{
+}
+
+type historyTypes [6]historyType
+
+func (ht *historyTypes) forEach(f func(*historyType)) {
+	eg, _ := errgroup.WithContext(context.Background())
+	for i := range *ht {
+		i := i
+		eg.Go(func() error {
+			f(&(*ht)[i])
+			return nil
+		})
+	}
+
+	_ = eg.Wait()
+}
+
+var types = historyTypes{
 	{
 		"acknowledgement",
 		"icinga_acknowledgements",
