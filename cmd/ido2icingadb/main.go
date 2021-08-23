@@ -11,12 +11,14 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v6"
 	"github.com/vbauerster/mpb/v6/decor"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"os"
+	"path"
 	"strings"
 	"time"
 )
@@ -25,6 +27,8 @@ import (
 type Flags struct {
 	// Config is the path to the config file.
 	Config string `short:"c" long:"config" description:"path to config file" required:"true"`
+	// Cache is a (not necessarily yet existing) directory for caching.
+	Cache string `short:"t" long:"cache" description:"path for caching" required:"true"`
 }
 
 // Config defines the YAML config structure.
@@ -58,6 +62,7 @@ func run() int {
 
 	log.Info("Starting IDO to Icinga DB history migration")
 
+	mkCache(log, f)
 	ido, idb := connectAll(log, c)
 	startIdoTx(log, ido)
 
@@ -85,6 +90,35 @@ func parseConfig(f *Flags) (*Config, int) {
 	}
 
 	return c, -1
+}
+
+func mkCache(log *zap.SugaredLogger, f *Flags) {
+	log.Info("Preparing cache")
+
+	if err := os.MkdirAll(f.Cache, 0700); err != nil {
+		log.With("dir", f.Cache).Fatalf("%+v", errors.Wrap(err, "can't create directory"))
+	}
+
+	types.forEach(func(ht *historyType) {
+		if ht.cacheSchema == nil {
+			return
+		}
+
+		file := path.Join(f.Cache, ht.name+".sqlite3")
+		var err error
+
+		ht.cache, err = sqlx.Open("sqlite3", "file:"+file)
+		if err != nil {
+			log.With("file", file).Fatalf("%+v", errors.Wrap(err, "can't open SQLite database"))
+		}
+
+		for _, ddl := range ht.cacheSchema {
+			if _, err := ht.cache.Exec(ddl); err != nil {
+				log.With("file", file, "ddl", ddl).
+					Fatalf("%+v", errors.Wrap(err, "can't import schema into SQLite database"))
+			}
+		}
+	})
 }
 
 func connectAll(log *zap.SugaredLogger, c *Config) (ido, idb *icingadb.DB) {
