@@ -1894,6 +1894,68 @@ COMMENT ON COLUMN history.acknowledgement_history_id IS 'acknowledgement_history
 COMMENT ON INDEX idx_history_event_time IS 'History filtered/ordered by event_time';
 COMMENT ON INDEX idx_history_host_service_id IS 'Host/service history detail filter';
 
+CREATE TABLE sla_history_state (
+  id bytea20 NOT NULL,
+  environment_id bytea20 NOT NULL,
+  endpoint_id bytea20 DEFAULT NULL,
+  object_type checkable_type NOT NULL,
+  host_id bytea20 NOT NULL,
+  service_id bytea20 DEFAULT NULL,
+
+  event_time biguint NOT NULL,
+  hard_state tinyuint NOT NULL,
+  previous_hard_state tinyuint NOT NULL,
+
+  CONSTRAINT pk_sla_history_state PRIMARY KEY (id)
+);
+
+ALTER TABLE sla_history_state ALTER COLUMN id SET STORAGE PLAIN;
+ALTER TABLE sla_history_state ALTER COLUMN environment_id SET STORAGE PLAIN;
+ALTER TABLE sla_history_state ALTER COLUMN endpoint_id SET STORAGE PLAIN;
+ALTER TABLE sla_history_state ALTER COLUMN host_id SET STORAGE PLAIN;
+ALTER TABLE sla_history_state ALTER COLUMN service_id SET STORAGE PLAIN;
+
+CREATE INDEX idx_sla_history_state_event ON sla_history_state(host_id, service_id, event_time);
+
+COMMENT ON COLUMN sla_history_state.id IS 'state_history.id (may reference already deleted rows)';
+COMMENT ON COLUMN sla_history_state.environment_id IS 'environment.id';
+COMMENT ON COLUMN sla_history_state.endpoint_id IS 'endpoint.id';
+COMMENT ON COLUMN sla_history_state.host_id IS 'host.id';
+COMMENT ON COLUMN sla_history_state.service_id IS 'service.id';
+COMMENT ON COLUMN sla_history_state.event_time IS 'unix timestamp the event occurred';
+COMMENT ON COLUMN sla_history_state.hard_state IS 'hard state after this event';
+COMMENT ON COLUMN sla_history_state.previous_hard_state IS 'hard state before this event';
+
+CREATE TABLE sla_history_downtime (
+  environment_id bytea20 NOT NULL,
+  endpoint_id bytea20 DEFAULT NULL,
+  object_type checkable_type NOT NULL,
+  host_id bytea20 NOT NULL,
+  service_id bytea20 DEFAULT NULL,
+
+  downtime_id bytea20 NOT NULL,
+  downtime_start biguint NOT NULL,
+  downtime_end biguint NOT NULL,
+
+  CONSTRAINT pk_sla_history_downtime PRIMARY KEY (downtime_id)
+);
+
+ALTER TABLE sla_history_downtime ALTER COLUMN environment_id SET STORAGE PLAIN;
+ALTER TABLE sla_history_downtime ALTER COLUMN endpoint_id SET STORAGE PLAIN;
+ALTER TABLE sla_history_downtime ALTER COLUMN host_id SET STORAGE PLAIN;
+ALTER TABLE sla_history_downtime ALTER COLUMN service_id SET STORAGE PLAIN;
+ALTER TABLE sla_history_downtime ALTER COLUMN downtime_id SET STORAGE PLAIN;
+
+CREATE INDEX idx_sla_history_downtime_event ON sla_history_downtime(host_id, service_id, downtime_start, downtime_end);
+
+COMMENT ON COLUMN sla_history_downtime.environment_id IS 'environment.id';
+COMMENT ON COLUMN sla_history_downtime.endpoint_id IS 'endpoint.id';
+COMMENT ON COLUMN sla_history_downtime.host_id IS 'host.id';
+COMMENT ON COLUMN sla_history_downtime.service_id IS 'service.id';
+COMMENT ON COLUMN sla_history_downtime.downtime_id IS 'downtime.id (may reference already deleted rows)';
+COMMENT ON COLUMN sla_history_downtime.downtime_start IS 'start time of the downtime';
+COMMENT ON COLUMN sla_history_downtime.downtime_end IS 'end time of the downtime';
+
 CREATE SEQUENCE icingadb_schema_id_seq;
 
 CREATE TABLE icingadb_schema (
