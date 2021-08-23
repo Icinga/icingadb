@@ -9,6 +9,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	"github.com/jmoiron/sqlx"
 	"github.com/vbauerster/mpb/v6"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -21,6 +22,15 @@ type convertedId struct {
 	ido uint64
 	idb []byte
 }
+
+var log = func() *zap.SugaredLogger {
+	logger, err := zap.NewDevelopmentConfig().Build()
+	if err != nil {
+		panic(err)
+	}
+
+	return logger.Sugar()
+}()
 
 // mkDeterministicUuid returns a formally random UUID (v4) as follows: 11111122-3300-4455-4455-555555555555
 //

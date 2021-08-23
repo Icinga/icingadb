@@ -15,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v6"
 	"github.com/vbauerster/mpb/v6/decor"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"os"
 	"path"
@@ -55,22 +54,19 @@ func run() int {
 		return ex
 	}
 
-	logger, _ := zap.NewDevelopmentConfig().Build()
-
-	log := logger.Sugar()
 	defer log.Sync()
 
 	log.Info("Starting IDO to Icinga DB history migration")
 
-	mkCache(log, f)
-	ido, idb := connectAll(log, c)
-	startIdoTx(log, ido)
+	mkCache(f)
+	ido, idb := connectAll(c)
+	startIdoTx(ido)
 
 	log.Info("Computing progress")
 
-	countIdoHistory(log)
+	countIdoHistory()
 	log.Sync()
-	computeProgress(log, c, idb)
+	computeProgress(c, idb)
 
 	return internal.ExitSuccess
 }
@@ -92,7 +88,7 @@ func parseConfig(f *Flags) (*Config, int) {
 	return c, -1
 }
 
-func mkCache(log *zap.SugaredLogger, f *Flags) {
+func mkCache(f *Flags) {
 	log.Info("Preparing cache")
 
 	if err := os.MkdirAll(f.Cache, 0700); err != nil {
@@ -121,17 +117,17 @@ func mkCache(log *zap.SugaredLogger, f *Flags) {
 	})
 }
 
-func connectAll(log *zap.SugaredLogger, c *Config) (ido, idb *icingadb.DB) {
+func connectAll(c *Config) (ido, idb *icingadb.DB) {
 	log.Info("Connecting to databases")
 	eg, _ := errgroup.WithContext(context.Background())
 
 	eg.Go(func() error {
-		ido = connect(log, "IDO", &c.IDO)
+		ido = connect("IDO", &c.IDO)
 		return nil
 	})
 
 	eg.Go(func() error {
-		idb = connect(log, "Icinga DB", &c.IcingaDB)
+		idb = connect("Icinga DB", &c.IcingaDB)
 		return nil
 	})
 
@@ -139,7 +135,7 @@ func connectAll(log *zap.SugaredLogger, c *Config) (ido, idb *icingadb.DB) {
 	return
 }
 
-func connect(log *zap.SugaredLogger, which string, cfg *config.Database) *icingadb.DB {
+func connect(which string, cfg *config.Database) *icingadb.DB {
 	db, err := cfg.Open(log)
 	if err != nil {
 		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
@@ -152,7 +148,7 @@ func connect(log *zap.SugaredLogger, which string, cfg *config.Database) *icinga
 	return db
 }
 
-func startIdoTx(log *zap.SugaredLogger, ido *icingadb.DB) {
+func startIdoTx(ido *icingadb.DB) {
 	types.forEach(func(ht *historyType) {
 		tx, err := ido.BeginTxx(context.Background(), &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 		if err != nil {
@@ -163,7 +159,7 @@ func startIdoTx(log *zap.SugaredLogger, ido *icingadb.DB) {
 	})
 }
 
-func countIdoHistory(log *zap.SugaredLogger) {
+func countIdoHistory() {
 	types.forEach(func(ht *historyType) {
 		err := ht.snapshot.Get(
 			&ht.total,
@@ -177,7 +173,7 @@ func countIdoHistory(log *zap.SugaredLogger) {
 	})
 }
 
-func computeProgress(log *zap.SugaredLogger, c *Config, idb *icingadb.DB) {
+func computeProgress(c *Config, idb *icingadb.DB) {
 	progress := mpb.New()
 	for i := range types {
 		typ := &types[i]
