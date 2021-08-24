@@ -5,10 +5,12 @@ go 1.16
 require (
 	github.com/containerd/containerd v1.5.6 // indirect
 	github.com/go-redis/redis/v8 v8.11.4
+	github.com/go-sql-driver/mysql v1.6.0
 	github.com/goccy/go-yaml v1.9.5
 	github.com/google/uuid v1.3.0
-	github.com/icinga/icinga-testing v0.0.0-20220503150619-1c215361234c
+	github.com/icinga/icinga-testing v0.0.0-20220513095329-9c98d3145b01
 	github.com/jmoiron/sqlx v1.3.4
+	github.com/lib/pq v1.10.5
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.21.0
 	golang.org/x/net v0.0.0-20211020060615-d418f374d309 // indirect

@@ -1,4 +1,4 @@
-package icingadb_test
+package sql_test
 
 import (
 	"github.com/icinga/icinga-testing"
@@ -17,13 +17,7 @@ func TestMain(m *testing.M) {
 }
 
 func getDatabase(t testing.TB) services.RelationalDatabase {
-	rdb := getEmptyDatabase(t)
-
+	rdb := utils.GetDatabase(it, t)
 	rdb.ImportIcingaDbSchema()
-
 	return rdb
-}
-
-func getEmptyDatabase(t testing.TB) services.RelationalDatabase {
-	return utils.GetDatabase(it, t)
 }
