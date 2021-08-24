@@ -126,18 +126,7 @@ var types = historyTypes{
 		"history",
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('a', row.Id) },
-		[]string{
-			`CREATE TABLE IF NOT EXISTS ack_clear_set_time (
-	acknowledgement_id INT PRIMARY KEY,
-	entry_time INT,
-	entry_time_usec INT
-)`,
-			`CREATE TABLE IF NOT EXISTS last_ack_set_time (
-	object_id INT PRIMARY KEY,
-	entry_time INT NOT NULL,
-	entry_time_usec INT NOT NULL
-)`,
-		},
+		ackCacheSchema,
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -168,18 +157,7 @@ var types = historyTypes{
 		"history",
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('f', row.Id) },
-		[]string{
-			`CREATE TABLE IF NOT EXISTS flapping_end_start_time (
-	flappinghistory_id INT PRIMARY KEY,
-	event_time INT,
-	event_time_usec INT
-)`,
-			`CREATE TABLE IF NOT EXISTS last_flapping_start_time (
-	object_id INT PRIMARY KEY,
-	event_time INT NOT NULL,
-	event_time_usec INT NOT NULL
-)`,
-		},
+		flappingCacheSchema,
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -190,22 +168,7 @@ var types = historyTypes{
 		"notification_history",
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('n', row.Id) },
-		[]string{
-			`CREATE TABLE IF NOT EXISTS previous_hard_state (
-	notification_id INT PRIMARY KEY,
-	previous_hard_state INT NOT NULL
-)`,
-			`CREATE TABLE IF NOT EXISTS next_hard_state (
-	object_id INT PRIMARY KEY,
-	next_hard_state INT NOT NULL
-)`,
-			`CREATE TABLE IF NOT EXISTS next_ids (
-	object_id INT NOT NULL,
-	notification_id INT NOT NULL
-)`,
-			"CREATE INDEX IF NOT EXISTS next_ids_object_id ON next_ids(object_id)",
-			"CREATE INDEX IF NOT EXISTS next_ids_notification_id ON next_ids(notification_id)",
-		},
+		notificationCacheSchema,
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -216,22 +179,7 @@ var types = historyTypes{
 		"state_history",
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('s', row.Id) },
-		[]string{
-			`CREATE TABLE IF NOT EXISTS previous_hard_state (
-	statehistory_id INT PRIMARY KEY,
-	previous_hard_state INT NOT NULL
-)`,
-			`CREATE TABLE IF NOT EXISTS next_hard_state (
-	object_id INT PRIMARY KEY,
-	next_hard_state INT NOT NULL
-)`,
-			`CREATE TABLE IF NOT EXISTS next_ids (
-	object_id INT NOT NULL,
-	statehistory_id INT NOT NULL
-)`,
-			"CREATE INDEX IF NOT EXISTS next_ids_object_id ON next_ids(object_id)",
-			"CREATE INDEX IF NOT EXISTS next_ids_statehistory_id ON next_ids(statehistory_id)",
-		},
+		stateCacheSchema,
 		nil, nil, 0, nil, 0,
 	},
 }
