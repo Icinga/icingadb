@@ -9,6 +9,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	"github.com/jmoiron/sqlx"
 	"github.com/vbauerster/mpb/v6"
+	"github.com/vbauerster/mpb/v6/decor"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 )
@@ -100,6 +101,18 @@ type historyType struct {
 	total    int64
 	bar      *mpb.Bar
 	lastId   uint64
+}
+
+func (ht *historyType) setupBar(progress *mpb.Progress) {
+	ht.bar = progress.AddBar(
+		ht.total,
+		mpb.BarFillerClearOnComplete(),
+		mpb.PrependDecorators(
+			decor.Name(ht.name, decor.WC{W: len(ht.name) + 1, C: decor.DidentRight}),
+			decor.Percentage(decor.WC{W: 5}),
+		),
+		mpb.AppendDecorators(decor.EwmaETA(decor.ET_STYLE_GO, 6000000, decor.WC{W: 4})),
+	)
 }
 
 type historyTypes [6]historyType

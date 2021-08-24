@@ -14,7 +14,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v6"
-	"github.com/vbauerster/mpb/v6/decor"
 	"golang.org/x/sync/errgroup"
 	"os"
 	"path"
@@ -176,17 +175,7 @@ func countIdoHistory() {
 func computeProgress(c *Config, idb *icingadb.DB) {
 	progress := mpb.New()
 	for i := range types {
-		typ := &types[i]
-
-		typ.bar = progress.AddBar(
-			typ.total,
-			mpb.BarFillerClearOnComplete(),
-			mpb.PrependDecorators(
-				decor.Name(typ.name, decor.WC{W: len(typ.name) + 1, C: decor.DidentRight}),
-				decor.Percentage(decor.WC{W: 5}),
-			),
-			mpb.AppendDecorators(decor.EwmaETA(decor.ET_STYLE_GO, 6000000, decor.WC{W: 4})),
-		)
+		types[i].setupBar(progress)
 	}
 
 	types.forEach(func(ht *historyType) {
