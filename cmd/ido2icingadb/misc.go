@@ -12,6 +12,7 @@ import (
 	"github.com/vbauerster/mpb/v6/decor"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"time"
 )
 
 type ProgressRow struct {
@@ -22,6 +23,20 @@ type ProgressRow struct {
 type convertedId struct {
 	ido uint64
 	idb []byte
+}
+
+type barIncrementer struct {
+	bar   *mpb.Bar
+	start time.Time
+}
+
+func (bi *barIncrementer) inc(i int) {
+	prev := bi.start
+	now := time.Now()
+	bi.start = now
+
+	bi.bar.IncrBy(i)
+	bi.bar.DecoratorEwmaUpdate(now.Sub(prev))
 }
 
 const bulk = 10000

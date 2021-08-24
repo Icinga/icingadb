@@ -198,7 +198,7 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 		var lastRowsLen int
 		var lastQuery string
 		var lastStmt *sqlx.Stmt
-		start := time.Now()
+		inc := barIncrementer{ht.bar, time.Now()}
 
 		defer func() {
 			if lastStmt != nil {
@@ -273,12 +273,7 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 				ht.lastId = conv.ido
 			}
 
-			prev := start
-			now := time.Now()
-			start = now
-
-			ht.bar.IncrBy(len(rows))
-			ht.bar.DecoratorEwmaUpdate(now.Sub(prev))
+			inc.inc(len(rows))
 		}
 
 		ht.bar.SetTotal(ht.bar.Current(), true)
