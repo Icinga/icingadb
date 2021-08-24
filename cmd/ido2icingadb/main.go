@@ -11,6 +11,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v6"
@@ -57,9 +58,9 @@ func run() int {
 
 	log.Info("Starting IDO to Icinga DB history migration")
 
-	mkCache(f)
 	ido, idb := connectAll(c)
 	startIdoTx(ido)
+	mkCache(f, idb.Mapper)
 
 	log.Info("Computing progress")
 
@@ -87,7 +88,7 @@ func parseConfig(f *Flags) (*Config, int) {
 	return c, -1
 }
 
-func mkCache(f *Flags) {
+func mkCache(f *Flags, mapper *reflectx.Mapper) {
 	log.Info("Preparing cache")
 
 	if err := os.MkdirAll(f.Cache, 0700); err != nil {
@@ -106,6 +107,8 @@ func mkCache(f *Flags) {
 		if err != nil {
 			log.With("file", file).Fatalf("%+v", errors.Wrap(err, "can't open SQLite database"))
 		}
+
+		ht.cache.Mapper = mapper
 
 		for _, ddl := range ht.cacheSchema {
 			if _, err := ht.cache.Exec(ddl); err != nil {
