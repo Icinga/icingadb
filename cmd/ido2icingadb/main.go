@@ -187,7 +187,7 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 		query := "SELECT xh." +
 			strings.Join(append(append([]string(nil), ht.idoColumns...), ht.idoIdColumn), ", xh.") + " id FROM " +
 			ht.idoTable + " xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE " +
-			ht.idoIdColumn + " > ? ORDER BY xh." + ht.idoIdColumn + " LIMIT 10000"
+			ht.idoIdColumn + " > ? ORDER BY xh." + ht.idoIdColumn + " LIMIT ?"
 
 		stmt, err := ht.snapshot.Preparex(query)
 		if err != nil {
@@ -209,7 +209,7 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 	Queries:
 		for {
 			var rows []ProgressRow
-			if err := stmt.Select(&rows, ht.lastId); err != nil {
+			if err := stmt.Select(&rows, ht.lastId, bulk); err != nil {
 				log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 			}
 
