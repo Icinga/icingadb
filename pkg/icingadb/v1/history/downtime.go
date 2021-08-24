@@ -80,6 +80,30 @@ func (*HistoryDowntime) TableName() string {
 	return "history"
 }
 
+type SlaHistoryDowntime struct {
+	DowntimeHistoryEntity      `json:",inline"`
+	HistoryTableMeta           `json:",inline"`
+	SlaHistoryDowntimeUpserter `json:",inline"`
+	DowntimeStart              types.UnixMilli `json:"start_time"`
+	HasBeenCancelled           types.Bool      `json:"has_been_cancelled" db:"-"`
+	CancelTime                 types.UnixMilli `json:"cancel_time" db:"-"`
+	EndTime                    types.UnixMilli `json:"end_time" db:"-"`
+}
+
+// Init implements the contracts.Initer interface.
+func (s *SlaHistoryDowntime) Init() {
+	s.DowntimeEnd.History = s
+}
+
+type SlaHistoryDowntimeUpserter struct {
+	DowntimeEnd SlaDowntimeEndTime `json:"-"`
+}
+
+// Upsert implements the contracts.Upserter interface.
+func (h *SlaHistoryDowntimeUpserter) Upsert() interface{} {
+	return h
+}
+
 type DowntimeEventTime struct {
 	History *HistoryDowntime `db:"-"`
 }
@@ -109,6 +133,19 @@ func (et DowntimeEventTime) Value() (driver.Value, error) {
 	}
 }
 
+type SlaDowntimeEndTime struct {
+	History *SlaHistoryDowntime `db:"-"`
+}
+
+// Value implements the driver.Valuer interface.
+func (et SlaDowntimeEndTime) Value() (driver.Value, error) {
+	if et.History.HasBeenCancelled.Valid && et.History.HasBeenCancelled.Bool {
+		return et.History.CancelTime.Value()
+	} else {
+		return et.History.EndTime.Value()
+	}
+}
+
 // Assert interface compliance.
 var (
 	_ contracts.Entity     = (*DowntimeHistoryEntity)(nil)
@@ -117,5 +154,8 @@ var (
 	_ contracts.Initer     = (*HistoryDowntime)(nil)
 	_ contracts.TableNamer = (*HistoryDowntime)(nil)
 	_ UpserterEntity       = (*HistoryDowntime)(nil)
+	_ contracts.Initer     = (*SlaHistoryDowntime)(nil)
+	_ UpserterEntity       = (*SlaHistoryDowntime)(nil)
 	_ driver.Valuer        = DowntimeEventTime{}
+	_ driver.Valuer        = SlaDowntimeEndTime{}
 )

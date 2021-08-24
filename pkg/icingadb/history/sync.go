@@ -359,12 +359,14 @@ var syncPipelines = map[string][]stageFunc{
 		writeOneEntityStage((*v1.HistoryNotification)(nil)), // history (depends on notification_history)
 	},
 	"state": {
-		writeOneEntityStage((*v1.StateHistory)(nil)), // state_history
-		writeOneEntityStage((*v1.HistoryState)(nil)), // history (depends on state_history)
+		writeOneEntityStage((*v1.StateHistory)(nil)),   // state_history
+		writeOneEntityStage((*v1.HistoryState)(nil)),   // history (depends on state_history)
+		writeMultiEntityStage(stateHistoryToSlaEntity), // sla_history_state
 	},
 	"downtime": {
-		writeOneEntityStage((*v1.DowntimeHistory)(nil)), // downtime_history
-		writeOneEntityStage((*v1.HistoryDowntime)(nil)), // history (depends on downtime_history)
+		writeOneEntityStage((*v1.DowntimeHistory)(nil)),    // downtime_history
+		writeOneEntityStage((*v1.HistoryDowntime)(nil)),    // history (depends on downtime_history)
+		writeOneEntityStage((*v1.SlaHistoryDowntime)(nil)), // sla_history_downtime
 	},
 	"comment": {
 		writeOneEntityStage((*v1.CommentHistory)(nil)), // comment_history

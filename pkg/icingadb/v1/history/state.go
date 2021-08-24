@@ -33,9 +33,19 @@ func (*HistoryState) TableName() string {
 	return "history"
 }
 
+type SlaHistoryState struct {
+	HistoryTableEntity `json:",inline"`
+	HistoryTableMeta   `json:",inline"`
+	EventTime          types.UnixMilli `json:"event_time"`
+	StateType          types.StateType `json:"state_type" db:"-"`
+	HardState          uint8           `json:"hard_state"`
+	PreviousHardState  uint8           `json:"previous_hard_state"`
+}
+
 // Assert interface compliance.
 var (
 	_ UpserterEntity       = (*StateHistory)(nil)
 	_ contracts.TableNamer = (*HistoryState)(nil)
 	_ UpserterEntity       = (*HistoryState)(nil)
+	_ UpserterEntity       = (*SlaHistoryState)(nil)
 )
