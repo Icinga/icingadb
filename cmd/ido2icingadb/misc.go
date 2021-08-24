@@ -24,6 +24,8 @@ type convertedId struct {
 	idb []byte
 }
 
+const bulk = 10000
+
 var log = func() *zap.SugaredLogger {
 	logger, err := zap.NewDevelopmentConfig().Build()
 	if err != nil {
