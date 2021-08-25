@@ -2,9 +2,7 @@ package icingaredis
 
 import (
 	"context"
-	"github.com/creasty/defaults"
 	"github.com/go-redis/redis/v8"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -34,17 +32,8 @@ type Options struct {
 	HScanCount          int           `yaml:"hscan_count"           default:"4096"`
 }
 
-// UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (o *Options) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := defaults.Set(o); err != nil {
-		return errors.Wrapf(err, "can't set defaults %#v", o)
-	}
-	// Prevent recursion.
-	type self Options
-	if err := unmarshal((*self)(o)); err != nil {
-		return internal.CantUnmarshalYAML(err, o)
-	}
-
+// Validate checks constraints in the supplied Redis options and returns an error if they are violated.
+func (o *Options) Validate() error {
 	if o.Timeout == 0 {
 		return errors.New("timeout cannot be 0. Configure a value greater than zero, or use -1 for no timeout")
 	}
@@ -57,7 +46,6 @@ func (o *Options) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	if o.HScanCount < 1 {
 		return errors.New("hscan_count must be at least 1")
 	}
-
 	return nil
 }
 

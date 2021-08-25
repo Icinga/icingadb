@@ -49,3 +49,8 @@ func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
 
 	return icingadb.NewDb(db, logger, &d.Options), nil
 }
+
+// Validate checks constraints in the supplied database configuration and returns an error if they are violated.
+func (d *Database) Validate() error {
+	return d.Options.Validate()
+}

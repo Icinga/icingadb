@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
-	"github.com/creasty/defaults"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
@@ -56,24 +55,14 @@ type Options struct {
 	MaxRowsPerTransaction int `yaml:"MaxRowsPerTransaction" default:"8192"`
 }
 
-// UnmarshalYAML implements the yaml.Unmarshaler interface.
-func (o *Options) UnmarshalYAML(unmarshal func(interface{}) error) error {
-	if err := defaults.Set(o); err != nil {
-		return errors.Wrap(err, "can't set default database config")
-	}
-	// Prevent recursion.
-	type self Options
-	if err := unmarshal((*self)(o)); err != nil {
-		return internal.CantUnmarshalYAML(err, o)
-	}
-
+// Validate checks constraints in the supplied database options and returns an error if they are violated.
+func (o *Options) Validate() error {
 	if o.MaxConnections == 0 {
 		return errors.New("max_connections cannot be 0. Configure a value greater than zero, or use -1 for no connection limit")
 	}
 	if o.MaxConnectionsPerTable < 1 {
 		return errors.New("max_connections_per_table must be at least 1")
 	}
-
 	return nil
 }
 
