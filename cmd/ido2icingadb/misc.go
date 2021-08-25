@@ -156,7 +156,7 @@ var types = historyTypes{
 		"history",
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('a', row.Id) },
-		ackCacheSchema,
+		eventTimeCacheSchema,
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -187,7 +187,7 @@ var types = historyTypes{
 		"history",
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('f', row.Id) },
-		flappingCacheSchema,
+		eventTimeCacheSchema,
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -198,7 +198,7 @@ var types = historyTypes{
 		"notification_history",
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('n', row.Id) },
-		notificationCacheSchema,
+		previousHardStateCacheSchema,
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -209,7 +209,7 @@ var types = historyTypes{
 		"state_history",
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('s', row.Id) },
-		stateCacheSchema,
+		previousHardStateCacheSchema,
 		nil, nil, 0, nil, 0,
 	},
 }
