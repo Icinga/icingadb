@@ -68,6 +68,9 @@ func run() int {
 	log.Sync()
 	computeProgress(c, idb)
 
+	log.Info("Filling cache")
+	fillCache()
+
 	return internal.ExitSuccess
 }
 
@@ -280,6 +283,23 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 		}
 
 		ht.bar.SetTotal(ht.bar.Current(), true)
+	})
+
+	progress.Wait()
+}
+
+func fillCache() {
+	progress := mpb.New()
+	for i := range types {
+		if types[i].cacheFiller != nil {
+			types[i].setupBar(progress)
+		}
+	}
+
+	types.forEach(func(ht *historyType) {
+		if ht.cacheFiller != nil {
+			ht.cacheFiller(ht)
+		}
 	})
 
 	progress.Wait()
