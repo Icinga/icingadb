@@ -8,10 +8,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v6"
 	"github.com/vbauerster/mpb/v6/decor"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"reflect"
 	"time"
 )
 
@@ -103,6 +105,37 @@ func calcObjectId(env, name1 string) []byte {
 	return hashAny([2]string{env, name1})
 }
 
+func streamIdoQuery(snapshot *sqlx.Tx, query string, args []interface{}, onResultSetReady func(), onRow interface{}) {
+	vOnRow := reflect.ValueOf(onRow) // TODO: make onRow generic[T] one nice day
+
+	tRow := vOnRow.Type(). // func(idoRow *T)
+				In(0). // *T
+				Elem() // T
+
+	rows, err := snapshot.Queryx(query, args...)
+	if err != nil {
+		log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+	}
+	defer rows.Close()
+
+	onResultSetReady()
+
+	for {
+		if rows.Next() {
+			vRow := reflect.New(tRow)
+			if err := rows.StructScan(vRow.Interface()); err != nil {
+				log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't scan result set"))
+			}
+
+			vOnRow.Call([]reflect.Value{vRow})
+		} else if err := rows.Err(); err == nil {
+			break
+		} else {
+			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't fetch result set"))
+		}
+	}
+}
+
 type historyType struct {
 	name        string
 	idoTable    string
@@ -112,6 +145,7 @@ type historyType struct {
 	idbIdColumn string
 	convertId   func(row ProgressRow, env string) []byte
 	cacheSchema []string
+	cacheFiller func(*historyType)
 
 	cache    *sqlx.DB
 	snapshot *sqlx.Tx
@@ -157,6 +191,12 @@ var types = historyTypes{
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('a', row.Id) },
 		eventTimeCacheSchema,
+		func(ht *historyType) {
+			buildEventTimeCache(ht, []string{
+				"xh.acknowledgement_id id", "UNIX_TIMESTAMP(xh.entry_time) event_time",
+				"xh.entry_time_usec event_time_usec", "xh.acknowledgement_type event_is_start", "xh.object_id",
+			})
+		},
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -167,7 +207,7 @@ var types = historyTypes{
 		"comment_history",
 		"comment_id",
 		func(row ProgressRow, env string) []byte { return calcObjectId(env, row.Name) },
-		nil, nil, nil, 0, nil, 0,
+		nil, nil, nil, nil, 0, nil, 0,
 	},
 	{
 		"downtime",
@@ -177,7 +217,7 @@ var types = historyTypes{
 		"downtime_history",
 		"downtime_id",
 		func(row ProgressRow, env string) []byte { return calcObjectId(env, row.Name) },
-		nil, nil, nil, 0, nil, 0,
+		nil, nil, nil, nil, 0, nil, 0,
 	},
 	{
 		"flapping",
@@ -188,6 +228,12 @@ var types = historyTypes{
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('f', row.Id) },
 		eventTimeCacheSchema,
+		func(ht *historyType) {
+			buildEventTimeCache(ht, []string{
+				"xh.flappinghistory_id id", "UNIX_TIMESTAMP(xh.event_time) event_time",
+				"xh.event_time_usec", "xh.event_type-1000 event_is_start", "xh.object_id",
+			})
+		},
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -199,6 +245,11 @@ var types = historyTypes{
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('n', row.Id) },
 		previousHardStateCacheSchema,
+		func(ht *historyType) {
+			buildPreviousHardStateCache(ht, []string{
+				"xh.notification_id id", "xh.object_id", "xh.state last_hard_state",
+			})
+		},
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -210,6 +261,9 @@ var types = historyTypes{
 		"id",
 		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('s', row.Id) },
 		previousHardStateCacheSchema,
+		func(ht *historyType) {
+			buildPreviousHardStateCache(ht, []string{"xh.statehistory_id id", "xh.object_id", "xh.last_hard_state"})
+		},
 		nil, nil, 0, nil, 0,
 	},
 }
