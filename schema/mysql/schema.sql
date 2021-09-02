@@ -594,6 +594,7 @@ CREATE TABLE downtime (
   is_in_effect enum('n', 'y') NOT NULL,
   start_time bigint unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
   end_time bigint unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + flexible_duration otherwise',
+  scheduled_by varchar(767) DEFAULT NULL COMMENT 'Name of the ScheduledDowntime which created this Downtime. 255+1+255+1+255, i.e. "host.name!service.name!scheduled-downtime-name"',
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
@@ -958,6 +959,7 @@ CREATE TABLE downtime_history (
   scheduled_end_time bigint unsigned NOT NULL,
   start_time bigint unsigned NOT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
   end_time bigint unsigned NOT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + duration otherwise',
+  scheduled_by varchar(767) DEFAULT NULL COMMENT 'Name of the ScheduledDowntime which created this Downtime. 255+1+255+1+255, i.e. "host.name!service.name!scheduled-downtime-name"',
   has_been_cancelled enum('n', 'y') NOT NULL,
   trigger_time bigint unsigned NOT NULL,
   cancel_time bigint unsigned DEFAULT NULL,

@@ -97,6 +97,7 @@ ALTER TABLE comment
     MODIFY is_persistent enum('n','y') NOT NULL,
     MODIFY is_sticky enum('n','y') NOT NULL;
 ALTER TABLE downtime
+    ADD COLUMN scheduled_by varchar(767) DEFAULT NULL COMMENT 'Name of the ScheduledDowntime which created this Downtime. 255+1+255+1+255, i.e. "host.name!service.name!scheduled-downtime-name"' AFTER end_time,
     MODIFY name varchar(548) NOT NULL COMMENT '255+1+255+1+36, i.e. "host.name!service.name!UUID"',
     MODIFY is_flexible enum('n','y') NOT NULL,
     MODIFY is_in_effect enum('n','y') NOT NULL;
@@ -107,6 +108,7 @@ ALTER TABLE user
 ALTER TABLE zone
     MODIFY is_global enum('n','y') NOT NULL;
 ALTER TABLE downtime_history
+    ADD COLUMN scheduled_by varchar(767) DEFAULT NULL COMMENT 'Name of the ScheduledDowntime which created this Downtime. 255+1+255+1+255, i.e. "host.name!service.name!scheduled-downtime-name"' AFTER end_time,
     MODIFY is_flexible enum('n','y') NOT NULL,
     MODIFY has_been_cancelled enum('n','y') NOT NULL;
 ALTER TABLE comment_history

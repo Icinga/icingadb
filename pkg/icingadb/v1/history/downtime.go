@@ -51,6 +51,7 @@ type DowntimeHistory struct {
 	ScheduledEndTime        types.UnixMilli `json:"scheduled_end_time"`
 	StartTime               types.UnixMilli `json:"start_time"`
 	EndTime                 types.UnixMilli `json:"end_time"`
+	ScheduledBy             types.String    `json:"scheduled_by"`
 	TriggerTime             types.UnixMilli `json:"trigger_time"`
 }
 
