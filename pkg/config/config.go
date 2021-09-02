@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/creasty/defaults"
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -11,6 +12,17 @@ import (
 type Config struct {
 	Database Database `yaml:"database"`
 	Redis    Redis    `yaml:"redis"`
+}
+
+// Validate checks constraints in the supplied configuration and returns an error if they are violated.
+func (c *Config) Validate() error {
+	if err := c.Database.Validate(); err != nil {
+		return err
+	}
+	if err := c.Redis.Validate(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Flags defines CLI flags.
@@ -32,8 +44,16 @@ func FromYAMLFile(name string) (*Config, error) {
 	c := &Config{}
 	d := yaml.NewDecoder(f)
 
+	if err := defaults.Set(c); err != nil {
+		return nil, errors.Wrap(err, "can't set config defaults")
+	}
+
 	if err := d.Decode(c); err != nil {
 		return nil, errors.Wrap(err, "can't parse YAML file "+name)
+	}
+
+	if err := c.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid configuration")
 	}
 
 	return c, nil

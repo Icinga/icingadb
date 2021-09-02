@@ -74,3 +74,8 @@ func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, st
 		return
 	}
 }
+
+// Validate checks constraints in the supplied Redis configuration and returns an error if they are violated.
+func (r *Redis) Validate() error {
+	return r.Options.Validate()
+}
