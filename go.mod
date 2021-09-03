@@ -3,7 +3,7 @@ module github.com/icinga/icingadb
 go 1.16
 
 require (
-	github.com/creasty/defaults v1.5.1
+	github.com/creasty/defaults v1.5.2
 	github.com/go-redis/redis/v8 v8.11.3
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/google/uuid v1.3.0
