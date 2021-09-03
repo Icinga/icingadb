@@ -16,8 +16,12 @@ UPDATE service_state SET properties_checksum = 0;
 ALTER TABLE service_state MODIFY COLUMN properties_checksum binary(20) COMMENT 'sha1(all properties)' NOT NULL;
 ALTER TABLE service_state ADD UNIQUE INDEX idx_service_state_service_id (service_id);
 
-ALTER TABLE downtime ADD COLUMN parent_id binary(20) AFTER triggered_by_id;
-ALTER TABLE downtime_history ADD COLUMN parent_id binary(20) AFTER triggered_by_id;
+ALTER TABLE downtime
+    ADD COLUMN parent_id binary(20) COMMENT 'For service downtimes, the ID of the host downtime that created this downtime by using the "all_services" flag of the schedule-downtime API.' AFTER triggered_by_id,
+    MODIFY COLUMN triggered_by_id binary(20) COMMENT 'The ID of the downtime that triggered this downtime. This is set when creating downtimes on a host or service higher up in the dependency chain using the "child_option" "DowntimeTriggeredChildren" and can also be set manually via the API.';
+ALTER TABLE downtime_history
+    ADD COLUMN parent_id binary(20) COMMENT 'For service downtimes, the ID of the host downtime that created this downtime by using the "all_services" flag of the schedule-downtime API.' AFTER triggered_by_id,
+    MODIFY COLUMN triggered_by_id binary(20) COMMENT 'The ID of the downtime that triggered this downtime. This is set when creating downtimes on a host or service higher up in the dependency chain using the "child_option" "DowntimeTriggeredChildren" and can also be set manually via the API.';
 
 ALTER TABLE checkcommand_argument MODIFY COLUMN argument_order smallint DEFAULT NULL;
 ALTER TABLE eventcommand_argument MODIFY COLUMN argument_order smallint DEFAULT NULL;
