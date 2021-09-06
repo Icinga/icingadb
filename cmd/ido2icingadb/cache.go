@@ -40,61 +40,67 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 		cacheGet(*tx, &checkpoint, "SELECT COUNT(*) cnt, MAX(history_id) max_id FROM end_start_time")
 
 		ht.bar.SetCurrent(checkpoint.Cnt * 2)
-		var inc *barIncrementer
+		inc := barIncrementer{ht.bar, time.Now()}
 
-		streamIdoQuery(
+		sliceIdoHistory(
 			ht.snapshot,
 			"SELECT "+strings.Join(idoColumns, ", ")+" FROM "+ht.idoTable+
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
-				ht.idoIdColumn+" > ? ORDER BY xh."+ht.idoIdColumn,
-			[]interface{}{checkpoint.MaxId.Int64},
-			func() { inc = &barIncrementer{ht.bar, time.Now()} },
-			func(idoRow *struct {
+				ht.idoIdColumn+" > ? ORDER BY xh."+ht.idoIdColumn+" LIMIT ?",
+			checkpoint.MaxId.Int64,
+			func(idoRows []struct {
 				Id            uint64
 				EventTime     int64
 				EventTimeUsec uint32
 				EventIsStart  uint8
 				ObjectId      uint64
-			}) {
-				if idoRow.EventIsStart == 0 {
-					var lst []struct {
-						EventTime     int64
-						EventTimeUsec uint32
-					}
-					cacheSelect(
-						*tx, &lst,
-						"SELECT event_time, event_time_usec FROM last_start_time WHERE object_id=?", idoRow.ObjectId,
-					)
-
-					if len(lst) > 0 {
-						cacheExec(
-							*tx, false,
-							"INSERT INTO end_start_time(history_id, event_time, event_time_usec) VALUES (?, ?, ?)",
-							idoRow.Id, lst[0].EventTime, lst[0].EventTimeUsec,
+			}) (checkpoint interface{}) {
+				for _, idoRow := range idoRows {
+					if idoRow.EventIsStart == 0 {
+						var lst []struct {
+							EventTime     int64
+							EventTimeUsec uint32
+						}
+						cacheSelect(
+							*tx, &lst, "SELECT event_time, event_time_usec FROM last_start_time WHERE object_id=?",
+							idoRow.ObjectId,
 						)
 
+						if len(lst) > 0 {
+							cacheExec(
+								*tx, false,
+								"INSERT INTO end_start_time(history_id, event_time, event_time_usec) VALUES (?, ?, ?)",
+								idoRow.Id, lst[0].EventTime, lst[0].EventTimeUsec,
+							)
+
+							onDeleted(cacheExec(
+								*tx, false, "DELETE FROM last_start_time WHERE object_id=?", idoRow.ObjectId,
+							))
+						} else {
+							cacheExec(
+								*tx, false,
+								"INSERT INTO end_start_time(history_id, event_time, event_time_usec) "+
+									"VALUES (?, NULL, NULL)", idoRow.Id,
+							)
+						}
+					} else {
 						onDeleted(cacheExec(
 							*tx, false, "DELETE FROM last_start_time WHERE object_id=?", idoRow.ObjectId,
 						))
-					} else {
+
 						cacheExec(
 							*tx, false,
-							"INSERT INTO end_start_time(history_id, event_time, event_time_usec) "+
-								"VALUES (?, NULL, NULL)", idoRow.Id,
+							"INSERT INTO last_start_time(object_id, event_time, event_time_usec) VALUES (?, ?, ?)",
+							idoRow.ObjectId, idoRow.EventTime, idoRow.EventTimeUsec,
 						)
 					}
-				} else {
-					onDeleted(cacheExec(*tx, false, "DELETE FROM last_start_time WHERE object_id=?", idoRow.ObjectId))
 
-					cacheExec(
-						*tx, false,
-						"INSERT INTO last_start_time(object_id, event_time, event_time_usec) VALUES (?, ?, ?)",
-						idoRow.ObjectId, idoRow.EventTime, idoRow.EventTimeUsec,
-					)
+					onNewUncommittedDml()
+					checkpoint = idoRow.Id
 				}
 
-				onNewUncommittedDml()
-				inc.inc(1)
+				inc.inc(len(idoRows))
+				return
 			},
 		)
 
@@ -158,7 +164,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 		}
 
 		ht.bar.SetCurrent(previousHardState.Cnt + nextIds.Cnt)
-		var inc *barIncrementer
+		inc := barIncrementer{ht.bar, time.Now()}
 
 		// We continue where we finished before. As we build the cache in reverse chronological order:
 		// 1. If the history grows between two migration trials, we won't migrate the difference. Workarounds:
@@ -167,59 +173,63 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 		// 2. If the history gets cleaned up between two migration trials,
 		//    the difference either just doesn't appear in the cache or - if already there - will be ignored later.
 
-		streamIdoQuery(
+		sliceIdoHistory(
 			ht.snapshot,
 			"SELECT "+strings.Join(idoColumns, ", ")+" FROM "+ht.idoTable+
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
-				ht.idoIdColumn+" < ? ORDER BY xh."+ht.idoIdColumn+" DESC",
-			[]interface{}{checkpoint},
-			func() { inc = &barIncrementer{ht.bar, time.Now()} },
-			func(idoRow *struct {
+				ht.idoIdColumn+" < ? ORDER BY xh."+ht.idoIdColumn+" DESC LIMIT ?",
+			checkpoint,
+			func(idoRows []struct {
 				Id            uint64
 				ObjectId      uint64
 				LastHardState uint8
-			}) {
-				var nhs []struct{ NextHardState uint8 }
-				cacheSelect(*tx, &nhs, "SELECT next_hard_state FROM next_hard_state WHERE object_id=?", idoRow.ObjectId)
+			}) (checkpoint interface{}) {
+				for _, idoRow := range idoRows {
+					var nhs []struct{ NextHardState uint8 }
+					cacheSelect(*tx, &nhs, "SELECT next_hard_state FROM next_hard_state WHERE object_id=?", idoRow.ObjectId)
 
-				if len(nhs) < 1 {
-					cacheExec(
-						*tx, false, "INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
-						idoRow.ObjectId, idoRow.LastHardState,
-					)
+					if len(nhs) < 1 {
+						cacheExec(
+							*tx, false, "INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
+							idoRow.ObjectId, idoRow.LastHardState,
+						)
 
-					cacheExec(
-						*tx, false, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
-						idoRow.Id, idoRow.ObjectId,
-					)
-				} else if idoRow.LastHardState == nhs[0].NextHardState {
-					cacheExec(
-						*tx, false, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
-						idoRow.Id, idoRow.ObjectId,
-					)
-				} else {
-					cacheExec(
-						*tx, false, "INSERT INTO previous_hard_state(history_id, previous_hard_state) "+
-							"SELECT history_id, ? FROM next_ids WHERE object_id=?",
-						idoRow.LastHardState, idoRow.ObjectId,
-					)
+						cacheExec(
+							*tx, false, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
+							idoRow.Id, idoRow.ObjectId,
+						)
+					} else if idoRow.LastHardState == nhs[0].NextHardState {
+						cacheExec(
+							*tx, false, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
+							idoRow.Id, idoRow.ObjectId,
+						)
+					} else {
+						cacheExec(
+							*tx, false, "INSERT INTO previous_hard_state(history_id, previous_hard_state) "+
+								"SELECT history_id, ? FROM next_ids WHERE object_id=?",
+							idoRow.LastHardState, idoRow.ObjectId,
+						)
 
-					onDeleted(cacheExec(*tx, false, "DELETE FROM next_hard_state WHERE object_id=?", idoRow.ObjectId))
-					onDeleted(cacheExec(*tx, false, "DELETE FROM next_ids WHERE object_id=?", idoRow.ObjectId))
+						onDeleted(cacheExec(*tx, false, "DELETE FROM next_hard_state WHERE object_id=?", idoRow.ObjectId))
+						onDeleted(cacheExec(*tx, false, "DELETE FROM next_ids WHERE object_id=?", idoRow.ObjectId))
 
-					cacheExec(
-						*tx, false, "INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
-						idoRow.ObjectId, idoRow.LastHardState,
-					)
+						cacheExec(
+							*tx, false, "INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
+							idoRow.ObjectId, idoRow.LastHardState,
+						)
 
-					cacheExec(
-						*tx, false, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
-						idoRow.Id, idoRow.ObjectId,
-					)
+						cacheExec(
+							*tx, false, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
+							idoRow.Id, idoRow.ObjectId,
+						)
+					}
+
+					onNewUncommittedDml()
+					checkpoint = idoRow.Id
 				}
 
-				onNewUncommittedDml()
-				inc.inc(1)
+				inc.inc(len(idoRows))
+				return
 			},
 		)
 
