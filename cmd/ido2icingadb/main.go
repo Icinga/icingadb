@@ -195,12 +195,6 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 			ht.idoTable + " xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE " +
 			ht.idoIdColumn + " > ? ORDER BY xh." + ht.idoIdColumn + " LIMIT ?"
 
-		stmt, err := ht.snapshot.Preparex(query)
-		if err != nil {
-			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
-		}
-		defer stmt.Close()
-
 		var lastRowsLen int
 		var lastQuery string
 		var lastStmt *sqlx.Stmt
@@ -212,17 +206,7 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 			}
 		}()
 
-	Queries:
-		for {
-			var rows []ProgressRow
-			if err := stmt.Select(&rows, ht.lastId, bulk); err != nil {
-				log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
-			}
-
-			if len(rows) < 1 {
-				break
-			}
-
+		sliceIdoHistory(ht.snapshot, query, 0, func(rows []ProgressRow) (checkpoint interface{}) {
 			if len(rows) != lastRowsLen {
 				if lastStmt != nil {
 					lastStmt.Close()
@@ -273,14 +257,15 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 				copy(key[:], conv.idb)
 
 				if _, ok := presentSet[key]; !ok {
-					break Queries
+					return nil
 				}
 
 				ht.lastId = conv.ido
 			}
 
 			inc.inc(len(rows))
-		}
+			return ht.lastId
+		})
 
 		ht.bar.SetTotal(ht.bar.Current(), true)
 	})

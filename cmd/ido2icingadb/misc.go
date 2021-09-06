@@ -105,34 +105,38 @@ func calcObjectId(env, name1 string) []byte {
 	return hashAny([2]string{env, name1})
 }
 
-func streamIdoQuery(snapshot *sqlx.Tx, query string, args []interface{}, onResultSetReady func(), onRow interface{}) {
-	vOnRow := reflect.ValueOf(onRow) // TODO: make onRow generic[T] one nice day
+func sliceIdoHistory(snapshot *sqlx.Tx, query string, checkpoint, onRows interface{}) {
+	vOnRows := reflect.ValueOf(onRows) // TODO: make onRows generic[T] one nice day
 
-	tRow := vOnRow.Type(). // func(idoRow *T)
-				In(0). // *T
-				Elem() // T
+	tRows := vOnRows.Type(). // func(rows []T) (checkpoint interface{})
+					In(0) // []T
 
-	rows, err := snapshot.Queryx(query, args...)
+	vNewRows := reflect.New(tRows)
+	rowsPtr := vNewRows.Interface()
+	vRows := vNewRows.Elem()
+	onRowsArgs := [1]reflect.Value{vRows}
+	vZeroRows := reflect.Zero(tRows)
+
+	stmt, err := snapshot.Preparex(query)
 	if err != nil {
-		log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+		log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
 	}
-	defer rows.Close()
-
-	onResultSetReady()
+	defer stmt.Close()
 
 	for {
-		if rows.Next() {
-			vRow := reflect.New(tRow)
-			if err := rows.StructScan(vRow.Interface()); err != nil {
-				log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't scan result set"))
-			}
-
-			vOnRow.Call([]reflect.Value{vRow})
-		} else if err := rows.Err(); err == nil {
-			break
-		} else {
-			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't fetch result set"))
+		if err := stmt.Select(rowsPtr, checkpoint, bulk); err != nil {
+			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 		}
+
+		if vRows.Len() < 1 {
+			break
+		}
+
+		if checkpoint = vOnRows.Call(onRowsArgs[:])[0].Interface(); checkpoint == nil {
+			break
+		}
+
+		vRows.Set(vZeroRows)
 	}
 }
 
