@@ -38,7 +38,6 @@ func TestMultipleEnvironments(t *testing.T) {
 	db, err := m.Open()
 	require.NoError(t, err, "mysql open")
 	t.Cleanup(func() { _ = db.Close() })
-	time.Sleep(30 * time.Second)
 
 	t.Run("Table", func(t *testing.T) {
 		t.Parallel()
