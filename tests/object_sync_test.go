@@ -66,12 +66,6 @@ func TestObjectSync(t *testing.T) {
 	}
 	//logger.Sugar().Infof("config:\n\n%s\n\n", conf.String())
 	i.WriteConfig("etc/icinga2/conf.d/testdata.conf", conf.Bytes())
-	i.WriteConfig("etc/icinga2/conf.d/api-users.conf", []byte(`
-		object ApiUser "root" {
-		password = "root"
-		permissions = ["*"]
-	}
-	`))
 	i.EnableIcingaDb(r)
 	i.Reload()
 
