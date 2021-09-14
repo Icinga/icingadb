@@ -31,6 +31,7 @@ type Options struct {
 	MaxHMGetConnections int           `yaml:"max_hmget_connections" default:"4096"`
 	HMGetCount          int           `yaml:"hmget_count"           default:"4096"`
 	HScanCount          int           `yaml:"hscan_count"           default:"4096"`
+	XReadCount          int           `yaml:"xread_count"           default:"4096"`
 }
 
 // Validate checks constraints in the supplied Redis options and returns an error if they are violated.
