@@ -2,6 +2,7 @@ package history
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -19,10 +20,14 @@ type NotificationHistory struct {
 }
 
 type UserNotificationHistory struct {
-	HistoryTableEntity    `json:",inline"`
-	EnvironmentId         types.Binary `json:"environment_id"`
-	NotificationHistoryId types.UUID   `json:"notification_history_id"`
-	UserId                types.Binary `json:"user_id"`
+	v1.EntityWithoutChecksum `json:",inline"`
+	v1.EnvironmentMeta       `json:",inline"`
+	NotificationHistoryId    types.UUID   `json:"notification_history_id"`
+	UserId                   types.Binary `json:"user_id"`
+}
+
+func (u *UserNotificationHistory) Upsert() interface{} {
+	return u
 }
 
 type HistoryNotification struct {

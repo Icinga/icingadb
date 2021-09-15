@@ -309,8 +309,6 @@ func TestHistory(t *testing.T) {
 		timeAfter := time.Now()
 
 		assertEventuallyDrained(t, redisClient, "icinga:history:stream:notification")
-		// TODO: remove once the separate usernotification stream is gone from icinga2 and icingadb.
-		assertEventuallyDrained(t, redisClient, "icinga:history:stream:usernotification")
 
 		eventually.Assert(t, func(t require.TestingT) {
 			var rows []Notification

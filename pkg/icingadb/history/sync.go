@@ -3,12 +3,16 @@ package history
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
+	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/structify"
+	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -176,9 +180,24 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 // and can be processed at a later time.
 type stageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error
 
-func stageFuncForEntity(structPtr interface{}) stageFunc {
+// writeOneEntityStage creates a stageFunc from a pointer to a struct implementing the v1.UpserterEntity interface.
+// For each history event it receives, it parses that event into a new instance of that entity type and writes it to
+// the database. It writes exactly one entity to the database for each history event.
+func writeOneEntityStage(structPtr interface{}) stageFunc {
 	structifier := structify.MakeMapStructifier(reflect.TypeOf(structPtr).Elem(), "json")
 
+	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
+		ptr, err := structifier(entry.Values)
+		if err != nil {
+			return nil, errors.Wrapf(err, "can't structify values %#v", entry.Values)
+		}
+		return []v1.UpserterEntity{ptr.(v1.UpserterEntity)}, nil
+	})
+}
+
+// writeMultiEntityStage creates a stageFunc from a function that takes a history event as an input and returns a
+// (potentially empty) slice of v1.UpserterEntity instances that it then inserts into the database.
+func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.UpserterEntity, error)) stageFunc {
 	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
 		type State struct {
 			Message redis.XMessage // Original event from Redis.
@@ -188,6 +207,7 @@ func stageFuncForEntity(structPtr interface{}) stageFunc {
 		bufSize := s.db.Options.MaxPlaceholdersPerStatement
 		insert := make(chan contracts.Entity, bufSize) // Events sent to the database for insertion.
 		inserted := make(chan contracts.Entity)        // Events returned by the database after successful insertion.
+		skipped := make(chan redis.XMessage)           // Events skipping insert/inserted (no entities generated).
 		state := make(map[contracts.Entity]*State)     // Shared state between all entities created by one event.
 		var stateMu sync.Mutex                         // Synchronizes concurrent access to state.
 
@@ -195,6 +215,7 @@ func stageFuncForEntity(structPtr interface{}) stageFunc {
 
 		g.Go(func() error {
 			defer close(insert)
+			defer close(skipped)
 
 			for {
 				select {
@@ -203,25 +224,32 @@ func stageFuncForEntity(structPtr interface{}) stageFunc {
 						return nil
 					}
 
-					ptr, err := structifier(e.Values)
+					entities, err := entryToEntities(e)
 					if err != nil {
-						return errors.Wrapf(err, "can't structify values %#v", e.Values)
+						return err
 					}
 
-					ue := ptr.(v1.UpserterEntity)
+					if len(entities) == 0 {
+						skipped <- e
+					} else {
+						st := &State{
+							Message: e,
+							Pending: len(entities),
+						}
 
-					st := &State{
-						Message: e,
-						Pending: 1,
-					}
-					stateMu.Lock()
-					state[ue] = st
-					stateMu.Unlock()
+						stateMu.Lock()
+						for _, entity := range entities {
+							state[entity] = st
+						}
+						stateMu.Unlock()
 
-					select {
-					case insert <- ue:
-					case <-ctx.Done():
-						return ctx.Err()
+						for _, entity := range entities {
+							select {
+							case insert <- entity:
+							case <-ctx.Done():
+								return ctx.Err()
+							}
+						}
 					}
 
 				case <-ctx.Done():
@@ -260,6 +288,17 @@ func stageFuncForEntity(structPtr interface{}) stageFunc {
 						}
 					}
 
+				case m, ok := <-skipped:
+					if !ok {
+						return nil
+					}
+
+					select {
+					case out <- m:
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+
 				case <-ctx.Done():
 					return ctx.Err()
 				}
@@ -270,32 +309,81 @@ func stageFuncForEntity(structPtr interface{}) stageFunc {
 	}
 }
 
+// userNotificationStage is a specialized stageFunc that populates the user_notification_history table. It is executed
+// on the notification history stream and uses the users_notified_ids attribute to create an entry in the
+// user_notification_history relation table for each user ID.
+func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
+	type NotificationHistory struct {
+		Id            types.UUID   `structify:"id"`
+		EnvironmentId types.Binary `structify:"environment_id"`
+		EndpointId    types.Binary `structify:"endpoint_id"`
+		UserIds       types.String `structify:"users_notified_ids"`
+	}
+
+	structifier := structify.MakeMapStructifier(reflect.TypeOf((*NotificationHistory)(nil)).Elem(), "structify")
+
+	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
+		rawNotificationHistory, err := structifier(entry.Values)
+		if err != nil {
+			return nil, err
+		}
+		notificationHistory := rawNotificationHistory.(*NotificationHistory)
+
+		if !notificationHistory.UserIds.Valid {
+			return nil, nil
+		}
+
+		var users []types.Binary
+		err = internal.UnmarshalJSON([]byte(notificationHistory.UserIds.String), &users)
+		if err != nil {
+			return nil, err
+		}
+
+		var userNotifications []v1.UpserterEntity
+
+		for _, user := range users {
+			userNotifications = append(userNotifications, &v1.UserNotificationHistory{
+				EntityWithoutChecksum: v1types.EntityWithoutChecksum{
+					IdMeta: v1types.IdMeta{
+						Id: utils.Checksum(append(append([]byte(nil), notificationHistory.Id.UUID[:]...), user...)),
+					},
+				},
+				EnvironmentMeta: v1types.EnvironmentMeta{
+					EnvironmentId: notificationHistory.EnvironmentId,
+				},
+				NotificationHistoryId: notificationHistory.Id,
+				UserId:                user,
+			})
+		}
+
+		return userNotifications, nil
+	})(ctx, s, key, in, out)
+}
+
 var syncPipelines = map[string][]stageFunc{
 	"notification": {
-		stageFuncForEntity((*v1.NotificationHistory)(nil)), // notification_history
-		stageFuncForEntity((*v1.HistoryNotification)(nil)), // history (depends on notification_history)
-	},
-	"usernotification": {
-		stageFuncForEntity((*v1.UserNotificationHistory)(nil)),
+		writeOneEntityStage((*v1.NotificationHistory)(nil)), // notification_history
+		userNotificationStage,                               // user_notification_history (depends on notification_history)
+		writeOneEntityStage((*v1.HistoryNotification)(nil)), // history (depends on notification_history)
 	},
 	"state": {
-		stageFuncForEntity((*v1.StateHistory)(nil)), // state_history
-		stageFuncForEntity((*v1.HistoryState)(nil)), // history (depends on state_history)
+		writeOneEntityStage((*v1.StateHistory)(nil)), // state_history
+		writeOneEntityStage((*v1.HistoryState)(nil)), // history (depends on state_history)
 	},
 	"downtime": {
-		stageFuncForEntity((*v1.DowntimeHistory)(nil)), // downtime_history
-		stageFuncForEntity((*v1.HistoryDowntime)(nil)), // history (depends on downtime_history)
+		writeOneEntityStage((*v1.DowntimeHistory)(nil)), // downtime_history
+		writeOneEntityStage((*v1.HistoryDowntime)(nil)), // history (depends on downtime_history)
 	},
 	"comment": {
-		stageFuncForEntity((*v1.CommentHistory)(nil)), // comment_history
-		stageFuncForEntity((*v1.HistoryComment)(nil)), // history (depends on comment_history)
+		writeOneEntityStage((*v1.CommentHistory)(nil)), // comment_history
+		writeOneEntityStage((*v1.HistoryComment)(nil)), // history (depends on comment_history)
 	},
 	"flapping": {
-		stageFuncForEntity((*v1.FlappingHistory)(nil)), // flapping_history
-		stageFuncForEntity((*v1.HistoryFlapping)(nil)), // history (depends on flapping_history)
+		writeOneEntityStage((*v1.FlappingHistory)(nil)), // flapping_history
+		writeOneEntityStage((*v1.HistoryFlapping)(nil)), // history (depends on flapping_history)
 	},
 	"acknowledgement": {
-		stageFuncForEntity((*v1.AcknowledgementHistory)(nil)), // acknowledgement_history
-		stageFuncForEntity((*v1.HistoryAck)(nil)),             // history (depends on acknowledgement_history)
+		writeOneEntityStage((*v1.AcknowledgementHistory)(nil)), // acknowledgement_history
+		writeOneEntityStage((*v1.HistoryAck)(nil)),             // history (depends on acknowledgement_history)
 	},
 }

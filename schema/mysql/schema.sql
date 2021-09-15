@@ -910,7 +910,7 @@ CREATE TABLE notification_history (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_notification_history (
-  id binary(16) NOT NULL COMMENT 'UUID',
+  id binary(20) NOT NULL COMMENT 'sha1(notification_history_id + user_id)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   notification_history_id binary(16) NOT NULL COMMENT 'UUID notification_history.id',
   user_id binary(20) NOT NULL COMMENT 'user.id',

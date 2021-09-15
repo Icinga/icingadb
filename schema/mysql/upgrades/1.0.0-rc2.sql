@@ -144,3 +144,6 @@ ALTER TABLE service_state
     MODIFY output longtext DEFAULT NULL,
     MODIFY long_output longtext DEFAULT NULL,
     MODIFY performance_data longtext DEFAULT NULL;
+
+ALTER TABLE user_notification_history
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(notification_history_id + user_id)';
