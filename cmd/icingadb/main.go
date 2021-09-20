@@ -48,7 +48,10 @@ func run() int {
 
 	logger.Info("Starting Icinga DB")
 
-	db := cmd.Database()
+	db, err := cmd.Database(logs.GetChildLogger("database"))
+	if err != nil {
+		logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
+	}
 	defer db.Close()
 	{
 		logger.Info("Connecting to database")
@@ -62,7 +65,10 @@ func run() int {
 		logger.Fatalf("%+v", err)
 	}
 
-	rc := cmd.Redis()
+	rc, err := cmd.Redis(logs.GetChildLogger("redis"))
+	if err != nil {
+		logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
+	}
 	{
 		logger.Info("Connecting to Redis")
 		_, err := rc.Ping(context.Background()).Result()
