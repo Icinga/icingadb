@@ -80,9 +80,8 @@ func run() int {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 
-	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
-	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
-
+	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logs.GetChildLogger("heartbeat"))
+	ha := icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
 	defer func() {
@@ -92,11 +91,10 @@ func run() int {
 		ha.Close(ctx)
 		cancelCtx()
 	}()
-
-	s := icingadb.NewSync(db, rc, logger)
-	hs := history.NewSync(db, rc, logger)
-	rt := icingadb.NewRuntimeUpdates(db, rc, logger)
-	ods := overdue.NewSync(db, rc, logger)
+	s := icingadb.NewSync(db, rc, logs.GetChildLogger("config-sync"))
+	hs := history.NewSync(db, rc, logs.GetChildLogger("history-sync"))
+	rt := icingadb.NewRuntimeUpdates(db, rc, logs.GetChildLogger("runtime-updates"))
+	ods := overdue.NewSync(db, rc, logs.GetChildLogger("overdue-sync"))
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
@@ -124,7 +122,7 @@ func run() int {
 							logger.Fatalf("%+v", err)
 						}
 
-						dump := icingadb.NewDumpSignals(rc, logger)
+						dump := icingadb.NewDumpSignals(rc, logs.GetChildLogger("dump-signals"))
 						g.Go(func() error {
 							logger.Info("Staring config dump signal handling")
 
@@ -207,7 +205,7 @@ func run() int {
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logger))
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logs.GetChildLogger("config-sync")))
 							})
 
 							cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
@@ -222,7 +220,7 @@ func run() int {
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logger))
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logs.GetChildLogger("config-sync")))
 							})
 
 							return nil
