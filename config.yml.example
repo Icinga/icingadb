@@ -1,8 +1,28 @@
+# This is the configuration file for Icinga DB.
+
 database:
   host: icingadb
   port: 3306
   database: icingadb
   user: icingadb
   password: icingadb
+
 redis:
   address: redis:6380
+
+logging:
+  # Default logging level. Can be set to 'fatal', 'error', 'warning', 'info' or 'debug'.
+  # If not set, defaults to 'info'.
+  level:
+
+  # Map of component-logging level pairs to define a different log level than the default value for each component.
+  options:
+    database:
+    redis:
+    heartbeat:
+    high-availability:
+    config-sync:
+    history-sync:
+    runtime-updates:
+    overdue-sync:
+    dump-signals:
