@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/icinga/icingadb/internal/command"
+	"github.com/icinga/icingadb/internal/logging"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -34,8 +35,15 @@ func main() {
 
 func run() int {
 	cmd := command.New()
+	logs, err := logging.NewLogging(
+		cmd.Config.Logging.Level,
+		cmd.Config.Logging.Options,
+	)
+	if err != nil {
+		utils.Fatal(errors.Wrap(err, "can't configure logging"))
+	}
 
-	logger := cmd.Logger
+	logger := logs.GetLogger()
 	defer logger.Sync()
 
 	logger.Info("Starting Icinga DB")
