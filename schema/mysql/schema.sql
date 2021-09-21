@@ -1047,6 +1047,8 @@ CREATE TABLE history (
   PRIMARY KEY (id),
 
   INDEX idx_history_event_time (event_time) COMMENT 'History filtered/ordered by event_time',
+  INDEX idx_history_host_id_object_type_event_time (host_id, object_type, event_time) COMMENT 'Host detail history ordered by event_time',
+  INDEX idx_history_host_service_id_object_type_event_time (host_id, service_id, object_type, event_time) COMMENT 'Service detail history ordered by event_time',
   INDEX idx_history_acknowledgement (acknowledgement_history_id),
   INDEX idx_history_comment (comment_history_id),
   INDEX idx_history_downtime (downtime_history_id),

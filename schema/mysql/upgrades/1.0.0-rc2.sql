@@ -40,6 +40,10 @@ ALTER TABLE usergroup ADD INDEX `idx_usergroup_display_name` (`display_name`) CO
 ALTER TABLE usergroup ADD INDEX idx_usergroup_name_ci (name_ci) COMMENT 'Usergroup list filtered using quick search';
 ALTER TABLE usergroup ADD INDEX idx_usergroup_name (name) COMMENT 'Usergroup list filtered/ordered by name; Usergroup detail filter';
 
+ALTER TABLE history
+  ADD INDEX idx_history_host_id_object_type_event_time (host_id, object_type, event_time) COMMENT 'Host detail history ordered by event_time',
+  ADD INDEX idx_history_host_service_id_object_type_event_time (host_id, service_id, object_type, event_time) COMMENT 'Service detail history ordered by event_time';
+
 ALTER TABLE host
     MODIFY active_checks_enabled enum('n','y') NOT NULL,
     MODIFY passive_checks_enabled enum('n','y') NOT NULL,
