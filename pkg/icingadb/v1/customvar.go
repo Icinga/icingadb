@@ -72,7 +72,7 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 									IdMeta: IdMeta{
 										// TODO(el): Schema comment is wrong.
 										// Without customvar.Id we would produce duplicate keys here.
-										Id: utils.Checksum(objectpacker.MustPackAny(customvar.EnvironmentId, customvar.Id, flatname, flatvalue)),
+										Id: utils.Checksum(objectpacker.MustPackSlice(customvar.EnvironmentId, customvar.Id, flatname, flatvalue)),
 									},
 								},
 								EnvironmentMeta: EnvironmentMeta{
