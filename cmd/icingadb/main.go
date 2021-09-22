@@ -19,6 +19,7 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 )
 
 const (
@@ -67,9 +68,17 @@ func run() int {
 
 	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
 	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
+
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
-	defer ha.Close(context.Background())
+	defer func() {
+		// Give up after 3s, not 5m (default) not to hang for 5m if DB is down.
+		ctx, cancelCtx := context.WithTimeout(context.Background(), 3*time.Second)
+
+		ha.Close(ctx)
+		cancelCtx()
+	}()
+
 	s := icingadb.NewSync(db, rc, logger)
 	hs := history.NewSync(db, rc, logger)
 	rt := icingadb.NewRuntimeUpdates(db, rc, logger)
