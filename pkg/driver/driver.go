@@ -9,7 +9,6 @@ import (
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -25,23 +24,22 @@ type RetryConnector struct {
 // Connect implements part of the driver.Connector interface.
 func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	var conn driver.Conn
-	var logFirstError sync.Once
 	err := errors.Wrap(retry.WithBackoff(
 		ctx,
 		func(ctx context.Context) (err error) {
 			conn, err = c.Connector.Connect(ctx)
-
-			logFirstError.Do(func() {
-				if err != nil {
-					c.driver.Logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
-				}
-			})
-
 			return
 		},
 		shouldRetry,
 		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
-		retry.Settings{Timeout: timeout},
+		retry.Settings{
+			Timeout: timeout,
+			OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+				if lastErr == nil || err.Error() != lastErr.Error() {
+					c.driver.Logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
+				}
+			},
+		},
 	), "can't connect to database")
 	return conn, err
 }

@@ -10,7 +10,6 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"os"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -45,17 +44,11 @@ func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, st
 	// dial behaves like net.Dialer#DialContext, but re-tries on syscall.ECONNREFUSED.
 	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
 		var dl net.Dialer
-		var logFirstError sync.Once
 
 		err = retry.WithBackoff(
 			ctx,
 			func(ctx context.Context) (err error) {
 				conn, err = dl.DialContext(ctx, network, addr)
-				logFirstError.Do(func() {
-					if err != nil {
-						logger.Warnw("Can't connect to Redis. Retrying", zap.Error(err))
-					}
-				})
 				return
 			},
 			func(err error) bool {
@@ -66,7 +59,14 @@ func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, st
 				return false
 			},
 			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-			retry.Settings{Timeout: 5 * time.Minute},
+			retry.Settings{
+				Timeout: 5 * time.Minute,
+				OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+					if lastErr == nil || err.Error() != lastErr.Error() {
+						logger.Warnw("Can't connect to Redis. Retrying", zap.Error(err))
+					}
+				},
+			},
 		)
 
 		err = errors.Wrap(err, "can't connect to Redis")
