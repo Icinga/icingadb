@@ -113,6 +113,7 @@ func (h *HA) controller() {
 	h.logger.Debugw("Starting HA", zap.String("instance_id", hex.EncodeToString(h.instanceId)))
 
 	oldInstancesRemoved := false
+	var lost <-chan struct{}
 
 	logTicker := time.NewTicker(time.Second * 60)
 	defer logTicker.Stop()
@@ -155,10 +156,16 @@ func (h *HA) controller() {
 			}
 
 			shouldLog = false
-		case <-h.heartbeat.Lost():
+
+			if lost == nil {
+				lost = h.heartbeat.Lost()
+			}
+		case <-lost:
+			lost = nil
 			h.logger.Error("Lost heartbeat")
 			h.signalHandover()
 		case <-h.heartbeat.Done():
+			lost = nil
 			if err := h.heartbeat.Err(); err != nil {
 				h.abort(err)
 			}
