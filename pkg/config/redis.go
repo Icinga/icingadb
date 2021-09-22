@@ -66,6 +66,12 @@ func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, st
 						logger.Warnw("Can't connect to Redis. Retrying", zap.Error(err))
 					}
 				},
+				OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
+					if attempt > 0 {
+						logger.Infow("Reconnected to Redis",
+							zap.Duration("after", elapsed), zap.Uint64("attempts", attempt+1))
+					}
+				},
 			},
 		)
 
