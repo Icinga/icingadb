@@ -61,14 +61,14 @@ func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger
 	return ha
 }
 
-// Close implements the io.Closer interface.
-func (h *HA) Close() error {
+// Close shuts h down.
+func (h *HA) Close(ctx context.Context) error {
 	// Cancel ctx.
 	h.cancelCtx()
 	// Wait until the controller loop ended.
 	<-h.Done()
 	// Remove our instance from the database.
-	h.removeInstance(context.Background())
+	h.removeInstance(ctx)
 	// And return an error, if any.
 	return h.Err()
 }

@@ -69,7 +69,7 @@ func run() int {
 	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
-	defer ha.Close()
+	defer ha.Close(context.Background())
 	s := icingadb.NewSync(db, rc, logger)
 	hs := history.NewSync(db, rc, logger)
 	rt := icingadb.NewRuntimeUpdates(db, rc, logger)
