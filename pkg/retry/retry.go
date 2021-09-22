@@ -19,6 +19,8 @@ type Settings struct {
 	Timeout time.Duration
 	// OnError is called if an error occurs.
 	OnError func(elapsed time.Duration, attempt uint64, err, lastErr error)
+	// OnSuccess is called once the operation succeeds.
+	OnSuccess func(elapsed time.Duration, attempt uint64, lastErr error)
 }
 
 // WithBackoff retries the passed function if it fails and the error allows it to retry.
@@ -37,6 +39,10 @@ func WithBackoff(
 		prevErr := err
 
 		if err = retryableFunc(ctx); err == nil {
+			if settings.OnSuccess != nil {
+				settings.OnSuccess(time.Since(start), attempt, prevErr)
+			}
+
 			return
 		}
 
