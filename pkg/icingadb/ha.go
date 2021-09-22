@@ -61,14 +61,14 @@ func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger
 	return ha
 }
 
-// Close implements the io.Closer interface.
-func (h *HA) Close() error {
+// Close shuts h down.
+func (h *HA) Close(ctx context.Context) error {
 	// Cancel ctx.
 	h.cancelCtx()
 	// Wait until the controller loop ended.
 	<-h.Done()
 	// Remove our instance from the database.
-	h.removeInstance()
+	h.removeInstance(ctx)
 	// And return an error, if any.
 	return h.Err()
 }
@@ -259,11 +259,11 @@ func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLo
 	return nil
 }
 
-func (h *HA) removeInstance() {
+func (h *HA) removeInstance(ctx context.Context) {
 	h.logger.Debugw("Removing our row from icingadb_instance", zap.String("instance_id", hex.EncodeToString(h.instanceId)))
-	// Intentionally not using a context here as this is a cleanup task and h.ctx is already cancelled.
+	// Intentionally not using h.ctx here as it's already cancelled.
 	query := "DELETE FROM icingadb_instance WHERE id = ?"
-	_, err := h.db.Exec(query, h.instanceId)
+	_, err := h.db.ExecContext(ctx, query, h.instanceId)
 	if err != nil {
 		h.logger.Warnw("Could not remove instance from database", zap.Error(err), zap.String("query", query))
 	}
