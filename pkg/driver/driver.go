@@ -41,7 +41,7 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		},
 		shouldRetry,
 		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
-		timeout,
+		retry.Settings{Timeout: timeout},
 	), "can't connect to database")
 	return conn, err
 }

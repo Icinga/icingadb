@@ -66,7 +66,7 @@ func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, st
 				return false
 			},
 			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-			5*time.Minute,
+			retry.Settings{Timeout: 5 * time.Minute},
 		)
 
 		err = errors.Wrap(err, "can't connect to Redis")
