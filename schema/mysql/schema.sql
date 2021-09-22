@@ -151,6 +151,7 @@ CREATE TABLE host_state (
   latency int unsigned DEFAULT NULL,
   timeout int unsigned DEFAULT NULL,
   check_source text DEFAULT NULL,
+  scheduling_source text DEFAULT NULL,
 
   last_update bigint unsigned DEFAULT NULL,
   last_state_change bigint unsigned NOT NULL,
@@ -305,6 +306,7 @@ CREATE TABLE service_state (
   latency int unsigned DEFAULT NULL,
   timeout int unsigned DEFAULT NULL,
   check_source text DEFAULT NULL,
+  scheduling_source text DEFAULT NULL,
 
   last_update bigint unsigned DEFAULT NULL,
   last_state_change bigint unsigned NOT NULL,
@@ -935,6 +937,7 @@ CREATE TABLE state_history (
   long_output mediumtext DEFAULT NULL,
   max_check_attempts int unsigned NOT NULL,
   check_source text DEFAULT NULL,
+  scheduling_source text DEFAULT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
