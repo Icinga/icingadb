@@ -3,7 +3,7 @@
 ## Requirements <a id="installation-requirements"></a>
 
 * Local Redis instance (Will be installed during this documentation)
-* MySQL/MariaDB database `icingadb`, user and schema imports (Will be set up during this documentation)
+* MySQL/MariaDB/PostgreSQL database `icingadb`, user and schema imports (Will be set up during this documentation)
 
 ## Setting up Icinga DB <a id="setting-up-icingadb"></a>
 
@@ -133,7 +133,11 @@ Debian/Ubuntu:
 apt-get install icingadb-redis
 ```
 
-### Setting up the MySQL database <a id="setting-up-mysql-db"></a>
+### Setting up the Database <a id="setting-up-db"></a>
+
+A MySQL/MariaDB or PostgreSQL database is required.
+
+#### MySQL/MariaDB <a id="setting-up-mysql-db"></a>
 
 Note that if you're using a version of MySQL < 5.7 or MariaDB < 10.2, the following server options must be set:
 
@@ -158,6 +162,38 @@ After creating the database, you can import the Icinga DB schema using the follo
 ```
 mysql -u root -p icingadb </usr/share/icingadb/schema/mysql/schema.sql
 ```
+
+#### PostgreSQL <a id="setting-up-pgsql-db"></a>
+
+Set up a PostgreSQL database for Icinga DB:
+
+```
+# su -l postgres
+
+createuser -P icingadb
+createdb -E UTF8 -O icingadb icingadb
+```
+
+Edit `pg_hba.conf`, insert the following before everything else:
+
+```
+local all icingadb           md5
+host  all icingadb 0.0.0.0/0 md5
+host  all icingadb      ::/0 md5
+```
+
+To apply those changes, run `systemctl reload postgresql`.
+(On RHEL/CentOS 7 the service is called "rh-postgresql95-postgresql".)
+
+After creating the database you can import the Icinga DB schema using the
+following command. Enter the password when asked.
+
+```
+psql -U icingadb icingadb < /usr/share/icingadb/schema/pgsql/schema.sql
+```
+
+On RHEL/CentOS 7 prefix "createuser", "createdb" and "psql" with
+"/opt/rh/rh-postgresql95/root/usr/bin/".
 
 ### Running Icinga DB <a id="running-icingadb"></a>
 
