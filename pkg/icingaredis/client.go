@@ -70,9 +70,9 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 	return pairs, com.WaitAsync(contracts.WaiterFunc(func() error {
 		defer close(pairs)
 
-		var cnt com.Counter
+		var cnt uint64
 		defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-			c.logger.Infof("Fetched %d elements of %s in %s", cnt.Val(), key, elapsed)
+			c.logger.Infof("Fetched %d elements of %s in %s", cnt, key, elapsed)
 		})
 
 		var cursor uint64
@@ -93,7 +93,7 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 					Field: page[i],
 					Value: page[i+1],
 				}:
-					cnt.Inc()
+					cnt++
 				case <-ctx.Done():
 					return ctx.Err()
 				}
