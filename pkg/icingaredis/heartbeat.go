@@ -3,7 +3,6 @@ package icingaredis
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
-	"github.com/icinga/icingadb/pkg/com"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -21,16 +20,13 @@ var timeout = 60 * time.Second
 // Also signals on if the heartbeat is Lost.
 type Heartbeat struct {
 	active    bool
-	beat      *com.Cond
+	events    chan *v1.StatsMessage
 	cancelCtx context.CancelFunc
 	client    *Client
 	done      chan struct{}
 	errMu     sync.Mutex
 	err       error
 	logger    *zap.SugaredLogger
-	lost      *com.Cond
-	message   *v1.StatsMessage
-	messageMu sync.Mutex
 }
 
 // NewHeartbeat returns a new Heartbeat and starts the heartbeat controller loop.
@@ -38,12 +34,11 @@ func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger
 	ctx, cancelCtx := context.WithCancel(ctx)
 
 	heartbeat := &Heartbeat{
-		beat:      com.NewCond(ctx),
+		events:    make(chan *v1.StatsMessage, 1),
 		cancelCtx: cancelCtx,
 		client:    client,
 		done:      make(chan struct{}),
 		logger:    logger,
-		lost:      com.NewCond(ctx),
 	}
 
 	go heartbeat.controller(ctx)
@@ -51,9 +46,11 @@ func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger
 	return heartbeat
 }
 
-// Beat returns a channel that will be closed when a new heartbeat is received.
-func (h *Heartbeat) Beat() <-chan struct{} {
-	return h.beat.Wait()
+// Events returns a channel that is sent to on heartbeat events.
+//
+// A non-nil pointer signals that a heartbeat was received from Icinga 2 whereas a nil pointer signals a heartbeat loss.
+func (h *Heartbeat) Events() <-chan *v1.StatsMessage {
+	return h.events
 }
 
 // Close stops the heartbeat controller loop, waits for it to finish, and returns an error if any.
@@ -76,19 +73,6 @@ func (h *Heartbeat) Err() error {
 	defer h.errMu.Unlock()
 
 	return h.err
-}
-
-// Lost returns a channel that will be closed if the heartbeat is lost.
-func (h *Heartbeat) Lost() <-chan struct{} {
-	return h.lost.Wait()
-}
-
-// Message returns the last heartbeat message.
-func (h *Heartbeat) Message() *v1.StatsMessage {
-	h.messageMu.Lock()
-	defer h.messageMu.Unlock()
-
-	return h.message
 }
 
 // controller loop.
@@ -142,12 +126,11 @@ func (h *Heartbeat) controller(ctx context.Context) {
 					h.logger.Infow("Received first Icinga 2 heartbeat", zap.String("environment", s.Environment))
 					h.active = true
 				}
-				h.setMessage(&m)
-				h.beat.Broadcast()
+				h.sendEvent(&m)
 			case <-time.After(timeout):
 				if h.active {
 					h.logger.Warnw("Lost Icinga 2 heartbeat", zap.Duration("timeout", timeout))
-					h.lost.Broadcast()
+					h.sendEvent(nil)
 					h.active = false
 				} else {
 					h.logger.Warn("Waiting for Icinga 2 heartbeat")
@@ -175,9 +158,17 @@ func (h *Heartbeat) setError(err error) {
 	h.err = errors.Wrap(err, "heartbeat failed")
 }
 
-func (h *Heartbeat) setMessage(m *v1.StatsMessage) {
-	h.messageMu.Lock()
-	defer h.messageMu.Unlock()
+func (h *Heartbeat) sendEvent(m *v1.StatsMessage) {
+	// Remove any not yet delivered event
+	select {
+	case old := <-h.events:
+		if old != nil {
+			h.logger.Debug("Previous heartbeat not read from channel")
+		} else {
+			h.logger.Debug("Previous heartbeat loss event not read from channel")
+		}
+	default:
+	}
 
-	h.message = m
+	h.events <- m
 }

@@ -120,44 +120,45 @@ func (h *HA) controller() {
 
 	for {
 		select {
-		case <-h.heartbeat.Beat():
-			m := h.heartbeat.Message()
-			now := time.Now()
-			t, err := m.Time()
-			if err != nil {
-				h.abort(err)
-			}
-			tt := t.Time()
-			if tt.After(now.Add(1 * time.Second)) {
-				h.logger.Debugw("Received heartbeat from the future", zap.Time("time", tt))
-			}
-			if tt.Before(now.Add(-1 * timeout)) {
-				h.logger.Errorw("Received heartbeat from the past", zap.Time("time", tt))
+		case m := <-h.heartbeat.Events():
+			if m != nil {
+				now := time.Now()
+				t, err := m.Time()
+				if err != nil {
+					h.abort(err)
+				}
+				tt := t.Time()
+				if tt.After(now.Add(1 * time.Second)) {
+					h.logger.Debugw("Received heartbeat from the future", zap.Time("time", tt))
+				}
+				if tt.Before(now.Add(-1 * timeout)) {
+					h.logger.Errorw("Received heartbeat from the past", zap.Time("time", tt))
+					h.signalHandover()
+					continue
+				}
+				s, err := m.IcingaStatus()
+				if err != nil {
+					h.abort(err)
+				}
+
+				select {
+				case <-logTicker.C:
+					shouldLog = true
+				default:
+				}
+				if err = h.realize(s, t, shouldLog); err != nil {
+					h.abort(err)
+				}
+				if !oldInstancesRemoved {
+					go h.removeOldInstances(s)
+					oldInstancesRemoved = true
+				}
+
+				shouldLog = false
+			} else {
+				h.logger.Error("Lost heartbeat")
 				h.signalHandover()
-				continue
 			}
-			s, err := m.IcingaStatus()
-			if err != nil {
-				h.abort(err)
-			}
-
-			select {
-			case <-logTicker.C:
-				shouldLog = true
-			default:
-			}
-			if err = h.realize(s, t, shouldLog); err != nil {
-				h.abort(err)
-			}
-			if !oldInstancesRemoved {
-				go h.removeOldInstances(s)
-				oldInstancesRemoved = true
-			}
-
-			shouldLog = false
-		case <-h.heartbeat.Lost():
-			h.logger.Error("Lost heartbeat")
-			h.signalHandover()
 		case <-h.heartbeat.Done():
 			if err := h.heartbeat.Err(); err != nil {
 				h.abort(err)
