@@ -18,6 +18,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -101,10 +103,10 @@ func (db *DB) BuildColumns(subject interface{}) []string {
 
 // BuildDeleteStmt returns a DELETE statement for the given struct.
 func (db *DB) BuildDeleteStmt(from interface{}) string {
-	return fmt.Sprintf(
+	return db.PostProcessPlaceholders(fmt.Sprintf(
 		`DELETE FROM %s WHERE id IN (?)`,
 		utils.TableName(from),
-	)
+	))
 }
 
 // BuildInsertStmt returns an INSERT INTO statement for the given struct.
@@ -123,13 +125,22 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 // which the database ignores rows that have already been inserted.
 func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 	columns := db.BuildColumns(into)
+	var clause string
+
+	switch db.DriverName() {
+	case "icingadb-mysql":
+		// MySQL treats UPDATE id = id as a no-op.
+		clause = "ON DUPLICATE KEY UPDATE id = id"
+	case "icingadb-pgsql":
+		clause = "ON CONFLICT DO NOTHING"
+	}
 
 	return fmt.Sprintf(
-		// MySQL treats UPDATE id = id as a no-op.
-		`INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE id = id`,
+		`INSERT INTO %s (%s) VALUES (%s) %s`,
 		utils.TableName(into),
 		strings.Join(columns, ", "),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
+		clause,
 	), len(columns)
 }
 
@@ -177,17 +188,45 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 		updateColumns = insertColumns
 	}
 
+	var clause, setFormat string
+	switch db.DriverName() {
+	case "icingadb-mysql":
+		clause = "ON DUPLICATE KEY UPDATE"
+		setFormat = "%[1]s = VALUES(%[1]s)"
+	case "icingadb-pgsql":
+		var ids []string
+		for _, column := range insertColumns {
+			if column == "id" {
+				ids = []string{column}
+				break
+			}
+		}
+
+		if ids == nil {
+			for _, column := range insertColumns {
+				if strings.HasSuffix(column, "_id") {
+					ids = append(ids, column)
+					break
+				}
+			}
+		}
+
+		clause = fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET", strings.Join(ids, ","))
+		setFormat = "%[1]s = EXCLUDED.%[1]s"
+	}
+
 	set := make([]string, 0, len(updateColumns))
 
 	for _, col := range updateColumns {
-		set = append(set, fmt.Sprintf("%s = VALUES(%s)", col, col))
+		set = append(set, fmt.Sprintf(setFormat, col))
 	}
 
 	return fmt.Sprintf(
-		`INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s`,
+		`INSERT INTO %s (%s) VALUES (%s) %s %s`,
 		utils.TableName(subject),
 		strings.Join(insertColumns, ","),
 		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
+		clause,
 		strings.Join(set, ","),
 	), len(insertColumns)
 }
@@ -545,6 +584,21 @@ func (db *DB) GetSemaphoreForTable(table string) *semaphore.Weighted {
 		db.tableSemaphores[table] = sem
 		return sem
 	}
+}
+
+var placeholder = regexp.MustCompile(`\?`)
+
+// PostProcessPlaceholders returns query with placeholders (?) suitable for db.
+func (db *DB) PostProcessPlaceholders(query string) string {
+	if db.DriverName() == "icingadb-pgsql" {
+		var i uint64
+		return placeholder.ReplaceAllStringFunc(query, func(string) string {
+			i++
+			return "$" + strconv.FormatUint(i, 10)
+		})
+	}
+
+	return query
 }
 
 func (db *DB) log(ctx context.Context, query string, counter *com.Counter) periodic.Stopper {

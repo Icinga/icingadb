@@ -236,8 +236,8 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 				return errors.Wrap(errBegin, "can't start transaction")
 			}
 
-			query := `SELECT id, heartbeat FROM icingadb_instance` +
-				` WHERE environment_id = ? AND responsible = ? AND id != ? AND heartbeat > ?`
+			query := h.db.PostProcessPlaceholders("SELECT id, heartbeat FROM icingadb_instance " +
+				"WHERE environment_id = ? AND responsible = ? AND id <> ? AND heartbeat > ?")
 
 			instance := &v1.IcingadbInstance{}
 
@@ -339,7 +339,7 @@ func (h *HA) insertEnvironment() error {
 func (h *HA) removeInstance(ctx context.Context) {
 	h.logger.Debugw("Removing our row from icingadb_instance", zap.String("instance_id", hex.EncodeToString(h.instanceId)))
 	// Intentionally not using h.ctx here as it's already cancelled.
-	query := "DELETE FROM icingadb_instance WHERE id = ?"
+	query := h.db.PostProcessPlaceholders("DELETE FROM icingadb_instance WHERE id = ?")
 	_, err := h.db.ExecContext(ctx, query, h.instanceId)
 	if err != nil {
 		h.logger.Warnw("Could not remove instance from database", zap.Error(err), zap.String("query", query))
@@ -351,8 +351,8 @@ func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus, envId types.Binar
 	case <-h.ctx.Done():
 		return
 	case <-time.After(timeout):
-		query := "DELETE FROM icingadb_instance " +
-			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?"
+		query := h.db.PostProcessPlaceholders("DELETE FROM icingadb_instance " +
+			"WHERE id <> ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?")
 		heartbeat := types.UnixMilli(time.Now().Add(-timeout))
 		result, err := h.db.ExecContext(h.ctx, query, h.instanceId, envId,
 			s.EndpointId, heartbeat)

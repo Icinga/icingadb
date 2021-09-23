@@ -8,6 +8,7 @@ import (
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"syscall"
@@ -79,6 +80,7 @@ func (d Driver) OpenConnector(name string) (driver.Connector, error) {
 func Register(logger *logging.Logger) {
 	sql.Register("icingadb-mysql", &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
 	_ = mysql.SetLogger(mysqlLogger(func(v ...interface{}) { logger.Debug(v...) }))
+	sqlx.BindDriver("icingadb-pgsql", sqlx.DOLLAR)
 }
 
 // ctxDriver helps ensure that we only support drivers that implement driver.Driver and driver.DriverContext.
