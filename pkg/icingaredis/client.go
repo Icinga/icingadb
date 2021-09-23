@@ -70,6 +70,8 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 	return pairs, com.WaitAsync(contracts.WaiterFunc(func() error {
 		defer close(pairs)
 
+		seen := make(map[string]struct{})
+
 		var cnt uint64
 		defer utils.Timed(time.Now(), func(elapsed time.Duration) {
 			c.logger.Infof("Fetched %d elements of %s in %s", cnt, key, elapsed)
@@ -88,6 +90,13 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 			}
 
 			for i := 0; i < len(page); i += 2 {
+				if _, ok := seen[page[i]]; ok {
+					// Ignore duplicate returned by HSCAN.
+					continue
+				}
+
+				seen[page[i]] = struct{}{}
+
 				select {
 				case pairs <- HPair{
 					Field: page[i],
