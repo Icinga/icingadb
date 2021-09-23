@@ -146,7 +146,7 @@ func (h *Heartbeat) controller(ctx context.Context) {
 				h.beat.Broadcast()
 			case <-time.After(timeout):
 				if h.active {
-					h.logger.Warn("Lost Icinga 2 heartbeat", zap.Duration("timeout", timeout))
+					h.logger.Warnw("Lost Icinga 2 heartbeat", zap.Duration("timeout", timeout))
 					h.lost.Broadcast()
 					h.active = false
 				} else {
