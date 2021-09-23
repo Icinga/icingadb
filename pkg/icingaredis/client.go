@@ -63,7 +63,7 @@ type HPair struct {
 
 // HYield yields HPair field-value pairs for all fields in the hash stored at key.
 func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan error) {
-	pairs := make(chan HPair)
+	pairs := make(chan HPair, c.options.HScanCount)
 
 	c.logger.Infof("Syncing %s", key)
 
