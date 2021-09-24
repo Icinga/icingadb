@@ -105,7 +105,7 @@ func (db *DB) BuildColumns(subject interface{}) []string {
 // BuildDeleteStmt returns a DELETE statement for the given struct.
 func (db *DB) BuildDeleteStmt(from interface{}) string {
 	return db.PostProcessPlaceholders(fmt.Sprintf(
-		`DELETE FROM %s WHERE id IN (?)`,
+		`DELETE FROM "%s" WHERE id IN (?)`,
 		utils.TableName(from),
 	))
 }
@@ -115,7 +115,7 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 	columns := db.BuildColumns(into)
 
 	return fmt.Sprintf(
-		`INSERT INTO %s (%s) VALUES (%s)`,
+		`INSERT INTO "%s" (%s) VALUES (%s)`,
 		utils.TableName(into),
 		strings.Join(columns, ", "),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
@@ -137,7 +137,7 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 	}
 
 	return fmt.Sprintf(
-		`INSERT INTO %s (%s) VALUES (%s) %s`,
+		`INSERT INTO "%s" (%s) VALUES (%s) %s`,
 		utils.TableName(into),
 		strings.Join(columns, ", "),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
@@ -149,7 +149,7 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 // and the column list from the specified columns struct.
 func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
 	q := fmt.Sprintf(
-		`SELECT %s FROM %s`,
+		`SELECT %s FROM "%s"`,
 		strings.Join(db.BuildColumns(columns), ", "),
 		utils.TableName(table),
 	)
@@ -172,7 +172,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 	}
 
 	return fmt.Sprintf(
-		`UPDATE %s SET %s WHERE id = :id`,
+		`UPDATE "%s" SET %s WHERE id = :id`,
 		utils.TableName(update),
 		strings.Join(set, ", "),
 	), len(columns) + 1 // +1 because of WHERE id = :id
@@ -223,7 +223,7 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 	}
 
 	return fmt.Sprintf(
-		`INSERT INTO %s (%s) VALUES (%s) %s %s`,
+		`INSERT INTO "%s" (%s) VALUES (%s) %s %s`,
 		utils.TableName(subject),
 		strings.Join(insertColumns, ","),
 		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),

@@ -49,6 +49,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 		config.Addr = net.JoinHostPort(d.Host, fmt.Sprint(d.Port))
 		config.DBName = d.Database
 		config.Timeout = time.Minute
+		config.Params = map[string]string{"sql_mode": "ANSI_QUOTES"}
 
 		tlsConfig, err := d.TlsOptions.MakeConfig(config.Addr)
 		if err != nil {
