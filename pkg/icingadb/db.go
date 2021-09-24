@@ -125,6 +125,7 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 // BuildInsertIgnoreStmt returns an INSERT statement for the specified struct for
 // which the database ignores rows that have already been inserted.
 func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
+	table := utils.TableName(into)
 	columns := db.BuildColumns(into)
 	var clause string
 
@@ -133,12 +134,12 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 		// MySQL treats UPDATE id = id as a no-op.
 		clause = "ON DUPLICATE KEY UPDATE id = id"
 	case "icingadb-pgsql":
-		clause = "ON CONFLICT DO NOTHING"
+		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO NOTHING", table)
 	}
 
 	return fmt.Sprintf(
 		`INSERT INTO "%s" (%s) VALUES (%s) %s`,
-		utils.TableName(into),
+		table,
 		strings.Join(columns, ", "),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 		clause,
@@ -181,6 +182,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 // BuildUpsertStmt returns an upsert statement for the given struct.
 func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {
 	insertColumns := db.BuildColumns(subject)
+	table := utils.TableName(subject)
 	var updateColumns []string
 
 	if upserter, ok := subject.(contracts.Upserter); ok {
@@ -195,24 +197,7 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 		clause = "ON DUPLICATE KEY UPDATE"
 		setFormat = "%[1]s = VALUES(%[1]s)"
 	case "icingadb-pgsql":
-		var ids []string
-		for _, column := range insertColumns {
-			if column == "id" {
-				ids = []string{column}
-				break
-			}
-		}
-
-		if ids == nil {
-			for _, column := range insertColumns {
-				if strings.HasSuffix(column, "_id") {
-					ids = append(ids, column)
-					break
-				}
-			}
-		}
-
-		clause = fmt.Sprintf("ON CONFLICT (%s) DO UPDATE SET", strings.Join(ids, ","))
+		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO UPDATE SET", table)
 		setFormat = "%[1]s = EXCLUDED.%[1]s"
 	}
 
@@ -224,7 +209,7 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 
 	return fmt.Sprintf(
 		`INSERT INTO "%s" (%s) VALUES (%s) %s %s`,
-		utils.TableName(subject),
+		table,
 		strings.Join(insertColumns, ","),
 		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
 		clause,
