@@ -146,9 +146,18 @@ func (h *HA) controller() {
 					shouldLog = true
 				default:
 				}
-				if err = h.realize(s, t, shouldLog); err != nil {
+
+				realizeCtx, cancelRealizeCtx := context.WithDeadline(h.ctx, m.ExpiryTime())
+				err = h.realize(realizeCtx, s, t, shouldLog)
+				cancelRealizeCtx()
+				if errors.Is(err, context.DeadlineExceeded) {
+					h.signalHandover()
+					continue
+				}
+				if err != nil {
 					h.abort(err)
 				}
+
 				if !oldInstancesRemoved {
 					go h.removeOldInstances(s)
 					oldInstancesRemoved = true
@@ -169,13 +178,13 @@ func (h *HA) controller() {
 	}
 }
 
-func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLog bool) error {
+func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLog bool) error {
 	boff := backoff.NewExponentialWithJitter(time.Millisecond*256, time.Second*3)
 	for attempt := 0; true; attempt++ {
 		sleep := boff(uint64(attempt))
 		time.Sleep(sleep)
 
-		ctx, cancelCtx := context.WithCancel(h.ctx)
+		ctx, cancelCtx := context.WithCancel(ctx)
 		tx, err := h.db.BeginTxx(ctx, &sql.TxOptions{
 			Isolation: sql.LevelSerializable,
 		})
