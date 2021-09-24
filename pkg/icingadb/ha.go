@@ -123,7 +123,7 @@ func (h *HA) controller() {
 		case m := <-h.heartbeat.Events():
 			if m != nil {
 				now := time.Now()
-				t, err := m.Time()
+				t, err := m.Stats().Time()
 				if err != nil {
 					h.abort(err)
 				}
@@ -136,7 +136,7 @@ func (h *HA) controller() {
 					h.signalHandover()
 					continue
 				}
-				s, err := m.IcingaStatus()
+				s, err := m.Stats().IcingaStatus()
 				if err != nil {
 					h.abort(err)
 				}
