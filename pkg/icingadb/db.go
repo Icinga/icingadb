@@ -210,7 +210,7 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 						},
 						IsRetryable,
 						backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-						0,
+						retry.Settings{},
 					)
 				}
 			}(b))
@@ -283,7 +283,7 @@ func (db *DB) NamedBulkExec(
 							},
 							IsRetryable,
 							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-							0,
+							retry.Settings{},
 						)
 					}
 				}(b))
@@ -359,7 +359,7 @@ func (db *DB) NamedBulkExecTx(
 							},
 							IsRetryable,
 							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-							0,
+							retry.Settings{},
 						)
 					}
 				}(b))

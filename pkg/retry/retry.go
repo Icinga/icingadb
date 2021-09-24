@@ -13,23 +13,41 @@ type RetryableFunc func(context.Context) error
 // IsRetryable checks whether a new attempt can be started based on the error passed.
 type IsRetryable func(error) bool
 
+// Settings aggregates optional settings for WithBackoff.
+type Settings struct {
+	// Timeout lets WithBackoff give up once elapsed (if >0).
+	Timeout time.Duration
+	// OnError is called if an error occurs.
+	OnError func(elapsed time.Duration, attempt uint64, err, lastErr error)
+	// OnSuccess is called once the operation succeeds.
+	OnSuccess func(elapsed time.Duration, attempt uint64, lastErr error)
+}
+
 // WithBackoff retries the passed function if it fails and the error allows it to retry.
 // The specified backoff policy is used to determine how long to sleep between attempts.
-// Once the specified timeout (if >0) elapses, WithBackoff gives up.
 func WithBackoff(
-	ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff, timeout time.Duration,
+	ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff, settings Settings,
 ) (err error) {
-	if timeout > 0 {
+	if settings.Timeout > 0 {
 		var cancelCtx context.CancelFunc
-		ctx, cancelCtx = context.WithTimeout(ctx, timeout)
+		ctx, cancelCtx = context.WithTimeout(ctx, settings.Timeout)
 		defer cancelCtx()
 	}
 
-	for attempt := 0; ; /* true */ attempt++ {
+	start := time.Now()
+	for attempt := uint64(0); ; /* true */ attempt++ {
 		prevErr := err
 
 		if err = retryableFunc(ctx); err == nil {
+			if settings.OnSuccess != nil {
+				settings.OnSuccess(time.Since(start), attempt, prevErr)
+			}
+
 			return
+		}
+
+		if settings.OnError != nil {
+			settings.OnError(time.Since(start), attempt, err, prevErr)
 		}
 
 		isRetryable := retryable(err)
@@ -44,7 +62,7 @@ func WithBackoff(
 			return
 		}
 
-		sleep := b(uint64(attempt))
+		sleep := b(attempt)
 		select {
 		case <-ctx.Done():
 			if err == nil {
