@@ -19,6 +19,7 @@ type StateHistory struct {
 	LongOutput         types.String    `json:"long_output"`
 	MaxCheckAttempts   uint32          `json:"max_check_attempts"`
 	CheckSource        types.String    `json:"check_source"`
+	SchedulingSource   types.String    `json:"scheduling_source"`
 }
 
 type HistoryState struct {

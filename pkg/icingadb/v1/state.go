@@ -12,6 +12,7 @@ type State struct {
 	Attempt                   uint8                      `json:"check_attempt"`
 	CheckCommandline          types.String               `json:"commandline"`
 	CheckSource               types.String               `json:"check_source"`
+	SchedulingSource          types.String               `json:"scheduling_source"`
 	ExecutionTime             float64                    `json:"execution_time"`
 	HardState                 uint8                      `json:"hard_state"`
 	InDowntime                types.Bool                 `json:"in_downtime"`
