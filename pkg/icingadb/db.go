@@ -19,8 +19,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"reflect"
-	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -104,7 +102,7 @@ func (db *DB) BuildColumns(subject interface{}) []string {
 
 // BuildDeleteStmt returns a DELETE statement for the given struct.
 func (db *DB) BuildDeleteStmt(from interface{}) string {
-	return db.PostProcessPlaceholders(fmt.Sprintf(
+	return db.Rebind(fmt.Sprintf(
 		`DELETE FROM "%s" WHERE id IN (?)`,
 		utils.TableName(from),
 	))
@@ -570,21 +568,6 @@ func (db *DB) GetSemaphoreForTable(table string) *semaphore.Weighted {
 		db.tableSemaphores[table] = sem
 		return sem
 	}
-}
-
-var placeholder = regexp.MustCompile(`\?`)
-
-// PostProcessPlaceholders returns query with placeholders (?) suitable for db.
-func (db *DB) PostProcessPlaceholders(query string) string {
-	if db.DriverName() == "icingadb-pgsql" {
-		var i uint64
-		return placeholder.ReplaceAllStringFunc(query, func(string) string {
-			i++
-			return "$" + strconv.FormatUint(i, 10)
-		})
-	}
-
-	return query
 }
 
 func (db *DB) log(ctx context.Context, query string, counter *com.Counter) periodic.Stopper {
