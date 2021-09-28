@@ -1,8 +1,0 @@
-database:
-  host: icingadb
-  port: 3306
-  database: icingadb
-  user: icingadb
-  password: icingadb
-redis:
-  address: redis:6380
