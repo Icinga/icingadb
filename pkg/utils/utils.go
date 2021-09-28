@@ -49,20 +49,7 @@ func TableName(t interface{}) string {
 // Key returns the name with all Unicode letters mapped to lower case letters,
 // with an additional separator in front of each original upper case letter.
 func Key(name string, sep byte) string {
-	r := []rune(name)
-	b := strings.Builder{}
-	b.Grow(len(r) + 2) // nominal 2 bytes of extra space for inserted delimiters
-
-	b.WriteRune(unicode.ToLower(r[0]))
-	for _, r := range r[1:] {
-		if unicode.IsUpper(r) {
-			b.WriteByte(sep)
-		}
-
-		b.WriteRune(unicode.ToLower(r))
-	}
-
-	return b.String()
+	return ConvertCamelCase(name, unicode.LowerCase, sep)
 }
 
 // Timed calls the given callback with the time that has elapsed since the start.
@@ -155,4 +142,40 @@ func Ellipsize(s string, limit int) string {
 	default:
 		return utf8.Slice(0, limit-ellipsis.RuneCount()) + ellipsis.String()
 	}
+}
+
+// ConvertCamelCase converts a (lower) CamelCase string into various cases.
+// _case must be unicode.Lower or unicode.Upper.
+//
+// Example usage:
+//
+//  # snake_case
+//  ConvertCamelCase(s, unicode.Lower, '_')
+//
+//  # SCREAMING_SNAKE_CASE
+//  ConvertCamelCase(s, unicode.Upper, '_')
+//
+//  # kebab-case
+//  ConvertCamelCase(s, unicode.Lower, '-')
+//
+//  # SCREAMING-KEBAB-CASE
+//  ConvertCamelCase(s, unicode.Upper, '-')
+//
+//  # other.separator
+//  ConvertCamelCase(s, unicode.Lower, '.')
+func ConvertCamelCase(s string, _case int, sep byte) string {
+	r := []rune(s)
+	b := strings.Builder{}
+	b.Grow(len(r) + 2) // nominal 2 bytes of extra space for inserted delimiters
+
+	b.WriteRune(unicode.To(_case, r[0]))
+	for _, r := range r[1:] {
+		if sep != 0 && unicode.IsUpper(r) {
+			b.WriteByte(sep)
+		}
+
+		b.WriteRune(unicode.To(_case, r))
+	}
+
+	return b.String()
 }
