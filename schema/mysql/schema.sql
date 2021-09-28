@@ -129,10 +129,10 @@ CREATE TABLE host_state (
   attempt tinyint unsigned NOT NULL,
   severity smallint unsigned NOT NULL,
 
-  output mediumtext DEFAULT NULL,
-  long_output mediumtext DEFAULT NULL,
-  performance_data mediumtext DEFAULT NULL,
-  normalized_performance_data mediumtext DEFAULT NULL,
+  output longtext DEFAULT NULL,
+  long_output longtext DEFAULT NULL,
+  performance_data longtext DEFAULT NULL,
+  normalized_performance_data longtext DEFAULT NULL,
   check_commandline text DEFAULT NULL,
 
   is_problem enum('n', 'y') NOT NULL,
@@ -283,10 +283,10 @@ CREATE TABLE service_state (
   attempt tinyint unsigned NOT NULL,
   severity smallint unsigned NOT NULL,
 
-  output mediumtext DEFAULT NULL,
-  long_output mediumtext DEFAULT NULL,
-  performance_data mediumtext DEFAULT NULL,
-  normalized_performance_data mediumtext DEFAULT NULL,
+  output longtext DEFAULT NULL,
+  long_output longtext DEFAULT NULL,
+  performance_data longtext DEFAULT NULL,
+  normalized_performance_data longtext DEFAULT NULL,
 
   check_commandline text DEFAULT NULL,
 
@@ -933,8 +933,8 @@ CREATE TABLE state_history (
   previous_soft_state tinyint unsigned NOT NULL,
   previous_hard_state tinyint unsigned NOT NULL,
   attempt tinyint unsigned NOT NULL,
-  output mediumtext DEFAULT NULL,
-  long_output mediumtext DEFAULT NULL,
+  output longtext DEFAULT NULL,
+  long_output longtext DEFAULT NULL,
   max_check_attempts int unsigned NOT NULL,
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
