@@ -28,6 +28,8 @@ type Settings struct {
 func WithBackoff(
 	ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff, settings Settings,
 ) (err error) {
+	parentCtx := ctx
+
 	if settings.Timeout > 0 {
 		var cancelCtx context.CancelFunc
 		ctx, cancelCtx = context.WithTimeout(ctx, settings.Timeout)
@@ -65,10 +67,14 @@ func WithBackoff(
 		sleep := b(attempt)
 		select {
 		case <-ctx.Done():
-			if err == nil {
-				err = ctx.Err()
+			if outerErr := parentCtx.Err(); outerErr != nil {
+				err = errors.Wrap(outerErr, "outer context canceled")
+			} else {
+				if err == nil {
+					err = ctx.Err()
+				}
+				err = errors.Wrap(err, "can't retry")
 			}
-			err = errors.Wrap(err, "can't retry")
 
 			return
 		case <-time.After(sleep):
