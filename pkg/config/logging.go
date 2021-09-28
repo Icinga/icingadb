@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/icinga/icingadb/internal/logging"
+	"github.com/icinga/icingadb/pkg/logging"
 	"go.uber.org/zap/zapcore"
 )
 

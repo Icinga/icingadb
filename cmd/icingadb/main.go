@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"github.com/icinga/icingadb/internal/command"
-	"github.com/icinga/icingadb/internal/logging"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -12,6 +11,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
