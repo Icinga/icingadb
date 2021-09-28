@@ -3,6 +3,7 @@
 ## Overview <a id="configuration-overview"></a>
 
 The configuration is stored in `/etc/icingadb/icingadb.yml`.
+See [config.yml.example](../config.yml.example) for an example configuration.
 
 ## Redis Configuration <a id="configuration-redis"></a>
 
@@ -23,16 +24,3 @@ port                     | **Required.** Database port.
 database                 | **Required.** Database database.
 user                     | **Required.** Database username.
 password                 | **Required.** Database password.
-
-## Example Configuration <a id="configuration-example"></a>
-
-```yaml
-database:
-  host: icingadb
-  port: 3306
-  database: icingadb
-  user: icingadb
-  password: icingadb
-redis:
-  address: redis:6380
-```
