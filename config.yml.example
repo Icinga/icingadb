@@ -15,6 +15,10 @@ logging:
   # If not set, defaults to 'info'.
   level:
 
+  # Logging output. Can be set to 'console' (stderr) or 'systemd-journald'.
+  # If not set, logs to systemd-journald when running under systemd, otherwise stderr.
+  output:
+
   # Map of component-logging level pairs to define a different log level than the default value for each component.
   options:
     database:

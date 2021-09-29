@@ -27,6 +27,10 @@ func (c *Config) Validate() error {
 	if err := c.Redis.Validate(); err != nil {
 		return err
 	}
+	if err := c.Logging.Validate(); err != nil {
+		return err
+	}
+
 	return nil
 }
 

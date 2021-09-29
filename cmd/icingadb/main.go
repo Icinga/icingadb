@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/coreos/go-systemd/v22/daemon"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
@@ -38,7 +39,7 @@ func run() int {
 	logs, err := logging.NewLogging(
 		utils.AppName(),
 		cmd.Config.Logging.Level,
-		logging.CONSOLE,
+		cmd.Config.Logging.Output,
 		cmd.Config.Logging.Options,
 	)
 	if err != nil {
