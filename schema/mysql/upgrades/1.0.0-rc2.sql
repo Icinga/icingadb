@@ -49,7 +49,7 @@ ALTER TABLE host
     MODIFY perfdata_enabled enum('n','y') NOT NULL,
     MODIFY is_volatile enum('n','y') NOT NULL;
 ALTER TABLE host_state
-    ADD COLUMN normalized_performance_data mediumtext DEFAULT NULL AFTER performance_data,
+    ADD COLUMN normalized_performance_data longtext DEFAULT NULL AFTER performance_data,
     ADD COLUMN last_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id' AFTER acknowledgement_comment_id,
     ADD COLUMN scheduling_source text DEFAULT NULL AFTER check_source,
     MODIFY is_problem enum('n','y') NOT NULL,
@@ -68,7 +68,7 @@ ALTER TABLE service
     MODIFY perfdata_enabled enum('n','y') NOT NULL,
     MODIFY is_volatile enum('n','y') NOT NULL;
 ALTER TABLE service_state
-    ADD COLUMN normalized_performance_data mediumtext DEFAULT NULL AFTER performance_data,
+    ADD COLUMN normalized_performance_data longtext DEFAULT NULL AFTER performance_data,
     ADD COLUMN last_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id' AFTER acknowledgement_comment_id,
     ADD COLUMN scheduling_source text DEFAULT NULL AFTER check_source,
     MODIFY is_problem enum('n','y') NOT NULL,
@@ -131,16 +131,16 @@ INSERT INTO icingadb_schema (version, timestamp)
   VALUES (2, CURRENT_TIMESTAMP() * 1000);
 
 ALTER TABLE host_state
-    MODIFY output mediumtext DEFAULT NULL,
-    MODIFY long_output mediumtext DEFAULT NULL,
-    MODIFY performance_data mediumtext DEFAULT NULL;
+    MODIFY output longtext DEFAULT NULL,
+    MODIFY long_output longtext DEFAULT NULL,
+    MODIFY performance_data longtext DEFAULT NULL;
 
 ALTER TABLE state_history
     ADD COLUMN scheduling_source text DEFAULT NULL AFTER check_source,
-    MODIFY output mediumtext DEFAULT NULL,
-    MODIFY long_output mediumtext DEFAULT NULL;
+    MODIFY output longtext DEFAULT NULL,
+    MODIFY long_output longtext DEFAULT NULL;
 
 ALTER TABLE service_state
-    MODIFY output mediumtext DEFAULT NULL,
-    MODIFY long_output mediumtext DEFAULT NULL,
-    MODIFY performance_data mediumtext DEFAULT NULL;
+    MODIFY output longtext DEFAULT NULL,
+    MODIFY long_output longtext DEFAULT NULL,
+    MODIFY performance_data longtext DEFAULT NULL;
