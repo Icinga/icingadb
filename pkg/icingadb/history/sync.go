@@ -103,14 +103,13 @@ func (s Sync) readFromRedis(ctx context.Context, key string, output chan<- redis
 	xra := &redis.XReadArgs{
 		Streams: []string{"icinga:history:stream:" + key, "0-0"},
 		Count:   int64(s.redis.Options.XReadCount),
-		Block:   10 * time.Second,
 	}
 
 	for {
 		cmd := s.redis.XRead(ctx, xra)
 		streams, err := cmd.Result()
 
-		if err != nil && err != redis.Nil {
+		if err != nil {
 			return icingaredis.WrapCmdErr(cmd)
 		}
 
