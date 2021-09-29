@@ -38,6 +38,7 @@ func run() int {
 	logs, err := logging.NewLogging(
 		utils.AppName(),
 		cmd.Config.Logging.Level,
+		logging.CONSOLE,
 		cmd.Config.Logging.Options,
 	)
 	if err != nil {
