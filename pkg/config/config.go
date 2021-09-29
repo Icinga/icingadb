@@ -12,6 +12,7 @@ import (
 type Config struct {
 	Database Database `yaml:"database"`
 	Redis    Redis    `yaml:"redis"`
+	Logging  Logging  `yaml:"logging"`
 }
 
 // Validate checks constraints in the supplied configuration and returns an error if they are violated.

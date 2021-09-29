@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/icinga/icingadb/internal/command"
+	"github.com/icinga/icingadb/internal/logging"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -34,13 +35,23 @@ func main() {
 
 func run() int {
 	cmd := command.New()
+	logs, err := logging.NewLogging(
+		cmd.Config.Logging.Level,
+		cmd.Config.Logging.Options,
+	)
+	if err != nil {
+		utils.Fatal(errors.Wrap(err, "can't configure logging"))
+	}
 
-	logger := cmd.Logger
+	logger := logs.GetLogger()
 	defer logger.Sync()
 
 	logger.Info("Starting Icinga DB")
 
-	db := cmd.Database()
+	db, err := cmd.Database(logs.GetChildLogger("database"))
+	if err != nil {
+		logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
+	}
 	defer db.Close()
 	{
 		logger.Info("Connecting to database")
@@ -54,7 +65,10 @@ func run() int {
 		logger.Fatalf("%+v", err)
 	}
 
-	rc := cmd.Redis()
+	rc, err := cmd.Redis(logs.GetChildLogger("redis"))
+	if err != nil {
+		logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
+	}
 	{
 		logger.Info("Connecting to Redis")
 		_, err := rc.Ping(context.Background()).Result()
@@ -66,9 +80,8 @@ func run() int {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 
-	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logger)
-	ha := icingadb.NewHA(ctx, db, heartbeat, logger)
-
+	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logs.GetChildLogger("heartbeat"))
+	ha := icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
 	defer func() {
@@ -78,11 +91,10 @@ func run() int {
 		ha.Close(ctx)
 		cancelCtx()
 	}()
-
-	s := icingadb.NewSync(db, rc, logger)
-	hs := history.NewSync(db, rc, logger)
-	rt := icingadb.NewRuntimeUpdates(db, rc, logger)
-	ods := overdue.NewSync(db, rc, logger)
+	s := icingadb.NewSync(db, rc, logs.GetChildLogger("config-sync"))
+	hs := history.NewSync(db, rc, logs.GetChildLogger("history-sync"))
+	rt := icingadb.NewRuntimeUpdates(db, rc, logs.GetChildLogger("runtime-updates"))
+	ods := overdue.NewSync(db, rc, logs.GetChildLogger("overdue-sync"))
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
@@ -110,7 +122,7 @@ func run() int {
 							logger.Fatalf("%+v", err)
 						}
 
-						dump := icingadb.NewDumpSignals(rc, logger)
+						dump := icingadb.NewDumpSignals(rc, logs.GetChildLogger("dump-signals"))
 						g.Go(func() error {
 							logger.Info("Staring config dump signal handling")
 
@@ -193,7 +205,7 @@ func run() int {
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logger))
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logs.GetChildLogger("config-sync")))
 							})
 
 							cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
@@ -208,7 +220,7 @@ func run() int {
 							com.ErrgroupReceive(g, dbErrs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logger))
+								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logs.GetChildLogger("config-sync")))
 							})
 
 							return nil
