@@ -58,7 +58,7 @@ func run() int {
 		return ex
 	}
 
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	log.Info("Starting IDO to Icinga DB history migration")
 
@@ -69,7 +69,7 @@ func run() int {
 	log.Info("Computing progress")
 
 	countIdoHistory()
-	log.Sync()
+	_ = log.Sync()
 	computeProgress(c, idb)
 
 	log.Info("Filling cache")
@@ -84,14 +84,14 @@ func run() int {
 func parseConfig(f *Flags) (*Config, int) {
 	cf, err := os.Open(f.Config)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "can't open config file: %s\n", err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, "can't open config file: %s\n", err.Error())
 		return nil, 2
 	}
-	defer cf.Close()
+	defer func() { _ = cf.Close() }()
 
 	c := &Config{}
 	if err := yaml.NewDecoder(cf).Decode(c); err != nil {
-		fmt.Fprintf(os.Stderr, "can't parse config file: %s\n", err.Error())
+		_, _ = fmt.Fprintf(os.Stderr, "can't parse config file: %s\n", err.Error())
 		return nil, 2
 	}
 
@@ -209,18 +209,27 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 
 		defer func() {
 			if lastStmt != nil {
-				lastStmt.Close()
+				_ = lastStmt.Close()
 			}
 		}()
 
 		sliceIdoHistory(ht.snapshot, query, nil, 0, func(rows []ProgressRow) (checkpoint interface{}) {
 			if len(rows) != lastRowsLen {
 				if lastStmt != nil {
-					lastStmt.Close()
+					_ = lastStmt.Close()
 				}
 
 				buf := &bytes.Buffer{}
-				fmt.Fprintf(buf, "SELECT %s FROM %s WHERE %s IN (?", ht.idbIdColumn, ht.idbTable, ht.idbIdColumn)
+
+				{
+					_, err := fmt.Fprintf(
+						buf, "SELECT %s FROM %s WHERE %s IN (?", ht.idbIdColumn, ht.idbTable, ht.idbIdColumn,
+					)
+					if err != nil {
+						// programming error
+						panic(err)
+					}
+				}
 
 				for i := 1; i < len(rows); i++ {
 					buf.Write([]byte(",?"))
