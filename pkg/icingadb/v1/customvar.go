@@ -44,7 +44,7 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 	g.Go(func() error {
 		defer close(cvFlats)
 
-		g, _ := errgroup.WithContext(ctx)
+		g, ctx := errgroup.WithContext(ctx)
 
 		for i := 0; i < runtime.NumCPU(); i++ {
 			g.Go(func() error {
