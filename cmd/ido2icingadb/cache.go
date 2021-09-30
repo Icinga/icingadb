@@ -291,14 +291,14 @@ func cacheGet(cache interface {
 }, dest interface{}, query string, args ...interface{}) {
 	if err := cache.Get(dest, query, args...); err != nil {
 		log.With("backend", "cache", "query", query, "args", args).
-			Errorf("%+v", errors.Wrap(err, "can't perform query"))
+			Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 	}
 }
 
 func cacheSelect(cacheTx *sqlx.Tx, dest interface{}, query string, args ...interface{}) {
 	if err := cacheTx.Select(dest, query, args...); err != nil {
 		log.With("backend", "cache", "query", query, "args", args).
-			Errorf("%+v", errors.Wrap(err, "can't perform query"))
+			Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 	}
 }
 
