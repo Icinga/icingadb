@@ -496,6 +496,19 @@ func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []int
 	return db.DeleteStreamed(ctx, entityType, idsCh)
 }
 
+func (db *DB) getSemaphoreForTable(table string) *semaphore.Weighted {
+	db.tableSemaphoresMu.Lock()
+	defer db.tableSemaphoresMu.Unlock()
+
+	if sem, ok := db.tableSemaphores[table]; ok {
+		return sem
+	} else {
+		sem = semaphore.NewWeighted(int64(db.Options.MaxConnectionsPerTable))
+		db.tableSemaphores[table] = sem
+		return sem
+	}
+}
+
 // IsRetryable checks whether the given error is retryable.
 func IsRetryable(err error) bool {
 	if errors.Is(err, driver.ErrBadConn) {
@@ -519,17 +532,4 @@ func IsRetryable(err error) bool {
 	}
 
 	return false
-}
-
-func (db *DB) getSemaphoreForTable(table string) *semaphore.Weighted {
-	db.tableSemaphoresMu.Lock()
-	defer db.tableSemaphoresMu.Unlock()
-
-	if sem, ok := db.tableSemaphores[table]; ok {
-		return sem
-	} else {
-		sem = semaphore.NewWeighted(int64(db.Options.MaxConnectionsPerTable))
-		db.tableSemaphores[table] = sem
-		return sem
-	}
 }
