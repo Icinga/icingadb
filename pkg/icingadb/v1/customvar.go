@@ -36,13 +36,72 @@ func NewCustomvarFlat() contracts.Entity {
 	return &CustomvarFlat{}
 }
 
-// FlattenCustomvars creates and yields flat custom variables from the provided custom variables.
-func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan contracts.Entity, <-chan error) {
-	cvFlats := make(chan contracts.Entity)
+// ExpandCustomvars streams custom variables from a provided channel and returns three channels,
+// the first providing the unmodified custom variable read from the input channel,
+// the second channel providing the corresponding resolved flat custom variables,
+// and the third channel providing an error, if any.
+func ExpandCustomvars(
+	ctx context.Context,
+	cvs <-chan contracts.Entity,
+) (customvars, flatCustomvars <-chan contracts.Entity, errs <-chan error) {
 	g, ctx := errgroup.WithContext(ctx)
 
+	// Multiplex cvs to use them both for customvar and customvar_flat.
+	var forward chan contracts.Entity
+	customvars, forward = multiplexCvs(ctx, g, cvs)
+	flatCustomvars = flattenCustomvars(ctx, g, forward)
+	errs = com.WaitAsync(g)
+
+	return
+}
+
+// multiplexCvs streams custom variables from a provided channel and
+// forwards each custom variable to the two returned output channels.
+func multiplexCvs(
+	ctx context.Context,
+	g *errgroup.Group,
+	cvs <-chan contracts.Entity,
+) (customvars1, customvars2 chan contracts.Entity) {
+	customvars1 = make(chan contracts.Entity)
+	customvars2 = make(chan contracts.Entity)
+
 	g.Go(func() error {
-		defer close(cvFlats)
+		defer close(customvars1)
+		defer close(customvars2)
+
+		for {
+			select {
+			case cv, ok := <-cvs:
+				if !ok {
+					return nil
+				}
+
+				select {
+				case customvars1 <- cv:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+
+				select {
+				case customvars2 <- cv:
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	})
+
+	return
+}
+
+// flattenCustomvars creates and yields flat custom variables from the provided custom variables.
+func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan contracts.Entity) (flatCustomvars chan contracts.Entity) {
+	flatCustomvars = make(chan contracts.Entity)
+
+	g.Go(func() error {
+		defer close(flatCustomvars)
 
 		g, ctx := errgroup.WithContext(ctx)
 
@@ -66,7 +125,7 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 						}
 
 						select {
-						case cvFlats <- &CustomvarFlat{
+						case flatCustomvars <- &CustomvarFlat{
 							CustomvarMeta: CustomvarMeta{
 								EntityWithoutChecksum: EntityWithoutChecksum{
 									IdMeta: IdMeta{
@@ -97,5 +156,5 @@ func FlattenCustomvars(ctx context.Context, cvs <-chan contracts.Entity) (<-chan
 		return g.Wait()
 	})
 
-	return cvFlats, com.WaitAsync(g)
+	return
 }
