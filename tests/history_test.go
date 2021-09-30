@@ -387,7 +387,7 @@ func TestHistory(t *testing.T) {
 	})
 }
 
-func assertEventuallyDrained(t *testing.T, redis *redis.Client, stream string) {
+func assertEventuallyDrained(t testing.TB, redis *redis.Client, stream string) {
 	eventually.Assert(t, func(t require.TestingT) {
 		result, err := redis.XRange(context.Background(), stream, "-", "+").Result()
 		require.NoError(t, err, "reading %s should not fail", stream)
