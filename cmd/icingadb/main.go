@@ -202,56 +202,32 @@ func run() int {
 
 							<-dump.Done("icinga:customvar")
 
-							logger.Infof("Syncing customvar")
+							logger.Info("Syncing customvar")
+							logger.Info("Syncing customvar_flat")
 
 							cv := common.NewSyncSubject(v1.NewCustomvar)
 
-							cvs, redisErrs := rc.YieldAll(synctx, cv)
-							// Let errors from Redis cancel our group.
-							com.ErrgroupReceive(g, redisErrs)
+							cvs, errs := rc.YieldAll(synctx, cv)
+							com.ErrgroupReceive(g, errs)
 
-							// Multiplex cvs to use them both for customvar and customvar_flat.
-							cvs1, cvs2 := make(chan contracts.Entity), make(chan contracts.Entity)
+							desiredCvs, desiredFlatCvs, errs := v1.ExpandCustomvars(synctx, cvs)
+							com.ErrgroupReceive(g, errs)
+
+							actualCvs, errs := db.YieldAll(
+								synctx, cv.Factory(), db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
+							com.ErrgroupReceive(g, errs)
+
 							g.Go(func() error {
-								defer close(cvs1)
-								defer close(cvs2)
-								for {
-									select {
-									case cv, ok := <-cvs:
-										if !ok {
-											return nil
-										}
-
-										cvs1 <- cv
-										cvs2 <- cv
-									case <-synctx.Done():
-										return synctx.Err()
-									}
-								}
+								return s.ApplyDelta(synctx, icingadb.NewDelta(synctx, actualCvs, desiredCvs, cv, logs.GetChildLogger("config-sync")))
 							})
 
-							actualCvs, dbErrs := db.YieldAll(
-								ctx, cv.Factory(), db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
-							// Let errors from DB cancel our group.
-							com.ErrgroupReceive(g, dbErrs)
+							flatCv := common.NewSyncSubject(v1.NewCustomvarFlat)
+							actualFlatCvs, errs := db.YieldAll(
+								synctx, flatCv.Factory(), db.BuildSelectStmt(flatCv.Entity(), flatCv.Entity().Fingerprint()))
+							com.ErrgroupReceive(g, errs)
 
 							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvs, cvs1, cv, logs.GetChildLogger("config-sync")))
-							})
-
-							cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
-
-							cvFlats, flattenErrs := v1.FlattenCustomvars(ctx, cvs2)
-							// Let errors from Flatten cancel our group.
-							com.ErrgroupReceive(g, flattenErrs)
-
-							actualCvFlats, dbErrs := db.YieldAll(
-								ctx, cvFlat.Factory(), db.BuildSelectStmt(cvFlat.Entity(), cvFlat.Entity().Fingerprint()))
-							// Let errors from DB cancel our group.
-							com.ErrgroupReceive(g, dbErrs)
-
-							g.Go(func() error {
-								return s.ApplyDelta(ctx, icingadb.NewDelta(ctx, actualCvFlats, cvFlats, cvFlat, logs.GetChildLogger("config-sync")))
+								return s.ApplyDelta(synctx, icingadb.NewDelta(synctx, actualFlatCvs, desiredFlatCvs, flatCv, logs.GetChildLogger("config-sync")))
 							})
 
 							return nil
