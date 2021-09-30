@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"crypto/tls"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -16,20 +17,38 @@ import (
 
 // Redis defines Redis client configuration.
 type Redis struct {
-	Address  string              `yaml:"address"`
-	Password string              `yaml:"password"`
+	Address  string `yaml:"address"`
+	Password string `yaml:"password"`
+	TLS      `yaml:",inline"`
 	Options  icingaredis.Options `yaml:"options"`
 }
+
+type ctxDialerFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 // NewClient prepares Redis client configuration,
 // calls redis.NewClient, but returns *icingaredis.Client.
 func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error) {
+	tlsConfig, err := r.TLS.MakeConfig(r.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	var dialer ctxDialerFunc
+	dl := &net.Dialer{Timeout: 15 * time.Second}
+
+	if tlsConfig == nil {
+		dialer = dl.DialContext
+	} else {
+		dialer = (&tls.Dialer{NetDialer: dl, Config: tlsConfig}).DialContext
+	}
+
 	c := redis.NewClient(&redis.Options{
 		Addr:        r.Address,
-		Dialer:      dialWithLogging(logger),
+		Dialer:      dialWithLogging(dialer, logger),
 		Password:    r.Password,
 		DB:          0, // Use default DB,
 		ReadTimeout: r.Options.Timeout,
+		TLSConfig:   tlsConfig,
 	})
 
 	opts := c.Options()
@@ -40,15 +59,13 @@ func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error
 }
 
 // dialWithLogging returns a Redis Dialer with logging capabilities.
-func dialWithLogging(logger *zap.SugaredLogger) func(context.Context, string, string) (net.Conn, error) {
+func dialWithLogging(dialer ctxDialerFunc, logger *zap.SugaredLogger) ctxDialerFunc {
 	// dial behaves like net.Dialer#DialContext, but re-tries on syscall.ECONNREFUSED.
 	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
-		var dl net.Dialer
-
 		err = retry.WithBackoff(
 			ctx,
 			func(ctx context.Context) (err error) {
-				conn, err = dl.DialContext(ctx, network, addr)
+				conn, err = dialer(ctx, network, addr)
 				return
 			},
 			func(err error) bool {
