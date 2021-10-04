@@ -6,7 +6,6 @@ import (
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
@@ -237,13 +236,7 @@ func run() int {
 							configInitSync.Wait()
 							logger.Info("Starting config runtime updates sync")
 
-							// @TODO(el): The customvar runtime update sync may change because the customvar flat
-							// runtime update sync is not yet implemented.
-							return rt.Sync(
-								synctx,
-								append([]contracts.EntityFactoryFunc{v1.NewCustomvar}, v1.ConfigFactories...),
-								runtimeConfigUpdateStreams,
-							)
+							return rt.Sync(synctx, v1.ConfigFactories, runtimeConfigUpdateStreams)
 						})
 
 						g.Go(func() error {
