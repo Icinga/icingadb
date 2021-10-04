@@ -181,7 +181,7 @@ func run() int {
 							g.Go(func() error {
 								defer configInitSync.Done()
 
-								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory.WithInit), dump)
+								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump)
 							})
 						}
 
@@ -192,7 +192,7 @@ func run() int {
 							g.Go(func() error {
 								defer stateInitSync.Done()
 
-								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory.WithInit), dump)
+								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump)
 							})
 						}
 

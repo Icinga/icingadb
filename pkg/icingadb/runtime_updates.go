@@ -61,7 +61,7 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 	updateMessagesByKey := make(map[string]chan<- redis.XMessage)
 
 	for _, factoryFunc := range factoryFuncs {
-		s := common.NewSyncSubject(factoryFunc.WithInit)
+		s := common.NewSyncSubject(factoryFunc)
 
 		updateMessages := make(chan redis.XMessage, bulkSize)
 		upsertEntities := make(chan contracts.Entity, bulkSize)

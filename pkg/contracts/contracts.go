@@ -49,17 +49,6 @@ type Checksumer interface {
 // EntityFactoryFunc knows how to create an Entity.
 type EntityFactoryFunc func() Entity
 
-// WithInit calls Init() on the created Entity if applicable.
-func (f EntityFactoryFunc) WithInit() Entity {
-	e := f()
-
-	if initer, ok := e.(Initer); ok {
-		initer.Init()
-	}
-
-	return e
-}
-
 // Waiter implements the Wait method,
 // which blocks until execution is complete.
 type Waiter interface {
