@@ -9,6 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/exp/utf8string"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode"
@@ -178,4 +180,14 @@ func ConvertCamelCase(s string, _case int, sep byte) string {
 	}
 
 	return b.String()
+}
+
+// AppName returns the name of the executable that started this program (process).
+func AppName() string {
+	exe, err := os.Executable()
+	if err != nil {
+		exe = os.Args[0]
+	}
+
+	return filepath.Base(exe)
 }
