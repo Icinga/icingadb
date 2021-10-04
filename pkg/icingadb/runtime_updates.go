@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/structify"
@@ -60,28 +61,25 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 	updateMessagesByKey := make(map[string]chan<- redis.XMessage)
 
 	for _, factoryFunc := range factoryFuncs {
-		factoryFunc = factoryFunc.WithInit
+		s := common.NewSyncSubject(factoryFunc.WithInit)
 
 		updateMessages := make(chan redis.XMessage, bulkSize)
 		upsertEntities := make(chan contracts.Entity, bulkSize)
 		deleteIds := make(chan interface{}, bulkSize)
 
-		v := factoryFunc()
-		name := utils.Name(v)
+		updateMessagesByKey[fmt.Sprintf("icinga:%s", utils.Key(s.Name(), ':'))] = updateMessages
 
-		updateMessagesByKey[fmt.Sprintf("icinga:%s", utils.Key(name, ':'))] = updateMessages
-
-		r.logger.Debugf("Syncing runtime updates of %s", name)
-		g.Go(structifyStream(ctx, updateMessages, upsertEntities, deleteIds, structify.MakeMapStructifier(reflect.TypeOf(v).Elem(), "json")))
+		r.logger.Debugf("Syncing runtime updates of %s", s.Name())
+		g.Go(structifyStream(ctx, updateMessages, upsertEntities, deleteIds, structify.MakeMapStructifier(reflect.TypeOf(s.Entity()).Elem(), "json")))
 
 		g.Go(func() error {
-			stmt, placeholders := r.db.BuildUpsertStmt(v)
+			stmt, placeholders := r.db.BuildUpsertStmt(s.Entity())
 			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
 			sem := semaphore.NewWeighted(1)
 			return r.db.NamedBulkExec(ctx, stmt, r.db.BatchSizeByPlaceholders(placeholders), sem, upsertEntities, nil)
 		})
 		g.Go(func() error {
-			return r.db.DeleteStreamed(ctx, v, deleteIds)
+			return r.db.DeleteStreamed(ctx, s.Entity(), deleteIds)
 		})
 	}
 
