@@ -147,7 +147,13 @@ func (h *HA) controller() {
 				default:
 				}
 
-				realizeCtx, cancelRealizeCtx := context.WithDeadline(h.ctx, m.ExpiryTime())
+				var realizeCtx context.Context
+				var cancelRealizeCtx context.CancelFunc
+				if h.responsible {
+					realizeCtx, cancelRealizeCtx = context.WithDeadline(h.ctx, m.ExpiryTime())
+				} else {
+					realizeCtx, cancelRealizeCtx = context.WithCancel(h.ctx)
+				}
 				err = h.realize(realizeCtx, s, t, shouldLog)
 				cancelRealizeCtx()
 				if errors.Is(err, context.DeadlineExceeded) {
