@@ -2,6 +2,7 @@ package common
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/utils"
 )
 
 // SyncSubject defines information about entities to be synchronized.
@@ -31,6 +32,11 @@ func (s SyncSubject) Entity() contracts.Entity {
 // Factory returns the entity factory function.
 func (s SyncSubject) Factory() contracts.EntityFactoryFunc {
 	return s.factory
+}
+
+// Name returns the declared name of the entity.
+func (s SyncSubject) Name() string {
+	return utils.Name(s.entity)
 }
 
 // WithChecksum returns whether entities from the factory implement contracts.Checksumer.
