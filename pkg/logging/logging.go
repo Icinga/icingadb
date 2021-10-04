@@ -42,9 +42,10 @@ var defaultEncConfig = zapcore.EncoderConfig{
 // Options define child loggers with their desired log level.
 type Options map[string]zapcore.Level
 
-// NewLogging takes log level for default logger, output where log messages are written to
-// and options having log levels for named child loggers and initializes a new Logging.
-func NewLogging(level zapcore.Level, options Options) (*Logging, error) {
+// NewLogging takes the name and log level for the default logger,
+// options having log levels for named child loggers
+// and returns a new Logging.
+func NewLogging(name string, level zapcore.Level, options Options) (*Logging, error) {
 	atom := zap.NewAtomicLevelAt(level)
 
 	encoder := zapcore.NewConsoleEncoder(defaultEncConfig)
@@ -54,7 +55,7 @@ func NewLogging(level zapcore.Level, options Options) (*Logging, error) {
 		encoder,
 		syncer,
 		atom,
-	))
+	)).Named(name)
 
 	return &Logging{
 			level:   atom,

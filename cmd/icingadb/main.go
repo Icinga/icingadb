@@ -36,6 +36,7 @@ func main() {
 func run() int {
 	cmd := command.New()
 	logs, err := logging.NewLogging(
+		utils.AppName(),
 		cmd.Config.Logging.Level,
 		cmd.Config.Logging.Options,
 	)
