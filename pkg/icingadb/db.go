@@ -27,8 +27,9 @@ import (
 type DB struct {
 	*sqlx.DB
 
+	Options *Options
+
 	logger            *zap.SugaredLogger
-	options           *Options
 	tableSemaphores   map[string]*semaphore.Weighted
 	tableSemaphoresMu sync.Mutex
 }
@@ -71,7 +72,7 @@ func NewDb(db *sqlx.DB, logger *zap.SugaredLogger, options *Options) *DB {
 	return &DB{
 		DB:              db,
 		logger:          logger,
-		options:         options,
+		Options:         options,
 		tableSemaphores: make(map[string]*semaphore.Weighted),
 	}
 }
@@ -375,7 +376,7 @@ func (db *DB) NamedBulkExecTx(
 // BatchSizeByPlaceholders returns how often the specified number of placeholders fits
 // into Options.MaxPlaceholdersPerStatement, but at least 1.
 func (db *DB) BatchSizeByPlaceholders(n int) int {
-	s := db.options.MaxPlaceholdersPerStatement / n
+	s := db.Options.MaxPlaceholdersPerStatement / n
 	if s > 0 {
 		return s
 	}
@@ -471,7 +472,7 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Enti
 	sem := db.getSemaphoreForTable(utils.TableName(first))
 	stmt, _ := db.BuildUpdateStmt(first)
 
-	return db.NamedBulkExecTx(ctx, stmt, db.options.MaxRowsPerTransaction, sem, forward)
+	return db.NamedBulkExecTx(ctx, stmt, db.Options.MaxRowsPerTransaction, sem, forward)
 }
 
 // DeleteStreamed bulk deletes the specified ids via BulkExec.
@@ -480,7 +481,7 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Enti
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 func (db *DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}) error {
 	sem := db.getSemaphoreForTable(utils.TableName(entityType))
-	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), db.options.MaxPlaceholdersPerStatement, sem, ids)
+	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), db.Options.MaxPlaceholdersPerStatement, sem, ids)
 }
 
 // Delete creates a channel from the specified ids and
@@ -527,7 +528,7 @@ func (db *DB) getSemaphoreForTable(table string) *semaphore.Weighted {
 	if sem, ok := db.tableSemaphores[table]; ok {
 		return sem
 	} else {
-		sem = semaphore.NewWeighted(int64(db.options.MaxConnectionsPerTable))
+		sem = semaphore.NewWeighted(int64(db.Options.MaxConnectionsPerTable))
 		db.tableSemaphores[table] = sem
 		return sem
 	}

@@ -20,8 +20,9 @@ import (
 type Client struct {
 	*redis.Client
 
-	logger  *zap.SugaredLogger
-	options *Options
+	Options *Options
+
+	logger *zap.SugaredLogger
 }
 
 // Options define user configurable Redis options.
@@ -52,7 +53,7 @@ func (o *Options) Validate() error {
 
 // NewClient returns a new icingaredis.Client wrapper for a pre-existing *redis.Client.
 func NewClient(client *redis.Client, logger *zap.SugaredLogger, options *Options) *Client {
-	return &Client{Client: client, logger: logger, options: options}
+	return &Client{Client: client, logger: logger, Options: options}
 }
 
 // HPair defines Redis hashes field-value pairs.
@@ -63,7 +64,7 @@ type HPair struct {
 
 // HYield yields HPair field-value pairs for all fields in the hash stored at key.
 func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan error) {
-	pairs := make(chan HPair, c.options.HScanCount)
+	pairs := make(chan HPair, c.Options.HScanCount)
 
 	c.logger.Infof("Syncing %s", key)
 
@@ -82,7 +83,7 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 		var page []string
 
 		for {
-			cmd := c.HScan(ctx, key, cursor, "", int64(c.options.HScanCount))
+			cmd := c.HScan(ctx, key, cursor, "", int64(c.Options.HScanCount))
 			page, cursor, err = cmd.Result()
 
 			if err != nil {
@@ -133,9 +134,9 @@ func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-c
 		}()
 
 		// Use context from group.
-		batches := utils.BatchSliceOfStrings(ctx, fields, c.options.HMGetCount)
+		batches := utils.BatchSliceOfStrings(ctx, fields, c.Options.HMGetCount)
 
-		sem := semaphore.NewWeighted(int64(c.options.MaxHMGetConnections))
+		sem := semaphore.NewWeighted(int64(c.Options.MaxHMGetConnections))
 
 		for batch := range batches {
 			if err := sem.Acquire(ctx, 1); err != nil {
