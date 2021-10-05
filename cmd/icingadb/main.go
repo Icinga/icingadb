@@ -168,6 +168,18 @@ func run() int {
 							})
 						}
 
+						g.Go(func() error {
+							defer utils.Timed(time.Now(), func(elapsed time.Duration) {
+								logger.Infow("Finished config sync", zap.Duration("duration", elapsed))
+							})
+
+							wg.Wait()
+
+							sig <- syscall.SIGINT
+
+							return nil
+						})
+
 						wg.Add(1)
 						g.Go(func() error {
 							defer wg.Done()
