@@ -46,6 +46,8 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 		sliceIdoHistory(
 			ht.snapshot,
 			"SELECT "+strings.Join(idoColumns, ", ")+" FROM "+ht.idoTable+
+				// For actual migration icinga_objects will be joined anyway,
+				// so it makes no sense to take vanished objects into account.
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
 				ht.idoIdColumn+" > ? ORDER BY xh."+ht.idoIdColumn+" LIMIT ?",
 			nil, checkpoint.MaxId.Int64,
@@ -171,6 +173,8 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 		sliceIdoHistory(
 			ht.snapshot,
 			"SELECT "+strings.Join(idoColumns, ", ")+" FROM "+ht.idoTable+
+				// For actual migration icinga_objects will be joined anyway,
+				// so it makes no sense to take vanished objects into account.
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
 				ht.idoIdColumn+" < ? ORDER BY xh."+ht.idoIdColumn+" DESC LIMIT ?",
 			nil, checkpoint,
