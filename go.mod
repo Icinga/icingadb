@@ -10,6 +10,7 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/pkg/errors v0.9.1
+	github.com/ssgreg/journald v1.0.0
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.19.1
 	golang.org/x/exp v0.0.0-20210514180818-737f94c0881e
