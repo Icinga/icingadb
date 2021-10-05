@@ -4,7 +4,9 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 )
 
-var Factories = []contracts.EntityFactoryFunc{
+var StateFactories = []contracts.EntityFactoryFunc{NewHostState, NewServiceState}
+
+var ConfigFactories = []contracts.EntityFactoryFunc{
 	NewActionUrl,
 	NewCheckcommand,
 	NewCheckcommandArgument,
@@ -19,7 +21,6 @@ var Factories = []contracts.EntityFactoryFunc{
 	NewEventcommandEnvvar,
 	NewHost,
 	NewHostCustomvar,
-	NewHostState,
 	NewHostgroup,
 	NewHostgroupCustomvar,
 	NewHostgroupMember,
@@ -36,7 +37,6 @@ var Factories = []contracts.EntityFactoryFunc{
 	NewNotificationUsergroup,
 	NewService,
 	NewServiceCustomvar,
-	NewServiceState,
 	NewServicegroup,
 	NewServicegroupCustomvar,
 	NewServicegroupMember,

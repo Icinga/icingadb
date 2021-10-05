@@ -118,13 +118,14 @@ func run() int {
 					for hactx.Err() == nil {
 						synctx, cancelSynctx := context.WithCancel(hactx)
 						g, synctx := errgroup.WithContext(synctx)
-						// WaitGroup for configuration synchronization.
-						// Runtime updates must wait for configuration synchronization to complete.
-						wg := sync.WaitGroup{}
+						// WaitGroups for initial synchronization.
+						// Runtime updates must wait for initial synchronization to complete.
+						configInitSync := sync.WaitGroup{}
+						stateInitSync := &sync.WaitGroup{}
 
 						// Get the last IDs of the runtime update streams before starting anything else,
 						// otherwise updates may be lost.
-						runtimeUpdateStreams, err := rt.Streams(ctx)
+						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.Streams(ctx)
 						if err != nil {
 							logger.Fatalf("%+v", err)
 						}
@@ -161,20 +162,32 @@ func run() int {
 						})
 
 						logger.Info("Starting config sync")
-						for _, factory := range v1.Factories {
+
+						for _, factory := range v1.ConfigFactories {
 							factory := factory
 
-							wg.Add(1)
+							configInitSync.Add(1)
 							g.Go(func() error {
-								defer wg.Done()
+								defer configInitSync.Done()
 
 								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory.WithInit), dump)
 							})
 						}
 
-						wg.Add(1)
+						for _, factory := range v1.StateFactories {
+							factory := factory
+
+							stateInitSync.Add(1)
+							g.Go(func() error {
+								defer stateInitSync.Done()
+
+								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory.WithInit), dump)
+							})
+						}
+
+						configInitSync.Add(1)
 						g.Go(func() error {
-							defer wg.Done()
+							defer configInitSync.Done()
 
 							<-dump.Done("icinga:customvar")
 
@@ -234,17 +247,22 @@ func run() int {
 						})
 
 						g.Go(func() error {
-							wg.Wait()
-
-							logger.Info("Starting runtime updates sync")
+							configInitSync.Wait()
+							logger.Info("Starting config runtime updates sync")
 
 							// @TODO(el): The customvar runtime update sync may change because the customvar flat
 							// runtime update sync is not yet implemented.
 							return rt.Sync(
 								synctx,
-								append([]contracts.EntityFactoryFunc{v1.NewCustomvar}, v1.Factories...),
-								runtimeUpdateStreams,
+								append([]contracts.EntityFactoryFunc{v1.NewCustomvar}, v1.ConfigFactories...),
+								runtimeConfigUpdateStreams,
 							)
+						})
+
+						g.Go(func() error {
+							stateInitSync.Wait()
+							logger.Info("Starting state runtime updates sync")
+							return rt.Sync(synctx, v1.StateFactories, runtimeStateUpdateStreams)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {

@@ -34,18 +34,22 @@ func NewRuntimeUpdates(db *DB, redis *icingaredis.Client, logger *zap.SugaredLog
 const bulkSize = 1 << 14
 
 // Streams returns the stream key to ID mapping of the runtime update streams for later use in Sync.
-func (r *RuntimeUpdates) Streams(ctx context.Context) (icingaredis.Streams, error) {
-	keys := [...]string{"icinga:runtime", "icinga:runtime:state"}
-	streams := make(map[string]string, len(keys))
-	for _, key := range keys {
-		id, err := r.redis.StreamLastId(ctx, key)
-		if err != nil {
-			return nil, err
+func (r *RuntimeUpdates) Streams(ctx context.Context) (config, state icingaredis.Streams, err error) {
+	config = icingaredis.Streams{"icinga:runtime": "0-0"}
+	state = icingaredis.Streams{"icinga:runtime:state": "0-0"}
+
+	for _, streams := range [...]icingaredis.Streams{config, state} {
+		for key := range streams {
+			id, err := r.redis.StreamLastId(ctx, key)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			streams[key] = id
 		}
-		streams[key] = id
 	}
 
-	return streams, nil
+	return
 }
 
 // Sync synchronizes runtime update streams from s.redis to s.db and deletes the original data on success.
