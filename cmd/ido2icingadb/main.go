@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha1"
 	"database/sql"
@@ -206,6 +205,7 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 			ht.idoTable + " xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE " +
 			ht.idoIdColumn + " > ? ORDER BY xh." + ht.idoIdColumn + " LIMIT ?"
 
+		baseIdbQuery := fmt.Sprintf("SELECT %s FROM %s WHERE %s IN (?)", ht.idbIdColumn, ht.idbTable, ht.idbIdColumn)
 		var lastRowsLen int
 		var lastQuery string
 		var lastStmt *sqlx.Stmt
@@ -218,39 +218,6 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 		}()
 
 		sliceIdoHistory(ht.snapshot, query, nil, 0, func(rows []ProgressRow) (checkpoint interface{}) {
-			if len(rows) != lastRowsLen {
-				if lastStmt != nil {
-					_ = lastStmt.Close()
-				}
-
-				buf := &bytes.Buffer{}
-
-				{
-					_, err := fmt.Fprintf(
-						buf, "SELECT %s FROM %s WHERE %s IN (?", ht.idbIdColumn, ht.idbTable, ht.idbIdColumn,
-					)
-					if err != nil {
-						// programming error
-						panic(err)
-					}
-				}
-
-				for i := 1; i < len(rows); i++ {
-					buf.Write([]byte(",?"))
-				}
-
-				buf.Write([]byte(")"))
-				lastRowsLen = len(rows)
-				lastQuery = buf.String()
-
-				var err error
-				lastStmt, err = idb.Preparex(lastQuery)
-
-				if err != nil {
-					log.With("query", lastQuery).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
-				}
-			}
-
 			ids := make([]interface{}, 0, len(rows))
 			converted := make([]convertedId, 0, len(rows))
 
@@ -258,6 +225,30 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 				conv := ht.convertId(row, c.Icinga2.Env)
 				ids = append(ids, conv)
 				converted = append(converted, convertedId{row.Id, conv})
+			}
+
+			if len(rows) != lastRowsLen {
+				if lastStmt != nil {
+					_ = lastStmt.Close()
+				}
+
+				lastRowsLen = len(rows)
+
+				{
+					var err error
+					lastQuery, _, err = sqlx.In(baseIdbQuery, ids...)
+
+					if err != nil {
+						log.With("query", baseIdbQuery).Fatalf("%+v", errors.Wrap(err, "can't assemble query"))
+					}
+				}
+
+				var err error
+				lastStmt, err = idb.Preparex(lastQuery)
+
+				if err != nil {
+					log.With("query", lastQuery).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
+				}
 			}
 
 			var present [][]byte
