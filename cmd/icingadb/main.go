@@ -14,6 +14,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
+	"github.com/pkg/profile"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"os"
@@ -34,6 +35,8 @@ func main() {
 }
 
 func run() int {
+	defer profile.Start(profile.NoShutdownHook, profile.ProfilePath(".")).Stop()
+
 	cmd := command.New()
 	logs, err := logging.NewLogging(
 		cmd.Config.Logging.Level,
