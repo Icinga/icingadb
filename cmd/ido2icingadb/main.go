@@ -175,6 +175,8 @@ func countIdoHistory() {
 	types.forEach(func(ht *historyType) {
 		err := ht.snapshot.Get(
 			&ht.total,
+			// For actual migration icinga_objects will be joined anyway,
+			// so it makes no sense to take vanished objects into account.
 			"SELECT COUNT(*) FROM "+ht.idoTable+" xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id",
 		)
 		if err != nil {
@@ -199,6 +201,8 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 
 		query := "SELECT xh." +
 			strings.Join(append(append([]string(nil), ht.idoColumns...), ht.idoIdColumn), ", xh.") + " id FROM " +
+			// For actual migration icinga_objects will be joined anyway,
+			// so it makes no sense to take vanished objects into account.
 			ht.idoTable + " xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE " +
 			ht.idoIdColumn + " > ? ORDER BY xh." + ht.idoIdColumn + " LIMIT ?"
 
