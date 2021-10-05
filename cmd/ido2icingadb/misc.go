@@ -169,6 +169,11 @@ func calcServiceId(env, name1, name2 string) []byte {
 	return hashAny([2]string{env, name1 + "!" + name2})
 }
 
+// sliceIdoHistory performs query with args+[]interface{}{checkpoint,bulk} on snapshot and passes the results
+// to onRows (a func([]T)interface{}) until either an empty result set or onRows() returns nil.
+// Rationale: split the likely large result set of a query by adding a WHERE condition and a LIMIT,
+// both with ? placeholders. Due to this function's internals they have to be the last two placeholders.
+// checkpoint is the initial value for the WHERE condition, onRows() returns follow-up ones.
 func sliceIdoHistory(snapshot *sqlx.Tx, query string, args []interface{}, checkpoint, onRows interface{}) {
 	vOnRows := reflect.ValueOf(onRows) // TODO: make onRows generic[T] one nice day
 
