@@ -183,7 +183,7 @@ func countIdoHistory() {
 			log.Fatalf("%+v", errors.Wrap(err, "can't count query"))
 		}
 
-		log.With("type", ht.name, "amount", ht.total).Info("Counted total IDO events")
+		log.Infow("Counted total IDO events", "type", ht.name, "amount", ht.total)
 	})
 }
 
