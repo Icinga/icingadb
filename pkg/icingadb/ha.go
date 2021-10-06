@@ -120,44 +120,60 @@ func (h *HA) controller() {
 
 	for {
 		select {
-		case <-h.heartbeat.Beat():
-			m := h.heartbeat.Message()
-			now := time.Now()
-			t, err := m.Time()
-			if err != nil {
-				h.abort(err)
-			}
-			tt := t.Time()
-			if tt.After(now.Add(1 * time.Second)) {
-				h.logger.Debugw("Received heartbeat from the future", zap.Time("time", tt))
-			}
-			if tt.Before(now.Add(-1 * timeout)) {
-				h.logger.Errorw("Received heartbeat from the past", zap.Time("time", tt))
+		case m := <-h.heartbeat.Events():
+			if m != nil {
+				now := time.Now()
+				t, err := m.Stats().Time()
+				if err != nil {
+					h.abort(err)
+				}
+				tt := t.Time()
+				if tt.After(now.Add(1 * time.Second)) {
+					h.logger.Debugw("Received heartbeat from the future", zap.Time("time", tt))
+				}
+				if tt.Before(now.Add(-1 * timeout)) {
+					h.logger.Errorw("Received heartbeat from the past", zap.Time("time", tt))
+					h.signalHandover()
+					continue
+				}
+				s, err := m.Stats().IcingaStatus()
+				if err != nil {
+					h.abort(err)
+				}
+
+				select {
+				case <-logTicker.C:
+					shouldLog = true
+				default:
+				}
+
+				var realizeCtx context.Context
+				var cancelRealizeCtx context.CancelFunc
+				if h.responsible {
+					realizeCtx, cancelRealizeCtx = context.WithDeadline(h.ctx, m.ExpiryTime())
+				} else {
+					realizeCtx, cancelRealizeCtx = context.WithCancel(h.ctx)
+				}
+				err = h.realize(realizeCtx, s, t, shouldLog)
+				cancelRealizeCtx()
+				if errors.Is(err, context.DeadlineExceeded) {
+					h.signalHandover()
+					continue
+				}
+				if err != nil {
+					h.abort(err)
+				}
+
+				if !oldInstancesRemoved {
+					go h.removeOldInstances(s)
+					oldInstancesRemoved = true
+				}
+
+				shouldLog = false
+			} else {
+				h.logger.Error("Lost heartbeat")
 				h.signalHandover()
-				continue
 			}
-			s, err := m.IcingaStatus()
-			if err != nil {
-				h.abort(err)
-			}
-
-			select {
-			case <-logTicker.C:
-				shouldLog = true
-			default:
-			}
-			if err = h.realize(s, t, shouldLog); err != nil {
-				h.abort(err)
-			}
-			if !oldInstancesRemoved {
-				go h.removeOldInstances(s)
-				oldInstancesRemoved = true
-			}
-
-			shouldLog = false
-		case <-h.heartbeat.Lost():
-			h.logger.Error("Lost heartbeat")
-			h.signalHandover()
 		case <-h.heartbeat.Done():
 			if err := h.heartbeat.Err(); err != nil {
 				h.abort(err)
@@ -168,13 +184,13 @@ func (h *HA) controller() {
 	}
 }
 
-func (h *HA) realize(s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLog bool) error {
+func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLog bool) error {
 	boff := backoff.NewExponentialWithJitter(time.Millisecond*256, time.Second*3)
 	for attempt := 0; true; attempt++ {
 		sleep := boff(uint64(attempt))
 		time.Sleep(sleep)
 
-		ctx, cancelCtx := context.WithCancel(h.ctx)
+		ctx, cancelCtx := context.WithCancel(ctx)
 		tx, err := h.db.BeginTxx(ctx, &sql.TxOptions{
 			Isolation: sql.LevelSerializable,
 		})
