@@ -35,12 +35,17 @@ type Flags struct {
 type Config struct {
 	IDO      config.Database `yaml:"ido"`
 	IcingaDB config.Database `yaml:"icingadb"`
-	Icinga2  struct {
-		Env      string `yaml:"env"`
+	// Icinga2 specifies information the IDO doesn't provide.
+	Icinga2 struct {
+		// Env specifies the "Environment" config constant value (likely "").
+		Env string `yaml:"env"`
+		// Endpoint specifies the name on the main endpoint writing to IDO.
 		Endpoint string `yaml:"endpoint"`
 	} `yaml:"icinga2"`
 }
 
+// main validates the CLI, parses the config and migrates history from IDO to Icinga DB (see comments below).
+// Most of the called functions exit the whole program by themselves on non-recoverable errors.
 func main() {
 	f := &Flags{}
 	if _, err := flags.NewParser(f, flags.Default).Parse(); err != nil {
@@ -57,15 +62,28 @@ func main() {
 	log.Info("Starting IDO to Icinga DB history migration")
 
 	ido, idb := connectAll(c)
+
+	// Start repeatable-read-isolated transactions (consistent SELECTs)
+	// not to have to care for IDO data changes during migration.
 	startIdoTx(ido)
+
+	// Prepare the directory structure the following fillCache() will need later.
 	mkCache(f, idb.Mapper)
 
 	log.Info("Computing progress")
 
+	// Count total source data, so the following computeProgress()
+	// knows how many work is left and can display progress bars.
 	countIdoHistory()
+
+	// Roll out a red carpet for the following computeProgress()' progress bars.
 	_ = log.Sync()
+
+	// computeProgress figures out which data has already been migrated
+	// not to start from the beginning every time in the following migrate().
 	computeProgress(c, idb)
 
+	// On rationale read buildEventTimeCache() and buildPreviousHardStateCache() docs.
 	log.Info("Filling cache")
 	fillCache()
 
@@ -73,7 +91,8 @@ func main() {
 	migrate(c, idb)
 }
 
-func parseConfig(f *Flags) (*Config, int) {
+// parseConfig validates the f.Config file and returns the config and -1 or - on failure - nil and an exit code.
+func parseConfig(f *Flags) (_ *Config, exit int) {
 	cf, err := os.Open(f.Config)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "can't open config file: %s\n", err.Error())
@@ -90,6 +109,8 @@ func parseConfig(f *Flags) (*Config, int) {
 	return c, -1
 }
 
+// mkCache ensures <f.Cache>/<history type>.sqlite3 files are present and contain their schema
+// and initializes types[*].cache. (On non-recoverable errors the whole program exits.)
 func mkCache(f *Flags, mapper *reflectx.Mapper) {
 	log.Info("Preparing cache")
 
@@ -121,6 +142,7 @@ func mkCache(f *Flags, mapper *reflectx.Mapper) {
 	})
 }
 
+// connectAll connects to ido and idb (Icinga DB) as c specifies. (On non-recoverable errors the whole program exits.)
 func connectAll(c *Config) (ido, idb *icingadb.DB) {
 	log.Info("Connecting to databases")
 	eg, _ := errgroup.WithContext(context.Background())
@@ -139,6 +161,7 @@ func connectAll(c *Config) (ido, idb *icingadb.DB) {
 	return
 }
 
+// connect connects to which DB as cfg specifies. (On non-recoverable errors the whole program exits.)
 func connect(which string, cfg *config.Database) *icingadb.DB {
 	db, err := cfg.Open(log)
 	if err != nil {
@@ -152,6 +175,8 @@ func connect(which string, cfg *config.Database) *icingadb.DB {
 	return db
 }
 
+// startIdoTx initializes types[*].snapshot with new repeatable-read-isolated ido transactions.
+// (On non-recoverable errors the whole program exits.)
 func startIdoTx(ido *icingadb.DB) {
 	types.forEach(func(ht *historyType) {
 		tx, err := ido.BeginTxx(context.Background(), &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
@@ -163,6 +188,8 @@ func startIdoTx(ido *icingadb.DB) {
 	})
 }
 
+// countIdoHistory initializes types[*].total with how many events to migrate.
+// (On non-recoverable errors the whole program exits.)
 func countIdoHistory() {
 	types.forEach(func(ht *historyType) {
 		err := ht.snapshot.Get(
@@ -179,6 +206,8 @@ func countIdoHistory() {
 	})
 }
 
+// computeProgress initializes types[*].lastId with how many events have already been migrated to idb.
+// (On non-recoverable errors the whole program exits.)
 func computeProgress(c *Config, idb *icingadb.DB) {
 	progress := mpb.New()
 	for i := range types {
@@ -196,12 +225,17 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 			// For actual migration icinga_objects will be joined anyway,
 			// so it makes no sense to take vanished objects into account.
 			ht.idoTable + " xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE " +
-			ht.idoIdColumn + " > ? ORDER BY xh." + ht.idoIdColumn + " LIMIT ?"
+			ht.idoIdColumn + " > ? ORDER BY xh." + // requires migrate() to migrate serially, in order
+			ht.idoIdColumn + " LIMIT ?"
 
-		baseIdbQuery := fmt.Sprintf("SELECT %s FROM %s WHERE %s IN (?)", ht.idbIdColumn, ht.idbTable, ht.idbIdColumn)
+		// As long as the current chunk is lastRowsLen long (doesn't change)...
 		var lastRowsLen int
+
+		// ... we can re-use these:
 		var lastQuery string
 		var lastStmt *sqlx.Stmt
+
+		baseIdbQuery := fmt.Sprintf("SELECT %s FROM %s WHERE %s IN (?)", ht.idbIdColumn, ht.idbTable, ht.idbIdColumn)
 		inc := barIncrementer{ht.bar, time.Now()}
 
 		defer func() {
@@ -210,16 +244,19 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 			}
 		}()
 
+		// Stream IDO IDs, ...
 		sliceIdoHistory(ht.snapshot, query, nil, 0, func(rows []ProgressRow) (checkpoint interface{}) {
 			ids := make([]interface{}, 0, len(rows))
 			converted := make([]convertedId, 0, len(rows))
 
+			// ... convert them to Icinga DB ones, ...
 			for _, row := range rows {
 				conv := ht.convertId(row, c.Icinga2.Env)
 				ids = append(ids, conv)
 				converted = append(converted, convertedId{row.Id, conv})
 			}
 
+			// ... prepare a new query if the last one doesn't fit, ...
 			if len(rows) != lastRowsLen {
 				if lastStmt != nil {
 					_ = lastStmt.Close()
@@ -244,6 +281,7 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 				}
 			}
 
+			// ... select which have already been migrated, ...
 			var present [][]byte
 			if err := lastStmt.Select(&present, ids...); err != nil {
 				log.With("query", lastQuery).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
@@ -256,14 +294,17 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 				presentSet[key] = struct{}{}
 			}
 
+			// ... and in IDO ID order:
 			for _, conv := range converted {
 				var key [20]byte
 				copy(key[:], conv.idb)
 
+				// Stop on the first not yet migrated.
 				if _, ok := presentSet[key]; !ok {
 					return nil
 				}
 
+				// If an ID has already been migrated, increase the actual migration's start point.
 				ht.lastId = conv.ido
 			}
 
@@ -277,6 +318,7 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 	progress.Wait()
 }
 
+// fillCache fills <f.Cache>/<history type>.sqlite3 (actually types[*].cacheFiller does).
 func fillCache() {
 	progress := mpb.New()
 	for i := range types {
@@ -294,9 +336,11 @@ func fillCache() {
 	progress.Wait()
 }
 
+// tAny can't be created by just using reflect.TypeOf(interface{}(nil)).
 var tAny = reflect.TypeOf((*interface{})(nil)). // *interface{}
 						Elem() // interface{}
 
+// migrate does the actual migration.
 func migrate(c *Config, idb *icingadb.DB) {
 	envId := sha1.Sum([]byte(c.Icinga2.Env))
 	endpointId := sha1.Sum([]byte(c.Icinga2.Endpoint))
@@ -307,10 +351,15 @@ func migrate(c *Config, idb *icingadb.DB) {
 	}
 
 	types.forEach(func(ht *historyType) {
+		// type rowStructPtr = interface{}
+		// type table = []rowStructPtr
+		// func convertRowsFromIdoToIcingaDb(env string, envId, endpointId Binary,
+		// selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []T)
+		// (icingaDbUpdates, icingaDbInserts []table, checkpoint interface{})
 		vConvertRows := reflect.ValueOf(ht.convertRows) // TODO: make historyType#convertRows generic[T] one nice day
 
-		tRows := vConvertRows.Type(). // func(env string, envId, endpointId Binary, selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []T) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{})
-						In(5) // []T
+		// []T (idoRows)
+		tRows := vConvertRows.Type().In(5)
 
 		var lastQuery string
 		var lastStmt *sqlx.Stmt
@@ -324,7 +373,8 @@ func migrate(c *Config, idb *icingadb.DB) {
 		vConvertRowsArgs := [6]reflect.Value{
 			reflect.ValueOf(c.Icinga2.Env), reflect.ValueOf(icingadbTypes.Binary(envId[:])),
 			reflect.ValueOf(icingadbTypes.Binary(endpointId[:])),
-			reflect.ValueOf(func(dest interface{}, query string, args ...interface{}) {
+			reflect.ValueOf(func(dest interface{}, query string, args ...interface{}) { // selectCache
+				// Prepare new one, if old one doesn't fit anymore.
 				if query != lastQuery {
 					if lastStmt != nil {
 						_ = lastStmt.Close()
@@ -347,9 +397,13 @@ func migrate(c *Config, idb *icingadb.DB) {
 				}
 			}),
 			reflect.ValueOf(ht.snapshot),
+			// and the rows (below)
 		}
 
 		var args []interface{}
+
+		// For the case that the cache was older that the IDO,
+		// but ht.cacheFiller couldn't update it, limit (WHERE) our source data set.
 		if ht.cacheLimitQuery != "" {
 			var limit uint64
 			cacheGet(ht.cache, &limit, ht.cacheLimitQuery)
@@ -360,12 +414,17 @@ func migrate(c *Config, idb *icingadb.DB) {
 		icingaDbUpdates := map[reflect.Type]string{}
 		inc := barIncrementer{ht.bar, time.Now()}
 
+		// Stream IDO rows, ...
 		sliceIdoHistory(
 			ht.snapshot, ht.migrationQuery, args, ht.lastId,
 			reflect.MakeFunc(reflect.FuncOf([]reflect.Type{tRows}, []reflect.Type{tAny}, false),
 				func(args []reflect.Value) []reflect.Value {
-					vConvertRowsArgs[5] = args[0]
+					vConvertRowsArgs[5] = args[0] // pass the rows
+
+					// ... convert them, ...
 					res := vConvertRows.Call(vConvertRowsArgs[:])
+
+					// ... and insert them:
 
 					tx, err := idb.Beginx()
 					if err != nil {
@@ -391,6 +450,7 @@ func migrate(c *Config, idb *icingadb.DB) {
 								Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
 						}
 
+						// UPDATE à one.
 						for _, row := range table {
 							if _, err := stmt.Exec(row); err != nil {
 								log.With("backend", "Icinga DB", "dml", update, "args", row).
@@ -416,6 +476,7 @@ func migrate(c *Config, idb *icingadb.DB) {
 						}
 
 						for len(table) > 0 {
+							// REPLACE à 1000.
 							slice := table
 							if len(slice) > 1000 {
 								slice = slice[:1000]
