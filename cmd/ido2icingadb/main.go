@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/goccy/go-yaml"
-	"github.com/icinga/icingadb/cmd/internal"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
@@ -43,18 +42,14 @@ type Config struct {
 }
 
 func main() {
-	os.Exit(run())
-}
-
-func run() int {
 	f := &Flags{}
 	if _, err := flags.NewParser(f, flags.Default).Parse(); err != nil {
-		return 2
+		os.Exit(2)
 	}
 
 	c, ex := parseConfig(f)
 	if c == nil {
-		return ex
+		os.Exit(ex)
 	}
 
 	defer func() { _ = log.Sync() }()
@@ -76,8 +71,6 @@ func run() int {
 
 	log.Info("Actually migrating")
 	migrate(c, idb)
-
-	return internal.ExitSuccess
 }
 
 func parseConfig(f *Flags) (*Config, int) {
