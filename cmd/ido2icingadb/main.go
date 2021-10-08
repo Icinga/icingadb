@@ -3,12 +3,14 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"database/sql"
 	"fmt"
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/cmd/internal"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
+	icingadbTypes "github.com/icinga/icingadb/pkg/types"
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
@@ -18,6 +20,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"os"
 	"path"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -35,7 +38,8 @@ type Config struct {
 	IDO      config.Database `yaml:"ido"`
 	IcingaDB config.Database `yaml:"icingadb"`
 	Icinga2  struct {
-		Env string `yaml:"env"`
+		Env      string `yaml:"env"`
+		Endpoint string `yaml:"endpoint"`
 	} `yaml:"icinga2"`
 }
 
@@ -70,6 +74,9 @@ func run() int {
 
 	log.Info("Filling cache")
 	fillCache()
+
+	log.Info("Actually migrating")
+	migrate(c, idb)
 
 	return internal.ExitSuccess
 }
@@ -206,7 +213,7 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 			}
 		}()
 
-		sliceIdoHistory(ht.snapshot, query, 0, func(rows []ProgressRow) (checkpoint interface{}) {
+		sliceIdoHistory(ht.snapshot, query, nil, 0, func(rows []ProgressRow) (checkpoint interface{}) {
 			if len(rows) != lastRowsLen {
 				if lastStmt != nil {
 					lastStmt.Close()
@@ -285,6 +292,157 @@ func fillCache() {
 		if ht.cacheFiller != nil {
 			ht.cacheFiller(ht)
 		}
+	})
+
+	progress.Wait()
+}
+
+var tAny = reflect.TypeOf((*interface{})(nil)). // *interface{}
+						Elem() // interface{}
+
+func migrate(c *Config, idb *icingadb.DB) {
+	envId := sha1.Sum([]byte(c.Icinga2.Env))
+	endpointId := sha1.Sum([]byte(c.Icinga2.Endpoint))
+
+	progress := mpb.New()
+	for i := range types {
+		types[i].setupBar(progress)
+	}
+
+	types.forEach(func(ht *historyType) {
+		vConvertRows := reflect.ValueOf(ht.convertRows) // TODO: make historyType#convertRows generic[T] one nice day
+
+		tRows := vConvertRows.Type(). // func(env string, envId, endpointId Binary, selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []T) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{})
+						In(5) // []T
+
+		var lastQuery string
+		var lastStmt *sqlx.Stmt
+
+		defer func() {
+			if lastStmt != nil {
+				_ = lastStmt.Close()
+			}
+		}()
+
+		vConvertRowsArgs := [6]reflect.Value{
+			reflect.ValueOf(c.Icinga2.Env), reflect.ValueOf(icingadbTypes.Binary(envId[:])),
+			reflect.ValueOf(icingadbTypes.Binary(endpointId[:])),
+			reflect.ValueOf(func(dest interface{}, query string, args ...interface{}) {
+				if query != lastQuery {
+					if lastStmt != nil {
+						_ = lastStmt.Close()
+					}
+
+					var err error
+
+					lastStmt, err = ht.cache.Preparex(query)
+					if err != nil {
+						log.With("backend", "cache", "query", query).
+							Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
+					}
+
+					lastQuery = query
+				}
+
+				if err := lastStmt.Select(dest, args...); err != nil {
+					log.With("backend", "cache", "query", query, "args", args).
+						Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+				}
+			}),
+			reflect.ValueOf(ht.snapshot),
+		}
+
+		var args []interface{}
+		if ht.cacheLimitQuery != "" {
+			var limit uint64
+			cacheGet(ht.cache, &limit, ht.cacheLimitQuery)
+			args = append(args, limit)
+		}
+
+		icingaDbInserts := map[reflect.Type]string{}
+		icingaDbUpdates := map[reflect.Type]string{}
+		inc := barIncrementer{ht.bar, time.Now()}
+
+		sliceIdoHistory(
+			ht.snapshot, ht.migrationQuery, args, ht.lastId,
+			reflect.MakeFunc(reflect.FuncOf([]reflect.Type{tRows}, []reflect.Type{tAny}, false),
+				func(args []reflect.Value) []reflect.Value {
+					vConvertRowsArgs[5] = args[0]
+					res := vConvertRows.Call(vConvertRowsArgs[:])
+
+					tx, err := idb.Beginx()
+					if err != nil {
+						log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
+					}
+
+					for _, table := range res[0].Interface().([][]interface{}) {
+						if len(table) < 1 {
+							continue
+						}
+
+						tRow := reflect.TypeOf(table[0])
+
+						update, ok := icingaDbUpdates[tRow]
+						if !ok {
+							update, _ = idb.BuildUpdateStmt(table[0])
+							icingaDbUpdates[tRow] = update
+						}
+
+						stmt, err := tx.PrepareNamed(update)
+						if err != nil {
+							log.With("backend", "Icinga DB", "dml", update).
+								Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
+						}
+
+						for _, row := range table {
+							if _, err := stmt.Exec(row); err != nil {
+								log.With("backend", "Icinga DB", "dml", update, "args", row).
+									Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+							}
+						}
+
+						_ = stmt.Close()
+					}
+
+					for _, table := range res[1].Interface().([][]interface{}) {
+						if len(table) < 1 {
+							continue
+						}
+
+						tRow := reflect.TypeOf(table[0])
+
+						insert, ok := icingaDbInserts[tRow]
+						if !ok {
+							insert, _ = idb.BuildInsertStmt(table[0])
+							insert = "REPLACE " + strings.TrimPrefix(insert, "INSERT ")
+							icingaDbInserts[tRow] = insert
+						}
+
+						for len(table) > 0 {
+							slice := table
+							if len(slice) > 1000 {
+								slice = slice[:1000]
+								table = table[1000:]
+							} else {
+								table = nil
+							}
+
+							if _, err := tx.NamedExec(insert, slice); err != nil {
+								log.With("backend", "Icinga DB", "dml", insert, "args", slice).
+									Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+							}
+						}
+					}
+
+					if err := tx.Commit(); err != nil {
+						log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
+					}
+
+					inc.inc(args[0].Len())
+					return res[2:]
+				},
+			).Interface(),
+		)
 	})
 
 	progress.Wait()
