@@ -431,36 +431,6 @@ func migrate(c *Config, idb *icingadb.DB) {
 						log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
 					}
 
-					for _, table := range res[0].Interface().([][]interface{}) {
-						if len(table) < 1 {
-							continue
-						}
-
-						tRow := reflect.TypeOf(table[0])
-
-						update, ok := icingaDbUpdates[tRow]
-						if !ok {
-							update, _ = idb.BuildUpdateStmt(table[0])
-							icingaDbUpdates[tRow] = update
-						}
-
-						stmt, err := tx.PrepareNamed(update)
-						if err != nil {
-							log.With("backend", "Icinga DB", "dml", update).
-								Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
-						}
-
-						// UPDATE à one.
-						for _, row := range table {
-							if _, err := stmt.Exec(row); err != nil {
-								log.With("backend", "Icinga DB", "dml", update, "args", row).
-									Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
-							}
-						}
-
-						_ = stmt.Close()
-					}
-
 					for _, table := range res[1].Interface().([][]interface{}) {
 						if len(table) < 1 {
 							continue
@@ -490,6 +460,36 @@ func migrate(c *Config, idb *icingadb.DB) {
 									Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 							}
 						}
+					}
+
+					for _, table := range res[0].Interface().([][]interface{}) {
+						if len(table) < 1 {
+							continue
+						}
+
+						tRow := reflect.TypeOf(table[0])
+
+						update, ok := icingaDbUpdates[tRow]
+						if !ok {
+							update, _ = idb.BuildUpdateStmt(table[0])
+							icingaDbUpdates[tRow] = update
+						}
+
+						stmt, err := tx.PrepareNamed(update)
+						if err != nil {
+							log.With("backend", "Icinga DB", "dml", update).
+								Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
+						}
+
+						// UPDATE à one.
+						for _, row := range table {
+							if _, err := stmt.Exec(row); err != nil {
+								log.With("backend", "Icinga DB", "dml", update, "args", row).
+									Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+							}
+						}
+
+						_ = stmt.Close()
 					}
 
 					if err := tx.Commit(); err != nil {
