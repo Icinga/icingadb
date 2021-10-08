@@ -21,21 +21,23 @@ import (
 	"time"
 )
 
+// ProgressRow contains all IDO info needed to assemble an Icinga DB ID.
 type ProgressRow struct {
-	Id   uint64
+	// Id is the IDO table ID.
+	Id uint64
+	// Name is the name of the affected comment or downtime.
 	Name string
 }
 
-type convertedId struct {
-	ido uint64
-	idb []byte
-}
-
+// barIncrementer simplifies incrementing bar.
 type barIncrementer struct {
-	bar   *mpb.Bar
+	// bar is the bar to increment.
+	bar *mpb.Bar
+	// start shall be the work start time.
 	start time.Time
 }
 
+// inc increments bi.bar by i.
 func (bi *barIncrementer) inc(i int) {
 	prev := bi.start
 	now := time.Now()
@@ -47,6 +49,7 @@ func (bi *barIncrementer) inc(i int) {
 
 const bulk = 10000
 
+// log is the root logger.
 var log = func() *zap.SugaredLogger {
 	logger, err := zap.NewDevelopmentConfig().Build()
 	if err != nil {
@@ -56,6 +59,7 @@ var log = func() *zap.SugaredLogger {
 	return logger.Sugar()
 }()
 
+// objectTypes maps IDO values to Icinga DB ones.
 var objectTypes = map[uint8]string{1: "host", 2: "service"}
 
 // mkDeterministicUuid returns a formally random UUID (v4) as follows: 11111122-3300-4455-4455-555555555555
@@ -66,6 +70,8 @@ var objectTypes = map[uint8]string{1: "host", 2: "service"}
 // 3: "h" (for "history")
 // 4: the new UUID's formal version (unused bits zeroed)
 // 5: the ID of the row the new UUID is for in the IDO (big endian)
+//
+// Rationale: be able to pre-calculate the IDs to figure out which have already been migrated.
 func mkDeterministicUuid(table byte, rowId uint64) icingadbTypes.UUID {
 	uid := uuidTemplate
 	uid[3] = table
@@ -82,7 +88,7 @@ func mkDeterministicUuid(table byte, rowId uint64) icingadbTypes.UUID {
 	return icingadbTypes.UUID{UUID: uid}
 }
 
-// uuidTemplate is for mkDeterministicUuid.
+// uuidTemplate is for mkDeterministicUuid() to save a few CPU cycles.
 var uuidTemplate = func() uuid.UUID {
 	buf := &bytes.Buffer{}
 	buf.Write(uuid.Nil[:])
@@ -96,10 +102,12 @@ var uuidTemplate = func() uuid.UUID {
 	return uid
 }()
 
-// randomUuid generates a new UUIDv4.
+// randomUuid generates a new UUIDv4. Saves getrandom(2) syscalls via bufio.Reader-s.
+// (On non-recoverable errors the whole program exits.)
 func randomUuid() icingadbTypes.UUID {
 	var rander *bufio.Reader
 
+	// Get random available rander.
 	massRanders.Lock()
 	for r := range massRanders.pool {
 		rander = r
@@ -108,6 +116,7 @@ func randomUuid() icingadbTypes.UUID {
 	}
 	massRanders.Unlock()
 
+	// Fall back to new one.
 	if rander == nil {
 		rander = bufio.NewReader(rand.Reader)
 	}
@@ -117,6 +126,7 @@ func randomUuid() icingadbTypes.UUID {
 		log.Fatalf("%+v", errors.Wrap(err, "can't generate random UUID"))
 	}
 
+	// Make it available for the next call.
 	massRanders.Lock()
 	massRanders.pool[rander] = struct{}{}
 	massRanders.Unlock()
@@ -124,6 +134,7 @@ func randomUuid() icingadbTypes.UUID {
 	return icingadbTypes.UUID{UUID: id}
 }
 
+// massRanders are randomUuid()'s storage.
 var massRanders = struct {
 	sync.Mutex
 	pool map[*bufio.Reader]struct{}
@@ -132,7 +143,7 @@ var massRanders = struct {
 	map[*bufio.Reader]struct{}{},
 }
 
-// hashAny combines PackAny and SHA1 hashing.
+// hashAny combines objectpacker.PackAny and SHA1 hashing.
 func hashAny(in interface{}) []byte {
 	hash := sha1.New()
 	if err := objectpacker.PackAny(in, hash); err != nil {
@@ -174,6 +185,7 @@ func calcServiceId(env, name1, name2 string) []byte {
 // Rationale: split the likely large result set of a query by adding a WHERE condition and a LIMIT,
 // both with ? placeholders. Due to this function's internals they have to be the last two placeholders.
 // checkpoint is the initial value for the WHERE condition, onRows() returns follow-up ones.
+// (On non-recoverable errors the whole program exits.)
 func sliceIdoHistory(snapshot *sqlx.Tx, query string, args []interface{}, checkpoint, onRows interface{}) {
 	vOnRows := reflect.ValueOf(onRows) // TODO: make onRows generic[T] one nice day
 
@@ -205,27 +217,46 @@ func sliceIdoHistory(snapshot *sqlx.Tx, query string, args []interface{}, checkp
 	}
 }
 
+// historyType specifies a history data type.
 type historyType struct {
-	name            string
-	idoTable        string
-	idoIdColumn     string
-	idoColumns      []string
-	idbTable        string
-	idbIdColumn     string
-	convertId       func(row ProgressRow, env string) []byte
-	cacheSchema     []string
-	cacheFiller     func(*historyType)
+	// name is a human-readable, but machine-friendly common name.
+	name string
+	// idoTable specifies the source table.
+	idoTable string
+	// idoIdColumn specifies idoTable's primary key.
+	idoIdColumn string
+	// idoColumns specifies idoTable's columns in addition to idoIdColumn computeProgress() needs.
+	idoColumns []string
+	// idbTable specifies the destination table computeProgress() compares the source data with.
+	idbTable string
+	// idoIdColumn specifies idbTable's primary key.
+	idbIdColumn string
+	// convertId converts the IDO row and the Icinga 2 env name to a value suitable for idbIdColumn.
+	convertId func(row ProgressRow, env string) []byte
+	// cacheSchema specifies <name>.sqlite3's structure.
+	cacheSchema []string
+	// cacheFiller fills cache from snapshot.
+	cacheFiller func(*historyType)
+	// cacheLimitQuery rationale: see migrate().
 	cacheLimitQuery string
-	migrationQuery  string
-	convertRows     interface{}
+	// migrationQuery SELECTs source data for actual migration.
+	migrationQuery string
+	// convertRows intention: see migrate().
+	convertRows interface{}
 
-	cache    *sqlx.DB
+	// cache represents <name>.sqlite3.
+	cache *sqlx.DB
+	// snapshot represents the data source.
 	snapshot *sqlx.Tx
-	total    int64
-	bar      *mpb.Bar
-	lastId   uint64
+	// total summarizes the source data.
+	total int64
+	// bar represents the current progress bar.
+	bar *mpb.Bar
+	// lastId is the last already migrated ID.
+	lastId uint64
 }
 
+// setupBar (re-)initializes ht.bar.
 func (ht *historyType) setupBar(progress *mpb.Progress) {
 	ht.bar = progress.AddBar(
 		ht.total,
@@ -240,6 +271,7 @@ func (ht *historyType) setupBar(progress *mpb.Progress) {
 
 type historyTypes [6]historyType
 
+// forEach performs f per *ht in parallel.
 func (ht *historyTypes) forEach(f func(*historyType)) {
 	eg, _ := errgroup.WithContext(context.Background())
 	for i := range *ht {

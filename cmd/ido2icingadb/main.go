@@ -246,6 +246,11 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 
 		// Stream IDO IDs, ...
 		sliceIdoHistory(ht.snapshot, query, nil, 0, func(rows []ProgressRow) (checkpoint interface{}) {
+			type convertedId struct {
+				ido uint64
+				idb []byte
+			}
+
 			ids := make([]interface{}, 0, len(rows))
 			converted := make([]convertedId, 0, len(rows))
 
