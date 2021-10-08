@@ -1,13 +1,13 @@
 package v1
 
 import (
-	"crypto/sha1"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
 // IcingaStatus defines Icinga status information.
 type IcingaStatus struct {
-	Environment                string          `json:"environment"`
+	// Note: Icinga2Environment is not related to the environment_id used throughout Icinga DB.
+	Icinga2Environment         string          `json:"environment"`
 	NodeName                   string          `json:"node_name"`
 	Version                    string          `json:"version"`
 	ProgramStart               types.UnixMilli `json:"program_start"`
@@ -18,11 +18,4 @@ type IcingaStatus struct {
 	EventHandlersEnabled       types.Bool      `json:"enable_event_handlers"`
 	FlapDetectionEnabled       types.Bool      `json:"enable_flapping"`
 	PerformanceDataEnabled     types.Bool      `json:"enable_perfdata"`
-}
-
-// EnvironmentID returns the environment ID.
-func (s *IcingaStatus) EnvironmentID() types.Binary {
-	chksm := sha1.Sum([]byte(s.Environment))
-
-	return chksm[:]
 }

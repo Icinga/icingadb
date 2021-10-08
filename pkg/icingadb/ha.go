@@ -1,6 +1,7 @@
 package icingadb
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/hex"
@@ -157,23 +158,34 @@ func (h *HA) controller() {
 					h.abort(err)
 				}
 
-				if h.environment == nil || h.environment.Name.String != s.Environment {
+				envId, err := m.EnvironmentID()
+				if err != nil {
+					h.abort(err)
+				}
+
+				if h.environment == nil || !bytes.Equal(h.environment.Id, envId) {
 					var restart bool
 
 					if h.environment != nil {
-						h.logger.Warnw("Got new environment", zap.String("current", h.environment.Name.String), zap.String("new", s.Environment))
+						h.logger.Warnw("Got new environment",
+							zap.String("current", h.environment.Id.String()),
+							zap.String("new", envId.String()))
 						restart = true
 					}
 
+					h.environmentMu.Lock()
 					h.environment = &v1.Environment{
 						EntityWithoutChecksum: v1.EntityWithoutChecksum{IdMeta: v1.IdMeta{
-							Id: s.EnvironmentID(),
+							Id: envId,
 						}},
-						Name: types.String{NullString: sql.NullString{
-							String: s.Environment,
-							Valid:  true,
-						}},
+						Name: types.String{
+							NullString: sql.NullString{
+								String: envId.String(),
+								Valid:  true,
+							},
+						},
 					}
+					h.environmentMu.Unlock()
 
 					if restart {
 						h.signalRestart()
@@ -194,7 +206,7 @@ func (h *HA) controller() {
 				} else {
 					realizeCtx, cancelRealizeCtx = context.WithCancel(h.ctx)
 				}
-				err = h.realize(realizeCtx, s, t, shouldLog)
+				err = h.realize(realizeCtx, s, t, envId, shouldLog)
 				cancelRealizeCtx()
 				if errors.Is(err, context.DeadlineExceeded) {
 					h.signalHandover()
@@ -205,7 +217,7 @@ func (h *HA) controller() {
 				}
 
 				if !oldInstancesRemoved {
-					go h.removeOldInstances(s)
+					go h.removeOldInstances(s, envId)
 					oldInstancesRemoved = true
 				}
 
@@ -224,7 +236,7 @@ func (h *HA) controller() {
 	}
 }
 
-func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *types.UnixMilli, shouldLog bool) error {
+func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *types.UnixMilli, envId types.Binary, shouldLog bool) error {
 	boff := backoff.NewExponentialWithJitter(time.Millisecond*256, time.Second*3)
 	for attempt := 0; true; attempt++ {
 		sleep := boff(uint64(attempt))
@@ -239,7 +251,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 			return errors.Wrap(err, "can't start transaction")
 		}
 		query := `SELECT id, heartbeat FROM icingadb_instance WHERE environment_id = ? AND responsible = ? AND id != ? AND heartbeat > ?`
-		rows, err := tx.QueryxContext(ctx, query, s.EnvironmentID(), "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
+		rows, err := tx.QueryxContext(ctx, query, envId, "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)))
 		if err != nil {
 			cancelCtx()
 			return internal.CantPerformQuery(err, query)
@@ -252,7 +264,11 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 				h.logger.Errorw("Can't scan currently active instance", zap.Error(err))
 			} else {
 				if shouldLog {
-					h.logger.Infow("Another instance is active", "instance_id", instance.Id, zap.String("environment", s.Environment), "heartbeat", instance.Heartbeat, zap.Duration("heartbeat_age", time.Since(instance.Heartbeat.Time())))
+					h.logger.Infow("Another instance is active",
+						zap.String("instance_id", instance.Id.String()),
+						zap.String("environment", envId.String()),
+						"heartbeat", instance.Heartbeat,
+						zap.Duration("heartbeat_age", time.Since(instance.Heartbeat.Time())))
 				}
 				takeover = false
 			}
@@ -265,7 +281,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 				},
 			},
 			EnvironmentMeta: v1.EnvironmentMeta{
-				EnvironmentId: s.EnvironmentID(),
+				EnvironmentId: envId,
 			},
 			Heartbeat:                         *t,
 			Responsible:                       types.Bool{Bool: takeover || h.responsible, Valid: true},
@@ -345,7 +361,7 @@ func (h *HA) removeInstance(ctx context.Context) {
 	}
 }
 
-func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
+func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus, envId types.Binary) {
 	select {
 	case <-h.ctx.Done():
 		return
@@ -353,12 +369,12 @@ func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus) {
 		query := "DELETE FROM icingadb_instance " +
 			"WHERE id != ? AND environment_id = ? AND endpoint_id = ? AND heartbeat < ?"
 		heartbeat := types.UnixMilli(time.Now().Add(-timeout))
-		result, err := h.db.ExecContext(h.ctx, query, h.instanceId, s.EnvironmentID(),
+		result, err := h.db.ExecContext(h.ctx, query, h.instanceId, envId,
 			s.EndpointId, heartbeat)
 		if err != nil {
 			h.logger.Errorw("Can't remove rows of old instances", zap.Error(err),
 				zap.String("query", query),
-				zap.String("id", h.instanceId.String()), zap.String("environment_id", s.EnvironmentID().String()),
+				zap.String("id", h.instanceId.String()), zap.String("environment_id", envId.String()),
 				zap.String("endpoint_id", s.EndpointId.String()), zap.Time("heartbeat", heartbeat.Time()))
 			return
 		}
