@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha1"
 	"encoding/binary"
 	"github.com/google/uuid"
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
+	icingadbTypes "github.com/icinga/icingadb/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v6"
@@ -14,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -52,6 +56,8 @@ var log = func() *zap.SugaredLogger {
 	return logger.Sugar()
 }()
 
+var objectTypes = map[uint8]string{1: "host", 2: "service"}
+
 // mkDeterministicUuid returns a formally random UUID (v4) as follows: 11111122-3300-4455-4455-555555555555
 //
 // 0: zeroed
@@ -60,7 +66,7 @@ var log = func() *zap.SugaredLogger {
 // 3: "h" (for "history")
 // 4: the new UUID's formal version (unused bits zeroed)
 // 5: the ID of the row the new UUID is for in the IDO (big endian)
-func mkDeterministicUuid(table byte, rowId uint64) []byte {
+func mkDeterministicUuid(table byte, rowId uint64) icingadbTypes.UUID {
 	uid := uuidTemplate
 	uid[3] = table
 
@@ -73,7 +79,7 @@ func mkDeterministicUuid(table byte, rowId uint64) []byte {
 	uid[7] = bEId[0]
 	copy(uid[9:], bEId[1:])
 
-	return uid[:]
+	return icingadbTypes.UUID{UUID: uid}
 }
 
 // uuidTemplate is for mkDeterministicUuid.
@@ -90,6 +96,42 @@ var uuidTemplate = func() uuid.UUID {
 	return uid
 }()
 
+// randomUuid generates a new UUIDv4.
+func randomUuid() icingadbTypes.UUID {
+	var rander *bufio.Reader
+
+	massRanders.Lock()
+	for r := range massRanders.pool {
+		rander = r
+		delete(massRanders.pool, r)
+		break
+	}
+	massRanders.Unlock()
+
+	if rander == nil {
+		rander = bufio.NewReader(rand.Reader)
+	}
+
+	id, err := uuid.NewRandomFromReader(rander)
+	if err != nil {
+		log.Fatalf("%+v", errors.Wrap(err, "can't generate random UUID"))
+	}
+
+	massRanders.Lock()
+	massRanders.pool[rander] = struct{}{}
+	massRanders.Unlock()
+
+	return icingadbTypes.UUID{UUID: id}
+}
+
+var massRanders = struct {
+	sync.Mutex
+	pool map[*bufio.Reader]struct{}
+}{
+	sync.Mutex{},
+	map[*bufio.Reader]struct{}{},
+}
+
 // hashAny combines PackAny and SHA1 hashing.
 func hashAny(in interface{}) []byte {
 	hash := sha1.New()
@@ -100,12 +142,34 @@ func hashAny(in interface{}) []byte {
 	return hash.Sum(nil)
 }
 
+// convertTime converts *nix timestamps from the IDO for Icinga DB.
+func convertTime(ts int64, tsUs uint32) icingadbTypes.UnixMilli {
+	if ts == 0 && tsUs == 0 {
+		return icingadbTypes.UnixMilli{}
+	}
+
+	return icingadbTypes.UnixMilli(time.Unix(ts, int64(tsUs)*int64(time.Microsecond/time.Nanosecond)))
+}
+
 // calcObjectId calculates the ID of the config object named name1 for Icinga DB.
 func calcObjectId(env, name1 string) []byte {
+	if name1 == "" {
+		return nil
+	}
+
 	return hashAny([2]string{env, name1})
 }
 
-func sliceIdoHistory(snapshot *sqlx.Tx, query string, checkpoint, onRows interface{}) {
+// calcServiceId calculates the ID of the service name2 of the host name1 for Icinga DB.
+func calcServiceId(env, name1, name2 string) []byte {
+	if name2 == "" {
+		return nil
+	}
+
+	return hashAny([2]string{env, name1 + "!" + name2})
+}
+
+func sliceIdoHistory(snapshot *sqlx.Tx, query string, args []interface{}, checkpoint, onRows interface{}) {
 	vOnRows := reflect.ValueOf(onRows) // TODO: make onRows generic[T] one nice day
 
 	tRows := vOnRows.Type(). // func(rows []T) (checkpoint interface{})
@@ -116,15 +180,10 @@ func sliceIdoHistory(snapshot *sqlx.Tx, query string, checkpoint, onRows interfa
 	vRows := vNewRows.Elem()
 	onRowsArgs := [1]reflect.Value{vRows}
 	vZeroRows := reflect.Zero(tRows)
-
-	stmt, err := snapshot.Preparex(query)
-	if err != nil {
-		log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
-	}
-	defer stmt.Close()
+	args = append(append([]interface{}(nil), args...), checkpoint, bulk)
 
 	for {
-		if err := stmt.Select(rowsPtr, checkpoint, bulk); err != nil {
+		if err := snapshot.Select(rowsPtr, query, args...); err != nil {
 			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 		}
 
@@ -137,19 +196,23 @@ func sliceIdoHistory(snapshot *sqlx.Tx, query string, checkpoint, onRows interfa
 		}
 
 		vRows.Set(vZeroRows)
+		args[len(args)-2] = checkpoint
 	}
 }
 
 type historyType struct {
-	name        string
-	idoTable    string
-	idoIdColumn string
-	idoColumns  []string
-	idbTable    string
-	idbIdColumn string
-	convertId   func(row ProgressRow, env string) []byte
-	cacheSchema []string
-	cacheFiller func(*historyType)
+	name            string
+	idoTable        string
+	idoIdColumn     string
+	idoColumns      []string
+	idbTable        string
+	idbIdColumn     string
+	convertId       func(row ProgressRow, env string) []byte
+	cacheSchema     []string
+	cacheFiller     func(*historyType)
+	cacheLimitQuery string
+	migrationQuery  string
+	convertRows     interface{}
 
 	cache    *sqlx.DB
 	snapshot *sqlx.Tx
@@ -193,7 +256,7 @@ var types = historyTypes{
 		nil,
 		"history",
 		"id",
-		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('a', row.Id) },
+		func(row ProgressRow, _ string) []byte { u := mkDeterministicUuid('a', row.Id); return u.UUID[:] },
 		eventTimeCacheSchema,
 		func(ht *historyType) {
 			buildEventTimeCache(ht, []string{
@@ -201,6 +264,9 @@ var types = historyTypes{
 				"xh.entry_time_usec event_time_usec", "xh.acknowledgement_type event_is_start", "xh.object_id",
 			})
 		},
+		"",
+		acknowledgementMigrationQuery,
+		convertAcknowledgementRows,
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -211,7 +277,10 @@ var types = historyTypes{
 		"comment_history",
 		"comment_id",
 		func(row ProgressRow, env string) []byte { return calcObjectId(env, row.Name) },
-		nil, nil, nil, nil, 0, nil, 0,
+		nil, nil, "",
+		commentMigrationQuery,
+		convertCommentRows,
+		nil, nil, 0, nil, 0,
 	},
 	{
 		"downtime",
@@ -221,7 +290,10 @@ var types = historyTypes{
 		"downtime_history",
 		"downtime_id",
 		func(row ProgressRow, env string) []byte { return calcObjectId(env, row.Name) },
-		nil, nil, nil, nil, 0, nil, 0,
+		nil, nil, "",
+		downtimeMigrationQuery,
+		convertDowntimeRows,
+		nil, nil, 0, nil, 0,
 	},
 	{
 		"flapping",
@@ -230,7 +302,7 @@ var types = historyTypes{
 		nil,
 		"history",
 		"id",
-		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('f', row.Id) },
+		func(row ProgressRow, _ string) []byte { u := mkDeterministicUuid('f', row.Id); return u.UUID[:] },
 		eventTimeCacheSchema,
 		func(ht *historyType) {
 			buildEventTimeCache(ht, []string{
@@ -238,6 +310,9 @@ var types = historyTypes{
 				"xh.event_time_usec", "xh.event_type-1000 event_is_start", "xh.object_id",
 			})
 		},
+		"",
+		flappingMigrationQuery,
+		convertFlappingRows,
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -247,13 +322,16 @@ var types = historyTypes{
 		nil,
 		"notification_history",
 		"id",
-		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('n', row.Id) },
+		func(row ProgressRow, _ string) []byte { u := mkDeterministicUuid('n', row.Id); return u.UUID[:] },
 		previousHardStateCacheSchema,
 		func(ht *historyType) {
 			buildPreviousHardStateCache(ht, []string{
 				"xh.notification_id id", "xh.object_id", "xh.state last_hard_state",
 			})
 		},
+		"SELECT MAX(history_id) FROM previous_hard_state",
+		notificationMigrationQuery,
+		convertNotificationRows,
 		nil, nil, 0, nil, 0,
 	},
 	{
@@ -263,11 +341,14 @@ var types = historyTypes{
 		nil,
 		"state_history",
 		"id",
-		func(row ProgressRow, _ string) []byte { return mkDeterministicUuid('s', row.Id) },
+		func(row ProgressRow, _ string) []byte { u := mkDeterministicUuid('s', row.Id); return u.UUID[:] },
 		previousHardStateCacheSchema,
 		func(ht *historyType) {
 			buildPreviousHardStateCache(ht, []string{"xh.statehistory_id id", "xh.object_id", "xh.last_hard_state"})
 		},
+		"SELECT MAX(history_id) FROM previous_hard_state",
+		stateMigrationQuery,
+		convertStateRows,
 		nil, nil, 0, nil, 0,
 	},
 }

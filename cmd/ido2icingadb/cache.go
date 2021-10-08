@@ -12,8 +12,8 @@ var eventTimeCacheSchema = []string{
 	// Icinga DB's flapping_history#start_time per flapping_end row (IDO's icinga_flappinghistory#flappinghistory_id).
 	`CREATE TABLE IF NOT EXISTS end_start_time (
 	history_id INT PRIMARY KEY,
-	event_time INT,
-	event_time_usec INT
+	event_time INT NOT NULL,
+	event_time_usec INT NOT NULL
 )`,
 	// Helper table, the last start_time per icinga_statehistory#object_id.
 	`CREATE TABLE IF NOT EXISTS last_start_time (
@@ -47,7 +47,7 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 			"SELECT "+strings.Join(idoColumns, ", ")+" FROM "+ht.idoTable+
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
 				ht.idoIdColumn+" > ? ORDER BY xh."+ht.idoIdColumn+" LIMIT ?",
-			checkpoint.MaxId.Int64,
+			nil, checkpoint.MaxId.Int64,
 			func(idoRows []struct {
 				Id            uint64
 				EventTime     int64
@@ -76,12 +76,6 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 							onDeleted(cacheExec(
 								*tx, false, "DELETE FROM last_start_time WHERE object_id=?", idoRow.ObjectId,
 							))
-						} else {
-							cacheExec(
-								*tx, false,
-								"INSERT INTO end_start_time(history_id, event_time, event_time_usec) "+
-									"VALUES (?, NULL, NULL)", idoRow.Id,
-							)
 						}
 					} else {
 						onDeleted(cacheExec(
@@ -178,7 +172,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 			"SELECT "+strings.Join(idoColumns, ", ")+" FROM "+ht.idoTable+
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
 				ht.idoIdColumn+" < ? ORDER BY xh."+ht.idoIdColumn+" DESC LIMIT ?",
-			checkpoint,
+			nil, checkpoint,
 			func(idoRows []struct {
 				Id            uint64
 				ObjectId      uint64
@@ -292,8 +286,10 @@ func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, onDeleted func(sql.Resul
 	}
 }
 
-func cacheGet(cacheTx *sqlx.Tx, dest interface{}, query string, args ...interface{}) {
-	if err := cacheTx.Get(dest, query, args...); err != nil {
+func cacheGet(cache interface {
+	Get(dest interface{}, query string, args ...interface{}) error
+}, dest interface{}, query string, args ...interface{}) {
+	if err := cache.Get(dest, query, args...); err != nil {
 		log.With("backend", "cache", "query", query, "args", args).
 			Errorf("%+v", errors.Wrap(err, "can't perform query"))
 	}
