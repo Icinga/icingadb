@@ -34,7 +34,6 @@ type HA struct {
 	responsible   bool
 	handover      chan struct{}
 	takeover      chan struct{}
-	restart       chan struct{}
 	done          chan struct{}
 	errOnce       sync.Once
 	errMu         sync.Mutex
@@ -56,7 +55,6 @@ func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger
 		logger:     logger,
 		handover:   make(chan struct{}),
 		takeover:   make(chan struct{}),
-		restart:    make(chan struct{}),
 		done:       make(chan struct{}),
 	}
 
@@ -106,11 +104,6 @@ func (h *HA) Handover() chan struct{} {
 // Takeover returns a channel with which takeovers are signaled.
 func (h *HA) Takeover() chan struct{} {
 	return h.takeover
-}
-
-// Restart returns a channel with which restarts are signaled.
-func (h *HA) Restart() chan struct{} {
-	return h.restart
 }
 
 func (h *HA) abort(err error) {
@@ -164,13 +157,10 @@ func (h *HA) controller() {
 				}
 
 				if h.environment == nil || !bytes.Equal(h.environment.Id, envId) {
-					var restart bool
-
 					if h.environment != nil {
-						h.logger.Warnw("Got new environment",
+						h.logger.Fatalw("Environment changed unexpectedly",
 							zap.String("current", h.environment.Id.String()),
 							zap.String("new", envId.String()))
-						restart = true
 					}
 
 					h.environmentMu.Lock()
@@ -186,11 +176,6 @@ func (h *HA) controller() {
 						},
 					}
 					h.environmentMu.Unlock()
-
-					if restart {
-						h.signalRestart()
-						continue
-					}
 				}
 
 				select {
@@ -406,14 +391,5 @@ func (h *HA) signalTakeover() {
 		case <-h.ctx.Done():
 			// Noop
 		}
-	}
-}
-
-func (h *HA) signalRestart() {
-	select {
-	case h.restart <- struct{}{}:
-		h.responsible = false
-	case <-h.ctx.Done():
-		// Noop
 	}
 }
