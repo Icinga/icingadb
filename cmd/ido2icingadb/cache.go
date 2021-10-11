@@ -151,15 +151,15 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 		}
 		cacheGet(*tx, &nextIds, "SELECT COUNT(*) cnt, MIN(history_id) min_id FROM next_ids")
 
-		var previousHardState struct{ Cnt int64 }
-		cacheGet(*tx, &previousHardState, "SELECT COUNT(*) cnt FROM previous_hard_state")
+		var previousHardStateCnt int64
+		cacheGet(*tx, &previousHardStateCnt, "SELECT COUNT(*) FROM previous_hard_state")
 
 		var checkpoint int64
 		if nextIds.MinId.Valid { // there are next_ids
 			checkpoint = nextIds.MinId.Int64 // this kind of caches is filled descending
 		} else { // there aren't any next_ids
 			// next_ids contains the most recently processed IDs and is only empty if...
-			if previousHardState.Cnt == 0 {
+			if previousHardStateCnt == 0 {
 				// ... we didn't actually start yet...
 				checkpoint = (1 << 63) - 1 // start from the largest (possible) ID
 			} else {
@@ -168,7 +168,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 			}
 		}
 
-		ht.bar.SetCurrent(previousHardState.Cnt + nextIds.Cnt)
+		ht.bar.SetCurrent(previousHardStateCnt + nextIds.Cnt)
 		inc := barIncrementer{ht.bar, time.Now()}
 
 		// We continue where we finished before. As we build the cache in reverse chronological order:
