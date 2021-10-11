@@ -6,7 +6,7 @@ import (
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/types"
+	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -46,9 +46,9 @@ func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc
 		for i := 0; i < concurrent; i++ {
 			g.Go(func() error {
 				for pair := range pairs {
-					var id types.Binary
+					var id v1.IdMeta
 
-					if err := id.UnmarshalText([]byte(pair.Field)); err != nil {
+					if err := id.Id.UnmarshalText([]byte(pair.Field)); err != nil {
 						return errors.Wrapf(err, "can't create ID from value %#v", pair.Field)
 					}
 
@@ -56,7 +56,7 @@ func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc
 					if err := internal.UnmarshalJSON([]byte(pair.Value), e); err != nil {
 						return err
 					}
-					e.SetID(id)
+					e.SetID(id.ID())
 
 					select {
 					case entities <- e:
@@ -78,7 +78,7 @@ func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc
 // SetChecksums concurrently streams from the given entities and
 // sets their checksums using the specified map and
 // streams the results on a returned channel.
-func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksums map[string]contracts.Entity, concurrent int) (<-chan contracts.Entity, <-chan error) {
+func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksums map[contracts.ID]contracts.Entity, concurrent int) (<-chan contracts.Entity, <-chan error) {
 	entitiesWithChecksum := make(chan contracts.Entity)
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -90,7 +90,7 @@ func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksu
 		for i := 0; i < concurrent; i++ {
 			g.Go(func() error {
 				for entity := range entities {
-					if checksumer, ok := checksums[entity.ID().String()]; ok {
+					if checksumer, ok := checksums[entity.ID()]; ok {
 						entity.(contracts.Checksumer).SetChecksum(checksumer.(contracts.Checksumer).Checksum())
 					} else {
 						return errors.Errorf("no checksum for %#v", entity)

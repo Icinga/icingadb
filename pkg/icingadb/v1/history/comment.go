@@ -16,13 +16,16 @@ func (che CommentHistoryEntity) Fingerprint() contracts.Fingerprinter {
 }
 
 // ID implements part of the contracts.Entity interface.
-func (che CommentHistoryEntity) ID() contracts.ID {
-	return che.CommentId
+func (che CommentHistoryEntity) ID() (id contracts.ID) {
+	copy(id[:], che.CommentId)
+	return
 }
 
 // SetID implements part of the contracts.Entity interface.
 func (che *CommentHistoryEntity) SetID(id contracts.ID) {
-	che.CommentId = id.(types.Binary)
+	cp := make(types.Binary, len(id))
+	copy(cp, id[:])
+	che.CommentId = cp
 }
 
 type CommentHistoryUpserter struct {

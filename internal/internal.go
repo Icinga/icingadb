@@ -1,9 +1,11 @@
 package internal
 
 import (
-	"encoding/json"
+	jsoniter "github.com/json-iterator/go"
 	"github.com/pkg/errors"
 )
+
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
 
 // CantDecodeHex wraps the given error with the given string that cannot be hex-decoded.
 func CantDecodeHex(err error, s string) error {
@@ -37,12 +39,12 @@ func CantUnmarshalYAML(err error, v interface{}) error {
 
 // MarshalJSON calls json.Marshal and wraps any resulting errors.
 func MarshalJSON(v interface{}) ([]byte, error) {
-	b, err := json.Marshal(v)
+	b, err := json.Marshal(&v)
 
 	return b, errors.Wrapf(err, "can't marshal JSON from %T", v)
 }
 
 // UnmarshalJSON calls json.Unmarshal and wraps any resulting errors.
 func UnmarshalJSON(data []byte, v interface{}) error {
-	return errors.Wrapf(json.Unmarshal(data, v), "can't unmarshal JSON into %T", v)
+	return errors.Wrapf(json.Unmarshal(data, &v), "can't unmarshal JSON into %T", v)
 }

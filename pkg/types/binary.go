@@ -127,7 +127,6 @@ func (binary Binary) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
-	_ contracts.ID             = (*Binary)(nil)
 	_ encoding.TextMarshaler   = (*Binary)(nil)
 	_ encoding.TextUnmarshaler = (*Binary)(nil)
 	_ json.Marshaler           = (*Binary)(nil)

@@ -2,17 +2,18 @@ package icingadb
 
 import (
 	"context"
+	"encoding/hex"
 	"github.com/icinga/icingadb/pkg/contracts"
 )
 
-// EntitiesById is a map of key-contracts.Entity pairs.
-type EntitiesById map[string]contracts.Entity
+// EntitiesById is a map contracts.ID-contracts.Entity pairs.
+type EntitiesById map[contracts.ID]contracts.Entity
 
 // Keys returns the keys.
 func (ebi EntitiesById) Keys() []string {
 	keys := make([]string, 0, len(ebi))
 	for k := range ebi {
-		keys = append(keys, k)
+		keys = append(keys, hex.EncodeToString(k[:]))
 	}
 
 	return keys
@@ -21,8 +22,8 @@ func (ebi EntitiesById) Keys() []string {
 // IDs returns the contracts.ID of the entities.
 func (ebi EntitiesById) IDs() []interface{} {
 	ids := make([]interface{}, 0, len(ebi))
-	for _, v := range ebi {
-		ids = append(ids, v.(contracts.IDer).ID())
+	for k := range ebi {
+		ids = append(ids, k)
 	}
 
 	return ids

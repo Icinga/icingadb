@@ -16,13 +16,16 @@ func (dhe DowntimeHistoryEntity) Fingerprint() contracts.Fingerprinter {
 }
 
 // ID implements part of the contracts.Entity interface.
-func (dhe DowntimeHistoryEntity) ID() contracts.ID {
-	return dhe.DowntimeId
+func (dhe DowntimeHistoryEntity) ID() (id contracts.ID) {
+	copy(id[:], dhe.DowntimeId)
+	return
 }
 
 // SetID implements part of the contracts.Entity interface.
 func (dhe *DowntimeHistoryEntity) SetID(id contracts.ID) {
-	dhe.DowntimeId = id.(types.Binary)
+	cp := make(types.Binary, len(id))
+	copy(cp, id[:])
+	dhe.DowntimeId = cp
 }
 
 type DowntimeHistoryUpserter struct {

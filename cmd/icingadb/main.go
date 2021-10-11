@@ -14,6 +14,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
+	"github.com/pkg/profile"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"os"
@@ -34,6 +35,8 @@ func main() {
 }
 
 func run() int {
+	defer profile.Start(profile.NoShutdownHook, profile.ProfilePath(".")).Stop()
+
 	cmd := command.New()
 	logs, err := logging.NewLogging(
 		cmd.Config.Logging.Level,
@@ -164,6 +167,18 @@ func run() int {
 								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory.WithInit), dump)
 							})
 						}
+
+						g.Go(func() error {
+							defer utils.Timed(time.Now(), func(elapsed time.Duration) {
+								logger.Infow("Finished config sync", zap.Duration("duration", elapsed))
+							})
+
+							wg.Wait()
+
+							sig <- syscall.SIGINT
+
+							return nil
+						})
 
 						wg.Add(1)
 						g.Go(func() error {
