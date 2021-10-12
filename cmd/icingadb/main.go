@@ -211,6 +211,11 @@ func run() int {
 
 						g.Go(func() error {
 							configInitSync.Wait()
+
+							if err := synctx.Err(); err != nil {
+								return err
+							}
+
 							logger.Info("Starting config runtime updates sync")
 
 							return rt.Sync(synctx, v1.ConfigFactories, runtimeConfigUpdateStreams)
@@ -218,7 +223,13 @@ func run() int {
 
 						g.Go(func() error {
 							stateInitSync.Wait()
+
+							if err := synctx.Err(); err != nil {
+								return err
+							}
+
 							logger.Info("Starting state runtime updates sync")
+
 							return rt.Sync(synctx, v1.StateFactories, runtimeStateUpdateStreams)
 						})
 
