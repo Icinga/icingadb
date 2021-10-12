@@ -225,8 +225,8 @@ func computeProgress(c *Config, idb *icingadb.DB) {
 			// For actual migration icinga_objects will be joined anyway,
 			// so it makes no sense to take vanished objects into account.
 			ht.idoTable + " xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE " +
-			ht.idoIdColumn + " > ? ORDER BY xh." + // requires migrate() to migrate serially, in order
-			ht.idoIdColumn + " LIMIT ?"
+			ht.idoIdColumn + " > :checkpoint ORDER BY xh." + // requires migrate() to migrate serially, in order
+			ht.idoIdColumn + " LIMIT :bulk"
 
 		// As long as the current chunk is lastRowsLen long (doesn't change)...
 		var lastRowsLen int
@@ -405,14 +405,14 @@ func migrate(c *Config, idb *icingadb.DB) {
 			// and the rows (below)
 		}
 
-		var args []interface{}
+		var args map[string]interface{}
 
 		// For the case that the cache was older that the IDO,
 		// but ht.cacheFiller couldn't update it, limit (WHERE) our source data set.
 		if ht.cacheLimitQuery != "" {
 			var limit uint64
 			cacheGet(ht.cache, &limit, ht.cacheLimitQuery)
-			args = append(args, limit)
+			args = map[string]interface{}{"cache_limit": limit}
 		}
 
 		icingaDbInserts := map[reflect.Type]string{}

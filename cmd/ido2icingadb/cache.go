@@ -49,7 +49,7 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 				// For actual migration icinga_objects will be joined anyway,
 				// so it makes no sense to take vanished objects into account.
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
-				ht.idoIdColumn+" > ? ORDER BY xh."+ht.idoIdColumn+" LIMIT ?",
+				ht.idoIdColumn+" > :checkpoint ORDER BY xh."+ht.idoIdColumn+" LIMIT :bulk",
 			nil, checkpoint.MaxId.Int64, // ... since we were interrupted:
 			func(idoRows []struct {
 				Id            uint64
@@ -185,7 +185,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 				// For actual migration icinga_objects will be joined anyway,
 				// so it makes no sense to take vanished objects into account.
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
-				ht.idoIdColumn+" < ? ORDER BY xh."+ht.idoIdColumn+" DESC LIMIT ?",
+				ht.idoIdColumn+" < :checkpoint ORDER BY xh."+ht.idoIdColumn+" DESC LIMIT :bulk",
 			nil, checkpoint, // ... since we were interrupted:
 			func(idoRows []struct {
 				Id            uint64
