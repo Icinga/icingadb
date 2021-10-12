@@ -19,9 +19,9 @@ const acknowledgementMigrationQuery = "SELECT ah.acknowledgement_id, UNIX_TIMEST
 	"IFNULL(o.name2, '') name2 " +
 	"FROM icinga_acknowledgements ah USE INDEX (PRIMARY) " +
 	"INNER JOIN icinga_objects o ON o.object_id=ah.object_id " +
-	"WHERE ah.acknowledgement_id > ? " + // where we were interrupted
+	"WHERE ah.acknowledgement_id > :checkpoint " + // where we were interrupted
 	"ORDER BY ah.acknowledgement_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT ?"
+	"LIMIT :bulk"
 
 // AckClear updates an already migrated ack event with the clear event info.
 type AckClear struct {
@@ -183,9 +183,9 @@ const commentMigrationQuery = "SELECT ch.commenthistory_id, UNIX_TIMESTAMP(ch.en
 	"o.objecttype_id, o.name1, IFNULL(o.name2, '') name2 " +
 	"FROM icinga_commenthistory ch USE INDEX (PRIMARY) " +
 	"INNER JOIN icinga_objects o ON o.object_id=ch.object_id " +
-	"WHERE ch.commenthistory_id > ? " + // where we were interrupted
+	"WHERE ch.commenthistory_id > :checkpoint " + // where we were interrupted
 	"ORDER BY ch.commenthistory_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT ?"
+	"LIMIT :bulk"
 
 type commentRow = struct {
 	CommenthistoryId uint64
@@ -296,9 +296,9 @@ const downtimeMigrationQuery = "SELECT dh.downtimehistory_id, UNIX_TIMESTAMP(dh.
 	"FROM icinga_downtimehistory dh USE INDEX (PRIMARY) " +
 	"INNER JOIN icinga_objects o ON o.object_id=dh.object_id " +
 	"LEFT JOIN icinga_scheduleddowntime sd ON sd.scheduleddowntime_id=dh.triggered_by_id " +
-	"WHERE dh.downtimehistory_id > ? " + // where we were interrupted
+	"WHERE dh.downtimehistory_id > :checkpoint " + // where we were interrupted
 	"ORDER BY dh.downtimehistory_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT ?"
+	"LIMIT :bulk"
 
 type downtimeRow = struct {
 	DowntimehistoryId   uint64
@@ -440,9 +440,9 @@ const flappingMigrationQuery = "SELECT fh.flappinghistory_id, UNIX_TIMESTAMP(fh.
 	"fh.high_threshold, o.objecttype_id, o.name1, IFNULL(o.name2, '') name2 " +
 	"FROM icinga_flappinghistory fh USE INDEX (PRIMARY) " +
 	"INNER JOIN icinga_objects o ON o.object_id=fh.object_id " +
-	"WHERE fh.flappinghistory_id > ? " + // where we were interrupted
+	"WHERE fh.flappinghistory_id > :checkpoint " + // where we were interrupted
 	"ORDER BY fh.flappinghistory_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT ?"
+	"LIMIT :bulk"
 
 // FlappingEnd updates an already migrated start event with the end event info.
 type FlappingEnd struct {
@@ -598,10 +598,10 @@ const notificationMigrationQuery = "SELECT n.notification_id, n.notification_rea
 	"n.long_output, n.contacts_notified, o.objecttype_id, o.name1, IFNULL(o.name2, '') name2 " +
 	"FROM icinga_notifications n USE INDEX (PRIMARY) " +
 	"INNER JOIN icinga_objects o ON o.object_id=n.object_id " +
-	"WHERE n.notification_id <= ? AND " +
-	"n.notification_id > ? " + // where we were interrupted
+	"WHERE n.notification_id <= :cache_limit AND " +
+	"n.notification_id > :checkpoint " + // where we were interrupted
 	"ORDER BY n.notification_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT ?"
+	"LIMIT :bulk"
 
 // zeroHash is a NULL alternative for NOT NULL columns.
 var zeroHash = make(icingadbTypes.Binary, 20)
@@ -759,10 +759,10 @@ const stateMigrationQuery = "SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_
 	"sh.check_source, o.objecttype_id, o.name1, IFNULL(o.name2, '') name2 " +
 	"FROM icinga_statehistory sh USE INDEX (PRIMARY) " +
 	"INNER JOIN icinga_objects o ON o.object_id=sh.object_id " +
-	"WHERE sh.statehistory_id <= ? AND " +
-	"sh.statehistory_id > ? " + // where we were interrupted
+	"WHERE sh.statehistory_id <= :cache_limit AND " +
+	"sh.statehistory_id > :checkpoint " + // where we were interrupted
 	"ORDER BY sh.statehistory_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT ?"
+	"LIMIT :bulk"
 
 type stateRow = struct {
 	StatehistoryId      uint64

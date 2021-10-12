@@ -180,13 +180,13 @@ func calcServiceId(env, name1, name2 string) []byte {
 	return hashAny([2]string{env, name1 + "!" + name2})
 }
 
-// sliceIdoHistory performs query with args+[]interface{}{checkpoint,bulk} on snapshot and passes the results
-// to onRows (a func([]T)interface{}) until either an empty result set or onRows() returns nil.
+// sliceIdoHistory performs query with args+map[string]interface{}{"checkpoint": checkpoint, "bulk": bulk} on snapshot
+// and passes the results to onRows (a func([]T)interface{}) until either an empty result set or onRows() returns nil.
 // Rationale: split the likely large result set of a query by adding a WHERE condition and a LIMIT,
-// both with ? placeholders. Due to this function's internals they have to be the last two placeholders.
+// both with :named placeholders (:checkpoint, :bulk).
 // checkpoint is the initial value for the WHERE condition, onRows() returns follow-up ones.
 // (On non-recoverable errors the whole program exits.)
-func sliceIdoHistory(snapshot *sqlx.Tx, query string, args []interface{}, checkpoint, onRows interface{}) {
+func sliceIdoHistory(snapshot *sqlx.Tx, query string, args map[string]interface{}, checkpoint, onRows interface{}) {
 	vOnRows := reflect.ValueOf(onRows) // TODO: make onRows generic[T] one nice day
 
 	tRows := vOnRows.Type(). // func(rows []T) (checkpoint interface{})
@@ -197,12 +197,26 @@ func sliceIdoHistory(snapshot *sqlx.Tx, query string, args []interface{}, checkp
 	vRows := vNewRows.Elem()
 	onRowsArgs := [1]reflect.Value{vRows}
 	vZeroRows := reflect.Zero(tRows)
-	args = append(append([]interface{}(nil), args...), checkpoint, bulk)
+
+	if args == nil {
+		args = map[string]interface{}{}
+	}
+
+	args["checkpoint"] = checkpoint
+	args["bulk"] = bulk
 
 	for {
-		if err := snapshot.Select(rowsPtr, query, args...); err != nil {
+		// TODO: use Tx#SelectNamed() one nice day (https://github.com/jmoiron/sqlx/issues/779)
+		stmt, err := snapshot.PrepareNamed(query)
+		if err != nil {
+			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
+		}
+
+		if err := stmt.Select(rowsPtr, args); err != nil {
 			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 		}
+
+		_ = stmt.Close()
 
 		if vRows.Len() < 1 {
 			break
@@ -213,7 +227,7 @@ func sliceIdoHistory(snapshot *sqlx.Tx, query string, args []interface{}, checkp
 		}
 
 		vRows.Set(vZeroRows)
-		args[len(args)-2] = checkpoint
+		args["checkpoint"] = checkpoint
 	}
 }
 
