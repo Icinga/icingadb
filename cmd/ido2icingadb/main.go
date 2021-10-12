@@ -436,65 +436,39 @@ func migrate(c *Config, idb *icingadb.DB) {
 						log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
 					}
 
-					for _, table := range res[1].Interface().([][]interface{}) {
-						if len(table) < 1 {
-							continue
-						}
-
-						tRow := reflect.TypeOf(table[0])
-
-						insert, ok := icingaDbInserts[tRow]
-						if !ok {
-							insert, _ = idb.BuildInsertStmt(table[0])
-							insert = "REPLACE " + strings.TrimPrefix(insert, "INSERT ")
-							icingaDbInserts[tRow] = insert
-						}
-
-						for len(table) > 0 {
-							// REPLACE à 1000.
-							slice := table
-							if len(slice) > 1000 {
-								slice = slice[:1000]
-								table = table[1000:]
-							} else {
-								table = nil
+					for _, operation := range [...]struct {
+						data      reflect.Value
+						buildStmt func(subject interface{}) (stmt string, _ int)
+						stmtCache map[reflect.Type]string
+					}{{res[1], idb.BuildUpsertStmt, icingaDbInserts}, {res[0], idb.BuildUpdateStmt, icingaDbUpdates}} {
+						for _, table := range operation.data.Interface().([][]interface{}) {
+							if len(table) < 1 {
+								continue
 							}
 
-							if _, err := tx.NamedExec(insert, slice); err != nil {
-								log.With("backend", "Icinga DB", "dml", insert, "args", slice).
-									Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+							tRow := reflect.TypeOf(table[0])
+
+							query, ok := operation.stmtCache[tRow]
+							if !ok {
+								query, _ = operation.buildStmt(table[0])
+								operation.stmtCache[tRow] = query
 							}
-						}
-					}
 
-					for _, table := range res[0].Interface().([][]interface{}) {
-						if len(table) < 1 {
-							continue
-						}
-
-						tRow := reflect.TypeOf(table[0])
-
-						update, ok := icingaDbUpdates[tRow]
-						if !ok {
-							update, _ = idb.BuildUpdateStmt(table[0])
-							icingaDbUpdates[tRow] = update
-						}
-
-						stmt, err := tx.PrepareNamed(update)
-						if err != nil {
-							log.With("backend", "Icinga DB", "dml", update).
-								Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
-						}
-
-						// UPDATE à one.
-						for _, row := range table {
-							if _, err := stmt.Exec(row); err != nil {
-								log.With("backend", "Icinga DB", "dml", update, "args", row).
-									Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+							stmt, err := tx.PrepareNamed(query)
+							if err != nil {
+								log.With("backend", "Icinga DB", "dml", query).
+									Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
 							}
-						}
 
-						_ = stmt.Close()
+							for _, row := range table {
+								if _, err := stmt.Exec(row); err != nil {
+									log.With("backend", "Icinga DB", "dml", query, "args", row).
+										Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+								}
+							}
+
+							_ = stmt.Close()
+						}
 					}
 
 					if err := tx.Commit(); err != nil {
