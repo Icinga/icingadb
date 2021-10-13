@@ -113,7 +113,10 @@ CREATE TABLE hostgroup_customvar (
   hostgroup_id binary(20) NOT NULL COMMENT 'hostgroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_hostgroup_customvar_hostgroup_id (hostgroup_id, customvar_id),
+  INDEX idx_hostgroup_customvar_customvar_id (customvar_id, hostgroup_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE host_state (
@@ -267,7 +270,10 @@ CREATE TABLE servicegroup_customvar (
   servicegroup_id binary(20) NOT NULL COMMENT 'servicegroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_servicegroup_customvar_servicegroup_id (servicegroup_id, customvar_id),
+  INDEX idx_servicegroup_customvar_customvar_id (customvar_id, servicegroup_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service_state (
@@ -423,7 +429,11 @@ CREATE TABLE checkcommand_customvar (
 
   command_id binary(20) NOT NULL COMMENT 'command.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
-  PRIMARY KEY (id)
+
+  PRIMARY KEY (id),
+
+  INDEX idx_checkcommand_customvar_command_id (command_id, customvar_id),
+  INDEX idx_checkcommand_customvar_customvar_id (customvar_id, command_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 
@@ -482,7 +492,10 @@ CREATE TABLE eventcommand_customvar (
   command_id binary(20) NOT NULL COMMENT 'command.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_eventcommand_customvar_command_id (command_id, customvar_id),
+  INDEX idx_eventcommand_customvar_customvar_id (customvar_id, command_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand (
@@ -540,7 +553,10 @@ CREATE TABLE notificationcommand_customvar (
   command_id binary(20) NOT NULL COMMENT 'command.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_notificationcommand_customvar_command_id (command_id, customvar_id),
+  INDEX idx_notificationcommand_customvar_customvar_id (customvar_id, command_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE comment (
@@ -680,7 +696,10 @@ CREATE TABLE notification_customvar (
   notification_id binary(20) NOT NULL COMMENT 'notification.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_notification_customvar_notification_id (notification_id, customvar_id),
+  INDEX idx_notification_customvar_customvar_id (customvar_id, notification_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icon_image (
@@ -762,7 +781,10 @@ CREATE TABLE timeperiod_customvar (
   timeperiod_id binary(20) NOT NULL COMMENT 'timeperiod.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_timeperiod_customvar_timeperiod_id (timeperiod_id, customvar_id),
+  INDEX idx_timeperiod_customvar_customvar_id (customvar_id, timeperiod_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE customvar (
@@ -856,7 +878,10 @@ CREATE TABLE user_customvar (
   user_id binary(20) NOT NULL COMMENT 'user.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_user_customvar_user_id (user_id, customvar_id),
+  INDEX idx_user_customvar_customvar_id (customvar_id, user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE usergroup_customvar (
@@ -865,7 +890,10 @@ CREATE TABLE usergroup_customvar (
   usergroup_id binary(20) NOT NULL COMMENT 'usergroup.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_usergroup_customvar_usergroup_id (usergroup_id, customvar_id),
+  INDEX idx_usergroup_customvar_customvar_id (customvar_id, usergroup_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE zone (
