@@ -42,6 +42,7 @@ Configuration of the logging component used by Icinga DB.
 Option                   | Description
 -------------------------|-----------------------------------------------
 level                    | **Optional.** Specifies the default logging level. Can be set to `fatal`, `error`, `warning`, `info` or `debug`. Defaults to `info`.
+output                   | **Optional.** Configures the logging output. Can be set to `console` (stderr) or `systemd-journald`. If not set, logs to systemd-journald when running under systemd, otherwise stderr.
 options                  | **Optional.** Map of component name to logging level in order to set a different logging level for each component instead of the default one. See [logging components](#logging-components) for details.
 
 ### Logging Components <a id="logging-components"></a>

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"github.com/icinga/icingadb/internal/command"
-	"github.com/icinga/icingadb/internal/logging"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -12,7 +11,9 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/okzk/sdnotify"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -36,12 +37,18 @@ func main() {
 func run() int {
 	cmd := command.New()
 	logs, err := logging.NewLogging(
+		utils.AppName(),
 		cmd.Config.Logging.Level,
+		cmd.Config.Logging.Output,
 		cmd.Config.Logging.Options,
 	)
 	if err != nil {
 		utils.Fatal(errors.Wrap(err, "can't configure logging"))
 	}
+
+	// When started by systemd, NOTIFY_SOCKET is set by systemd for Type=notify supervised services, which is the
+	// default setting for the Icinga DB service. So we notify that Icinga DB finished starting up.
+	_ = sdnotify.Ready()
 
 	logger := logs.GetLogger()
 	defer logger.Sync()
