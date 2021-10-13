@@ -16,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"reflect"
+	"sync"
 )
 
 // RuntimeUpdates specifies the source and destination of runtime updates.
@@ -116,35 +117,22 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 			return r.db.NamedBulkExec(ctx, stmt, r.db.BatchSizeByPlaceholders(placeholders), sem, flatCustomvars, nil)
 		})
 
-		deleteCustomvars, deleteFlatCustomvars := make(chan interface{}), make(chan interface{})
 		g.Go(func() error {
-			defer close(deleteCustomvars)
-			defer close(deleteFlatCustomvars)
+			var once sync.Once
 			for {
 				select {
-				case id, ok := <-deleteIds:
+				case _, ok := <-deleteIds:
 					if !ok {
 						return nil
 					}
-
-					deleteCustomvars <- id
-					deleteFlatCustomvars <- id
+					// Icinga 2 does not send custom var delete events.
+					once.Do(func() {
+						r.logger.DPanic("received unexpected custom var delete event")
+					})
 				case <-ctx.Done():
 					return ctx.Err()
 				}
 			}
-		})
-		g.Go(func() error {
-			return r.db.DeleteStreamed(ctx, cv.Entity(), deleteCustomvars)
-		})
-		g.Go(func() error {
-			return r.db.BulkExec(
-				ctx,
-				`DELETE FROM customvar_flat WHERE customvar_id IN (?)`,
-				r.db.Options.MaxPlaceholdersPerStatement,
-				r.db.GetSemaphoreForTable(utils.TableName(cvFlat.Entity())),
-				deleteFlatCustomvars,
-			)
 		})
 	}
 
