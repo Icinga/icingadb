@@ -148,6 +148,8 @@ ALTER TABLE service_state
 ALTER TABLE user_notification_history
     MODIFY id binary(20) NOT NULL COMMENT 'sha1(notification_history_id + user_id)';
 
+SET FOREIGN_KEY_CHECKS = 0;
+
 ALTER TABLE history
     ADD CONSTRAINT fk_history_acknowledgement_history FOREIGN KEY (acknowledgement_history_id) REFERENCES acknowledgement_history (id) ON DELETE CASCADE,
     ADD CONSTRAINT fk_history_comment_history FOREIGN KEY (comment_history_id) REFERENCES comment_history (comment_id) ON DELETE CASCADE,
@@ -158,3 +160,5 @@ ALTER TABLE history
 
 ALTER TABLE user_notification_history
     ADD CONSTRAINT fk_user_notification_history_notification_history FOREIGN KEY (notification_history_id) REFERENCES notification_history (id) ON DELETE CASCADE;
+
+SET FOREIGN_KEY_CHECKS = 1;
