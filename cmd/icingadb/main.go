@@ -199,7 +199,11 @@ func run() int {
 						g.Go(func() error {
 							defer configInitSync.Done()
 
-							<-dump.Done("icinga:customvar")
+							select {
+							case <-dump.Done("icinga:customvar"):
+							case <-synctx.Done():
+								return synctx.Err()
+							}
 
 							logger.Info("Syncing customvar")
 							logger.Info("Syncing customvar_flat")
