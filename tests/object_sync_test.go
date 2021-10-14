@@ -300,7 +300,6 @@ func TestObjectSync(t *testing.T) {
 						})
 
 						t.Run("CustomVarFlat", func(t *testing.T) {
-							t.Skip("runtime updates for customvar_flat are not yet implemented") // TODO(jb)
 							logger := it.Logger(t)
 							eventually.Assert(t, func(t require.TestingT) {
 								service.Vars.VerifyCustomVarFlat(t, logger, db, service)
@@ -360,9 +359,6 @@ func TestObjectSync(t *testing.T) {
 							})
 
 							t.Run("CustomVarFlat", func(t *testing.T) {
-								// TODO(jb): needs PR #297
-								t.Skip("runtime updates for customvar_flat are not yet implemented")
-
 								logger := it.Logger(t)
 								eventually.Assert(t, func(t require.TestingT) {
 									service.Vars.VerifyCustomVarFlat(t, logger, db, service)
