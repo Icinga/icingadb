@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal/command"
-	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
@@ -205,35 +204,7 @@ func run() int {
 								return synctx.Err()
 							}
 
-							logger.Info("Syncing customvar")
-							logger.Info("Syncing customvar_flat")
-
-							cv := common.NewSyncSubject(v1.NewCustomvar)
-
-							cvs, errs := rc.YieldAll(synctx, cv)
-							com.ErrgroupReceive(g, errs)
-
-							desiredCvs, desiredFlatCvs, errs := v1.ExpandCustomvars(synctx, cvs)
-							com.ErrgroupReceive(g, errs)
-
-							actualCvs, errs := db.YieldAll(
-								synctx, cv.Factory(), db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
-							com.ErrgroupReceive(g, errs)
-
-							g.Go(func() error {
-								return s.ApplyDelta(synctx, icingadb.NewDelta(synctx, actualCvs, desiredCvs, cv, logs.GetChildLogger("config-sync")))
-							})
-
-							flatCv := common.NewSyncSubject(v1.NewCustomvarFlat)
-							actualFlatCvs, errs := db.YieldAll(
-								synctx, flatCv.Factory(), db.BuildSelectStmt(flatCv.Entity(), flatCv.Entity().Fingerprint()))
-							com.ErrgroupReceive(g, errs)
-
-							g.Go(func() error {
-								return s.ApplyDelta(synctx, icingadb.NewDelta(synctx, actualFlatCvs, desiredFlatCvs, flatCv, logs.GetChildLogger("config-sync")))
-							})
-
-							return nil
+							return s.SyncCustomvars(synctx)
 						})
 
 						g.Go(func() error {

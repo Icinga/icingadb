@@ -6,6 +6,7 @@ import (
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -154,6 +155,42 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs())
 		})
 	}
+
+	return g.Wait()
+}
+
+// SyncCustomvars synchronizes customvar and customvar_flat.
+func (s Sync) SyncCustomvars(ctx context.Context) error {
+	s.logger.Info("Syncing customvar")
+	s.logger.Info("Syncing customvar_flat")
+
+	g, ctx := errgroup.WithContext(ctx)
+
+	cv := common.NewSyncSubject(v1.NewCustomvar)
+
+	cvs, errs := s.redis.YieldAll(ctx, cv)
+	com.ErrgroupReceive(g, errs)
+
+	desiredCvs, desiredFlatCvs, errs := v1.ExpandCustomvars(ctx, cvs)
+	com.ErrgroupReceive(g, errs)
+
+	actualCvs, errs := s.db.YieldAll(
+		ctx, cv.Factory(), s.db.BuildSelectStmt(cv.Entity(), cv.Entity().Fingerprint()))
+	com.ErrgroupReceive(g, errs)
+
+	g.Go(func() error {
+		return s.ApplyDelta(ctx, NewDelta(ctx, actualCvs, desiredCvs, cv, s.logger))
+	})
+
+	flatCv := common.NewSyncSubject(v1.NewCustomvarFlat)
+
+	actualFlatCvs, errs := s.db.YieldAll(
+		ctx, flatCv.Factory(), s.db.BuildSelectStmt(flatCv.Entity(), flatCv.Entity().Fingerprint()))
+	com.ErrgroupReceive(g, errs)
+
+	g.Go(func() error {
+		return s.ApplyDelta(ctx, NewDelta(ctx, actualFlatCvs, desiredFlatCvs, flatCv, s.logger))
+	})
 
 	return g.Wait()
 }
