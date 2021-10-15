@@ -194,3 +194,131 @@ ALTER TABLE history
 
 ALTER TABLE user_notification_history
     ADD CONSTRAINT fk_user_notification_history_notification_history FOREIGN KEY (notification_history_id) REFERENCES notification_history (id) ON DELETE CASCADE;
+
+ALTER TABLE host
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE hostgroup
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE hostgroup_member
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + host_id + hostgroup_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE host_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + host_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE hostgroup_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + hostgroup_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE host_state
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE service
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE servicegroup
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE servicegroup_member
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + servicegroup_id + service_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE service_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + service_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE servicegroup_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + servicegroup_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE service_state
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE endpoint
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE environment
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(Icinga CA public key)';
+ALTER TABLE checkcommand
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + type + name)';
+ALTER TABLE checkcommand_argument
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + argument_key)';
+ALTER TABLE checkcommand_envvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + envvar_key)';
+ALTER TABLE checkcommand_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE eventcommand
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + type + name)';
+ALTER TABLE eventcommand_argument
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + argument_key)';
+ALTER TABLE eventcommand_envvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + envvar_key)';
+ALTER TABLE eventcommand_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE notificationcommand
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + type + name)';
+ALTER TABLE notificationcommand_argument
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + argument_key)';
+ALTER TABLE notificationcommand_envvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + envvar_key)';
+ALTER TABLE notificationcommand_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE comment
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)';
+ALTER TABLE downtime
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)';
+ALTER TABLE notification
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE notification_user
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + notification_id + user_id)';
+ALTER TABLE notification_usergroup
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + notification_id + usergroup_id)';
+ALTER TABLE notification_recipient
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + notification_id + (user_id | usergroup_id))';
+ALTER TABLE notification_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + notification_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE icon_image
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE action_url
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE notes_url
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE timeperiod
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)';
+ALTER TABLE timeperiod_range
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + range_id + timeperiod_id)';
+ALTER TABLE timeperiod_override_include
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + include_id + timeperiod_id)';
+ALTER TABLE timeperiod_override_exclude
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + exclude_id + timeperiod_id)';
+ALTER TABLE timeperiod_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + timeperiod_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name + value)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE customvar_flat
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + flatname + flatvalue)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE user
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE usergroup
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE usergroup_member
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + usergroup_id + user_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE user_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + user_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE usergroup_customvar
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + usergroup_id + customvar_id)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE zone
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
+    MODIFY environment_id binary(20) NOT NULL COMMENT 'environment.id';
+ALTER TABLE flapping_history
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + "Host"|"Service" + host|service.name + start_time)';
+ALTER TABLE acknowledgement_history
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + "Host"|"Service" + host|service.name + set_time)';
