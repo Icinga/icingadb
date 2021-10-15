@@ -22,7 +22,7 @@ type NotificationHistory struct {
 type UserNotificationHistory struct {
 	v1.EntityWithoutChecksum `json:",inline"`
 	v1.EnvironmentMeta       `json:",inline"`
-	NotificationHistoryId    types.UUID   `json:"notification_history_id"`
+	NotificationHistoryId    types.Binary `json:"notification_history_id"`
 	UserId                   types.Binary `json:"user_id"`
 }
 
@@ -32,7 +32,7 @@ func (u *UserNotificationHistory) Upsert() interface{} {
 
 type HistoryNotification struct {
 	HistoryMeta           `json:",inline"`
-	NotificationHistoryId types.UUID      `json:"id"`
+	NotificationHistoryId types.Binary    `json:"id"`
 	EventTime             types.UnixMilli `json:"send_time"`
 }
 

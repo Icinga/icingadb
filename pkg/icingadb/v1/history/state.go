@@ -24,7 +24,7 @@ type StateHistory struct {
 
 type HistoryState struct {
 	HistoryMeta    `json:",inline"`
-	StateHistoryId types.UUID      `json:"id"`
+	StateHistoryId types.Binary    `json:"id"`
 	EventTime      types.UnixMilli `json:"event_time"`
 }
 

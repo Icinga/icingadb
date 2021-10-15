@@ -916,7 +916,7 @@ CREATE TABLE zone (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_history (
-  id binary(16) NOT NULL COMMENT 'UUID',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification.name + type + send_time)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
@@ -940,7 +940,7 @@ CREATE TABLE notification_history (
 CREATE TABLE user_notification_history (
   id binary(20) NOT NULL COMMENT 'sha1(notification_history_id + user_id)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  notification_history_id binary(16) NOT NULL COMMENT 'UUID notification_history.id',
+  notification_history_id binary(20) NOT NULL COMMENT 'UUID notification_history.id',
   user_id binary(20) NOT NULL COMMENT 'user.id',
 
   PRIMARY KEY (id),
@@ -949,7 +949,7 @@ CREATE TABLE user_notification_history (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE state_history (
-  id binary(16) NOT NULL COMMENT 'UUID',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.name + host|service.name + event_time)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
   object_type enum('host', 'service') NOT NULL,
@@ -1067,8 +1067,8 @@ CREATE TABLE history (
   object_type enum('host', 'service') NOT NULL,
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
-  notification_history_id binary(16) DEFAULT NULL COMMENT 'notification_history.id',
-  state_history_id binary(16) DEFAULT NULL COMMENT 'state_history.id',
+  notification_history_id binary(20) DEFAULT NULL COMMENT 'notification_history.id',
+  state_history_id binary(20) DEFAULT NULL COMMENT 'state_history.id',
   downtime_history_id binary(20) DEFAULT NULL COMMENT 'downtime_history.downtime_id',
   comment_history_id binary(20) DEFAULT NULL COMMENT 'comment_history.comment_id',
   flapping_history_id binary(20) DEFAULT NULL COMMENT 'flapping_history.id',
