@@ -2,6 +2,7 @@ package icingadb
 
 import (
 	"context"
+	"fmt"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -101,7 +102,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan contract
 	delta.Update = update
 	delta.Delete = actual
 
-	delta.logger.Debugw("Delta finished",
+	delta.logger.Debugw(fmt.Sprintf("Finished %s delta", utils.Name(delta.Subject.Entity())),
 		zap.String("subject", utils.Name(delta.Subject.Entity())),
 		zap.Duration("time_total", time.Since(start)),
 		zap.Duration("time_actual", endActual.Sub(start)),
