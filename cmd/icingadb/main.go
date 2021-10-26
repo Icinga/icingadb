@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/icingadb"
@@ -45,7 +46,7 @@ func run() int {
 	if err != nil {
 		utils.Fatal(errors.Wrap(err, "can't configure logging"))
 	}
-
+	internal.SetLoggingInterval(cmd.Config.Logging.Interval)
 	// When started by systemd, NOTIFY_SOCKET is set by systemd for Type=notify supervised services, which is the
 	// default setting for the Icinga DB service. So we notify that Icinga DB finished starting up.
 	_ = sdnotify.Ready()

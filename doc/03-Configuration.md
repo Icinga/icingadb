@@ -43,6 +43,7 @@ Option                   | Description
 -------------------------|-----------------------------------------------
 level                    | **Optional.** Specifies the default logging level. Can be set to `fatal`, `error`, `warning`, `info` or `debug`. Defaults to `info`.
 output                   | **Optional.** Configures the logging output. Can be set to `console` (stderr) or `systemd-journald`. If not set, logs to systemd-journald when running under systemd, otherwise stderr.
+interval                 | **Optional.** Interval for periodic logging defined as [duration string](#duration-string). Defaults to `"20s"`.
 options                  | **Optional.** Map of component name to logging level in order to set a different logging level for each component instead of the default one. See [logging components](#logging-components) for details.
 
 ### Logging Components <a id="logging-components"></a>
@@ -58,3 +59,8 @@ history-sync             | Synchronization of history entries from Redis to MySQ
 runtime-updates          | Runtime updates of config objects after the initial config synchronization.
 overdue-sync             | Calculation and synchronization of the overdue status of checkables.
 dump-signals             | Dump signals received from Icinga.
+
+### Duration String <a id="duration-string"></a>
+
+A duration string is a sequence of decimal numbers and a unit suffix, such as `"20s"`.
+Valid units are `"ms"`, `"s"`, `"m"` and `"h"`.
