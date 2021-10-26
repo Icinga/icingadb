@@ -9,6 +9,7 @@ import (
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
@@ -209,15 +210,12 @@ func (db *DB) BuildWhere(subject interface{}) (string, int) {
 // The derived queries are executed in a separate goroutine with a weighting of 1
 // and can be executed concurrently to the extent allowed by the semaphore passed in sem.
 func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan interface{}) error {
-	var cnt com.Counter
+	var counter com.Counter
+	defer db.log(ctx, query, &counter).Stop()
+
 	g, ctx := errgroup.WithContext(ctx)
 	// Use context from group.
 	bulk := com.Bulk(ctx, arg, count)
-
-	db.logger.Debugf("Executing %s", query)
-	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-		db.logger.Debugf("Executed %s with %d rows in %s", query, cnt.Val(), elapsed)
-	})
 
 	g.Go(func() error {
 		g, ctx := errgroup.WithContext(ctx)
@@ -245,7 +243,7 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 								return internal.CantPerformQuery(err, query)
 							}
 
-							cnt.Add(uint64(len(b)))
+							counter.Add(uint64(len(b)))
 
 							return nil
 						},
@@ -274,14 +272,11 @@ func (db *DB) NamedBulkExec(
 	ctx context.Context, query string, count int, sem *semaphore.Weighted,
 	arg <-chan contracts.Entity, succeeded chan<- contracts.Entity,
 ) error {
-	var cnt com.Counter
+	var counter com.Counter
+	defer db.log(ctx, query, &counter).Stop()
+
 	g, ctx := errgroup.WithContext(ctx)
 	bulk := com.BulkEntities(ctx, arg, count)
-
-	db.logger.Debugf("Executing %s", query)
-	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-		db.logger.Debugf("Executed %s with %d rows in %s", query, cnt.Val(), elapsed)
-	})
 
 	g.Go(func() error {
 		for {
@@ -302,13 +297,12 @@ func (db *DB) NamedBulkExec(
 						return retry.WithBackoff(
 							ctx,
 							func(ctx context.Context) error {
-								db.logger.Debugf("Executing %s with %d rows..", query, len(b))
 								_, err := db.NamedExecContext(ctx, query, b)
 								if err != nil {
 									return internal.CantPerformQuery(err, query)
 								}
 
-								cnt.Add(uint64(len(b)))
+								counter.Add(uint64(len(b)))
 
 								if succeeded != nil {
 									for _, row := range b {
@@ -346,14 +340,11 @@ func (db *DB) NamedBulkExec(
 func (db *DB) NamedBulkExecTx(
 	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan contracts.Entity,
 ) error {
-	var cnt com.Counter
+	var counter com.Counter
+	defer db.log(ctx, query, &counter).Stop()
+
 	g, ctx := errgroup.WithContext(ctx)
 	bulk := com.BulkEntities(ctx, arg, count)
-
-	db.logger.Debugf("Executing %s", query)
-	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-		db.logger.Debugf("Executed %s with %d rows in %s", query, cnt.Val(), elapsed)
-	})
 
 	g.Go(func() error {
 		for {
@@ -394,7 +385,7 @@ func (db *DB) NamedBulkExecTx(
 									return errors.Wrap(err, "can't commit transaction")
 								}
 
-								cnt.Add(uint64(len(b)))
+								counter.Add(uint64(len(b)))
 
 								return nil
 							},
@@ -428,18 +419,13 @@ func (db *DB) BatchSizeByPlaceholders(n int) int {
 // scans each resulting row into an entity returned by the factory function,
 // and streams them into a returned channel.
 func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, query string, scope interface{}) (<-chan contracts.Entity, <-chan error) {
-	var cnt com.Counter
 	entities := make(chan contracts.Entity, 1)
 	g, ctx := errgroup.WithContext(ctx)
 
-	db.logger.Infof("Syncing %s", query)
-
 	g.Go(func() error {
+		var counter com.Counter
+		defer db.log(ctx, query, &counter).Stop()
 		defer close(entities)
-		defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-			v := factoryFunc()
-			db.logger.Infof("Fetched %d elements of %s in %s", cnt.Val(), utils.Name(v), elapsed)
-		})
 
 		rows, err := db.NamedQueryContext(ctx, query, scope)
 		if err != nil {
@@ -456,7 +442,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 
 			select {
 			case entities <- e:
-				cnt.Inc()
+				counter.Inc()
 			case <-ctx.Done():
 				return ctx.Err()
 			}
@@ -547,6 +533,16 @@ func (db *DB) GetSemaphoreForTable(table string) *semaphore.Weighted {
 		db.tableSemaphores[table] = sem
 		return sem
 	}
+}
+
+func (db *DB) log(ctx context.Context, query string, counter *com.Counter) periodic.Stoper {
+	return periodic.Start(ctx, internal.LoggingInterval(), func(tick periodic.Tick) {
+		if count := counter.Reset(); count > 0 {
+			db.logger.Debugf("Executed %q with %d rows", query, count)
+		}
+	}, periodic.OnStop(func(tick periodic.Tick) {
+		db.logger.Debugf("Finished executing %q with %d rows in %s", query, counter.Total(), tick.Elapsed)
+	}))
 }
 
 // IsRetryable checks whether the given error is retryable.
