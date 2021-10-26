@@ -131,7 +131,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Update
 	if len(delta.Update) > 0 {
-		s.logger.Infof("Updating %d rows of type %s", len(delta.Update), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+		s.logger.Infof("Updating %d items of type %s", len(delta.Update), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		pairs, errs := s.redis.HMYield(
 			ctx,
 			fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
@@ -155,7 +155,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Delete
 	if len(delta.Delete) > 0 {
-		s.logger.Infof("Deleting %d rows of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		g.Go(func() error {
 			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs())
 		})
