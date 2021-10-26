@@ -173,8 +173,8 @@ func run() int {
 							return ods.Sync(synctx)
 						})
 
+						syncStart := time.Now()
 						logger.Info("Starting config sync")
-
 						for _, factory := range v1.ConfigFactories {
 							factory := factory
 
@@ -185,7 +185,7 @@ func run() int {
 								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump)
 							})
 						}
-
+						logger.Info("Starting initial state sync")
 						for _, factory := range v1.StateFactories {
 							factory := factory
 
@@ -208,6 +208,34 @@ func run() int {
 							}
 
 							return s.SyncCustomvars(synctx)
+						})
+
+						g.Go(func() error {
+							configInitSync.Wait()
+
+							elapsed := time.Since(syncStart)
+							logger := logs.GetChildLogger("config-sync")
+							if synctx.Err() == nil {
+								logger.Infof("Finished config sync in %s", elapsed)
+							} else {
+								logger.Warnf("Aborted config sync after %s", elapsed)
+							}
+
+							return nil
+						})
+
+						g.Go(func() error {
+							stateInitSync.Wait()
+
+							elapsed := time.Since(syncStart)
+							logger := logs.GetChildLogger("config-sync")
+							if synctx.Err() == nil {
+								logger.Infof("Finished initial state sync in %s", elapsed)
+							} else {
+								logger.Warnf("Aborted initial state sync after %s", elapsed)
+							}
+
+							return nil
 						})
 
 						g.Go(func() error {
