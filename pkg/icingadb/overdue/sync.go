@@ -109,7 +109,7 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 	})
 
 	if err == nil {
-		s.logger.Infof(
+		s.logger.Debugf(
 			"Refreshing %d already synced %s overdue indicators took %s",
 			len(rows), objectType, time.Since(start),
 		)
