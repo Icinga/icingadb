@@ -3,9 +3,11 @@ package icingaredis
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -73,14 +75,11 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 	c.logger.Infof("Syncing %s", key)
 
 	return pairs, com.WaitAsync(contracts.WaiterFunc(func() error {
+		var counter com.Counter
+		defer c.log(ctx, key, &counter).Stop()
 		defer close(pairs)
 
 		seen := make(map[string]struct{})
-
-		var cnt uint64
-		defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-			c.logger.Infof("Fetched %d elements of %s in %s", cnt, key, elapsed)
-		})
 
 		var cursor uint64
 		var err error
@@ -107,7 +106,7 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 					Field: page[i],
 					Value: page[i+1],
 				}:
-					cnt++
+					counter.Inc()
 				case <-ctx.Done():
 					return ctx.Err()
 				}
@@ -127,6 +126,9 @@ func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-c
 	pairs := make(chan HPair)
 
 	return pairs, com.WaitAsync(contracts.WaiterFunc(func() error {
+		var counter com.Counter
+		defer c.log(ctx, key, &counter).Stop()
+
 		g, ctx := errgroup.WithContext(ctx)
 
 		defer func() {
@@ -169,6 +171,7 @@ func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-c
 						Field: batch[i],
 						Value: v.(string),
 					}:
+						counter.Inc()
 					case <-ctx.Done():
 						return ctx.Err()
 					}
@@ -219,4 +222,17 @@ func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-ch
 	com.ErrgroupReceive(g, errs)
 
 	return desired, com.WaitAsync(g)
+}
+
+func (c *Client) log(ctx context.Context, key string, counter *com.Counter) periodic.Stoper {
+	return periodic.Start(ctx, internal.LoggingInterval(), func(tick periodic.Tick) {
+		// We may never get to progress logging here,
+		// as fetching should be completed before the interval expires,
+		// but if it does, it is good to have this log message.
+		if count := counter.Reset(); count > 0 {
+			c.logger.Debugf("Fetched %d items from %s", count, key)
+		}
+	}, periodic.OnStop(func(tick periodic.Tick) {
+		c.logger.Debugf("Finished fetching from %s with %d items in %s", key, counter.Total(), tick.Elapsed)
+	}))
 }
