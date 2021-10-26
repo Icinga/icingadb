@@ -15,6 +15,11 @@ func (c *Counter) Inc() {
 	c.Add(1)
 }
 
+// Reset resets the counter to 0 and returns its previous value.
+func (c *Counter) Reset() uint64 {
+	return atomic.SwapUint64(c.ptr(), 0)
+}
+
 // Val returns the counter value.
 func (c *Counter) Val() uint64 {
 	return atomic.LoadUint64(c.ptr())
