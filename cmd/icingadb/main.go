@@ -249,6 +249,7 @@ func run() int {
 						g.Go(func() error {
 							configInitSync.Wait()
 							logger.Info("Starting config runtime updates sync")
+							_ = logger.Sync()
 
 							// @TODO(el): The customvar runtime update sync may change because the customvar flat
 							// runtime update sync is not yet implemented.
@@ -262,12 +263,15 @@ func run() int {
 						g.Go(func() error {
 							stateInitSync.Wait()
 							logger.Info("Starting state runtime updates sync")
+							_ = logger.Sync()
 							return rt.Sync(synctx, v1.StateFactories, runtimeStateUpdateStreams)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
 							logger.Fatalf("%+v", err)
 						}
+
+						_ = logger.Sync()
 					}
 				}()
 			case <-ha.Handover():
