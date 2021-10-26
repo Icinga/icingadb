@@ -25,7 +25,7 @@ func (hte HistoryTableEntity) Upsert() interface{} {
 
 // HistoryEntity is embedded by every concrete history type.
 type HistoryEntity struct {
-	Id types.UUID `json:"event_id"`
+	Id types.Binary `json:"event_id"`
 }
 
 // Fingerprint implements part of the contracts.Entity interface.
@@ -40,7 +40,7 @@ func (he HistoryEntity) ID() contracts.ID {
 
 // SetID implements part of the contracts.Entity interface.
 func (he *HistoryEntity) SetID(id contracts.ID) {
-	he.Id = id.(types.UUID)
+	he.Id = id.(types.Binary)
 }
 
 // Upsert implements the contracts.Upserter interface.

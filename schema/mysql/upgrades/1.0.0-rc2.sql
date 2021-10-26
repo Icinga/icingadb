@@ -182,6 +182,7 @@ ALTER TABLE user_notification_history
     MODIFY notification_history_id binary(20) NOT NULL COMMENT 'UUID notification_history.id';
 
 ALTER TABLE history
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.name + event_type + x...) given that sha1(environment.name + x...) = *_history_id',
     MODIFY notification_history_id binary(20) DEFAULT NULL COMMENT 'notification_history.id',
     MODIFY state_history_id binary(20) DEFAULT NULL COMMENT 'state_history.id',
     ADD CONSTRAINT fk_history_acknowledgement_history FOREIGN KEY (acknowledgement_history_id) REFERENCES acknowledgement_history (id) ON DELETE CASCADE,
