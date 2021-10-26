@@ -105,6 +105,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Create
 	if len(delta.Create) > 0 {
+		s.logger.Infof("Inserting %d items of type %s", len(delta.Create), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		var entities <-chan contracts.Entity
 		if delta.Subject.WithChecksum() {
 			pairs, errs := s.redis.HMYield(
