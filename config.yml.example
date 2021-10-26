@@ -21,12 +21,12 @@ logging:
 
   # Map of component-logging level pairs to define a different log level than the default value for each component.
   options:
-    database:
-    redis:
-    heartbeat:
-    high-availability:
-    config-sync:
-    history-sync:
-    runtime-updates:
-    overdue-sync:
-    dump-signals:
+#    database:
+#    redis:
+#    heartbeat:
+#    high-availability:
+#    config-sync:
+#    history-sync:
+#    runtime-updates:
+#    overdue-sync:
+#    dump-signals:
