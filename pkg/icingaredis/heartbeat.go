@@ -130,17 +130,17 @@ func (h *Heartbeat) controller(ctx context.Context) {
 					if err != nil {
 						return err
 					}
-					h.logger.Infow("Received first Icinga 2 heartbeat", zap.String("environment", envId.String()))
+					h.logger.Infow("Received Icinga heartbeat", zap.String("environment", envId.String()))
 					h.active = true
 				}
 				h.sendEvent(m)
 			case <-time.After(timeout):
 				if h.active {
-					h.logger.Warnw("Lost Icinga 2 heartbeat", zap.Duration("timeout", timeout))
+					h.logger.Warnw("Lost Icinga heartbeat", zap.Duration("timeout", timeout))
 					h.sendEvent(nil)
 					h.active = false
 				} else {
-					h.logger.Warn("Waiting for Icinga 2 heartbeat")
+					h.logger.Warn("Waiting for Icinga heartbeat")
 				}
 			case <-ctx.Done():
 				return ctx.Err()
