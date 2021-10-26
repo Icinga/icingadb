@@ -3,6 +3,7 @@ package icingadb
 import (
 	"context"
 	"fmt"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -39,9 +40,9 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 	key := "icinga:" + utils.Key(typeName, ':')
 
 	startTime := time.Now()
-	logTicker := time.NewTicker(20 * time.Second)
-	loggedWaiting := false
+	logTicker := time.NewTicker(internal.LoggingInterval())
 	defer logTicker.Stop()
+	loggedWaiting := false
 
 	for {
 		select {
