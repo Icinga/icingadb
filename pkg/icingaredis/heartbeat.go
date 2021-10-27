@@ -81,8 +81,6 @@ func (h *Heartbeat) Err() error {
 func (h *Heartbeat) controller(ctx context.Context) {
 	defer close(h.done)
 
-	h.logger.Info("Waiting for Icinga 2 heartbeat")
-
 	messages := make(chan *HeartbeatMessage)
 	defer close(messages)
 
