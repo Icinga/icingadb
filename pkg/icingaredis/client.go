@@ -72,8 +72,6 @@ type HPair struct {
 func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan error) {
 	pairs := make(chan HPair, c.Options.HScanCount)
 
-	c.logger.Infof("Syncing %s", key)
-
 	return pairs, com.WaitAsync(contracts.WaiterFunc(func() error {
 		var counter com.Counter
 		defer c.log(ctx, key, &counter).Stop()
