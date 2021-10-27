@@ -78,7 +78,7 @@ func (s Sync) Sync(ctx context.Context) error {
 
 // initSync initializes icingadb:overdue:objectType from the database.
 func (s Sync) initSync(ctx context.Context, objectType string) error {
-	s.logger.Infof("Refreshing already synced %s overdue indicators", objectType)
+	s.logger.Debugf("Refreshing already synced %s overdue indicators", objectType)
 	start := time.Now()
 
 	var rows []v1.IdMeta
@@ -165,7 +165,7 @@ return res
 
 // sync synchronizes Redis overdue sets from s.redis to s.db for objectType.
 func (s Sync) sync(ctx context.Context, objectType string, factory factory, counter *com.Counter) error {
-	s.logger.Infof("Syncing %s overdue indicators", objectType)
+	s.logger.Debugf("Syncing %s overdue indicators", objectType)
 
 	keys := [3]string{"icinga:nextupdate:" + objectType, "icingadb:overdue:" + objectType, ""}
 	if rand, err := uuid.NewRandom(); err == nil {
