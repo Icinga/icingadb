@@ -45,7 +45,7 @@ func (s Sync) Sync(ctx context.Context) error {
 		key := key
 		pipeline := pipeline
 
-		s.logger.Debugw("Starting history sync", zap.String("type", key))
+		s.logger.Debugf("Starting %s history sync", key)
 
 		// The pipeline consists of n+2 stages connected sequentially using n+1 channels of type chan redis.XMessage,
 		// where n = len(pipeline), i.e. the number of actual sync stages. So the resulting pipeline looks like this:
