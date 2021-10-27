@@ -71,8 +71,6 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 // Sync synchronizes entities between Icinga DB and Redis created with the specified sync subject.
 // This function does not respect dump signals. For this, use SyncAfterDump.
 func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
-	s.logger.Infof("Syncing %s", utils.Key(utils.Name(subject.Entity()), ' '))
-
 	g, ctx := errgroup.WithContext(ctx)
 
 	desired, redisErrs := s.redis.YieldAll(ctx, subject)
@@ -168,9 +166,6 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 // SyncCustomvars synchronizes customvar and customvar_flat.
 func (s Sync) SyncCustomvars(ctx context.Context) error {
-	s.logger.Info("Syncing customvar")
-	s.logger.Info("Syncing customvar_flat")
-
 	e, ok := v1.EnvironmentFromContext(ctx)
 	if !ok {
 		return errors.New("can't get environment from context")
