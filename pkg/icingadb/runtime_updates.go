@@ -4,7 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -13,6 +16,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"reflect"
+	"sync"
 )
 
 // RuntimeUpdates specifies the source and destination of runtime updates.
@@ -60,28 +64,75 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 	updateMessagesByKey := make(map[string]chan<- redis.XMessage)
 
 	for _, factoryFunc := range factoryFuncs {
-		factoryFunc = factoryFunc.WithInit
+		s := common.NewSyncSubject(factoryFunc)
 
 		updateMessages := make(chan redis.XMessage, bulkSize)
 		upsertEntities := make(chan contracts.Entity, bulkSize)
 		deleteIds := make(chan interface{}, bulkSize)
 
-		v := factoryFunc()
-		name := utils.Name(v)
+		updateMessagesByKey[fmt.Sprintf("icinga:%s", utils.Key(s.Name(), ':'))] = updateMessages
 
-		updateMessagesByKey[fmt.Sprintf("icinga:%s", utils.Key(name, ':'))] = updateMessages
-
-		r.logger.Debugf("Syncing runtime updates of %s", name)
-		g.Go(structifyStream(ctx, updateMessages, upsertEntities, deleteIds, structify.MakeMapStructifier(reflect.TypeOf(v).Elem(), "json")))
+		r.logger.Debugf("Syncing runtime updates of %s", s.Name())
+		g.Go(structifyStream(ctx, updateMessages, upsertEntities, deleteIds, structify.MakeMapStructifier(reflect.TypeOf(s.Entity()).Elem(), "json")))
 
 		g.Go(func() error {
-			stmt, placeholders := r.db.BuildUpsertStmt(v)
+			stmt, placeholders := r.db.BuildUpsertStmt(s.Entity())
 			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
 			sem := semaphore.NewWeighted(1)
 			return r.db.NamedBulkExec(ctx, stmt, r.db.BatchSizeByPlaceholders(placeholders), sem, upsertEntities, nil)
 		})
 		g.Go(func() error {
-			return r.db.DeleteStreamed(ctx, v, deleteIds)
+			return r.db.DeleteStreamed(ctx, s.Entity(), deleteIds)
+		})
+	}
+
+	// customvar and customvar_flat sync.
+	{
+		updateMessages := make(chan redis.XMessage, bulkSize)
+		upsertEntities := make(chan contracts.Entity, bulkSize)
+		deleteIds := make(chan interface{}, bulkSize)
+
+		cv := common.NewSyncSubject(v1.NewCustomvar)
+		cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
+
+		r.logger.Debug("Syncing runtime updates of " + cv.Name())
+		r.logger.Debug("Syncing runtime updates of " + cvFlat.Name())
+
+		updateMessagesByKey["icinga:"+utils.Key(cv.Name(), ':')] = updateMessages
+		g.Go(structifyStream(ctx, updateMessages, upsertEntities, deleteIds, structify.MakeMapStructifier(reflect.TypeOf(cv.Entity()).Elem(), "json")))
+
+		customvars, flatCustomvars, errs := v1.ExpandCustomvars(ctx, upsertEntities)
+		com.ErrgroupReceive(g, errs)
+		g.Go(func() error {
+			stmt, placeholders := r.db.BuildUpsertStmt(cv.Entity())
+			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
+			sem := semaphore.NewWeighted(1)
+			return r.db.NamedBulkExec(ctx, stmt, r.db.BatchSizeByPlaceholders(placeholders), sem, customvars, nil)
+		})
+
+		g.Go(func() error {
+			stmt, placeholders := r.db.BuildUpsertStmt(cvFlat.Entity())
+			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
+			sem := semaphore.NewWeighted(1)
+			return r.db.NamedBulkExec(ctx, stmt, r.db.BatchSizeByPlaceholders(placeholders), sem, flatCustomvars, nil)
+		})
+
+		g.Go(func() error {
+			var once sync.Once
+			for {
+				select {
+				case _, ok := <-deleteIds:
+					if !ok {
+						return nil
+					}
+					// Icinga 2 does not send custom var delete events.
+					once.Do(func() {
+						r.logger.DPanic("received unexpected custom var delete event")
+					})
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}
 		})
 	}
 
