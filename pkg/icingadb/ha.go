@@ -11,6 +11,7 @@ import (
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -30,7 +31,7 @@ type HA struct {
 	environmentMu sync.Mutex
 	environment   *v1.Environment
 	heartbeat     *icingaredis.Heartbeat
-	logger        *zap.SugaredLogger
+	logger        *logging.Logger
 	responsible   bool
 	handover      chan struct{}
 	takeover      chan struct{}
@@ -41,7 +42,7 @@ type HA struct {
 }
 
 // NewHA returns a new HA and starts the controller loop.
-func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger *zap.SugaredLogger) *HA {
+func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger *logging.Logger) *HA {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
 	instanceId := uuid.New()

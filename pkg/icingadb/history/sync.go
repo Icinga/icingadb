@@ -10,12 +10,12 @@ import (
 	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"reflect"
 	"sync"
@@ -25,11 +25,11 @@ import (
 type Sync struct {
 	db     *icingadb.DB
 	redis  *icingaredis.Client
-	logger *zap.SugaredLogger
+	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *zap.SugaredLogger) *Sync {
+func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -135,7 +135,7 @@ func (s Sync) readFromRedis(ctx context.Context, key string, output chan<- redis
 // pipeline stage and then deletes the stream entry from Redis as all pipeline stages successfully processed the entry.
 func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redis.XMessage) error {
 	var counter com.Counter
-	defer periodic.Start(ctx, internal.LoggingInterval(), func(_ periodic.Tick) {
+	defer periodic.Start(ctx, s.logger.Interval(), func(_ periodic.Tick) {
 		if count := counter.Reset(); count > 0 {
 			s.logger.Infof("Synced %d %s history items", count, key)
 		}

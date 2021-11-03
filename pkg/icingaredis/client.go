@@ -3,14 +3,13 @@ package icingaredis
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"runtime"
@@ -24,7 +23,7 @@ type Client struct {
 
 	Options *Options
 
-	logger *zap.SugaredLogger
+	logger *logging.Logger
 }
 
 // Options define user configurable Redis options.
@@ -58,7 +57,7 @@ func (o *Options) Validate() error {
 }
 
 // NewClient returns a new icingaredis.Client wrapper for a pre-existing *redis.Client.
-func NewClient(client *redis.Client, logger *zap.SugaredLogger, options *Options) *Client {
+func NewClient(client *redis.Client, logger *logging.Logger, options *Options) *Client {
 	return &Client{Client: client, logger: logger, Options: options}
 }
 
@@ -223,7 +222,7 @@ func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-ch
 }
 
 func (c *Client) log(ctx context.Context, key string, counter *com.Counter) periodic.Stoper {
-	return periodic.Start(ctx, internal.LoggingInterval(), func(tick periodic.Tick) {
+	return periodic.Start(ctx, c.logger.Interval(), func(tick periodic.Tick) {
 		// We may never get to progress logging here,
 		// as fetching should be completed before the interval expires,
 		// but if it does, it is good to have this log message.

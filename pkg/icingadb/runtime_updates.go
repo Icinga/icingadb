@@ -4,17 +4,16 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"reflect"
@@ -25,11 +24,11 @@ import (
 type RuntimeUpdates struct {
 	db     *DB
 	redis  *icingaredis.Client
-	logger *zap.SugaredLogger
+	logger *logging.Logger
 }
 
 // NewRuntimeUpdates creates a new RuntimeUpdates.
-func NewRuntimeUpdates(db *DB, redis *icingaredis.Client, logger *zap.SugaredLogger) *RuntimeUpdates {
+func NewRuntimeUpdates(db *DB, redis *icingaredis.Client, logger *logging.Logger) *RuntimeUpdates {
 	return &RuntimeUpdates{
 		db:     db,
 		redis:  redis,
@@ -88,7 +87,7 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 		})
 		g.Go(func() error {
 			var counter com.Counter
-			defer periodic.Start(ctx, internal.LoggingInterval(), func(_ periodic.Tick) {
+			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
 				if count := counter.Reset(); count > 0 {
 					r.logger.Infof("Upserted %d %s items", count, s.Name())
 				}
@@ -116,7 +115,7 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 		})
 		g.Go(func() error {
 			var counter com.Counter
-			defer periodic.Start(ctx, internal.LoggingInterval(), func(_ periodic.Tick) {
+			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
 				if count := counter.Reset(); count > 0 {
 					r.logger.Infof("Deleted %d %s items", count, s.Name())
 				}
@@ -166,7 +165,7 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 		})
 		g.Go(func() error {
 			var counter com.Counter
-			defer periodic.Start(ctx, internal.LoggingInterval(), func(_ periodic.Tick) {
+			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
 				if count := counter.Reset(); count > 0 {
 					r.logger.Infof("Upserted %d %s items", count, cv.Name())
 				}
@@ -197,7 +196,7 @@ func (r *RuntimeUpdates) Sync(ctx context.Context, factoryFuncs []contracts.Enti
 		})
 		g.Go(func() error {
 			var counter com.Counter
-			defer periodic.Start(ctx, internal.LoggingInterval(), func(_ periodic.Tick) {
+			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
 				if count := counter.Reset(); count > 0 {
 					r.logger.Infof("Upserted %d %s items", count, cvFlat.Name())
 				}

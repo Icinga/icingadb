@@ -5,6 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -28,11 +29,11 @@ type Heartbeat struct {
 	done      chan struct{}
 	errMu     sync.Mutex
 	err       error
-	logger    *zap.SugaredLogger
+	logger    *logging.Logger
 }
 
 // NewHeartbeat returns a new Heartbeat and starts the heartbeat controller loop.
-func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger) *Heartbeat {
+func NewHeartbeat(ctx context.Context, client *Client, logger *logging.Logger) *Heartbeat {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
 	heartbeat := &Heartbeat{

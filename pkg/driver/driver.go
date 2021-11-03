@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -58,7 +59,7 @@ func (c RetryConnector) Driver() driver.Driver {
 // Driver wraps a driver.Driver that also must implement driver.DriverContext with logging capabilities and provides our RetryConnector.
 type Driver struct {
 	ctxDriver
-	Logger *zap.SugaredLogger
+	Logger *logging.Logger
 }
 
 // OpenConnector implements the DriverContext interface.
@@ -75,7 +76,7 @@ func (d Driver) OpenConnector(name string) (driver.Connector, error) {
 }
 
 // Register makes our database Driver available under the name "icingadb-mysql".
-func Register(logger *zap.SugaredLogger) {
+func Register(logger *logging.Logger) {
 	sql.Register("icingadb-mysql", &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
 	_ = mysql.SetLogger(mysqlLogger(func(v ...interface{}) { logger.Debug(v...) }))
 }

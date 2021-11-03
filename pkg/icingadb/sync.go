@@ -3,12 +3,12 @@ package icingadb
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -21,11 +21,11 @@ import (
 type Sync struct {
 	db     *DB
 	redis  *icingaredis.Client
-	logger *zap.SugaredLogger
+	logger *logging.Logger
 }
 
 // NewSync returns a new Sync.
-func NewSync(db *DB, redis *icingaredis.Client, logger *zap.SugaredLogger) *Sync {
+func NewSync(db *DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -40,7 +40,7 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 	key := "icinga:" + utils.Key(typeName, ':')
 
 	startTime := time.Now()
-	logTicker := time.NewTicker(internal.LoggingInterval())
+	logTicker := time.NewTicker(s.logger.Interval())
 	defer logTicker.Stop()
 	loggedWaiting := false
 

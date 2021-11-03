@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"
@@ -13,7 +14,7 @@ import (
 // Dump-done signals are passed on via Done channels, while InProgress must be checked for dump-wip signals.
 type DumpSignals struct {
 	redis        *icingaredis.Client
-	logger       *zap.SugaredLogger
+	logger       *logging.Logger
 	mutex        sync.Mutex
 	doneCh       map[string]chan struct{}
 	allDoneCh    chan struct{}
@@ -21,7 +22,7 @@ type DumpSignals struct {
 }
 
 // NewDumpSignals returns new DumpSignals.
-func NewDumpSignals(redis *icingaredis.Client, logger *zap.SugaredLogger) *DumpSignals {
+func NewDumpSignals(redis *icingaredis.Client, logger *logging.Logger) *DumpSignals {
 	return &DumpSignals{
 		redis:        redis,
 		logger:       logger,

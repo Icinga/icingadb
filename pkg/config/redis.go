@@ -6,6 +6,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -27,7 +28,7 @@ type ctxDialerFunc = func(ctx context.Context, network, addr string) (net.Conn, 
 
 // NewClient prepares Redis client configuration,
 // calls redis.NewClient, but returns *icingaredis.Client.
-func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error) {
+func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
 	tlsConfig, err := r.TLS.MakeConfig(r.Address)
 	if err != nil {
 		return nil, err
@@ -59,7 +60,7 @@ func (r *Redis) NewClient(logger *zap.SugaredLogger) (*icingaredis.Client, error
 }
 
 // dialWithLogging returns a Redis Dialer with logging capabilities.
-func dialWithLogging(dialer ctxDialerFunc, logger *zap.SugaredLogger) ctxDialerFunc {
+func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc {
 	// dial behaves like net.Dialer#DialContext, but re-tries on syscall.ECONNREFUSED.
 	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
 		err = retry.WithBackoff(

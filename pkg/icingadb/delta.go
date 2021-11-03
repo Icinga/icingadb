@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"go.uber.org/zap"
 	"time"
@@ -17,12 +18,12 @@ type Delta struct {
 	Delete  EntitiesById
 	Subject *common.SyncSubject
 	done    chan error
-	logger  *zap.SugaredLogger
+	logger  *logging.Logger
 }
 
 // NewDelta creates a new Delta and starts calculating it. The caller must ensure
 // that no duplicate entities are sent to the same stream.
-func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subject *common.SyncSubject, logger *zap.SugaredLogger) *Delta {
+func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subject *common.SyncSubject, logger *logging.Logger) *Delta {
 	delta := &Delta{
 		Subject: subject,
 		done:    make(chan error, 1),

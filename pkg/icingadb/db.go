@@ -9,12 +9,12 @@ import (
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"reflect"
@@ -30,7 +30,7 @@ type DB struct {
 
 	Options *Options
 
-	logger            *zap.SugaredLogger
+	logger            *logging.Logger
 	tableSemaphores   map[string]*semaphore.Weighted
 	tableSemaphoresMu sync.Mutex
 }
@@ -76,7 +76,7 @@ func (o *Options) Validate() error {
 }
 
 // NewDb returns a new icingadb.DB wrapper for a pre-existing *sqlx.DB.
-func NewDb(db *sqlx.DB, logger *zap.SugaredLogger, options *Options) *DB {
+func NewDb(db *sqlx.DB, logger *logging.Logger, options *Options) *DB {
 	return &DB{
 		DB:              db,
 		logger:          logger,
@@ -548,7 +548,7 @@ func (db *DB) GetSemaphoreForTable(table string) *semaphore.Weighted {
 }
 
 func (db *DB) log(ctx context.Context, query string, counter *com.Counter) periodic.Stoper {
-	return periodic.Start(ctx, internal.LoggingInterval(), func(tick periodic.Tick) {
+	return periodic.Start(ctx, db.logger.Interval(), func(tick periodic.Tick) {
 		if count := counter.Reset(); count > 0 {
 			db.logger.Debugf("Executed %q with %d rows", query, count)
 		}

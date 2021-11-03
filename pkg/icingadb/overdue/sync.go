@@ -12,9 +12,9 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/overdue"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"strconv"
 	"time"
@@ -24,11 +24,11 @@ import (
 type Sync struct {
 	db     *icingadb.DB
 	redis  *icingaredis.Client
-	logger *zap.SugaredLogger
+	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *zap.SugaredLogger) *Sync {
+func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -122,7 +122,7 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 
 // log periodically logs sync's workload.
 func (s Sync) log(ctx context.Context, objectType string, counter *com.Counter) periodic.Stoper {
-	return periodic.Start(ctx, internal.LoggingInterval(), func(_ periodic.Tick) {
+	return periodic.Start(ctx, s.logger.Interval(), func(_ periodic.Tick) {
 		if count := counter.Reset(); count > 0 {
 			s.logger.Infof("Synced %d %s overdue indicators", count, objectType)
 		}

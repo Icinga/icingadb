@@ -5,11 +5,11 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"net"
 	"sync"
 	"time"
@@ -30,7 +30,7 @@ type Database struct {
 
 // Open prepares the DSN string and driver configuration,
 // calls sqlx.Open, but returns *icingadb.DB.
-func (d *Database) Open(logger *zap.SugaredLogger) (*icingadb.DB, error) {
+func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 	registerDriverOnce.Do(func() {
 		driver.Register(logger)
 	})
