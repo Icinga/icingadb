@@ -49,11 +49,11 @@ type Options struct {
 	// but this increases the execution time of queries and thus reduces the number of queries
 	// that can be executed in parallel in a given time.
 	// The default is 2^13, which in our tests showed the best performance in terms of execution time and parallelism.
-	MaxPlaceholdersPerStatement int `yaml:"MaxPlaceholdersPerStatement" default:"8192"`
+	MaxPlaceholdersPerStatement int `yaml:"max_placeholders_per_statement" default:"8192"`
 
 	// MaxRowsPerTransaction defines the maximum number of rows per transaction.
 	// The default is 2^13, which in our tests showed the best performance in terms of execution time and parallelism.
-	MaxRowsPerTransaction int `yaml:"MaxRowsPerTransaction" default:"8192"`
+	MaxRowsPerTransaction int `yaml:"max_rows_per_transaction" default:"8192"`
 }
 
 // Validate checks constraints in the supplied database options and returns an error if they are violated.
