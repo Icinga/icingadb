@@ -115,6 +115,14 @@ func run() int {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
+	go func() {
+		logger.Info("Starting history sync")
+
+		if err := hs.Sync(ctx); err != nil && !utils.IsContextCanceled(err) {
+			logger.Fatalf("%+v", err)
+		}
+	}()
+
 	// Main loop
 	for {
 		hactx, cancelHactx := context.WithCancel(ctx)
@@ -156,12 +164,6 @@ func run() int {
 							case <-synctx.Done():
 								return synctx.Err()
 							}
-						})
-
-						g.Go(func() error {
-							logger.Info("Starting history sync")
-
-							return hs.Sync(synctx)
 						})
 
 						g.Go(func() error {
