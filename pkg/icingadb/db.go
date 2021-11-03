@@ -209,7 +209,8 @@ func (db *DB) BuildWhere(subject interface{}) (string, int) {
 // derives and expands a query and executes it with this set of arguments until the arg stream has been processed.
 // The derived queries are executed in a separate goroutine with a weighting of 1
 // and can be executed concurrently to the extent allowed by the semaphore passed in sem.
-func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan interface{}) error {
+// Arguments for which the query ran successfully will be streamed on the succeeded channel.
+func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan interface{}, succeeded chan<- interface{}) error {
 	var counter com.Counter
 	defer db.log(ctx, query, &counter).Stop()
 
@@ -244,6 +245,16 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 							}
 
 							counter.Add(uint64(len(b)))
+
+							if succeeded != nil {
+								for _, row := range b {
+									select {
+									case <-ctx.Done():
+										return ctx.Err()
+									case succeeded <- row:
+									}
+								}
+							}
 
 							return nil
 						},
@@ -505,9 +516,10 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Enti
 // The delete statement is created using BuildDeleteStmt with the passed entityType.
 // Bulk size is controlled via Options.MaxPlaceholdersPerStatement and
 // concurrency is controlled via Options.MaxConnectionsPerTable.
-func (db *DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}) error {
+// IDs for which the query ran successfully will be streamed on the succeeded channel.
+func (db *DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}, succeeded chan<- interface{}) error {
 	sem := db.GetSemaphoreForTable(utils.TableName(entityType))
-	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), db.Options.MaxPlaceholdersPerStatement, sem, ids)
+	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), db.Options.MaxPlaceholdersPerStatement, sem, ids, succeeded)
 }
 
 // Delete creates a channel from the specified ids and
@@ -519,7 +531,7 @@ func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []int
 	}
 	close(idsCh)
 
-	return db.DeleteStreamed(ctx, entityType, idsCh)
+	return db.DeleteStreamed(ctx, entityType, idsCh, nil)
 }
 
 func (db *DB) GetSemaphoreForTable(table string) *semaphore.Weighted {
