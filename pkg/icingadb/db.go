@@ -67,6 +67,9 @@ func (o *Options) Validate() error {
 	if o.MaxPlaceholdersPerStatement < 1 {
 		return errors.New("max_placeholders_per_statement must be at least 1")
 	}
+	if o.MaxRowsPerTransaction < 1 {
+		return errors.New("max_rows_per_transaction must be at least 1")
+	}
 
 	return nil
 }
