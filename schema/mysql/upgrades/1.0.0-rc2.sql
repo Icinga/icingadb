@@ -165,6 +165,7 @@ ALTER TABLE host_state
 
 ALTER TABLE state_history
     ADD COLUMN scheduling_source text DEFAULT NULL AFTER check_source,
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.name + host|service.name + event_time)',
     MODIFY output longtext DEFAULT NULL,
     MODIFY long_output longtext DEFAULT NULL;
 
@@ -173,10 +174,17 @@ ALTER TABLE service_state
     MODIFY long_output longtext DEFAULT NULL,
     MODIFY performance_data longtext DEFAULT NULL;
 
+ALTER TABLE notification_history
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.name + notification.name + type + send_time)';
+
 ALTER TABLE user_notification_history
-    MODIFY id binary(20) NOT NULL COMMENT 'sha1(notification_history_id + user_id)';
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(notification_history_id + user_id)',
+    MODIFY notification_history_id binary(20) NOT NULL COMMENT 'UUID notification_history.id';
 
 ALTER TABLE history
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.name + event_type + x...) given that sha1(environment.name + x...) = *_history_id',
+    MODIFY notification_history_id binary(20) DEFAULT NULL COMMENT 'notification_history.id',
+    MODIFY state_history_id binary(20) DEFAULT NULL COMMENT 'state_history.id',
     ADD CONSTRAINT fk_history_acknowledgement_history FOREIGN KEY (acknowledgement_history_id) REFERENCES acknowledgement_history (id) ON DELETE CASCADE,
     ADD CONSTRAINT fk_history_comment_history FOREIGN KEY (comment_history_id) REFERENCES comment_history (comment_id) ON DELETE CASCADE,
     ADD CONSTRAINT fk_history_downtime_history FOREIGN KEY (downtime_history_id) REFERENCES downtime_history (downtime_id) ON DELETE CASCADE,

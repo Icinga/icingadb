@@ -314,7 +314,7 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 // user_notification_history relation table for each user ID.
 func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
 	type NotificationHistory struct {
-		Id            types.UUID   `structify:"id"`
+		Id            types.Binary `structify:"id"`
 		EnvironmentId types.Binary `structify:"environment_id"`
 		EndpointId    types.Binary `structify:"endpoint_id"`
 		UserIds       types.String `structify:"users_notified_ids"`
@@ -345,7 +345,7 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 			userNotifications = append(userNotifications, &v1.UserNotificationHistory{
 				EntityWithoutChecksum: v1types.EntityWithoutChecksum{
 					IdMeta: v1types.IdMeta{
-						Id: utils.Checksum(append(append([]byte(nil), notificationHistory.Id.UUID[:]...), user...)),
+						Id: utils.Checksum(append(append([]byte(nil), notificationHistory.Id...), user...)),
 					},
 				},
 				EnvironmentMeta: v1types.EnvironmentMeta{
