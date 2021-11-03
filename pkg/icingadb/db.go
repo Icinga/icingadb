@@ -64,6 +64,10 @@ func (o *Options) Validate() error {
 	if o.MaxConnectionsPerTable < 1 {
 		return errors.New("max_connections_per_table must be at least 1")
 	}
+	if o.MaxPlaceholdersPerStatement < 1 {
+		return errors.New("max_placeholders_per_statement must be at least 1")
+	}
+
 	return nil
 }
 
