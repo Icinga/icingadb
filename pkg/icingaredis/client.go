@@ -48,6 +48,9 @@ func (o *Options) Validate() error {
 	if o.HScanCount < 1 {
 		return errors.New("hscan_count must be at least 1")
 	}
+	if o.XReadCount < 1 {
+		return errors.New("xread_count must be at least 1")
+	}
 
 	return nil
 }
