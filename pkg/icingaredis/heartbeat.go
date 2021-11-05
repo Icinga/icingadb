@@ -3,7 +3,9 @@ package icingaredis
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/internal"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
+	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -124,11 +126,11 @@ func (h *Heartbeat) controller(ctx context.Context) {
 			select {
 			case m := <-messages:
 				if !h.active {
-					s, err := m.Stats().IcingaStatus()
+					envId, err := m.EnvironmentID()
 					if err != nil {
-						return errors.Wrapf(err, "can't parse Icinga 2 status from message %#v", m)
+						return err
 					}
-					h.logger.Infow("Received first Icinga 2 heartbeat", zap.String("environment", s.Environment))
+					h.logger.Infow("Received first Icinga 2 heartbeat", zap.String("environment", envId.String()))
 					h.active = true
 				}
 				h.sendEvent(m)
@@ -189,6 +191,16 @@ type HeartbeatMessage struct {
 // Stats returns the underlying heartbeat message from the icinga:stats stream.
 func (m *HeartbeatMessage) Stats() *v1.StatsMessage {
 	return &m.stats
+}
+
+// EnvironmentID returns the Icinga DB environment ID stored in the heartbeat message.
+func (m *HeartbeatMessage) EnvironmentID() (types.Binary, error) {
+	var id types.Binary
+	err := internal.UnmarshalJSON([]byte(m.stats["icingadb_environment"].(string)), &id)
+	if err != nil {
+		return nil, err
+	}
+	return id, nil
 }
 
 // ExpiryTime returns the timestamp when the heartbeat expires.

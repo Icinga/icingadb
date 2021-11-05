@@ -52,3 +52,7 @@ var ConfigFactories = []contracts.EntityFactoryFunc{
 	NewUsergroupMember,
 	NewZone,
 }
+
+// contextKey is an unexported type for context keys defined in this package.
+// This prevents collisions with keys defined in other packages.
+type contextKey int

@@ -26,7 +26,7 @@ import (
 const (
 	ExitSuccess                = 0
 	ExitFailure                = 1
-	expectedRedisSchemaVersion = "2"
+	expectedRedisSchemaVersion = "3"
 	expectedDbSchemaVersion    = 2
 )
 
@@ -133,7 +133,7 @@ func run() int {
 
 				go func() {
 					for hactx.Err() == nil {
-						synctx, cancelSynctx := context.WithCancel(hactx)
+						synctx, cancelSynctx := context.WithCancel(ha.Environment().NewContext(hactx))
 						g, synctx := errgroup.WithContext(synctx)
 						// WaitGroups for initial synchronization.
 						// Runtime updates must wait for initial synchronization to complete.
@@ -142,7 +142,7 @@ func run() int {
 
 						// Get the last IDs of the runtime update streams before starting anything else,
 						// otherwise updates may be lost.
-						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.Streams(ctx)
+						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.Streams(synctx)
 						if err != nil {
 							logger.Fatalf("%+v", err)
 						}

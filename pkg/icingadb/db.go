@@ -118,14 +118,35 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 	), len(columns)
 }
 
+// BuildInsertIgnoreStmt returns an INSERT statement for the specified struct for
+// which the database ignores rows that have already been inserted.
+func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
+	columns := db.BuildColumns(into)
+
+	return fmt.Sprintf(
+		// MySQL treats UPDATE id = id as a no-op.
+		`INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE id = id`,
+		utils.TableName(into),
+		strings.Join(columns, ", "),
+		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
+	), len(columns)
+}
+
 // BuildSelectStmt returns a SELECT query that creates the FROM part from the given table struct
 // and the column list from the specified columns struct.
 func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
-	return fmt.Sprintf(
+	q := fmt.Sprintf(
 		`SELECT %s FROM %s`,
 		strings.Join(db.BuildColumns(columns), ", "),
 		utils.TableName(table),
 	)
+
+	if scoper, ok := table.(contracts.Scoper); ok {
+		where, _ := db.BuildWhere(scoper.Scope())
+		q += ` WHERE ` + where
+	}
+
+	return q
 }
 
 // BuildUpdateStmt returns an UPDATE statement for the given struct.
@@ -168,6 +189,18 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
 		strings.Join(set, ","),
 	), len(insertColumns)
+}
+
+// BuildWhere returns a WHERE clause with named placeholder conditions built from the specified struct
+// combined with the AND operator.
+func (db *DB) BuildWhere(subject interface{}) (string, int) {
+	columns := db.BuildColumns(subject)
+	where := make([]string, 0, len(columns))
+	for _, col := range columns {
+		where = append(where, fmt.Sprintf("%s = :%s", col, col))
+	}
+
+	return strings.Join(where, ` AND `), len(columns)
 }
 
 // BulkExec bulk executes queries with a single slice placeholder in the form of `IN (?)`.
@@ -391,10 +424,10 @@ func (db *DB) BatchSizeByPlaceholders(n int) int {
 	return 1
 }
 
-// YieldAll executes the query with the supplied args,
+// YieldAll executes the query with the supplied scope,
 // scans each resulting row into an entity returned by the factory function,
 // and streams them into a returned channel.
-func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, query string, args ...interface{}) (<-chan contracts.Entity, <-chan error) {
+func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, query string, scope interface{}) (<-chan contracts.Entity, <-chan error) {
 	var cnt com.Counter
 	entities := make(chan contracts.Entity, 1)
 	g, ctx := errgroup.WithContext(ctx)
@@ -408,7 +441,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 			db.logger.Infof("Fetched %d elements of %s in %s", cnt.Val(), utils.Name(v), elapsed)
 		})
 
-		rows, err := db.QueryxContext(ctx, query, args...)
+		rows, err := db.NamedQueryContext(ctx, query, scope)
 		if err != nil {
 			return internal.CantPerformQuery(err, query)
 		}
