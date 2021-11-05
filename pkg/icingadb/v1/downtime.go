@@ -19,11 +19,13 @@ type Downtime struct {
 	EntryTime          types.UnixMilli `json:"entry_time"`
 	ScheduledStartTime types.UnixMilli `json:"scheduled_start_time"`
 	ScheduledEndTime   types.UnixMilli `json:"scheduled_end_time"`
-	FlexibleDuration   uint64          `json:"flexible_duration"`
+	ScheduledDuration  uint64          `json:"scheduled_duration"`
 	IsFlexible         types.Bool      `json:"is_flexible"`
+	FlexibleDuration   uint64          `json:"flexible_duration"`
 	IsInEffect         types.Bool      `json:"is_in_effect"`
 	StartTime          types.UnixMilli `json:"start_time"`
 	EndTime            types.UnixMilli `json:"end_time"`
+	Duration           uint64          `json:"duration"`
 	ScheduledBy        types.String    `json:"scheduled_by"`
 	ZoneId             types.Binary    `json:"zone_id"`
 }

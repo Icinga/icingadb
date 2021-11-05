@@ -18,6 +18,8 @@ ALTER TABLE service_state ADD UNIQUE INDEX idx_service_state_service_id (service
 
 ALTER TABLE downtime
     ADD COLUMN parent_id binary(20) COMMENT 'For service downtimes, the ID of the host downtime that created this downtime by using the "all_services" flag of the schedule-downtime API.' AFTER triggered_by_id,
+    ADD COLUMN scheduled_duration bigint unsigned NOT NULL AFTER scheduled_end_time,
+    ADD COLUMN duration bigint unsigned NOT NULL COMMENT 'Duration of the downtime: When the downtime is flexible, this is the same as flexible_duration otherwise scheduled_end_time - scheduled_start_time' AFTER end_time,
     MODIFY COLUMN triggered_by_id binary(20) COMMENT 'The ID of the downtime that triggered this downtime. This is set when creating downtimes on a host or service higher up in the dependency chain using the "child_option" "DowntimeTriggeredChildren" and can also be set manually via the API.';
 ALTER TABLE downtime_history
     ADD COLUMN parent_id binary(20) COMMENT 'For service downtimes, the ID of the host downtime that created this downtime by using the "all_services" flag of the schedule-downtime API.' AFTER triggered_by_id,
