@@ -278,6 +278,7 @@ CREATE TABLE servicegroup_customvar (
 
 CREATE TABLE service_state (
   id binary(20) NOT NULL COMMENT 'service.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',

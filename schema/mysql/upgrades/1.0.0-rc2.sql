@@ -15,6 +15,7 @@ ALTER TABLE service_state ADD COLUMN properties_checksum binary(20) AFTER enviro
 UPDATE service_state SET properties_checksum = 0;
 ALTER TABLE service_state MODIFY COLUMN properties_checksum binary(20) COMMENT 'sha1(all properties)' NOT NULL;
 ALTER TABLE service_state ADD UNIQUE INDEX idx_service_state_service_id (service_id);
+ALTER TABLE service_state ADD COLUMN host_id binary(20) NOT NULL COMMENT 'host.id' AFTER id;
 
 ALTER TABLE downtime
     ADD COLUMN parent_id binary(20) COMMENT 'For service downtimes, the ID of the host downtime that created this downtime by using the "all_services" flag of the schedule-downtime API.' AFTER triggered_by_id,
