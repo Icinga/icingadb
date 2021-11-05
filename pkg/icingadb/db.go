@@ -547,7 +547,7 @@ func (db *DB) GetSemaphoreForTable(table string) *semaphore.Weighted {
 	}
 }
 
-func (db *DB) log(ctx context.Context, query string, counter *com.Counter) periodic.Stoper {
+func (db *DB) log(ctx context.Context, query string, counter *com.Counter) periodic.Stopper {
 	return periodic.Start(ctx, db.logger.Interval(), func(tick periodic.Tick) {
 		if count := counter.Reset(); count > 0 {
 			db.logger.Debugf("Executed %q with %d rows", query, count)

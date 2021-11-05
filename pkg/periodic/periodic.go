@@ -11,9 +11,9 @@ type Option interface {
 	apply(*periodic)
 }
 
-// Stoper implements the Stop method,
+// Stopper implements the Stop method,
 // which stops a periodic task from Start().
-type Stoper interface {
+type Stopper interface {
 	Stop() // Stops a periodic task.
 }
 
@@ -36,7 +36,7 @@ func OnStop(f func(Tick)) Option {
 // which executes the given callback after each tick.
 // Call Stop() on the return value in order to stop the ticker and to release associated resources.
 // The interval must be greater than zero.
-func Start(ctx context.Context, interval time.Duration, callback func(Tick), options ...Option) Stoper {
+func Start(ctx context.Context, interval time.Duration, callback func(Tick), options ...Option) Stopper {
 	t := &periodic{
 		interval: interval,
 		callback: callback,

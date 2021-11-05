@@ -121,7 +121,7 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 }
 
 // log periodically logs sync's workload.
-func (s Sync) log(ctx context.Context, objectType string, counter *com.Counter) periodic.Stoper {
+func (s Sync) log(ctx context.Context, objectType string, counter *com.Counter) periodic.Stopper {
 	return periodic.Start(ctx, s.logger.Interval(), func(_ periodic.Tick) {
 		if count := counter.Reset(); count > 0 {
 			s.logger.Infof("Synced %d %s overdue indicators", count, objectType)

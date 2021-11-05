@@ -221,7 +221,7 @@ func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-ch
 	return desired, com.WaitAsync(g)
 }
 
-func (c *Client) log(ctx context.Context, key string, counter *com.Counter) periodic.Stoper {
+func (c *Client) log(ctx context.Context, key string, counter *com.Counter) periodic.Stopper {
 	return periodic.Start(ctx, c.logger.Interval(), func(tick periodic.Tick) {
 		// We may never get to progress logging here,
 		// as fetching should be completed before the interval expires,
