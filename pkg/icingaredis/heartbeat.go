@@ -5,6 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -28,11 +29,11 @@ type Heartbeat struct {
 	done      chan struct{}
 	errMu     sync.Mutex
 	err       error
-	logger    *zap.SugaredLogger
+	logger    *logging.Logger
 }
 
 // NewHeartbeat returns a new Heartbeat and starts the heartbeat controller loop.
-func NewHeartbeat(ctx context.Context, client *Client, logger *zap.SugaredLogger) *Heartbeat {
+func NewHeartbeat(ctx context.Context, client *Client, logger *logging.Logger) *Heartbeat {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
 	heartbeat := &Heartbeat{
@@ -81,8 +82,6 @@ func (h *Heartbeat) Err() error {
 func (h *Heartbeat) controller(ctx context.Context) {
 	defer close(h.done)
 
-	h.logger.Info("Waiting for Icinga 2 heartbeat")
-
 	messages := make(chan *HeartbeatMessage)
 	defer close(messages)
 
@@ -130,17 +129,17 @@ func (h *Heartbeat) controller(ctx context.Context) {
 					if err != nil {
 						return err
 					}
-					h.logger.Infow("Received first Icinga 2 heartbeat", zap.String("environment", envId.String()))
+					h.logger.Infow("Received Icinga heartbeat", zap.String("environment", envId.String()))
 					h.active = true
 				}
 				h.sendEvent(m)
 			case <-time.After(timeout):
 				if h.active {
-					h.logger.Warnw("Lost Icinga 2 heartbeat", zap.Duration("timeout", timeout))
+					h.logger.Warnw("Lost Icinga heartbeat", zap.Duration("timeout", timeout))
 					h.sendEvent(nil)
 					h.active = false
 				} else {
-					h.logger.Warn("Waiting for Icinga 2 heartbeat")
+					h.logger.Warn("Waiting for Icinga heartbeat")
 				}
 			case <-ctx.Done():
 				return ctx.Err()

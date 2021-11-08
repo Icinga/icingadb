@@ -10,26 +10,26 @@ import (
 	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"reflect"
 	"sync"
-	"time"
 )
 
 // Sync specifies the source and destination of a history sync.
 type Sync struct {
 	db     *icingadb.DB
 	redis  *icingaredis.Client
-	logger *zap.SugaredLogger
+	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *zap.SugaredLogger) *Sync {
+func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -45,7 +45,7 @@ func (s Sync) Sync(ctx context.Context) error {
 		key := key
 		pipeline := pipeline
 
-		s.logger.Debugw("Starting history sync", zap.String("type", key))
+		s.logger.Debugf("Starting %s history sync", key)
 
 		// The pipeline consists of n+2 stages connected sequentially using n+1 channels of type chan redis.XMessage,
 		// where n = len(pipeline), i.e. the number of actual sync stages. So the resulting pipeline looks like this:
@@ -134,16 +134,15 @@ func (s Sync) readFromRedis(ctx context.Context, key string, output chan<- redis
 // deleteFromRedis is the last stage of the history sync pipeline. It receives history entries from the second to last
 // pipeline stage and then deletes the stream entry from Redis as all pipeline stages successfully processed the entry.
 func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redis.XMessage) error {
-	const logInterval = 20 * time.Second
-
-	var count uint64 // Count of synced entries for periodic logging.
-	stream := "icinga:history:stream:" + key
-
-	logTicker := time.NewTicker(logInterval)
-	defer logTicker.Stop()
+	var counter com.Counter
+	defer periodic.Start(ctx, s.logger.Interval(), func(_ periodic.Tick) {
+		if count := counter.Reset(); count > 0 {
+			s.logger.Infof("Synced %d %s history items", count, key)
+		}
+	}).Stop()
 
 	bulks := com.BulkXMessages(ctx, input, s.redis.Options.HScanCount)
-
+	stream := "icinga:history:stream:" + key
 	for {
 		select {
 		case bulk := <-bulks:
@@ -157,14 +156,7 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 				return icingaredis.WrapCmdErr(cmd)
 			}
 
-			count += uint64(len(ids))
-
-		case <-logTicker.C:
-			if count > 0 {
-				s.logger.Infof("Inserted %d %s history entries in the last %s", count, key, logInterval)
-				count = 0
-			}
-
+			counter.Add(uint64(len(ids)))
 		case <-ctx.Done():
 			return ctx.Err()
 		}

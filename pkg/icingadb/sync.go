@@ -8,6 +8,7 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -20,11 +21,11 @@ import (
 type Sync struct {
 	db     *DB
 	redis  *icingaredis.Client
-	logger *zap.SugaredLogger
+	logger *logging.Logger
 }
 
 // NewSync returns a new Sync.
-func NewSync(db *DB, redis *icingaredis.Client, logger *zap.SugaredLogger) *Sync {
+func NewSync(db *DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -39,9 +40,9 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 	key := "icinga:" + utils.Key(typeName, ':')
 
 	startTime := time.Now()
-	logTicker := time.NewTicker(20 * time.Second)
-	loggedWaiting := false
+	logTicker := time.NewTicker(s.logger.Interval())
 	defer logTicker.Stop()
+	loggedWaiting := false
 
 	for {
 		select {
@@ -70,8 +71,6 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 // Sync synchronizes entities between Icinga DB and Redis created with the specified sync subject.
 // This function does not respect dump signals. For this, use SyncAfterDump.
 func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
-	s.logger.Infof("Syncing %s", utils.Key(utils.Name(subject.Entity()), ' '))
-
 	g, ctx := errgroup.WithContext(ctx)
 
 	desired, redisErrs := s.redis.YieldAll(ctx, subject)
@@ -105,6 +104,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Create
 	if len(delta.Create) > 0 {
+		s.logger.Infof("Inserting %d items of type %s", len(delta.Create), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		var entities <-chan contracts.Entity
 		if delta.Subject.WithChecksum() {
 			pairs, errs := s.redis.HMYield(
@@ -131,7 +131,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Update
 	if len(delta.Update) > 0 {
-		s.logger.Infof("Updating %d rows of type %s", len(delta.Update), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+		s.logger.Infof("Updating %d items of type %s", len(delta.Update), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		pairs, errs := s.redis.HMYield(
 			ctx,
 			fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
@@ -155,7 +155,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Delete
 	if len(delta.Delete) > 0 {
-		s.logger.Infof("Deleting %d rows of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		g.Go(func() error {
 			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs())
 		})
@@ -166,9 +166,6 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 // SyncCustomvars synchronizes customvar and customvar_flat.
 func (s Sync) SyncCustomvars(ctx context.Context) error {
-	s.logger.Info("Syncing customvar")
-	s.logger.Info("Syncing customvar_flat")
-
 	e, ok := v1.EnvironmentFromContext(ctx)
 	if !ok {
 		return errors.New("can't get environment from context")

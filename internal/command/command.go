@@ -6,10 +6,10 @@ import (
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	goflags "github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"os"
 )
 
@@ -48,11 +48,11 @@ func New() *Command {
 }
 
 // Database creates and returns a new icingadb.DB connection from config.Config.
-func (c Command) Database(l *zap.SugaredLogger) (*icingadb.DB, error) {
+func (c Command) Database(l *logging.Logger) (*icingadb.DB, error) {
 	return c.Config.Database.Open(l)
 }
 
 // Redis creates and returns a new icingaredis.Client connection from config.Config.
-func (c Command) Redis(l *zap.SugaredLogger) (*icingaredis.Client, error) {
+func (c Command) Redis(l *logging.Logger) (*icingaredis.Client, error) {
 	return c.Config.Redis.NewClient(l)
 }

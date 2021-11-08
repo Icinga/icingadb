@@ -2,8 +2,10 @@ package icingadb
 
 import (
 	"context"
+	"fmt"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"go.uber.org/zap"
 	"time"
@@ -16,12 +18,12 @@ type Delta struct {
 	Delete  EntitiesById
 	Subject *common.SyncSubject
 	done    chan error
-	logger  *zap.SugaredLogger
+	logger  *logging.Logger
 }
 
 // NewDelta creates a new Delta and starts calculating it. The caller must ensure
 // that no duplicate entities are sent to the same stream.
-func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subject *common.SyncSubject, logger *zap.SugaredLogger) *Delta {
+func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subject *common.SyncSubject, logger *logging.Logger) *Delta {
 	delta := &Delta{
 		Subject: subject,
 		done:    make(chan error, 1),
@@ -101,7 +103,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan contract
 	delta.Update = update
 	delta.Delete = actual
 
-	delta.logger.Debugw("Delta finished",
+	delta.logger.Debugw(fmt.Sprintf("Finished %s delta", utils.Name(delta.Subject.Entity())),
 		zap.String("subject", utils.Name(delta.Subject.Entity())),
 		zap.Duration("time_total", time.Since(start)),
 		zap.Duration("time_actual", endActual.Sub(start)),

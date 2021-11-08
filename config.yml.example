@@ -19,14 +19,20 @@ logging:
   # If not set, logs to systemd-journald when running under systemd, otherwise stderr.
   output:
 
+  # Interval for periodic logging defined as duration string.
+  # A duration string is a sequence of decimal numbers and a unit suffix, such as "20s".
+  # Valid units are "ms", "s", "m", "h".
+  # Defaults to "20s".
+  interval:
+
   # Map of component-logging level pairs to define a different log level than the default value for each component.
   options:
-    database:
-    redis:
-    heartbeat:
-    high-availability:
-    config-sync:
-    history-sync:
-    runtime-updates:
-    overdue-sync:
-    dump-signals:
+#    database:
+#    redis:
+#    heartbeat:
+#    high-availability:
+#    config-sync:
+#    history-sync:
+#    runtime-updates:
+#    overdue-sync:
+#    dump-signals:

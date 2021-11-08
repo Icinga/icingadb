@@ -6,6 +6,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"os"
 	"sync"
+	"time"
 )
 
 const (
@@ -36,15 +37,16 @@ type Options map[string]zapcore.Level
 // fall back on a default log level.
 // Logs either to the console or to systemd-journald.
 type Logging struct {
-	logger    *zap.SugaredLogger
+	logger    *Logger
 	output    string
 	verbosity zap.AtomicLevel
+	interval  time.Duration
 
 	// coreFactory creates zapcore.Core based on the log level and the log output.
 	coreFactory func(zap.AtomicLevel) zapcore.Core
 
 	mu      sync.Mutex
-	loggers map[string]*zap.SugaredLogger
+	loggers map[string]*Logger
 
 	options Options
 }
@@ -53,7 +55,7 @@ type Logging struct {
 // output where log messages are written to,
 // options having log levels for named child loggers
 // and returns a new Logging.
-func NewLogging(name string, level zapcore.Level, output string, options Options) (*Logging, error) {
+func NewLogging(name string, level zapcore.Level, output string, options Options, interval time.Duration) (*Logging, error) {
 	verbosity := zap.NewAtomicLevelAt(level)
 
 	var coreFactory func(zap.AtomicLevel) zapcore.Core
@@ -72,14 +74,15 @@ func NewLogging(name string, level zapcore.Level, output string, options Options
 		return nil, invalidOutput(output)
 	}
 
-	logger := zap.New(coreFactory(verbosity)).Named(name).Sugar()
+	logger := NewLogger(zap.New(coreFactory(verbosity)).Named(name).Sugar(), interval)
 
 	return &Logging{
 			logger:      logger,
 			output:      output,
 			verbosity:   verbosity,
+			interval:    interval,
 			coreFactory: coreFactory,
-			loggers:     map[string]*zap.SugaredLogger{},
+			loggers:     make(map[string]*Logger),
 			options:     options,
 		},
 		nil
@@ -88,7 +91,7 @@ func NewLogging(name string, level zapcore.Level, output string, options Options
 // GetChildLogger returns a named child logger.
 // Log levels for named child loggers are obtained from the logging options and, if not found,
 // set to the default log level.
-func (l *Logging) GetChildLogger(name string) *zap.SugaredLogger {
+func (l *Logging) GetChildLogger(name string) *Logger {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -103,14 +106,14 @@ func (l *Logging) GetChildLogger(name string) *zap.SugaredLogger {
 		verbosity = l.verbosity
 	}
 
-	logger := zap.New(l.coreFactory(verbosity)).Named(name).Sugar()
+	logger := NewLogger(zap.New(l.coreFactory(verbosity)).Named(name).Sugar(), l.interval)
 	l.loggers[name] = logger
 
 	return logger
 }
 
 // GetLogger returns the default logger.
-func (l *Logging) GetLogger() *zap.SugaredLogger {
+func (l *Logging) GetLogger() *Logger {
 	return l.logger
 }
 

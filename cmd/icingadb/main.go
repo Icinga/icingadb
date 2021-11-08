@@ -41,11 +41,11 @@ func run() int {
 		cmd.Config.Logging.Level,
 		cmd.Config.Logging.Output,
 		cmd.Config.Logging.Options,
+		cmd.Config.Logging.Interval,
 	)
 	if err != nil {
 		utils.Fatal(errors.Wrap(err, "can't configure logging"))
 	}
-
 	// When started by systemd, NOTIFY_SOCKET is set by systemd for Type=notify supervised services, which is the
 	// default setting for the Icinga DB service. So we notify that Icinga DB finished starting up.
 	_ = sdnotify.Ready()
@@ -149,7 +149,7 @@ func run() int {
 
 						dump := icingadb.NewDumpSignals(rc, logs.GetChildLogger("dump-signals"))
 						g.Go(func() error {
-							logger.Info("Staring config dump signal handling")
+							logger.Debug("Staring config dump signal handling")
 
 							return dump.Listen(synctx)
 						})
@@ -172,8 +172,8 @@ func run() int {
 							return ods.Sync(synctx)
 						})
 
+						syncStart := time.Now()
 						logger.Info("Starting config sync")
-
 						for _, factory := range v1.ConfigFactories {
 							factory := factory
 
@@ -184,7 +184,7 @@ func run() int {
 								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump)
 							})
 						}
-
+						logger.Info("Starting initial state sync")
 						for _, factory := range v1.StateFactories {
 							factory := factory
 
@@ -211,6 +211,39 @@ func run() int {
 
 						g.Go(func() error {
 							configInitSync.Wait()
+
+							elapsed := time.Since(syncStart)
+							logger := logs.GetChildLogger("config-sync")
+							if synctx.Err() == nil {
+								logger.Infof("Finished config sync in %s", elapsed)
+							} else {
+								logger.Warnf("Aborted config sync after %s", elapsed)
+							}
+
+							return nil
+						})
+
+						g.Go(func() error {
+							stateInitSync.Wait()
+
+							elapsed := time.Since(syncStart)
+							logger := logs.GetChildLogger("config-sync")
+							if synctx.Err() == nil {
+								logger.Infof("Finished initial state sync in %s", elapsed)
+							} else {
+								logger.Warnf("Aborted initial state sync after %s", elapsed)
+							}
+
+							return nil
+						})
+
+						g.Go(func() error {
+							configInitSync.Wait()
+
+							if err := synctx.Err(); err != nil {
+								return err
+							}
+
 							logger.Info("Starting config runtime updates sync")
 
 							return rt.Sync(synctx, v1.ConfigFactories, runtimeConfigUpdateStreams)
@@ -218,7 +251,13 @@ func run() int {
 
 						g.Go(func() error {
 							stateInitSync.Wait()
+
+							if err := synctx.Err(); err != nil {
+								return err
+							}
+
 							logger.Info("Starting state runtime updates sync")
+
 							return rt.Sync(synctx, v1.StateFactories, runtimeStateUpdateStreams)
 						})
 
@@ -275,7 +314,7 @@ func checkDbSchema(ctx context.Context, db *icingadb.DB) error {
 }
 
 // monitorRedisSchema monitors rc's icinga:schema version validity.
-func monitorRedisSchema(logger *zap.SugaredLogger, rc *icingaredis.Client, pos string) {
+func monitorRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) {
 	for {
 		var err error
 		pos, err = checkRedisSchema(logger, rc, pos)
@@ -287,7 +326,7 @@ func monitorRedisSchema(logger *zap.SugaredLogger, rc *icingaredis.Client, pos s
 }
 
 // checkRedisSchema verifies rc's icinga:schema version.
-func checkRedisSchema(logger *zap.SugaredLogger, rc *icingaredis.Client, pos string) (newPos string, err error) {
+func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) (newPos string, err error) {
 	if pos == "0-0" {
 		defer time.AfterFunc(3*time.Second, func() { logger.Info("Waiting for current Redis schema version") }).Stop()
 	} else {

@@ -6,6 +6,7 @@ import (
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +16,7 @@ import (
 	"strconv"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestDelta(t *testing.T) {
@@ -88,7 +90,7 @@ func TestDelta(t *testing.T) {
 					chActual := make(chan contracts.Entity)
 					chDesired := make(chan contracts.Entity)
 					subject := common.NewSyncSubject(v1.NewEndpoint)
-					logger := zaptest.NewLogger(t).Sugar()
+					logger := logging.NewLogger(zaptest.NewLogger(t).Sugar(), time.Second)
 
 					go func() {
 						sendOrder.Send(id, test, chActual, chDesired)
@@ -117,7 +119,7 @@ func TestDelta(t *testing.T) {
 		chActual := make(chan contracts.Entity)
 		chDesired := make(chan contracts.Entity)
 		subject := common.NewSyncSubject(v1.NewEndpoint)
-		logger := zaptest.NewLogger(t).Sugar()
+		logger := logging.NewLogger(zaptest.NewLogger(t).Sugar(), time.Second)
 
 		expectedCreate := make(map[uint64]uint64)
 		expectedUpdate := make(map[uint64]uint64)
@@ -256,7 +258,7 @@ func benchmarkDelta(b *testing.B, numEntities int) {
 	}
 	subject := common.NewSyncSubject(v1.NewEndpoint)
 	// logger := zaptest.NewLogger(b).Sugar()
-	logger := zap.New(zapcore.NewTee()).Sugar()
+	logger := logging.NewLogger(zap.New(zapcore.NewTee()).Sugar(), time.Second)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		d := NewDelta(context.Background(), chActual[i], chDesired[i], subject, logger)
