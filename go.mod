@@ -2,10 +2,14 @@ module github.com/icinga/icingadb
 
 go 1.16
 
+// TODO: remove once merged https://github.com/goccy/go-yaml/pull/260
+replace github.com/goccy/go-yaml v1.9.5-0.20211015131146-c6bcb8045535 => github.com/Al2Klimov/go-yaml v1.9.5-0.20211015131146-c6bcb8045535
+
 require (
 	github.com/creasty/defaults v1.5.2
 	github.com/go-redis/redis/v8 v8.11.4
 	github.com/go-sql-driver/mysql v1.6.0
+	github.com/goccy/go-yaml v1.9.5-0.20211015131146-c6bcb8045535
 	github.com/google/uuid v1.3.0
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/jmoiron/sqlx v1.3.4
@@ -16,5 +20,4 @@ require (
 	go.uber.org/zap v1.19.1
 	golang.org/x/exp v0.0.0-20210514180818-737f94c0881e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
