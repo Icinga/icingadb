@@ -337,10 +337,12 @@ ALTER TABLE eventcommand_customvar
 
 ALTER TABLE notificationcommand_customvar
     DROP INDEX idx_notificationcommand_customvar_command_id,
-    DROP INDEX idx_notificationcommand_customvar_id;
+    DROP INDEX idx_notificationcommand_customvar_customvar_id;
 
 ALTER TABLE notification
     RENAME COLUMN command_id TO notificationcommand_id;
+ALTER TABLE notification
+    MODIFY notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id';
 
 ALTER TABLE checkcommand_argument
     RENAME COLUMN command_id TO checkcommand_id;

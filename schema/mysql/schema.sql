@@ -432,7 +432,7 @@ CREATE TABLE checkcommand_customvar (
 
   PRIMARY KEY (id),
 
-  INDEX idx_checkcommand_customvar_checkcheckcommand_id (checkcommand_id, customvar_id),
+  INDEX idx_checkcommand_customvar_checkcommand_id (checkcommand_id, customvar_id),
   INDEX idx_checkcommand_customvar_customvar_id (customvar_id, checkcommand_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
