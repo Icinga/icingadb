@@ -26,7 +26,7 @@ import (
 const (
 	ExitSuccess                = 0
 	ExitFailure                = 1
-	expectedRedisSchemaVersion = "3"
+	expectedRedisSchemaVersion = "4"
 	expectedDbSchemaVersion    = 2
 )
 

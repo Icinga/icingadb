@@ -6,19 +6,19 @@ import (
 )
 
 type Notification struct {
-	EntityWithChecksum   `json:",inline"`
-	EnvironmentMeta      `json:",inline"`
-	NameCiMeta           `json:",inline"`
-	HostId               types.Binary             `json:"host_id"`
-	ServiceId            types.Binary             `json:"service_id"`
-	CommandId            types.Binary             `json:"command_id"`
-	TimesBegin           types.Int                `json:"times_begin"`
-	TimesEnd             types.Int                `json:"times_end"`
-	NotificationInterval uint32                   `json:"notification_interval"`
-	TimeperiodId         types.Binary             `json:"timeperiod_id"`
-	States               types.NotificationStates `json:"states"`
-	Types                types.NotificationTypes  `json:"types"`
-	ZoneId               types.Binary             `json:"zone_id"`
+	EntityWithChecksum    `json:",inline"`
+	EnvironmentMeta       `json:",inline"`
+	NameCiMeta            `json:",inline"`
+	HostId                types.Binary             `json:"host_id"`
+	ServiceId             types.Binary             `json:"service_id"`
+	NotificationcommandId types.Binary             `json:"notificationcommand_id"`
+	TimesBegin            types.Int                `json:"times_begin"`
+	TimesEnd              types.Int                `json:"times_end"`
+	NotificationInterval  uint32                   `json:"notification_interval"`
+	TimeperiodId          types.Binary             `json:"timeperiod_id"`
+	States                types.NotificationStates `json:"states"`
+	Types                 types.NotificationTypes  `json:"types"`
+	ZoneId                types.Binary             `json:"zone_id"`
 }
 
 type NotificationUser struct {

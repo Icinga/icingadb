@@ -322,3 +322,88 @@ ALTER TABLE flapping_history
     MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + "Host"|"Service" + host|service.name + start_time)';
 ALTER TABLE acknowledgement_history
     MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + "Host"|"Service" + host|service.name + set_time)';
+
+/*
+ * Schema changes after https://github.com/Icinga/icingadb/pull/403:
+ */
+
+ALTER TABLE checkcommand_customvar
+    DROP INDEX idx_checkcommand_customvar_command_id,
+    DROP INDEX idx_checkcommand_customvar_customvar_id;
+
+ALTER TABLE eventcommand_customvar
+    DROP INDEX idx_eventcommand_customvar_command_id,
+    DROP INDEX idx_eventcommand_customvar_customvar_id;
+
+ALTER TABLE notificationcommand_customvar
+    DROP INDEX idx_notificationcommand_customvar_command_id,
+    DROP INDEX idx_notificationcommand_customvar_id;
+
+ALTER TABLE notification
+    RENAME COLUMN command_id TO notificationcommand_id;
+
+ALTER TABLE checkcommand_argument
+    RENAME COLUMN command_id TO checkcommand_id;
+ALTER TABLE checkcommand_argument
+    MODIFY checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + checkcommand_id + argument_key)';
+
+ALTER TABLE checkcommand_envvar
+    RENAME COLUMN command_id TO checkcommand_id;
+ALTER TABLE checkcommand_envvar
+    MODIFY checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + checkcommand_id + envvar_key)';
+
+ALTER TABLE checkcommand_customvar
+    RENAME COLUMN command_id TO checkcommand_id;
+ALTER TABLE checkcommand_customvar
+    MODIFY checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + checkcommand_id + customvar_id)';
+
+ALTER TABLE eventcommand_argument
+    RENAME COLUMN command_id TO eventcommand_id;
+ALTER TABLE eventcommand_argument
+    MODIFY eventcommand_id binary(20) NOT NULL COMMENT 'eventcommand.id',
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + eventcommand_id + argument_key)';
+
+ALTER TABLE eventcommand_envvar
+    RENAME COLUMN command_id TO eventcommand_id;
+ALTER TABLE eventcommand_envvar
+    MODIFY eventcommand_id binary(20) NOT NULL COMMENT 'eventcommand.id',
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + eventcommand_id + envvar_key)';
+
+ALTER TABLE eventcommand_customvar
+    RENAME COLUMN command_id TO eventcommand_id;
+ALTER TABLE eventcommand_customvar
+    MODIFY eventcommand_id binary(20) NOT NULL COMMENT 'eventcommand.id',
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + eventcommand_id + customvar_id)';
+
+ALTER TABLE notificationcommand_argument
+    RENAME COLUMN command_id TO notificationcommand_id;
+ALTER TABLE notificationcommand_argument
+    MODIFY notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id',
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + notificationcommand_id + argument_key)';
+
+ALTER TABLE notificationcommand_envvar
+    RENAME COLUMN command_id TO notificationcommand_id;
+ALTER TABLE notificationcommand_envvar
+    MODIFY notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id',
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + notificationcommand_id + envvar_key)';
+
+ALTER TABLE notificationcommand_customvar
+    RENAME COLUMN command_id TO notificationcommand_id;
+ALTER TABLE notificationcommand_customvar
+    MODIFY notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id',
+    MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + notificationcommand_id + customvar_id)';
+
+ALTER TABLE checkcommand_customvar
+    ADD INDEX idx_checkcommand_customvar_checkcommand_id (checkcommand_id, customvar_id),
+    ADD INDEX idx_checkcommand_customvar_customvar_id (customvar_id, checkcommand_id);
+
+ALTER TABLE eventcommand_customvar
+    ADD INDEX idx_eventcommand_customvar_eventcommand_id (eventcommand_id, customvar_id),
+    ADD INDEX idx_eventcommand_customvar_customvar_id (customvar_id, eventcommand_id);
+
+ALTER TABLE notificationcommand_customvar
+    ADD INDEX idx_notificationcommand_customvar_notificationcommand_id (notificationcommand_id, customvar_id),
+    ADD INDEX idx_notificationcommand_customvar_customvar_id (customvar_id, notificationcommand_id);

@@ -17,7 +17,6 @@ type Command struct {
 type CommandArgument struct {
 	EntityWithChecksum  `json:",inline"`
 	EnvironmentMeta     `json:",inline"`
-	CommandId           types.Binary `json:"command_id"`
 	ArgumentKey         string       `json:"argument_key"`
 	ArgumentValue       types.String `json:"value"`
 	ArgumentOrder       types.Int    `json:"order"`
@@ -50,14 +49,8 @@ func (ca *CommandArgument) Init() {
 type CommandEnvvar struct {
 	EntityWithChecksum `json:",inline"`
 	EnvironmentMeta    `json:",inline"`
-	CommandId          types.Binary `json:"command_id"`
-	EnvvarKey          string       `json:"envvar_key"`
-	EnvvarValue        string       `json:"value"`
-}
-
-type CommandCustomvar struct {
-	CustomvarMeta `json:",inline"`
-	CommandId     types.Binary `json:"command_id"`
+	EnvvarKey          string `json:"envvar_key"`
+	EnvvarValue        string `json:"value"`
 }
 
 type Checkcommand struct {
@@ -66,14 +59,17 @@ type Checkcommand struct {
 
 type CheckcommandArgument struct {
 	CommandArgument `json:",inline"`
+	CheckcommandId  types.Binary `json:"checkcommand_id"`
 }
 
 type CheckcommandEnvvar struct {
-	CommandEnvvar `json:",inline"`
+	CommandEnvvar  `json:",inline"`
+	CheckcommandId types.Binary `json:"checkcommand_id"`
 }
 
 type CheckcommandCustomvar struct {
-	CommandCustomvar `json:",inline"`
+	CustomvarMeta  `json:",inline"`
+	CheckcommandId types.Binary `json:"checkcommand_id"`
 }
 
 type Eventcommand struct {
@@ -82,14 +78,17 @@ type Eventcommand struct {
 
 type EventcommandArgument struct {
 	CommandArgument `json:",inline"`
+	EventcommandId  types.Binary `json:"eventcommand_id"`
 }
 
 type EventcommandEnvvar struct {
-	CommandEnvvar `json:",inline"`
+	CommandEnvvar  `json:",inline"`
+	EventcommandId types.Binary `json:"eventcommand_id"`
 }
 
 type EventcommandCustomvar struct {
-	CommandCustomvar `json:",inline"`
+	CustomvarMeta  `json:",inline"`
+	EventcommandId types.Binary `json:"eventcommand_id"`
 }
 
 type Notificationcommand struct {
@@ -97,15 +96,18 @@ type Notificationcommand struct {
 }
 
 type NotificationcommandArgument struct {
-	CommandArgument `json:",inline"`
+	CommandArgument       `json:",inline"`
+	NotificationcommandId types.Binary `json:"notificationcommand_id"`
 }
 
 type NotificationcommandEnvvar struct {
-	CommandEnvvar `json:",inline"`
+	CommandEnvvar         `json:",inline"`
+	NotificationcommandId types.Binary `json:"notificationcommand_id"`
 }
 
 type NotificationcommandCustomvar struct {
-	CommandCustomvar `json:",inline"`
+	CustomvarMeta         `json:",inline"`
+	NotificationcommandId types.Binary `json:"notificationcommand_id"`
 }
 
 func NewCheckcommand() contracts.Entity {

@@ -391,9 +391,9 @@ CREATE TABLE checkcommand (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE checkcommand_argument (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + argument_key)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.id + checkcommand_id + argument_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
   argument_key varchar(64) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -411,9 +411,9 @@ CREATE TABLE checkcommand_argument (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE checkcommand_envvar (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + envvar_key)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.id + checkcommand_id + envvar_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
   envvar_key varchar(64) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -424,16 +424,16 @@ CREATE TABLE checkcommand_envvar (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE checkcommand_customvar (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + customvar_id)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.id + checkcommand_id + customvar_id)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
 
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id),
 
-  INDEX idx_checkcommand_customvar_command_id (command_id, customvar_id),
-  INDEX idx_checkcommand_customvar_customvar_id (customvar_id, command_id)
+  INDEX idx_checkcommand_customvar_checkcheckcommand_id (checkcommand_id, customvar_id),
+  INDEX idx_checkcommand_customvar_customvar_id (customvar_id, checkcommand_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 
@@ -454,9 +454,9 @@ CREATE TABLE eventcommand (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE eventcommand_argument (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + argument_key)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.id + eventcommand_id + argument_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  eventcommand_id binary(20) NOT NULL COMMENT 'eventcommand.id',
   argument_key varchar(64) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -474,9 +474,9 @@ CREATE TABLE eventcommand_argument (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE eventcommand_envvar (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + envvar_key)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.id + eventcommand_id + envvar_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  eventcommand_id binary(20) NOT NULL COMMENT 'eventcommand.id',
   envvar_key varchar(64) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -487,15 +487,15 @@ CREATE TABLE eventcommand_envvar (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE eventcommand_customvar (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + customvar_id)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.id + eventcommand_id + customvar_id)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  eventcommand_id binary(20) NOT NULL COMMENT 'eventcommand.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id),
 
-  INDEX idx_eventcommand_customvar_command_id (command_id, customvar_id),
-  INDEX idx_eventcommand_customvar_customvar_id (customvar_id, command_id)
+  INDEX idx_eventcommand_customvar_eventcommand_id (eventcommand_id, customvar_id),
+  INDEX idx_eventcommand_customvar_customvar_id (customvar_id, eventcommand_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand (
@@ -515,9 +515,9 @@ CREATE TABLE notificationcommand (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand_argument (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + argument_key)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.id + notificationcommand_id + argument_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id',
   argument_key varchar(64) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -535,9 +535,9 @@ CREATE TABLE notificationcommand_argument (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand_envvar (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + envvar_key)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.id + notificationcommand_id + envvar_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id',
   envvar_key varchar(64) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -548,15 +548,15 @@ CREATE TABLE notificationcommand_envvar (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notificationcommand_customvar (
-  id binary(20) NOT NULL COMMENT 'sha1(environment.id + command_id + customvar_id)',
+  id binary(20) NOT NULL COMMENT 'sha1(environment.id + notificationcommand_id + customvar_id)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id',
   customvar_id binary(20) NOT NULL COMMENT 'customvar.id',
 
   PRIMARY KEY (id),
 
-  INDEX idx_notificationcommand_customvar_command_id (command_id, customvar_id),
-  INDEX idx_notificationcommand_customvar_customvar_id (customvar_id, command_id)
+  INDEX idx_notificationcommand_customvar_notificationcommand_id (notificationcommand_id, customvar_id),
+  INDEX idx_notificationcommand_customvar_customvar_id (customvar_id, notificationcommand_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE comment (
@@ -633,7 +633,7 @@ CREATE TABLE notification (
 
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
-  command_id binary(20) NOT NULL COMMENT 'command.id',
+  notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id',
 
   times_begin int unsigned DEFAULT NULL,
   times_end int unsigned DEFAULT NULL,
