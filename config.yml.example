@@ -1,14 +1,14 @@
 # This is the configuration file for Icinga DB.
 
 database:
-  host: icingadb
+  host: localhost
   port: 3306
   database: icingadb
   user: icingadb
   password: icingadb
 
 redis:
-  address: redis:6380
+  address: localhost:6380
 
 logging:
   # Default logging level. Can be set to 'fatal', 'error', 'warn', 'info' or 'debug'.
