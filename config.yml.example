@@ -13,17 +13,17 @@ redis:
 logging:
   # Default logging level. Can be set to 'fatal', 'error', 'warn', 'info' or 'debug'.
   # If not set, defaults to 'info'.
-  level:
+#  level: info
 
   # Logging output. Can be set to 'console' (stderr) or 'systemd-journald'.
   # If not set, logs to systemd-journald when running under systemd, otherwise stderr.
-  output:
+#  output:
 
   # Interval for periodic logging defined as duration string.
   # A duration string is a sequence of decimal numbers and a unit suffix, such as "20s".
   # Valid units are "ms", "s", "m", "h".
   # Defaults to "20s".
-  interval:
+#  interval: 20s
 
   # Map of component-logging level pairs to define a different log level than the default value for each component.
   options:
