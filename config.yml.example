@@ -11,7 +11,7 @@ redis:
   address: redis:6380
 
 logging:
-  # Default logging level. Can be set to 'fatal', 'error', 'warning', 'info' or 'debug'.
+  # Default logging level. Can be set to 'fatal', 'error', 'warn', 'info' or 'debug'.
   # If not set, defaults to 'info'.
   level:
 
