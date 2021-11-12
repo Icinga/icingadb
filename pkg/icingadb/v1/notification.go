@@ -36,8 +36,11 @@ type NotificationUsergroup struct {
 }
 
 type NotificationRecipient struct {
-	NotificationUser `json:",inline"`
-	UsergroupId      types.Binary `json:"usergroup_id"`
+	EntityWithoutChecksum `json:",inline"`
+	EnvironmentMeta       `json:",inline"`
+	NotificationId        types.Binary `json:"notification_id"`
+	UserId                types.Binary `json:"user_id"`
+	UsergroupId           types.Binary `json:"usergroup_id"`
 }
 
 type NotificationCustomvar struct {
