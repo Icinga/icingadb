@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"text/template"
@@ -27,23 +28,42 @@ import (
 var testSyncConfRaw string
 var testSyncConfTemplate = template.Must(template.New("testdata.conf").Parse(testSyncConfRaw))
 
+var usergroups = []string{
+	"testusergroup1",
+	"testusergroup2",
+	"testusergroup3",
+}
+
+// Map of users to a set of their groups
+var users = map[string]map[string]struct{}{
+	"testuser1": {"testusergroup1": {}, "testusergroup3": {}},
+	"testuser2": {"testusergroup2": {}},
+	"testuser3": {"testusergroup3": {}, "testusergroup1": {}},
+}
+
 func TestObjectSync(t *testing.T) {
 	logger := it.Logger(t)
 
 	type Data struct {
-		GenericPrefixes []string
-		Hosts           []Host
-		Services        []Service
-		Users           []User
+		GenericPrefixes        []string
+		Hosts                  []Host
+		Services               []Service
+		Users                  []User
+		Notifications          []Notification
+		NotificationUsers      map[string]map[string]struct{}
+		NotificationUserGroups []string
 	}
 	data := &Data{
 		// Some name prefixes to loop over in the template to generate multiple instances of objects,
 		// for example default-host, some-host, and other-host.
 		GenericPrefixes: []string{"default", "some", "other"},
 
-		Hosts:    makeTestSyncHosts(t),
-		Services: makeTestSyncServices(t),
-		Users:    makeTestUsers(t),
+		Hosts:                  makeTestSyncHosts(t),
+		Services:               makeTestSyncServices(t),
+		Users:                  makeTestUsers(t),
+		Notifications:          makeTestNotifications(t),
+		NotificationUsers:      users,
+		NotificationUserGroups: usergroups,
 	}
 
 	r := it.RedisServerT(t)
@@ -63,6 +83,10 @@ func TestObjectSync(t *testing.T) {
 	for _, user := range data.Users {
 		err := writeIcinga2ConfigObject(conf, user)
 		require.NoError(t, err, "generate icinga2 user config")
+	}
+	for _, notification := range data.Notifications {
+		err := writeIcinga2ConfigObject(conf, notification)
+		require.NoError(t, err, "generate icinga2 notification config")
 	}
 	//logger.Sugar().Infof("config:\n\n%s\n\n", conf.String())
 	i.WriteConfig("etc/icinga2/conf.d/testdata.conf", conf.Bytes())
@@ -196,12 +220,32 @@ func TestObjectSync(t *testing.T) {
 
 	t.Run("Notification", func(t *testing.T) {
 		t.Parallel()
-		// TODO(jb): add tests
+		for _, notification := range data.Notifications {
+			notification := notification
+			t.Run("Verify-"+notification.VariantInfoString(), func(t *testing.T) {
+				t.Parallel()
 
-		t.Run("User", func(t *testing.T) { t.Parallel(); t.Skip() })
-		t.Run("UserGroup", func(t *testing.T) { t.Parallel(); t.Skip() })
-		t.Run("Recipient", func(t *testing.T) { t.Parallel(); t.Skip() })
-		t.Run("CustomVar", func(t *testing.T) { t.Parallel(); t.Skip() })
+				eventually.Assert(t, func(t require.TestingT) {
+					notification.verify(t, db)
+				}, 20*time.Second, 1*time.Second)
+
+				if notification.Vars != nil {
+					t.Run("CustomVar", func(t *testing.T) {
+						logger := it.Logger(t)
+						eventually.Assert(t, func(t require.TestingT) {
+							notification.Vars.VerifyCustomVar(t, logger, db, notification)
+						}, 20*time.Second, 1*time.Second)
+					})
+
+					t.Run("CustomVarFlat", func(t *testing.T) {
+						logger := it.Logger(t)
+						eventually.Assert(t, func(t require.TestingT) {
+							notification.Vars.VerifyCustomVarFlat(t, logger, db, notification)
+						}, 20*time.Second, 1*time.Second)
+					})
+				}
+			})
+		}
 	})
 
 	t.Run("TimePeriod", func(t *testing.T) {
@@ -403,33 +447,166 @@ func TestObjectSync(t *testing.T) {
 			t.Run("Update", func(t *testing.T) {
 				t.Parallel()
 
+				userName := utils.UniqueName(t, "user")
+
+				client.CreateObject(t, "users", userName, map[string]interface{}{
+					"attrs": map[string]interface{}{},
+				})
+				require.Eventuallyf(t, func() bool {
+					var count int
+					err := db.Get(&count, "SELECT COUNT(*) FROM user WHERE name = ?", userName)
+					require.NoError(t, err, "querying user count should not fail")
+					return count == 1
+				}, 20*time.Second, 1*time.Second, "user with name=%q should exist in database", userName)
+
 				for _, user := range makeTestUsers(t) {
 					user := user
+					user.Name = userName
 
 					t.Run(user.VariantInfoString(), func(t *testing.T) {
-						t.Parallel()
-
-						client.CreateObject(t, "users", user.Name, map[string]interface{}{
-							"attrs": map[string]interface{}{},
-						})
-						require.Eventuallyf(t, func() bool {
-							var count int
-							err := db.Get(&count, "SELECT COUNT(*) FROM user WHERE name = ?", user.Name)
-							require.NoError(t, err, "querying user count should not fail")
-							return count == 1
-						}, 20*time.Second, 1*time.Second, "user with name=%q should exist in database", user.Name)
-
-						client.UpdateObject(t, "users", user.Name, map[string]interface{}{
+						client.UpdateObject(t, "users", userName, map[string]interface{}{
 							"attrs": makeIcinga2ApiAttributes(user),
 						})
 
 						eventually.Assert(t, func(t require.TestingT) {
 							verifyIcingaDbRow(t, db, user)
 						}, 20*time.Second, 1*time.Second)
-
-						client.DeleteObject(t, "users", user.Name, false)
 					})
 				}
+
+				client.DeleteObject(t, "users", userName, false)
+			})
+		})
+
+		t.Run("Notifications", func(t *testing.T) {
+			t.Parallel()
+
+			for _, notification := range makeTestNotifications(t) {
+				notification := notification
+
+				t.Run("CreateAndDelete-"+notification.VariantInfoString(), func(t *testing.T) {
+					t.Parallel()
+
+					client.CreateObject(t, "notifications", notification.fullName(), map[string]interface{}{
+						"attrs": makeIcinga2ApiAttributes(notification),
+					})
+
+					eventually.Assert(t, func(t require.TestingT) {
+						notification.verify(t, db)
+					}, 20*time.Second, 200*time.Millisecond)
+
+					client.DeleteObject(t, "notifications", notification.fullName(), false)
+
+					require.Eventuallyf(t, func() bool {
+						var count int
+						err := db.Get(&count, "SELECT COUNT(*) FROM notification WHERE name = ?", notification.fullName())
+						require.NoError(t, err, "querying notification count should not fail")
+						return count == 0
+					}, 20*time.Second, 200*time.Millisecond, "notification with name=%q should be removed from database", notification.fullName())
+				})
+			}
+
+			t.Run("Update", func(t *testing.T) {
+				t.Parallel()
+
+				baseNotification := Notification{
+					Name:        utils.UniqueName(t, "notification"),
+					HostName:    newString("default-host"),
+					ServiceName: newString("default-service"),
+					Command:     "default-notificationcommand",
+					Users:       []string{"default-user"},
+					UserGroups:  []string{"default-usergroup"},
+					Interval:    1800,
+				}
+
+				client.CreateObject(t, "notifications", baseNotification.fullName(), map[string]interface{}{
+					"attrs": makeIcinga2ApiAttributes(baseNotification),
+				})
+
+				require.Eventuallyf(t, func() bool {
+					var count int
+					err := db.Get(&count, "SELECT COUNT(*) FROM notification WHERE name = ?", baseNotification.fullName())
+					require.NoError(t, err, "querying notification count should not fail")
+					return count == 1
+				}, 20*time.Second, 200*time.Millisecond, "notification with name=%q should exist in database", baseNotification.fullName())
+
+				// TODO: Currently broken, but has been tested manually multiple times. Gets more time after RC2
+				/*t.Run("CreateAndDeleteUser", func(t *testing.T) {
+					groupName := utils.UniqueName(t, "group")
+					userName := "testuser112312321"
+
+					// Create usergroup
+					client.CreateObject(t, "usergroups", groupName, nil)
+
+					baseNotification.UserGroups = []string{groupName}
+					client.UpdateObject(t, "notifications", baseNotification.fullName(), map[string]interface{}{
+						"attrs": map[string]interface{}{
+							"user_groups": baseNotification.UserGroups,
+						},
+					})
+
+					eventually.Assert(t, func(t require.TestingT) {
+						baseNotification.verify(t, db)
+					}, 20*time.Second, 1*time.Second)
+
+					// Create user
+					users[userName] = map[string]struct{}{groupName: {}}
+					client.CreateObject(t, "users", userName, map[string]interface{}{
+						"attrs": map[string]interface{}{
+							"groups": baseNotification.UserGroups,
+						},
+					})
+
+					require.Eventuallyf(t, func() bool {
+						var count int
+						err := db.Get(&count, "SELECT COUNT(*) FROM user WHERE name = ?", userName)
+						require.NoError(t, err, "querying user count should not fail")
+						return count == 1
+					}, 20*time.Second, 200*time.Millisecond, "user with name=%q should exist in database", userName)
+
+					eventually.Assert(t, func(t require.TestingT) {
+						baseNotification.verify(t, db)
+					}, 20*time.Second, 1*time.Second)
+
+					// Delete user
+					delete(users, userName)
+					client.DeleteObject(t, "users", userName, false)
+
+					eventually.Assert(t, func(t require.TestingT) {
+						baseNotification.verify(t, db)
+					}, 20*time.Second, 1*time.Second)
+
+					// Remove group
+					baseNotification.UserGroups = []string{}
+					client.UpdateObject(t, "notifications", baseNotification.fullName(), map[string]interface{}{
+						"attrs": map[string]interface{}{
+							"user_groups": baseNotification.UserGroups,
+						},
+					})
+
+					client.DeleteObject(t, "usergroups", groupName, false)
+
+					eventually.Assert(t, func(t require.TestingT) {
+						baseNotification.verify(t, db)
+					}, 20*time.Second, 1*time.Second)
+				})*/
+
+				for _, notification := range makeTestNotifications(t) {
+					notification := notification
+					notification.Name = baseNotification.Name
+
+					t.Run(notification.VariantInfoString(), func(t *testing.T) {
+						client.UpdateObject(t, "notifications", notification.fullName(), map[string]interface{}{
+							"attrs": makeIcinga2ApiAttributes(notification),
+						})
+
+						eventually.Assert(t, func(t require.TestingT) {
+							notification.verify(t, db)
+						}, 20*time.Second, 200*time.Millisecond)
+					})
+				}
+
+				client.DeleteObject(t, "notifications", baseNotification.fullName(), false)
 			})
 		})
 
@@ -710,6 +887,166 @@ func makeTestUsers(t *testing.T) []User {
 	return users
 }
 
+type Notification struct {
+	Name        string            `                                  icingadb:"name"`
+	HostName    *string           `icinga2:"host_name"               icingadb:"host.name"`
+	ServiceName *string           `icinga2:"service_name"            icingadb:"service.name"`
+	Command     string            `icinga2:"command"                 icingadb:"notificationcommand.name"`
+	Times       map[string]string `icinga2:"times"`
+	Interval    int               `icinga2:"interval"                icingadb:"notification_interval"`
+	Period      *string           `icinga2:"period"                  icingadb:"timeperiod.name"`
+	//Zone      string                   `icinga2:"zone"                    icingadb:"zone.name"`
+	Types      value.NotificationTypes  `icinga2:"types"                   icingadb:"types"`
+	States     value.NotificationStates `icinga2:"states"                  icingadb:"states"`
+	Users      []string                 `icinga2:"users"`
+	UserGroups []string                 `icinga2:"user_groups"`
+	Vars       *CustomVarTestData       `icinga2:"vars"`
+
+	utils.VariantInfo
+}
+
+func (n Notification) fullName() string {
+	if n.ServiceName == nil {
+		return *n.HostName + "!" + n.Name
+	} else {
+		return *n.HostName + "!" + *n.ServiceName + "!" + n.Name
+	}
+}
+
+func (n Notification) verify(t require.TestingT, db *sqlx.DB) {
+	verifyIcingaDbRow(t, db, n)
+
+	// Check if the "notification_user" table has been populated correctly
+	{
+		query := "SELECT u.name FROM notification n JOIN notification_user nu ON n.id = nu.notification_id JOIN user u ON u.id = nu.user_id WHERE n.name = ? ORDER BY u.name"
+		var rows []string
+		err := db.Select(&rows, query, n.fullName())
+		require.NoError(t, err, "mysql query")
+
+		expected := append([]string(nil), n.Users...)
+		sort.Strings(expected)
+
+		assert.Equal(t, expected, rows, "Users in database should be equal")
+	}
+
+	// Check if the "notification_groups" table has been populated correctly
+	{
+		query := "SELECT ug.name FROM notification n JOIN notification_usergroup ng ON n.id = ng.notification_id JOIN usergroup ug ON ug.id = ng.usergroup_id WHERE n.name = ? ORDER BY ug.name"
+		var rows []string
+		err := db.Select(&rows, query, n.fullName())
+		require.NoError(t, err, "mysql query")
+
+		expected := append([]string(nil), n.UserGroups...)
+		sort.Strings(expected)
+		require.Equal(t, expected, rows, "Usergroups in database should be equal")
+	}
+
+	// Check if the "notification_recipients" table has been populated correctly
+	{
+		type Row struct {
+			User  *string `db:"username"`
+			Group *string `db:"groupname"`
+		}
+
+		var expected []Row
+
+		for _, user := range n.Users {
+			expected = append(expected, Row{User: newString(user)})
+		}
+
+		for _, userGroup := range n.UserGroups {
+			expected = append(expected, Row{Group: newString(userGroup)})
+			for user, groups := range users {
+				if _, ok := groups[userGroup]; ok {
+					expected = append(expected, Row{User: newString(user), Group: newString(userGroup)})
+				}
+			}
+		}
+
+		sort.Slice(expected, func(i, j int) bool {
+			r1 := expected[i]
+			r2 := expected[j]
+
+			stringComparePtr := func(a, b *string) int {
+				if a == nil && b == nil {
+					return 0
+				} else if a == nil {
+					return -1
+				} else if b == nil {
+					return 1
+				}
+
+				return strings.Compare(*a, *b)
+			}
+
+			switch stringComparePtr(r1.User, r2.User) {
+			case -1:
+				return true
+			case 1:
+				return false
+			default:
+				return stringComparePtr(r1.Group, r2.Group) == -1
+			}
+		})
+
+		query := "SELECT u.name AS username, ug.name AS groupname FROM notification n " +
+			"JOIN notification_recipient nr ON n.id = nr.notification_id " +
+			"LEFT JOIN user u ON u.id = nr.user_id " +
+			"LEFT JOIN usergroup ug ON ug.id = nr.usergroup_id " +
+			"WHERE n.name = ? " +
+			"ORDER BY u.name, ug.name"
+
+		var rows []Row
+		err := db.Select(&rows, query, n.fullName())
+
+		require.NoError(t, err, "mysql query")
+		require.Equal(t, expected, rows, "Recipients in database should be equal")
+	}
+}
+
+func makeTestNotifications(t *testing.T) []Notification {
+	notification := Notification{
+		HostName:    newString("default-host"),
+		ServiceName: newString("default-service"),
+		Command:     "default-notificationcommand",
+		Users:       []string{"default-user", "testuser1", "testuser2", "testuser3"},
+		UserGroups:  []string{"default-usergroup", "testusergroup1", "testusergroup2", "testusergroup3"},
+		Interval:    1800,
+	}
+
+	notifications := utils.MakeVariants(notification).
+		//Vary("TimesBegin", 5, 999, 23980, 525, 666, 0).
+		//Vary("TimesEnd", 0, 453, 74350, 423, 235, 63477).
+		Vary("Interval", 5, 453, 74350, 423, 235, 63477).
+		Vary("Period", newString("some-timeperiod"), newString("other-timeperiod")).
+		Vary("Types",
+			value.NotificationTypes{"DowntimeStart", "DowntimeEnd", "DowntimeRemoved"},
+			value.NotificationTypes{"Custom"},
+			value.NotificationTypes{"Acknowledgement"},
+			value.NotificationTypes{"Problem", "Recovery"},
+			value.NotificationTypes{"FlappingStart", "FlappingEnd"},
+			value.NotificationTypes{"DowntimeStart", "Problem", "FlappingStart"},
+			value.NotificationTypes{"DowntimeEnd", "DowntimeRemoved", "Recovery", "FlappingEnd"},
+			value.NotificationTypes{"DowntimeStart", "DowntimeEnd", "DowntimeRemoved", "Custom", "Acknowledgement", "Problem", "Recovery", "FlappingStart", "FlappingEnd"},
+			value.NotificationTypes{"Custom", "Acknowledgement"},
+		).
+		Vary("States",
+			value.NotificationStates{},
+			value.NotificationStates{"OK", "Warning", "Critical", "Unknown"},
+			value.NotificationStates{"OK", "Unknown"}).
+		Vary("Users", localutils.AnySliceToInterfaceSlice(localutils.SliceSubsets(
+			"default-user", "some-user", "other-user", "testuser1", "testuser2", "testuser3"))...).
+		Vary("UserGroups", localutils.AnySliceToInterfaceSlice(localutils.SliceSubsets(
+			"default-usergroup", "some-usergroup", "other-usergroup", "testusergroup1", "testusergroup2", "testusergroup3"))...).
+		ResultAsBaseTypeSlice().([]Notification)
+
+	for i := range notifications {
+		notifications[i].Name = utils.UniqueName(t, "notification")
+	}
+
+	return notifications
+}
+
 // writeIcinga2ConfigObjects emits config objects as icinga2 DSL to a writer
 // based on the type of obj and its field having icinga2 struct tags.
 func writeIcinga2ConfigObject(w io.Writer, obj interface{}) error {
@@ -764,6 +1101,10 @@ func verifyIcingaDbRow(t require.TestingT, db *sqlx.DB, obj interface{}) {
 	typ := o.Type()
 	typeName := typ.Name()
 
+	if notification, ok := obj.(Notification); ok {
+		name = notification.fullName()
+	}
+
 	type ColumnValueExpected struct {
 		Column   string
 		Value    interface{}
@@ -791,7 +1132,7 @@ func verifyIcingaDbRow(t require.TestingT, db *sqlx.DB, obj interface{}) {
 	joins := make(map[string]struct{})
 
 	for fieldIndex := 0; fieldIndex < typ.NumField(); fieldIndex++ {
-		if col := typ.Field(fieldIndex).Tag.Get("icingadb"); col != "" {
+		if col := typ.Field(fieldIndex).Tag.Get("icingadb"); col != "" && col != "name" {
 			if val := o.Field(fieldIndex).Interface(); val != nil {
 				dbVal := value.ToIcingaDb(val)
 				scanVal := reflect.New(reflect.TypeOf(dbVal)).Interface()
@@ -835,9 +1176,7 @@ func verifyIcingaDbRow(t require.TestingT, db *sqlx.DB, obj interface{}) {
 // newString allocates a new *string and initializes it. This helper function exists as
 // there seems to be no way to achieve this within a single statement.
 func newString(s string) *string {
-	p := new(string)
-	*p = s
-	return p
+	return &s
 }
 
 type CustomVarTestData struct {

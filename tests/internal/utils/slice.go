@@ -19,3 +19,19 @@ func AnySliceToInterfaceSlice(in interface{}) []interface{} {
 	}
 	return out
 }
+
+func SliceSubsets(in ...string) [][]string {
+	result := make([][]string, 0, 1<<len(in))
+
+	for bitset := 0; bitset < (1 << len(in)); bitset++ {
+		var subset []string
+		for i := 0; i < len(in); i++ {
+			if bitset&(1<<i) != 0 {
+				subset = append(subset, in[i])
+			}
+		}
+		result = append(result, subset)
+	}
+
+	return result
+}
