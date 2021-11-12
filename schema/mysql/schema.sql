@@ -80,7 +80,9 @@ CREATE TABLE hostgroup (
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_hostroup_name (name) COMMENT 'Host/service/host group list filtered by host group name'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_member (
@@ -162,7 +164,12 @@ CREATE TABLE host_state (
   next_update bigint unsigned NOT NULL,
 
   PRIMARY KEY (id),
-  UNIQUE INDEX idx_host_state_host_id (host_id)
+
+  UNIQUE INDEX idx_host_state_host_id (host_id),
+  INDEX idx_host_state_is_problem (is_problem, severity) COMMENT 'Host list filtered by is_problem ordered by severity',
+  INDEX idx_host_state_severity (severity) COMMENT 'Host list filtered/ordered by severity',
+  INDEX idx_host_state_soft_state (soft_state, last_state_change) COMMENT 'Host list filtered/ordered by soft_state; recently recovered filter',
+  INDEX idx_host_state_last_state_change (last_state_change) COMMENT 'Host list filtered/ordered by last_state_change'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE service (
@@ -236,7 +243,9 @@ CREATE TABLE servicegroup (
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_servicegroup_name (name) COMMENT 'Host/service/service group list filtered by service group name'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE servicegroup_member (
@@ -321,7 +330,12 @@ CREATE TABLE service_state (
   next_update bigint unsigned NOT NULL,
 
   PRIMARY KEY (id),
-  UNIQUE INDEX idx_service_state_service_id (service_id)
+
+  UNIQUE INDEX idx_service_state_service_id (service_id),
+  INDEX idx_service_state_is_problem (is_problem, severity) COMMENT 'Service list filtered by is_problem ordered by severity',
+  INDEX idx_service_state_severity (severity) COMMENT 'Service list filtered/ordered by severity',
+  INDEX idx_service_state_soft_state (soft_state, last_state_change) COMMENT 'Service list filtered/ordered by soft_state; recently recovered filter',
+  INDEX idx_service_state_last_state_change (last_state_change) COMMENT 'Service list filtered/ordered by last_state_change'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE endpoint (
@@ -574,7 +588,9 @@ CREATE TABLE comment (
   PRIMARY KEY (id),
 
   INDEX idx_comment_name (name) COMMENT 'Comment detail filter',
-  INDEX idx_comment_entry_time (entry_time) COMMENT 'Comment list fileted/ordered by entry_time'
+  INDEX idx_comment_entry_time (entry_time) COMMENT 'Comment list fileted/ordered by entry_time',
+  INDEX idx_comment_author (author) COMMENT 'Comment list filtered/ordered by author',
+  INDEX idx_comment_expire_time (expire_time) COMMENT 'Comment list filtered/ordered by expire_time'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE downtime (
@@ -611,7 +627,14 @@ CREATE TABLE downtime (
   PRIMARY KEY (id),
 
   INDEX idx_downtime_is_in_effect (is_in_effect, start_time) COMMENT 'Downtime list filtered/ordered by severity',
-  INDEX idx_downtime_name (name) COMMENT 'Downtime detail filter'
+  INDEX idx_downtime_name (name) COMMENT 'Downtime detail filter',
+  INDEX idx_downtime_entry_time (entry_time) COMMENT 'Downtime list filtered/ordered by entry_time',
+  INDEX idx_downtime_start_time (start_time) COMMENT 'Downtime list filtered/ordered by start_time',
+  INDEX idx_downtime_end_time (end_time) COMMENT 'Downtime list filtered/ordered by end_time',
+  INDEX idx_downtime_scheduled_start_time (scheduled_start_time) COMMENT 'Downtime list filtered/ordered by scheduled_start_time',
+  INDEX idx_downtime_scheduled_end_time (scheduled_end_time) COMMENT 'Downtime list filtered/ordered by scheduled_end_time',
+  INDEX idx_downtime_author (author) COMMENT 'Downtime list filtered/ordered by author',
+  INDEX idx_downtime_duration (duration) COMMENT 'Downtime list filtered/ordered by duration'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification (
@@ -639,8 +662,8 @@ CREATE TABLE notification (
 
   PRIMARY KEY (id),
 
-  INDEX idx_host_id (host_id),
-  INDEX idx_service_id (service_id)
+  INDEX idx_notification_host_id (host_id),
+  INDEX idx_notification_service_id (service_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_user (
@@ -903,8 +926,9 @@ CREATE TABLE zone (
   depth tinyint unsigned NOT NULL,
 
   PRIMARY KEY (id),
-  INDEX idx_parent_id (parent_id),
-  UNIQUE INDEX idx_environment_id_id (environment_id,id)
+
+  UNIQUE INDEX idx_environment_id_id (environment_id, id),
+  INDEX idx_zone_parent_id (parent_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE notification_history (
@@ -926,7 +950,7 @@ CREATE TABLE notification_history (
 
   PRIMARY KEY (id),
 
-  INDEX idx_notification_history_event_time (send_time DESC) COMMENT 'Notification list filtered/ordered by entry_time'
+  INDEX idx_notification_history_send_time (send_time DESC) COMMENT 'Notification list filtered/ordered by send_time'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_notification_history (
@@ -1084,7 +1108,8 @@ CREATE TABLE history (
   INDEX idx_history_downtime (downtime_history_id),
   INDEX idx_history_flapping (flapping_history_id),
   INDEX idx_history_notification (notification_history_id),
-  INDEX idx_history_state (state_history_id)
+  INDEX idx_history_state (state_history_id),
+  INDEX idx_history_host_service_id (host_id, service_id, event_time) COMMENT 'Host/service history detail filter'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icingadb_schema (
