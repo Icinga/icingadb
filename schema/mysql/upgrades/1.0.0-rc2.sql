@@ -418,3 +418,51 @@ UPDATE downtime SET scheduled_duration = scheduled_end_time - scheduled_start_ti
 
 ALTER TABLE service_state ADD COLUMN host_id binary(20) NOT NULL COMMENT 'host.id' AFTER id;
 UPDATE service_state INNER JOIN service ON service.id = service_state.service_id SET service_state.host_id = service.host_id WHERE service_state.host_id = REPEAT('\0', 20);
+
+ALTER TABLE comment
+    ADD INDEX idx_comment_author (author) COMMENT 'Comment list filtered/ordered by author',
+    ADD INDEX idx_comment_expire_time (expire_time) COMMENT 'Comment list filtered/ordered by expire_time';
+
+ALTER TABLE downtime
+    ADD INDEX idx_downtime_entry_time (entry_time) COMMENT 'Downtime list filtered/ordered by entry_time',
+    ADD INDEX idx_downtime_start_time (start_time) COMMENT 'Downtime list filtered/ordered by start_time',
+    ADD INDEX idx_downtime_end_time (end_time) COMMENT 'Downtime list filtered/ordered by end_time',
+    ADD INDEX idx_downtime_scheduled_start_time (scheduled_start_time) COMMENT 'Downtime list filtered/ordered by scheduled_start_time',
+    ADD INDEX idx_downtime_scheduled_end_time (scheduled_end_time) COMMENT 'Downtime list filtered/ordered by scheduled_end_time',
+    ADD INDEX idx_downtime_author (author) COMMENT 'Downtime list filtered/ordered by author',
+    ADD INDEX idx_downtime_duration (duration) COMMENT 'Downtime list filtered/ordered by duration';
+
+ALTER TABLE service_state
+    ADD INDEX idx_service_state_is_problem (is_problem, severity) COMMENT 'Service list filtered by is_problem ordered by severity',
+    ADD INDEX idx_service_state_severity (severity) COMMENT 'Service list filtered/ordered by severity',
+    ADD INDEX idx_service_state_soft_state (soft_state, last_state_change) COMMENT 'Service list filtered/ordered by soft_state; recently recovered filter',
+    ADD INDEX idx_service_state_last_state_change (last_state_change) COMMENT 'Service list filtered/ordered by last_state_change';
+
+ALTER TABLE host_state
+    ADD INDEX idx_host_state_is_problem (is_problem, severity) COMMENT 'Host list filtered by is_problem ordered by severity',
+    ADD INDEX idx_host_state_severity (severity) COMMENT 'Host list filtered/ordered by severity',
+    ADD INDEX idx_host_state_soft_state (soft_state, last_state_change) COMMENT 'Host list filtered/ordered by soft_state; recently recovered filter',
+    ADD INDEX idx_host_state_last_state_change (last_state_change) COMMENT 'Host list filtered/ordered by last_state_change';
+
+ALTER TABLE hostgroup
+    ADD INDEX idx_hostroup_name (name) COMMENT 'Host/service/host group list filtered by host group name';
+
+ALTER TABLE servicegroup
+    ADD INDEX idx_servicegroup_name (name) COMMENT 'Host/service/service group list filtered by service group name';
+
+ALTER TABLE notification
+    DROP INDEX idx_host_id,
+    DROP INDEX idx_service_id,
+    ADD INDEX idx_notification_host_id (host_id),
+    ADD INDEX idx_notification_service_id (service_id);
+
+ALTER TABLE zone
+    DROP INDEX idx_parent_id,
+    ADD INDEX idx_zone_parent_id (parent_id);
+
+ALTER TABLE history
+    ADD INDEX idx_history_host_service_id (host_id, service_id, event_time) COMMENT 'Host/service history detail filter';
+
+ALTER TABLE notification_history
+    DROP INDEX idx_notification_history_event_time,
+    ADD INDEX idx_notification_history_send_time (send_time) COMMENT 'Notification list filtered/ordered by send_time';
