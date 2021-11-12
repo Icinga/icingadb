@@ -409,3 +409,12 @@ ALTER TABLE eventcommand_customvar
 ALTER TABLE notificationcommand_customvar
     ADD INDEX idx_notificationcommand_customvar_notificationcommand_id (notificationcommand_id, customvar_id),
     ADD INDEX idx_notificationcommand_customvar_customvar_id (customvar_id, notificationcommand_id);
+
+ALTER TABLE downtime
+    ADD COLUMN scheduled_duration bigint unsigned NOT NULL AFTER scheduled_end_time,
+    ADD COLUMN duration bigint unsigned NOT NULL COMMENT 'Duration of the downtime: When the downtime is flexible, this is the same as flexible_duration otherwise scheduled_duration' AFTER end_time,
+    MODIFY COLUMN flexible_duration bigint unsigned NOT NULL AFTER is_flexible;
+UPDATE downtime SET scheduled_duration = scheduled_end_time - scheduled_start_time, duration = (CASE WHEN is_flexible = 'y' THEN flexible_duration ELSE scheduled_end_time - scheduled_start_time END) WHERE scheduled_duration = 0;
+
+ALTER TABLE service_state ADD COLUMN host_id binary(20) NOT NULL COMMENT 'host.id' AFTER id;
+UPDATE service_state INNER JOIN service ON service.id = service_state.service_id SET service_state.host_id = service.host_id WHERE service_state.host_id = REPEAT('\0', 20);

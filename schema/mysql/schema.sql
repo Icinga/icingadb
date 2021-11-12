@@ -278,6 +278,7 @@ CREATE TABLE servicegroup_customvar (
 
 CREATE TABLE service_state (
   id binary(20) NOT NULL COMMENT 'service.id',
+  host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) NOT NULL COMMENT 'service.id',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
@@ -606,12 +607,14 @@ CREATE TABLE downtime (
   entry_time bigint unsigned NOT NULL,
   scheduled_start_time bigint unsigned NOT NULL,
   scheduled_end_time bigint unsigned NOT NULL,
-  flexible_duration bigint unsigned NOT NULL,
+  scheduled_duration bigint unsigned NOT NULL,
   is_flexible enum('n', 'y') NOT NULL,
+  flexible_duration bigint unsigned NOT NULL,
 
   is_in_effect enum('n', 'y') NOT NULL,
   start_time bigint unsigned DEFAULT NULL COMMENT 'Time when the host went into a problem state during the downtimes timeframe',
   end_time bigint unsigned DEFAULT NULL COMMENT 'Problem state assumed: scheduled_end_time if fixed, start_time + flexible_duration otherwise',
+  duration bigint unsigned NOT NULL COMMENT 'Duration of the downtime: When the downtime is flexible, this is the same as flexible_duration otherwise scheduled_duration',
   scheduled_by varchar(767) DEFAULT NULL COMMENT 'Name of the ScheduledDowntime which created this Downtime. 255+1+255+1+255, i.e. "host.name!service.name!scheduled-downtime-name"',
 
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',

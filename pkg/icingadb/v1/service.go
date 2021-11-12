@@ -18,6 +18,7 @@ type ServiceCustomvar struct {
 type ServiceState struct {
 	State     `json:",inline"`
 	ServiceId types.Binary `json:"service_id"`
+	HostId    types.Binary `json:"host_id"`
 }
 
 type Servicegroup struct {
