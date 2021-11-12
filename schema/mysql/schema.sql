@@ -364,17 +364,6 @@ CREATE TABLE icingadb_instance (
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
-CREATE TABLE icingadb_schema (
-  id int unsigned NOT NULL AUTO_INCREMENT,
-  version smallint unsigned NOT NULL,
-  timestamp bigint unsigned NOT NULL,
-
-  PRIMARY KEY (id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
-
-INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (2, CURRENT_TIMESTAMP() * 1000);
-
 CREATE TABLE checkcommand (
   id binary(20) NOT NULL COMMENT 'sha1(environment.id + type + name)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
@@ -1097,3 +1086,14 @@ CREATE TABLE history (
   INDEX idx_history_notification (notification_history_id),
   INDEX idx_history_state (state_history_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
+CREATE TABLE icingadb_schema (
+  id int unsigned NOT NULL AUTO_INCREMENT,
+  version smallint unsigned NOT NULL,
+  timestamp bigint unsigned NOT NULL,
+
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
+INSERT INTO icingadb_schema (version, timestamp)
+  VALUES (2, CURRENT_TIMESTAMP() * 1000);
