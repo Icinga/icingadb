@@ -3,11 +3,14 @@ package icingadb_test
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icinga-testing/services"
 	"github.com/icinga/icinga-testing/utils"
 	"github.com/icinga/icinga-testing/utils/eventually"
+	"github.com/icinga/icinga-testing/utils/pki"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,28 +20,107 @@ import (
 	"net/http"
 	"sort"
 	"testing"
+	"text/template"
 	"time"
 )
 
+//go:embed history_test_zones.conf
+var historyZonesConfRaw string
+var historyZonesConfTemplate = template.Must(template.New("zones.conf").Parse(historyZonesConfRaw))
+
 func TestHistory(t *testing.T) {
+	t.Run("SingleNode", func(t *testing.T) {
+		testHistory(t, 1)
+	})
+
+	t.Run("HA", func(t *testing.T) {
+		testHistory(t, 2)
+	})
+}
+
+func testHistory(t *testing.T, numNodes int) {
 	m := it.MysqlDatabaseT(t)
 	m.ImportIcingaDbSchema()
 
-	r := it.RedisServerT(t)
-	i := it.Icinga2NodeT(t, "master")
-	i.EnableIcingaDb(r)
-	err := i.Reload()
-	require.NoError(t, err, "icinga2 should reload without error")
-	it.IcingaDbInstanceT(t, r, m)
+	ca, err := pki.NewCA()
+	require.NoError(t, err, "generating a CA should succeed")
 
-	client := i.ApiClient()
+	type Node struct {
+		Name         string
+		Icinga2      services.Icinga2
+		IcingaClient *utils.Icinga2Client
+		Redis        services.RedisServer
+		RedisClient  *redis.Client
+	}
+
+	nodes := make([]*Node, numNodes)
+
+	for i := range nodes {
+		name := fmt.Sprintf("master-%d", i)
+		redisServer := it.RedisServerT(t)
+		icinga := it.Icinga2NodeT(t, name)
+
+		nodes[i] = &Node{
+			Name:         name,
+			Icinga2:      icinga,
+			IcingaClient: icinga.ApiClient(),
+			Redis:        redisServer,
+			RedisClient:  redisServer.Open(),
+		}
+	}
+
+	zonesConf := bytes.NewBuffer(nil)
+	err = historyZonesConfTemplate.Execute(zonesConf, nodes)
+	require.NoError(t, err, "failed to render zones.conf")
+
+	for _, n := range nodes {
+		cert, err := ca.NewCertificate(n.Name)
+		require.NoError(t, err, "generating cert for %q should succeed", n.Name)
+		n.Icinga2.WriteConfig("etc/icinga2/zones.conf", zonesConf.Bytes())
+		n.Icinga2.WriteConfig("etc/icinga2/features-available/api.conf", []byte(`
+			object ApiListener "api" {
+				accept_config = true
+				accept_commands = true
+			}
+		`))
+		n.Icinga2.WriteConfig("var/lib/icinga2/certs/ca.crt", ca.CertificateToPem())
+		n.Icinga2.WriteConfig("var/lib/icinga2/certs/"+n.Name+".crt", cert.CertificateToPem())
+		n.Icinga2.WriteConfig("var/lib/icinga2/certs/"+n.Name+".key", cert.KeyToPem())
+		n.Icinga2.EnableIcingaDb(n.Redis)
+		err = n.Icinga2.Reload()
+		require.NoError(t, err, "icinga2 should reload without error")
+		it.IcingaDbInstanceT(t, n.Redis, m)
+
+		{
+			n := n
+			t.Cleanup(func() { _ = n.RedisClient.Close() })
+		}
+	}
+
+	eventually.Require(t, func(t require.TestingT) {
+		for i, ni := range nodes {
+			for j, nj := range nodes {
+				if i != j {
+					response, err := ni.IcingaClient.GetJson("/v1/objects/endpoints/" + nj.Name)
+					require.NoErrorf(t, err, "fetching endpoint %q from %q should not fail", nj.Name, ni.Name)
+					require.Equalf(t, 200, response.StatusCode, "fetching endpoint %q from %q should not fail", nj.Name, ni.Name)
+
+					var endpoints ObjectsEndpointsResponse
+					err = json.NewDecoder(response.Body).Decode(&endpoints)
+					require.NoErrorf(t, err, "parsing response from %q for endpoint %q should not fail", ni.Name, nj.Name)
+					require.NotEmptyf(t, endpoints.Results, "response from %q for endpoint %q should contain a result", ni.Name, nj.Name)
+
+					assert.Truef(t, endpoints.Results[0].Attrs.Connected, "endpoint %q should be connected to %q", nj.Name, ni.Name)
+				}
+			}
+		}
+	}, 15*time.Second, 200*time.Millisecond)
 
 	db, err := sqlx.Connect("mysql", m.DSN())
 	require.NoError(t, err, "connecting to mysql")
 	t.Cleanup(func() { _ = db.Close() })
 
-	redisClient := r.Open()
-	t.Cleanup(func() { _ = redisClient.Close() })
+	client := nodes[0].IcingaClient
 
 	t.Run("Acknowledgement", func(t *testing.T) {
 		t.Parallel()
@@ -75,7 +157,10 @@ func TestHistory(t *testing.T) {
 		require.Equal(t, 1, len(ackResponse.Results), "acknowledge-problem should return 1 result")
 		require.Equal(t, http.StatusOK, ackResponse.Results[0].Code, "acknowledge-problem result should have OK status")
 
-		assertEventuallyDrained(t, redisClient, "icinga:history:stream:acknowledgement")
+		for _, n := range nodes {
+			assertEventuallyDrained(t, n.RedisClient, "icinga:history:stream:acknowledgement")
+
+		}
 
 		eventually.Assert(t, func(t require.TestingT) {
 			type Row struct {
@@ -128,7 +213,9 @@ func TestHistory(t *testing.T) {
 		require.Equal(t, 1, len(addResponse.Results), "add-comment should return 1 result")
 		require.Equal(t, http.StatusOK, addResponse.Results[0].Code, "add-comment result should have OK status")
 
-		assertEventuallyDrained(t, redisClient, "icinga:history:stream:comment")
+		for _, n := range nodes {
+			assertEventuallyDrained(t, n.RedisClient, "icinga:history:stream:comment")
+		}
 
 		eventually.Assert(t, func(t require.TestingT) {
 			type Row struct {
@@ -137,7 +224,10 @@ func TestHistory(t *testing.T) {
 			}
 
 			var rows []Row
-			err = db.Select(&rows, "SELECT c.author, c.comment FROM comment_history c JOIN host ON host.id = c.host_id WHERE host.name = ?", hostname)
+			err = db.Select(&rows, "SELECT c.author, c.comment"+
+				" FROM history h"+
+				" JOIN comment_history c ON c.comment_id = h.comment_history_id"+
+				" JOIN host ON host.id = c.host_id WHERE host.name = ?", hostname)
 			require.NoError(t, err, "select comment_history")
 
 			require.Equal(t, 1, len(rows), "there should be exactly one comment_history row")
@@ -193,7 +283,9 @@ func TestHistory(t *testing.T) {
 		require.Equal(t, 200, response.StatusCode, "remove-downtime")
 		downtimeEnd := time.Now()
 
-		assertEventuallyDrained(t, redisClient, "icinga:history:stream:downtime")
+		for _, n := range nodes {
+			assertEventuallyDrained(t, n.RedisClient, "icinga:history:stream:downtime")
+		}
 
 		eventually.Assert(t, func(t require.TestingT) {
 			var rows []string
@@ -234,7 +326,9 @@ func TestHistory(t *testing.T) {
 		}
 		timeAfter := time.Now()
 
-		assertEventuallyDrained(t, redisClient, "icinga:history:stream:flapping")
+		for _, n := range nodes {
+			assertEventuallyDrained(t, n.RedisClient, "icinga:history:stream:flapping")
+		}
 
 		eventually.Assert(t, func(t require.TestingT) {
 			var rows []string
@@ -308,7 +402,9 @@ func TestHistory(t *testing.T) {
 		}
 		timeAfter := time.Now()
 
-		assertEventuallyDrained(t, redisClient, "icinga:history:stream:notification")
+		for _, n := range nodes {
+			assertEventuallyDrained(t, n.RedisClient, "icinga:history:stream:notification")
+		}
 
 		eventually.Assert(t, func(t require.TestingT) {
 			var rows []Notification
@@ -370,7 +466,9 @@ func TestHistory(t *testing.T) {
 		expected = append(expected, State{Type: "hard", Soft: 0, Hard: 0})
 		timeAfter := time.Now()
 
-		assertEventuallyDrained(t, redisClient, "icinga:history:stream:state")
+		for _, n := range nodes {
+			assertEventuallyDrained(t, n.RedisClient, "icinga:history:stream:state")
+		}
 
 		eventually.Assert(t, func(t require.TestingT) {
 
@@ -508,6 +606,15 @@ type ObjectsHostsResponse struct {
 			LastHardState       int     `json:"last_hard_state"`
 			LastHardStateChange float64 `json:"last_hard_state_change"`
 			LastState           int     `json:"last_state"`
+		} `json:"attrs"`
+	} `json:"results"`
+}
+
+type ObjectsEndpointsResponse struct {
+	Results []struct {
+		Name  string `json:"name"`
+		Attrs struct {
+			Connected bool `json:"connected"`
 		} `json:"attrs"`
 	} `json:"results"`
 }
