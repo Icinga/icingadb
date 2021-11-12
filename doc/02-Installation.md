@@ -218,12 +218,13 @@ systemctl start icingadb
 
 ### Enable remote Redis connections <a id="remote-redis"></a>
 
-By default `icingadb-redis` listens only on `127.0.0.1`. If you want to change that (e.g. Icinga Web 2), just
-change `bind 127.0.0.1 ::1` and `protected-mode yes` in `/etc/icingadb-redis/icingadb-redis.conf` to the interface you
-want to use and `protected-mode no`.
+By default `icingadb-redis` listens only on `127.0.0.1`. If you want to change that, e.g. for Icinga Web 2 or Icinga 2
+running on another node, just change `bind 127.0.0.1 ::1` and `protected-mode yes`
+in `/etc/icingadb-redis/icingadb-redis.conf` to the interface you want to use and to `protected-mode no`.
 
-> WARNING: Make sure your host is secured by some kind of firewall, if you open Redis to an external interface.
-> Redis, by default, does not have any authentication that prevent others from accessing it.
+> WARNING: By default, Redis does not have any authentication that prevents others from accessing it.
+> If you open Redis to an external interface, make sure that you set up appropriate firewall rules or configure TLS
+> with certificate authentication on Redis and its consumers, i.e. Icinga 2, Icinga DB and Icinga Web 2.
 
 ### Icinga DB Web
 
