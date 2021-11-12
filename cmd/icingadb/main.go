@@ -246,7 +246,7 @@ func run() int {
 
 							logger.Info("Starting config runtime updates sync")
 
-							return rt.Sync(synctx, v1.ConfigFactories, runtimeConfigUpdateStreams)
+							return rt.Sync(synctx, v1.ConfigFactories, runtimeConfigUpdateStreams, false)
 						})
 
 						g.Go(func() error {
@@ -258,7 +258,7 @@ func run() int {
 
 							logger.Info("Starting state runtime updates sync")
 
-							return rt.Sync(synctx, v1.StateFactories, runtimeStateUpdateStreams)
+							return rt.Sync(synctx, v1.StateFactories, runtimeStateUpdateStreams, true)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
