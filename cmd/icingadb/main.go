@@ -96,8 +96,26 @@ func run() int {
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	defer cancelCtx()
 
-	heartbeat := icingaredis.NewHeartbeat(ctx, rc, logs.GetChildLogger("heartbeat"))
-	ha := icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
+	// Use dedicated connections for heartbeat and HA to ensure that heartbeats are always processed and
+	// the instance table is updated. Otherwise, the connections can be too busy due to the synchronization of
+	// configuration, status, history, etc., which can lead to handover / takeover loops because
+	// the heartbeat is not read while HA gets stuck when updating the instance table.
+	var heartbeat *icingaredis.Heartbeat
+	var ha *icingadb.HA
+	{
+		rc, err := cmd.Redis(logs.GetChildLogger("redis"))
+		if err != nil {
+			logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
+		}
+		heartbeat = icingaredis.NewHeartbeat(ctx, rc, logs.GetChildLogger("heartbeat"))
+
+		db, err := cmd.Database(logs.GetChildLogger("database"))
+		if err != nil {
+			logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
+		}
+		defer db.Close()
+		ha = icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
+	}
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
 	defer func() {
