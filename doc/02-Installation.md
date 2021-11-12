@@ -5,20 +5,17 @@
 * Local Redis instance (Will be installed during this documentation)
 * MySQL/MariaDB server with `icingadb` database, user and schema imports (Will be installed during this documentation)
 
-Supported enterprise distributions:
-
-* RHEL/CentOS 7/8
-* Debian 10 Buster
-* Ubuntu 18 Bionic
-* SLES 15.1
-
 ## Setting up Icinga DB <a id="setting-up-icingadb"></a>
 
 ### Package Repositories <a id="package-repositories"></a>
 
 In order to install the latest release candidate, you have to add our `testing` repository as shown below.
+We assume that you have our `release` repository already activated.
+The following commands must be executed with root permissions unless noted otherwise.
 
-#### RHEL/CentOS Repositories <a id="package-repositories-rhel-centos"></a>
+#### RHEL/CentOS/Fedora Repositories <a id="package-repositories-rhel-centos"></a>
+
+Make sure you have wget installed.
 
 ```
 rpm --import https://packages.icinga.com/icinga.key
@@ -74,7 +71,15 @@ apt-get update
 
 ### Installing Icinga DB <a id="installing-icingadb"></a>
 
-RHEL/CentOS 7/8:
+RHEL/CentOS 8/Fedora:
+
+```
+dnf install icingadb
+systemctl enable icingadb
+systemctl start icingadb
+```
+
+RHEL/CentOS 7:
 
 ```
 yum install icingadb
@@ -96,7 +101,16 @@ apt-get install icingadb
 
 ### Installing Icinga DB Redis <a id="configuring-icingadb-mysql"></a>
 
-RHEL/CentOS 7/8:
+RHEL/CentOS 8/Fedora:
+
+```
+dnf install icingadb-redis
+
+systemctl enable icingadb-redis
+systemctl start icingadb-redis
+```
+
+RHEL/CentOS 7:
 
 ```
 yum install icingadb-redis
@@ -124,7 +138,18 @@ apt-get install icingadb-redis
 
 #### Installing MySQL/MariaDB database server <a id="installing-database-mysql-server"></a>
 
-RHEL/CentOS 7/8:
+RHEL/CentOS 8/Fedora:
+
+```
+dnf install mariadb-server mariadb
+
+systemctl enable mariadb
+systemctl start mariadb
+
+mysql_secure_installation
+```
+
+RHEL/CentOS 7:
 
 ```
 yum install mariadb-server mariadb
@@ -178,7 +203,7 @@ After creating the database you can import the Icinga DB schema using the
 following command. Enter the root password into the prompt when asked.
 
 ```
-cat /usr/share/icingadb/schema/mysql/schema.sql | mysql -uroot icingadb -p
+cat /usr/share/icingadb/schema/mysql/schema.sql | mysql -u root icingadb -p
 ```
 
 ### Running Icinga DB <a id="running-icingadb"></a>
