@@ -5,20 +5,17 @@
 * Local Redis instance (Will be installed during this documentation)
 * MySQL/MariaDB server with `icingadb` database, user and schema imports (Will be installed during this documentation)
 
-Supported enterprise distributions:
-
-* RHEL/CentOS 7/8
-* Debian 10 Buster
-* Ubuntu 18 Bionic
-* SLES 15.1
-
 ## Setting up Icinga DB <a id="setting-up-icingadb"></a>
 
 ### Package Repositories <a id="package-repositories"></a>
 
-In order to install the latest release candidate, you have to add our `testing` repository as shown below.
+In order to install the latest release candidate, you have to add our `testing` repository as shown below. We assume
+that you have our `release` repository already activated. The following commands must be executed with root permissions
+unless noted otherwise.
 
-#### RHEL/CentOS Repositories <a id="package-repositories-rhel-centos"></a>
+#### RHEL/CentOS/Fedora Repositories <a id="package-repositories-rhel-centos"></a>
+
+Make sure you have wget installed.
 
 ```
 rpm --import https://packages.icinga.com/icinga.key
@@ -71,10 +68,17 @@ wget -O - https://packages.icinga.com/icinga.key | apt-key add -
 apt-get update
 ```
 
-
 ### Installing Icinga DB <a id="installing-icingadb"></a>
 
-RHEL/CentOS 7/8:
+RHEL/CentOS 8/Fedora:
+
+```
+dnf install icingadb
+systemctl enable icingadb
+systemctl start icingadb
+```
+
+RHEL/CentOS 7:
 
 ```
 yum install icingadb
@@ -96,7 +100,16 @@ apt-get install icingadb
 
 ### Installing Icinga DB Redis <a id="configuring-icingadb-mysql"></a>
 
-RHEL/CentOS 7/8:
+RHEL/CentOS 8/Fedora:
+
+```
+dnf install icingadb-redis
+
+systemctl enable icingadb-redis
+systemctl start icingadb-redis
+```
+
+RHEL/CentOS 7:
 
 ```
 yum install icingadb-redis
@@ -124,7 +137,18 @@ apt-get install icingadb-redis
 
 #### Installing MySQL/MariaDB database server <a id="installing-database-mysql-server"></a>
 
-RHEL/CentOS 7/8:
+RHEL/CentOS 8/Fedora:
+
+```
+dnf install mariadb-server mariadb
+
+systemctl enable mariadb
+systemctl start mariadb
+
+mysql_secure_installation
+```
+
+RHEL/CentOS 7:
 
 ```
 yum install mariadb-server mariadb
@@ -157,8 +181,8 @@ mysql_secure_installation
 Note that if you're using a version of MySQL < 5.7 or MariaDB < 10.2, the following server options must be set:
 
 ```
-innodb_file_format=barracuda	
-innodb_file_per_table=1	
+innodb_file_format=barracuda
+innodb_file_per_table=1
 innodb_large_prefix=1
 ```
 
@@ -169,16 +193,12 @@ Set up a MySQL database for Icinga DB:
 
 CREATE DATABASE icingadb;
 GRANT ALL ON icingadb.* TO 'icingadb'@'127.0.0.1' IDENTIFIED BY 'icingadb';
-FLUSH PRIVILEGES;
-
-quit
 ```
 
-After creating the database you can import the Icinga DB schema using the
-following command. Enter the root password into the prompt when asked.
+After creating the database, you can import the Icinga DB schema using the following command:
 
 ```
-cat /usr/share/icingadb/schema/mysql/schema.sql | mysql -uroot icingadb -p
+mysql -u root -p icingadb </usr/share/icingadb/schema/mysql/schema.sql
 ```
 
 ### Running Icinga DB <a id="running-icingadb"></a>
@@ -186,7 +206,7 @@ cat /usr/share/icingadb/schema/mysql/schema.sql | mysql -uroot icingadb -p
 Foreground:
 
 ```
-icingadb -config /etc/icingadb/icingadb.yml
+icingadb -config /etc/icingadb/config.yml
 ```
 
 Systemd service:
@@ -198,10 +218,15 @@ systemctl start icingadb
 
 ### Enable remote Redis connections <a id="remote-redis"></a>
 
-By default `icingadb-redis` listens only on `127.0.0.1`. If you want to change that (e.g. Icinga Web 2), just change `bind 127.0.0.1 ::1` and `protected-mode yes` in `/etc/icinga-redis/icingadb-redis.conf` to the interface you want to use and `protected-mode no`.
+By default `icingadb-redis` listens only on `127.0.0.1`. If you want to change that, e.g. for Icinga Web 2 or Icinga 2
+running on another node, just change `bind 127.0.0.1 ::1` and `protected-mode yes`
+in `/etc/icingadb-redis/icingadb-redis.conf` to the interface you want to use and to `protected-mode no`.
 
-> WARNING: Make sure your host is secured by some kind of firewall, if you open Redis to an external interface. Redis, by default, does not have any authentication that prevent others from accessing it.
+> WARNING: By default, Redis does not have any authentication that prevents others from accessing it.
+> If you open Redis to an external interface, make sure that you set up appropriate firewall rules or configure TLS
+> with certificate authentication on Redis and its consumers, i.e. Icinga 2, Icinga DB and Icinga Web 2.
 
 ### Icinga DB Web
 
-Consult the [Icinga DB Web documentation](https://icinga.com/docs/icingadb/latest/icingadb-web/doc/02-Installation/) on how to connect Icinga Web 2 with Icinga DB.
+Consult the [Icinga DB Web documentation](https://icinga.com/docs/icingadb/latest/icingadb-web/doc/02-Installation/) on
+how to connect Icinga Web 2 with Icinga DB.
