@@ -9,9 +9,9 @@
 
 ### Package Repositories <a id="package-repositories"></a>
 
-In order to install the latest release candidate, you have to add our `testing` repository as shown below.
-We assume that you have our `release` repository already activated.
-The following commands must be executed with root permissions unless noted otherwise.
+In order to install the latest release candidate, you have to add our `testing` repository as shown below. We assume
+that you have our `release` repository already activated. The following commands must be executed with root permissions
+unless noted otherwise.
 
 #### RHEL/CentOS/Fedora Repositories <a id="package-repositories-rhel-centos"></a>
 
@@ -67,7 +67,6 @@ wget -O - https://packages.icinga.com/icinga.key | apt-key add -
 
 apt-get update
 ```
-
 
 ### Installing Icinga DB <a id="installing-icingadb"></a>
 
@@ -182,8 +181,8 @@ mysql_secure_installation
 Note that if you're using a version of MySQL < 5.7 or MariaDB < 10.2, the following server options must be set:
 
 ```
-innodb_file_format=barracuda	
-innodb_file_per_table=1	
+innodb_file_format=barracuda
+innodb_file_per_table=1
 innodb_large_prefix=1
 ```
 
@@ -223,10 +222,14 @@ systemctl start icingadb
 
 ### Enable remote Redis connections <a id="remote-redis"></a>
 
-By default `icingadb-redis` listens only on `127.0.0.1`. If you want to change that (e.g. Icinga Web 2), just change `bind 127.0.0.1 ::1` and `protected-mode yes` in `/etc/icingadb-redis/icingadb-redis.conf` to the interface you want to use and `protected-mode no`.
+By default `icingadb-redis` listens only on `127.0.0.1`. If you want to change that (e.g. Icinga Web 2), just
+change `bind 127.0.0.1 ::1` and `protected-mode yes` in `/etc/icingadb-redis/icingadb-redis.conf` to the interface you
+want to use and `protected-mode no`.
 
-> WARNING: Make sure your host is secured by some kind of firewall, if you open Redis to an external interface. Redis, by default, does not have any authentication that prevent others from accessing it.
+> WARNING: Make sure your host is secured by some kind of firewall, if you open Redis to an external interface.
+> Redis, by default, does not have any authentication that prevent others from accessing it.
 
 ### Icinga DB Web
 
-Consult the [Icinga DB Web documentation](https://icinga.com/docs/icingadb/latest/icingadb-web/doc/02-Installation/) on how to connect Icinga Web 2 with Icinga DB.
+Consult the [Icinga DB Web documentation](https://icinga.com/docs/icingadb/latest/icingadb-web/doc/02-Installation/) on
+how to connect Icinga Web 2 with Icinga DB.
