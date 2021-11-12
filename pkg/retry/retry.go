@@ -48,10 +48,6 @@ func WithBackoff(
 			return
 		}
 
-		if err = parentCtx.Err(); err != nil {
-			return
-		}
-
 		if settings.OnError != nil {
 			settings.OnError(time.Since(start), attempt, err, prevErr)
 		}
