@@ -4,7 +4,7 @@ use warnings;
 use strict;
 use autodie qw(:all);
 
-if (/^ ?Copyright / || /^All rights reserved\.$/ || /^(?:The )?\S+ License(?: \(.+?\))?$/ || /^$/) {
+if (/^ ?(?:\w+ )?Copyright / || /^All rights reserved\.$/ || /^(?:The )?\S+ License(?: \(.+?\))?$/ || /^$/) {
     $_ = ""
 }
 
