@@ -2,9 +2,6 @@ module github.com/icinga/icingadb
 
 go 1.16
 
-// TODO: remove once merged https://github.com/goccy/go-yaml/pull/260
-replace github.com/goccy/go-yaml v1.9.5-0.20211015131146-c6bcb8045535 => github.com/Al2Klimov/go-yaml v1.9.5-0.20211015131146-c6bcb8045535
-
 require (
 	github.com/creasty/defaults v1.5.2
 	github.com/go-redis/redis/v8 v8.11.4
