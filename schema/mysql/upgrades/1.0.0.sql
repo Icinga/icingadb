@@ -222,6 +222,13 @@ CREATE TABLE sla_history_state (
   INDEX idx_sla_history_state_event (host_id, service_id, event_time)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
+INSERT INTO sla_history_state
+  (id, environment_id, endpoint_id, object_type, host_id, service_id, event_time, hard_state, previous_hard_state)
+  SELECT id, environment_id, endpoint_id, object_type, host_id, service_id, event_time, hard_state, previous_hard_state
+  FROM state_history
+  WHERE state_type = 'hard'
+  ON DUPLICATE KEY UPDATE sla_history_state.id = sla_history_state.id;
+
 CREATE TABLE sla_history_downtime (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
@@ -237,6 +244,13 @@ CREATE TABLE sla_history_downtime (
 
   INDEX idx_sla_history_downtime_event (host_id, service_id, downtime_start, downtime_end)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
+INSERT INTO sla_history_downtime
+  (environment_id, endpoint_id, object_type, host_id, service_id, downtime_id, downtime_start, downtime_end)
+  SELECT environment_id, endpoint_id, object_type, host_id, service_id, downtime_id,
+    start_time AS downtime_start, IF(has_been_cancelled = 'y', cancel_time, end_time) AS downtime_end
+  FROM downtime_history
+  ON DUPLICATE KEY UPDATE sla_history_downtime.downtime_id = sla_history_downtime.downtime_id;
 
 INSERT INTO icingadb_schema (version, TIMESTAMP)
   VALUES (3, CURRENT_TIMESTAMP() * 1000);
