@@ -29,6 +29,33 @@ func (NeverSplit) Track(contracts.Entity) bool {
 func (NeverSplit) Reset() {
 }
 
+// SplitOnDupId is a state machine which tracks the inputs' IDs.
+// Once an already seen input arrives, it demands splitting.
+type SplitOnDupId struct {
+	seenIds map[string]struct{}
+}
+
+func (sodi *SplitOnDupId) Track(entity contracts.Entity) bool {
+	id := entity.ID().String()
+
+	_, ok := sodi.seenIds[id]
+	if ok {
+		sodi.seenIds = map[string]struct{}{id: {}}
+	} else {
+		sodi.seenIds[id] = struct{}{}
+	}
+
+	return ok
+}
+
+func (sodi *SplitOnDupId) Reset() {
+	sodi.seenIds = map[string]struct{}{}
+}
+
+func NewSplitOnDupId() *SplitOnDupId {
+	return &SplitOnDupId{map[string]struct{}{}}
+}
+
 // EntityBulker reads all entities from a channel and streams them in chunks into a Bulk channel.
 type EntityBulker struct {
 	ch  chan []contracts.Entity
@@ -146,4 +173,7 @@ func oneEntityBulk(ctx context.Context, ch <-chan contracts.Entity) <-chan []con
 	return out
 }
 
-var _ BulkChunkSplitPolicy = NeverSplit{}
+var (
+	_ BulkChunkSplitPolicy = NeverSplit{}
+	_ BulkChunkSplitPolicy = (*SplitOnDupId)(nil)
+)
