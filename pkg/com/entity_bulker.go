@@ -19,6 +19,16 @@ type BulkChunkSplitPolicy interface {
 	Reset()
 }
 
+// NeverSplit is a pseudo state machine which never demands splitting.
+type NeverSplit struct{}
+
+func (NeverSplit) Track(contracts.Entity) bool {
+	return false
+}
+
+func (NeverSplit) Reset() {
+}
+
 // EntityBulker reads all entities from a channel and streams them in chunks into a Bulk channel.
 type EntityBulker struct {
 	ch  chan []contracts.Entity
@@ -135,3 +145,5 @@ func oneEntityBulk(ctx context.Context, ch <-chan contracts.Entity) <-chan []con
 
 	return out
 }
+
+var _ BulkChunkSplitPolicy = NeverSplit{}
