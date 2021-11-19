@@ -64,14 +64,16 @@ type EntityBulker struct {
 }
 
 // NewEntityBulker returns a new EntityBulker and starts streaming.
-func NewEntityBulker(ctx context.Context, ch <-chan contracts.Entity, count int) *EntityBulker {
+func NewEntityBulker(
+	ctx context.Context, ch <-chan contracts.Entity, count int, splitPolicy BulkChunkSplitPolicy,
+) *EntityBulker {
 	b := &EntityBulker{
 		ch:  make(chan []contracts.Entity),
 		ctx: ctx,
 		mu:  sync.Mutex{},
 	}
 
-	go b.run(ch, count)
+	go b.run(ch, count, splitPolicy)
 
 	return b
 }
@@ -81,7 +83,7 @@ func (b *EntityBulker) Bulk() <-chan []contracts.Entity {
 	return b.ch
 }
 
-func (b *EntityBulker) run(ch <-chan contracts.Entity, count int) {
+func (b *EntityBulker) run(ch <-chan contracts.Entity, count int, splitPolicy BulkChunkSplitPolicy) {
 	defer close(b.ch)
 
 	bufCh := make(chan contracts.Entity, count)
@@ -119,6 +121,15 @@ func (b *EntityBulker) run(ch <-chan contracts.Entity, count int) {
 						break
 					}
 
+					if splitPolicy.Track(v) {
+						if len(buf) > 0 {
+							b.ch <- buf
+							buf = make([]contracts.Entity, 0, count)
+						}
+
+						timeout = time.After(256 * time.Millisecond)
+					}
+
 					buf = append(buf, v)
 				case <-timeout:
 					drain = false
@@ -130,6 +141,8 @@ func (b *EntityBulker) run(ch <-chan contracts.Entity, count int) {
 			if len(buf) > 0 {
 				b.ch <- buf
 			}
+
+			splitPolicy.Reset()
 		}
 
 		return nil
@@ -146,11 +159,11 @@ func BulkEntities(ctx context.Context, ch <-chan contracts.Entity, count int) <-
 		return oneEntityBulk(ctx, ch)
 	}
 
-	return NewEntityBulker(ctx, ch, count).Bulk()
+	return NewEntityBulker(ctx, ch, count, NeverSplit{}).Bulk()
 }
 
-// oneEntityBulk operates just as NewEntityBulker(ctx, ch, 1).Bulk(),
-// but without the overhead of the actual bulk creation with a buffer channel and timeout.
+// oneEntityBulk operates just as NewEntityBulker(ctx, ch, 1, splitPolicy).Bulk(),
+// but without the overhead of the actual bulk creation with a buffer channel, timeout and BulkChunkSplitPolicy.
 func oneEntityBulk(ctx context.Context, ch <-chan contracts.Entity) <-chan []contracts.Entity {
 	out := make(chan []contracts.Entity)
 	go func() {
