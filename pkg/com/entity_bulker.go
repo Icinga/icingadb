@@ -8,6 +8,17 @@ import (
 	"time"
 )
 
+// BulkChunkSplitPolicy is a state machine which tracks the items of a chunk a bulker assembles.
+type BulkChunkSplitPolicy interface {
+	// Track takes an item for the current chunk into account.
+	// Output true indicates that the state machine was reset first and the bulker
+	// shall finish the current chunk now (not e.g. once $size is reached) without the given item.
+	Track(contracts.Entity) bool
+
+	// Reset resets the state machine.
+	Reset()
+}
+
 // EntityBulker reads all entities from a channel and streams them in chunks into a Bulk channel.
 type EntityBulker struct {
 	ch  chan []contracts.Entity
