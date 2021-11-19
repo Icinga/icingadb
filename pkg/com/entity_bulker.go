@@ -154,12 +154,14 @@ func (b *EntityBulker) run(ch <-chan contracts.Entity, count int, splitPolicy Bu
 }
 
 // BulkEntities reads all entities from a channel and streams them in chunks into a returned channel.
-func BulkEntities(ctx context.Context, ch <-chan contracts.Entity, count int) <-chan []contracts.Entity {
+func BulkEntities(
+	ctx context.Context, ch <-chan contracts.Entity, count int, splitPolicy BulkChunkSplitPolicy,
+) <-chan []contracts.Entity {
 	if count <= 1 {
 		return oneEntityBulk(ctx, ch)
 	}
 
-	return NewEntityBulker(ctx, ch, count, NeverSplit{}).Bulk()
+	return NewEntityBulker(ctx, ch, count, splitPolicy).Bulk()
 }
 
 // oneEntityBulk operates just as NewEntityBulker(ctx, ch, 1, splitPolicy).Bulk(),

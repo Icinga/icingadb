@@ -310,7 +310,7 @@ func (db *DB) NamedBulkExec(
 	defer db.log(ctx, query, &counter).Stop()
 
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.BulkEntities(ctx, arg, count)
+	bulk := com.BulkEntities(ctx, arg, count, com.NeverSplit{})
 
 	g.Go(func() error {
 		for {
@@ -378,7 +378,7 @@ func (db *DB) NamedBulkExecTx(
 	defer db.log(ctx, query, &counter).Stop()
 
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.BulkEntities(ctx, arg, count)
+	bulk := com.BulkEntities(ctx, arg, count, com.NeverSplit{})
 
 	g.Go(func() error {
 		for {
