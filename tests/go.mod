@@ -6,7 +6,7 @@ require (
 	github.com/containerd/containerd v1.5.6 // indirect
 	github.com/go-redis/redis/v8 v8.11.3
 	github.com/google/uuid v1.3.0
-	github.com/icinga/icinga-testing v0.0.0-20220309154907-12cf833da4f3
+	github.com/icinga/icinga-testing v0.0.0-20220315141514-b316c93f8d77
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/stretchr/testify v1.7.0
 	go.uber.org/zap v1.19.1
