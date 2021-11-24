@@ -102,10 +102,10 @@ func (db *DB) BuildColumns(subject interface{}) []string {
 
 // BuildDeleteStmt returns a DELETE statement for the given struct.
 func (db *DB) BuildDeleteStmt(from interface{}) string {
-	return db.Rebind(fmt.Sprintf(
+	return fmt.Sprintf(
 		`DELETE FROM "%s" WHERE id IN (?)`,
 		utils.TableName(from),
-	))
+	)
 }
 
 // BuildInsertStmt returns an INSERT INTO statement for the given struct.
