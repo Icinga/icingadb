@@ -304,13 +304,13 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 // Entities for which the query ran successfully will be streamed on the succeeded channel.
 func (db *DB) NamedBulkExec(
 	ctx context.Context, query string, count int, sem *semaphore.Weighted,
-	arg <-chan contracts.Entity, succeeded chan<- contracts.Entity, splitPolicy com.BulkChunkSplitPolicy,
+	arg <-chan contracts.Entity, succeeded chan<- contracts.Entity, splitPolicyFactory com.BulkChunkSplitPolicyFactory,
 ) error {
 	var counter com.Counter
 	defer db.log(ctx, query, &counter).Stop()
 
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.BulkEntities(ctx, arg, count, splitPolicy)
+	bulk := com.BulkEntities(ctx, arg, count, splitPolicyFactory)
 
 	g.Go(func() error {
 		for {
@@ -378,7 +378,7 @@ func (db *DB) NamedBulkExecTx(
 	defer db.log(ctx, query, &counter).Stop()
 
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.BulkEntities(ctx, arg, count, com.NeverSplit{})
+	bulk := com.BulkEntities(ctx, arg, count, com.NeverSplit)
 
 	g.Go(func() error {
 		for {
@@ -501,7 +501,7 @@ func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Enti
 	sem := db.GetSemaphoreForTable(utils.TableName(first))
 	stmt, placeholders := db.BuildInsertStmt(first)
 
-	return db.NamedBulkExec(ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, nil, com.NeverSplit{})
+	return db.NamedBulkExec(ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, nil, com.NeverSplit)
 }
 
 // UpsertStreamed bulk upserts the specified entities via NamedBulkExec.
@@ -518,7 +518,7 @@ func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Enti
 	stmt, placeholders := db.BuildUpsertStmt(first)
 
 	return db.NamedBulkExec(
-		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, succeeded, com.NewSplitOnDupId(),
+		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, succeeded, com.SplitOnDupId,
 	)
 }
 

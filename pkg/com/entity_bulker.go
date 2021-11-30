@@ -19,23 +19,33 @@ type BulkChunkSplitPolicy interface {
 	Reset()
 }
 
-// NeverSplit is a pseudo state machine which never demands splitting.
-type NeverSplit struct{}
+type BulkChunkSplitPolicyFactory func() BulkChunkSplitPolicy
 
-func (NeverSplit) Track(contracts.Entity) bool {
+func NeverSplit() BulkChunkSplitPolicy {
+	return neverSplit{}
+}
+
+func SplitOnDupId() BulkChunkSplitPolicy {
+	return &splitOnDupId{map[string]struct{}{}}
+}
+
+// neverSplit is a pseudo state machine which never demands splitting.
+type neverSplit struct{}
+
+func (neverSplit) Track(contracts.Entity) bool {
 	return false
 }
 
-func (NeverSplit) Reset() {
+func (neverSplit) Reset() {
 }
 
-// SplitOnDupId is a state machine which tracks the inputs' IDs.
+// splitOnDupId is a state machine which tracks the inputs' IDs.
 // Once an already seen input arrives, it demands splitting.
-type SplitOnDupId struct {
+type splitOnDupId struct {
 	seenIds map[string]struct{}
 }
 
-func (sodi *SplitOnDupId) Track(entity contracts.Entity) bool {
+func (sodi *splitOnDupId) Track(entity contracts.Entity) bool {
 	id := entity.ID().String()
 
 	_, ok := sodi.seenIds[id]
@@ -48,12 +58,8 @@ func (sodi *SplitOnDupId) Track(entity contracts.Entity) bool {
 	return ok
 }
 
-func (sodi *SplitOnDupId) Reset() {
+func (sodi *splitOnDupId) Reset() {
 	sodi.seenIds = map[string]struct{}{}
-}
-
-func NewSplitOnDupId() *SplitOnDupId {
-	return &SplitOnDupId{map[string]struct{}{}}
 }
 
 // EntityBulker reads all entities from a channel and streams them in chunks into a Bulk channel.
@@ -65,7 +71,7 @@ type EntityBulker struct {
 
 // NewEntityBulker returns a new EntityBulker and starts streaming.
 func NewEntityBulker(
-	ctx context.Context, ch <-chan contracts.Entity, count int, splitPolicy BulkChunkSplitPolicy,
+	ctx context.Context, ch <-chan contracts.Entity, count int, splitPolicyFactory BulkChunkSplitPolicyFactory,
 ) *EntityBulker {
 	b := &EntityBulker{
 		ch:  make(chan []contracts.Entity),
@@ -73,7 +79,7 @@ func NewEntityBulker(
 		mu:  sync.Mutex{},
 	}
 
-	go b.run(ch, count, splitPolicy)
+	go b.run(ch, count, splitPolicyFactory)
 
 	return b
 }
@@ -83,10 +89,11 @@ func (b *EntityBulker) Bulk() <-chan []contracts.Entity {
 	return b.ch
 }
 
-func (b *EntityBulker) run(ch <-chan contracts.Entity, count int, splitPolicy BulkChunkSplitPolicy) {
+func (b *EntityBulker) run(ch <-chan contracts.Entity, count int, splitPolicyFactory BulkChunkSplitPolicyFactory) {
 	defer close(b.ch)
 
 	bufCh := make(chan contracts.Entity, count)
+	splitPolicy := splitPolicyFactory()
 	g, ctx := errgroup.WithContext(b.ctx)
 
 	g.Go(func() error {
@@ -155,13 +162,13 @@ func (b *EntityBulker) run(ch <-chan contracts.Entity, count int, splitPolicy Bu
 
 // BulkEntities reads all entities from a channel and streams them in chunks into a returned channel.
 func BulkEntities(
-	ctx context.Context, ch <-chan contracts.Entity, count int, splitPolicy BulkChunkSplitPolicy,
+	ctx context.Context, ch <-chan contracts.Entity, count int, splitPolicyFactory BulkChunkSplitPolicyFactory,
 ) <-chan []contracts.Entity {
 	if count <= 1 {
 		return oneEntityBulk(ctx, ch)
 	}
 
-	return NewEntityBulker(ctx, ch, count, splitPolicy).Bulk()
+	return NewEntityBulker(ctx, ch, count, splitPolicyFactory).Bulk()
 }
 
 // oneEntityBulk operates just as NewEntityBulker(ctx, ch, 1, splitPolicy).Bulk(),
@@ -189,6 +196,8 @@ func oneEntityBulk(ctx context.Context, ch <-chan contracts.Entity) <-chan []con
 }
 
 var (
-	_ BulkChunkSplitPolicy = NeverSplit{}
-	_ BulkChunkSplitPolicy = (*SplitOnDupId)(nil)
+	_ BulkChunkSplitPolicy        = neverSplit{}
+	_ BulkChunkSplitPolicy        = (*splitOnDupId)(nil)
+	_ BulkChunkSplitPolicyFactory = NeverSplit
+	_ BulkChunkSplitPolicyFactory = SplitOnDupId
 )
