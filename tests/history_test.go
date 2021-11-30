@@ -287,6 +287,11 @@ func testHistory(t *testing.T, numNodes int) {
 			assertEventuallyDrained(t, n.RedisClient, "icinga:history:stream:downtime")
 		}
 
+		if numNodes > 1 {
+			t.Skip("does not work reliably at the moment due to a problem in icinga2: " +
+				"https://github.com/Icinga/icinga2/issues/9101")
+		}
+
 		eventually.Assert(t, func(t require.TestingT) {
 			var rows []string
 			err = db.Select(&rows, "SELECT h.event_type FROM history h"+
