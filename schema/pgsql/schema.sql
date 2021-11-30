@@ -1911,4 +1911,4 @@ CREATE TABLE icingadb_schema (
 ALTER SEQUENCE icingadb_schema_id_seq OWNED BY icingadb_schema.id;
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (2, extract(epoch from now()) * 1000);
+  VALUES (1, extract(epoch from now()) * 1000);

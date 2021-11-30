@@ -24,10 +24,11 @@ import (
 )
 
 const (
-	ExitSuccess                = 0
-	ExitFailure                = 1
-	expectedRedisSchemaVersion = "4"
-	expectedDbSchemaVersion    = 3
+	ExitSuccess                   = 0
+	ExitFailure                   = 1
+	expectedRedisSchemaVersion    = "4"
+	expectedMysqlSchemaVersion    = 3
+	expectedPostgresSchemaVersion = 1
 )
 
 func main() {
@@ -317,6 +318,14 @@ func run() int {
 
 // checkDbSchema asserts the database schema of the expected version being present.
 func checkDbSchema(ctx context.Context, db *icingadb.DB) error {
+	var expectedDbSchemaVersion uint16
+	switch db.DriverName() {
+	case "icingadb-mysql":
+		expectedDbSchemaVersion = expectedMysqlSchemaVersion
+	case "icingadb-pgsql":
+		expectedDbSchemaVersion = expectedPostgresSchemaVersion
+	}
+
 	var version uint16
 
 	err := db.QueryRowxContext(ctx, "SELECT version FROM icingadb_schema ORDER BY id DESC LIMIT 1").Scan(&version)
