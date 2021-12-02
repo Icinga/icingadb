@@ -420,6 +420,8 @@ func migrate(c *Config, idb *icingadb.DB) {
 				},
 			).Interface(),
 		)
+
+		ht.bar.SetTotal(ht.bar.Current(), true)
 	})
 
 	progress.Wait()
