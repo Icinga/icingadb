@@ -202,8 +202,7 @@ func countIdoHistory() {
 	})
 }
 
-// computeProgress initializes types[*].lastId with how many events have already been migrated to idb.
-// (On non-recoverable errors the whole program exits.)
+// computeProgress initializes types[*].lastId and types[*].done. (On non-recoverable errors the whole program exits.)
 func computeProgress(idb *icingadb.DB) {
 	{
 		_, err := idb.Exec(`CREATE TABLE IF NOT EXISTS ido_migration_progress (
@@ -232,6 +231,22 @@ func computeProgress(idb *icingadb.DB) {
 			log.With("backend", "Icinga DB", "query", query, "args", []interface{}{ht.name}).
 				Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 		}
+	})
+
+	types.forEach(func(ht *historyType) {
+		err := ht.snapshot.Get(
+			&ht.done,
+			// For actual migration icinga_objects will be joined anyway,
+			// so it makes no sense to take vanished objects into account.
+			"SELECT COUNT(*) FROM "+ht.idoTable+" xh USE INDEX (PRIMARY)"+
+				" INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+ht.idoIdColumn+"<=?",
+			ht.lastId,
+		)
+		if err != nil {
+			log.Fatalf("%+v", errors.Wrap(err, "can't count query"))
+		}
+
+		log.Infow("Counted migrated IDO events", "type", ht.name, "amount", ht.done)
 	})
 }
 
@@ -329,6 +344,8 @@ func migrate(c *Config, idb *icingadb.DB) {
 
 		icingaDbInserts := map[reflect.Type]string{}
 		icingaDbUpdates := map[reflect.Type]string{}
+
+		ht.bar.SetCurrent(ht.done)
 		inc := barIncrementer{ht.bar, time.Now()}
 
 		// Stream IDO rows, ...
