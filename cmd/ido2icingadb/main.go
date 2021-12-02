@@ -71,10 +71,6 @@ func main() {
 
 	log.Info("Computing progress")
 
-	// Count total source data, so the following functions
-	// know how many work is left and can display progress bars.
-	countIdoHistory()
-
 	// computeProgress figures out which data has already been migrated
 	// not to start from the beginning every time in the following migrate().
 	computeProgress(idb)
@@ -184,25 +180,8 @@ func startIdoTx(ido *icingadb.DB) {
 	})
 }
 
-// countIdoHistory initializes types[*].total with how many events to migrate.
+// computeProgress initializes types[*].lastId, types[*].total and types[*].done.
 // (On non-recoverable errors the whole program exits.)
-func countIdoHistory() {
-	types.forEach(func(ht *historyType) {
-		err := ht.snapshot.Get(
-			&ht.total,
-			// For actual migration icinga_objects will be joined anyway,
-			// so it makes no sense to take vanished objects into account.
-			"SELECT COUNT(*) FROM "+ht.idoTable+" xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id",
-		)
-		if err != nil {
-			log.Fatalf("%+v", errors.Wrap(err, "can't count query"))
-		}
-
-		log.Infow("Counted total IDO events", "type", ht.name, "amount", ht.total)
-	})
-}
-
-// computeProgress initializes types[*].lastId and types[*].done. (On non-recoverable errors the whole program exits.)
 func computeProgress(idb *icingadb.DB) {
 	{
 		_, err := idb.Exec(`CREATE TABLE IF NOT EXISTS ido_migration_progress (
@@ -234,19 +213,32 @@ func computeProgress(idb *icingadb.DB) {
 	})
 
 	types.forEach(func(ht *historyType) {
-		err := ht.snapshot.Get(
-			&ht.done,
+		var rows []struct {
+			Migrated uint8
+			Cnt      int64
+		}
+
+		err := ht.snapshot.Select(
+			&rows,
 			// For actual migration icinga_objects will be joined anyway,
 			// so it makes no sense to take vanished objects into account.
-			"SELECT COUNT(*) FROM "+ht.idoTable+" xh USE INDEX (PRIMARY)"+
-				" INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+ht.idoIdColumn+"<=?",
-			ht.lastId,
+			"SELECT xh."+ht.idoIdColumn+"<=? migrated, COUNT(*) cnt FROM "+ht.idoTable+" xh"+
+				" INNER JOIN icinga_objects o ON o.object_id=xh.object_id GROUP BY xh."+ht.idoIdColumn+"<=?",
+			ht.lastId, ht.lastId,
 		)
 		if err != nil {
 			log.Fatalf("%+v", errors.Wrap(err, "can't count query"))
 		}
 
-		log.Infow("Counted migrated IDO events", "type", ht.name, "amount", ht.done)
+		for _, row := range rows {
+			ht.total += row.Cnt
+
+			if row.Migrated == 1 {
+				ht.done = row.Cnt
+			}
+		}
+
+		log.Infow("Counted migrated IDO events", "type", ht.name, "migrated", ht.done, "total", ht.total)
 	})
 }
 
