@@ -248,6 +248,8 @@ type historyType struct {
 	snapshot *sqlx.Tx
 	// total summarizes the source data.
 	total int64
+	// done summarizes the migrated data.
+	done int64
 	// bar represents the current progress bar.
 	bar *mpb.Bar
 	// lastId is the last already migrated ID.
