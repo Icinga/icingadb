@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/pkg/config"
@@ -36,7 +37,7 @@ type Config struct {
 	IcingaDB config.Database `yaml:"icingadb"`
 	// Icinga2 specifies information the IDO doesn't provide.
 	Icinga2 struct {
-		// Env specifies the "Environment" config constant value (likely "").
+		// Env specifies the environment ID, hex.
 		Env string `yaml:"env"`
 		// Endpoint specifies the name on the main endpoint writing to IDO.
 		Endpoint string `yaml:"endpoint"`
@@ -54,6 +55,12 @@ func main() {
 	c, ex := parseConfig(f)
 	if c == nil {
 		os.Exit(ex)
+	}
+
+	envId, err := hex.DecodeString(c.Icinga2.Env)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "bad env ID: %s\n", err.Error())
+		os.Exit(2)
 	}
 
 	defer func() { _ = log.Sync() }()
@@ -80,7 +87,7 @@ func main() {
 	fillCache()
 
 	log.Info("Actually migrating")
-	migrate(c, idb)
+	migrate(c, idb, envId)
 }
 
 // parseConfig validates the f.Config file and returns the config and -1 or - on failure - nil and an exit code.
@@ -265,8 +272,7 @@ var tAny = reflect.TypeOf((*interface{})(nil)). // *interface{}
 						Elem() // interface{}
 
 // migrate does the actual migration.
-func migrate(c *Config, idb *icingadb.DB) {
-	envId := sha1.Sum([]byte(c.Icinga2.Env))
+func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 	endpointId := sha1.Sum([]byte(c.Icinga2.Endpoint))
 
 	progress := mpb.New()
@@ -295,7 +301,7 @@ func migrate(c *Config, idb *icingadb.DB) {
 		}()
 
 		vConvertRowsArgs := [6]reflect.Value{
-			reflect.ValueOf(c.Icinga2.Env), reflect.ValueOf(icingadbTypes.Binary(envId[:])),
+			reflect.ValueOf(c.Icinga2.Env), reflect.ValueOf(icingadbTypes.Binary(envId)),
 			reflect.ValueOf(icingadbTypes.Binary(endpointId[:])),
 			reflect.ValueOf(func(dest interface{}, query string, args ...interface{}) { // selectCache
 				// Prepare new one, if old one doesn't fit anymore.
