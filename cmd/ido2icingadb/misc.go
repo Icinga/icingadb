@@ -21,14 +21,6 @@ import (
 	"time"
 )
 
-// ProgressRow contains all IDO info needed to assemble an Icinga DB ID.
-type ProgressRow struct {
-	// Id is the IDO table ID.
-	Id uint64
-	// Name is the name of the affected comment or downtime.
-	Name string
-}
-
 // barIncrementer simplifies incrementing bar.
 type barIncrementer struct {
 	// bar is the bar to increment.
@@ -239,14 +231,6 @@ type historyType struct {
 	idoTable string
 	// idoIdColumn specifies idoTable's primary key.
 	idoIdColumn string
-	// idoColumns specifies idoTable's columns in addition to idoIdColumn computeProgress() needs.
-	idoColumns []string
-	// idbTable specifies the destination table computeProgress() compares the source data with.
-	idbTable string
-	// idoIdColumn specifies idbTable's primary key.
-	idbIdColumn string
-	// convertId converts the IDO row and the Icinga 2 env name to a value suitable for idbIdColumn.
-	convertId func(row ProgressRow, env string) []byte
 	// cacheSchema specifies <name>.sqlite3's structure.
 	cacheSchema []string
 	// cacheFiller fills cache from snapshot.
@@ -304,9 +288,6 @@ var types = historyTypes{
 		name:        "acknowledgement",
 		idoTable:    "icinga_acknowledgements",
 		idoIdColumn: "acknowledgement_id",
-		idbTable:    "history",
-		idbIdColumn: "id",
-		convertId:   func(row ProgressRow, _ string) []byte { u := mkDeterministicUuid('a', row.Id); return u.UUID[:] },
 		cacheSchema: eventTimeCacheSchema,
 		cacheFiller: func(ht *historyType) {
 			buildEventTimeCache(ht, []string{
@@ -321,10 +302,6 @@ var types = historyTypes{
 		name:           "comment",
 		idoTable:       "icinga_commenthistory",
 		idoIdColumn:    "commenthistory_id",
-		idoColumns:     []string{"name"},
-		idbTable:       "comment_history",
-		idbIdColumn:    "comment_id",
-		convertId:      func(row ProgressRow, env string) []byte { return calcObjectId(env, row.Name) },
 		migrationQuery: commentMigrationQuery,
 		convertRows:    convertCommentRows,
 	},
@@ -332,10 +309,6 @@ var types = historyTypes{
 		name:           "downtime",
 		idoTable:       "icinga_downtimehistory",
 		idoIdColumn:    "downtimehistory_id",
-		idoColumns:     []string{"name"},
-		idbTable:       "downtime_history",
-		idbIdColumn:    "downtime_id",
-		convertId:      func(row ProgressRow, env string) []byte { return calcObjectId(env, row.Name) },
 		migrationQuery: downtimeMigrationQuery,
 		convertRows:    convertDowntimeRows,
 	},
@@ -343,9 +316,6 @@ var types = historyTypes{
 		name:        "flapping",
 		idoTable:    "icinga_flappinghistory",
 		idoIdColumn: "flappinghistory_id",
-		idbTable:    "history",
-		idbIdColumn: "id",
-		convertId:   func(row ProgressRow, _ string) []byte { u := mkDeterministicUuid('f', row.Id); return u.UUID[:] },
 		cacheSchema: eventTimeCacheSchema,
 		cacheFiller: func(ht *historyType) {
 			buildEventTimeCache(ht, []string{
@@ -360,9 +330,6 @@ var types = historyTypes{
 		name:        "notification",
 		idoTable:    "icinga_notifications",
 		idoIdColumn: "notification_id",
-		idbTable:    "notification_history",
-		idbIdColumn: "id",
-		convertId:   func(row ProgressRow, _ string) []byte { u := mkDeterministicUuid('n', row.Id); return u.UUID[:] },
 		cacheSchema: previousHardStateCacheSchema,
 		cacheFiller: func(ht *historyType) {
 			buildPreviousHardStateCache(ht, []string{
@@ -377,9 +344,6 @@ var types = historyTypes{
 		name:        "state",
 		idoTable:    "icinga_statehistory",
 		idoIdColumn: "statehistory_id",
-		idbTable:    "state_history",
-		idbIdColumn: "id",
-		convertId:   func(row ProgressRow, _ string) []byte { u := mkDeterministicUuid('s', row.Id); return u.UUID[:] },
 		cacheSchema: previousHardStateCacheSchema,
 		cacheFiller: func(ht *historyType) {
 			buildPreviousHardStateCache(ht, []string{"xh.statehistory_id id", "xh.object_id", "xh.last_hard_state"})
