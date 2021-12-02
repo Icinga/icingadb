@@ -1,13 +1,8 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/sha1"
-	"encoding/binary"
-	"github.com/google/uuid"
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
 	"github.com/jmoiron/sqlx"
@@ -17,7 +12,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"reflect"
-	"sync"
 	"time"
 )
 
@@ -53,87 +47,6 @@ var log = func() *zap.SugaredLogger {
 
 // objectTypes maps IDO values to Icinga DB ones.
 var objectTypes = map[uint8]string{1: "host", 2: "service"}
-
-// mkDeterministicUuid returns a formally random UUID (v4) as follows: 11111122-3300-4455-4455-555555555555
-//
-// 0: zeroed
-// 1: "IDO" (where the data identified by the new UUID is from)
-// 2: the history table the new UUID is for, e.g. "s" for state_history
-// 3: "h" (for "history")
-// 4: the new UUID's formal version (unused bits zeroed)
-// 5: the ID of the row the new UUID is for in the IDO (big endian)
-//
-// Rationale: be able to pre-calculate the IDs to figure out which have already been migrated.
-func mkDeterministicUuid(table byte, rowId uint64) icingadbTypes.UUID {
-	uid := uuidTemplate
-	uid[3] = table
-
-	buf := &bytes.Buffer{}
-	if err := binary.Write(buf, binary.BigEndian, rowId); err != nil {
-		panic(err)
-	}
-
-	bEId := buf.Bytes()
-	uid[7] = bEId[0]
-	copy(uid[9:], bEId[1:])
-
-	return icingadbTypes.UUID{UUID: uid}
-}
-
-// uuidTemplate is for mkDeterministicUuid() to save a few CPU cycles.
-var uuidTemplate = func() uuid.UUID {
-	buf := &bytes.Buffer{}
-	buf.Write(uuid.Nil[:])
-
-	uid, err := uuid.NewRandomFromReader(buf)
-	if err != nil {
-		panic(err)
-	}
-
-	copy(uid[:], "IDO h")
-	return uid
-}()
-
-// randomUuid generates a new UUIDv4. Saves getrandom(2) syscalls via bufio.Reader-s.
-// (On non-recoverable errors the whole program exits.)
-func randomUuid() icingadbTypes.UUID {
-	var rander *bufio.Reader
-
-	// Get random available rander.
-	massRanders.Lock()
-	for r := range massRanders.pool {
-		rander = r
-		delete(massRanders.pool, r)
-		break
-	}
-	massRanders.Unlock()
-
-	// Fall back to new one.
-	if rander == nil {
-		rander = bufio.NewReader(rand.Reader)
-	}
-
-	id, err := uuid.NewRandomFromReader(rander)
-	if err != nil {
-		log.Fatalf("%+v", errors.Wrap(err, "can't generate random UUID"))
-	}
-
-	// Make it available for the next call.
-	massRanders.Lock()
-	massRanders.pool[rander] = struct{}{}
-	massRanders.Unlock()
-
-	return icingadbTypes.UUID{UUID: id}
-}
-
-// massRanders are randomUuid()'s storage.
-var massRanders = struct {
-	sync.Mutex
-	pool map[*bufio.Reader]struct{}
-}{
-	sync.Mutex{},
-	map[*bufio.Reader]struct{}{},
-}
 
 // hashAny combines objectpacker.PackAny and SHA1 hashing.
 func hashAny(in interface{}) []byte {
