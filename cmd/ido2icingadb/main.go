@@ -19,7 +19,6 @@ import (
 	"os"
 	"path"
 	"reflect"
-	"strings"
 	"time"
 )
 
@@ -72,16 +71,13 @@ func main() {
 
 	log.Info("Computing progress")
 
-	// Count total source data, so the following computeProgress()
-	// knows how many work is left and can display progress bars.
+	// Count total source data, so the following functions
+	// know how many work is left and can display progress bars.
 	countIdoHistory()
-
-	// Roll out a red carpet for the following computeProgress()' progress bars.
-	_ = log.Sync()
 
 	// computeProgress figures out which data has already been migrated
 	// not to start from the beginning every time in the following migrate().
-	computeProgress(c, idb)
+	computeProgress(idb)
 
 	// On rationale read buildEventTimeCache() and buildPreviousHardStateCache() docs.
 	log.Info("Filling cache")
@@ -208,119 +204,35 @@ func countIdoHistory() {
 
 // computeProgress initializes types[*].lastId with how many events have already been migrated to idb.
 // (On non-recoverable errors the whole program exits.)
-func computeProgress(c *Config, idb *icingadb.DB) {
-	progress := mpb.New()
-	for i := range types {
-		types[i].setupBar(progress)
+func computeProgress(idb *icingadb.DB) {
+	{
+		_, err := idb.Exec(`CREATE TABLE IF NOT EXISTS ido_migration_progress (
+    history_type VARCHAR(63) PRIMARY KEY,
+    last_ido_id BIGINT unsigned NOT NULL
+)`)
+		if err != nil {
+			log.Fatalf("%+v", errors.Wrap(err, "can't create table ido_migration_progress"))
+		}
 	}
 
 	types.forEach(func(ht *historyType) {
-		if ht.total == 0 {
-			ht.bar.SetTotal(ht.bar.Current(), true)
-			return
+		stmt := idb.Rebind(
+			"INSERT INTO ido_migration_progress(history_type, last_ido_id) " +
+				"VALUES (?, 0) ON DUPLICATE KEY UPDATE history_type=history_type",
+		)
+
+		if _, err := idb.Exec(stmt, ht.name); err != nil {
+			log.With("backend", "Icinga DB", "dml", stmt, "args", []interface{}{ht.name}).
+				Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 		}
 
-		query := "SELECT xh." +
-			strings.Join(append(append([]string(nil), ht.idoColumns...), ht.idoIdColumn), ", xh.") + " id FROM " +
-			// For actual migration icinga_objects will be joined anyway,
-			// so it makes no sense to take vanished objects into account.
-			ht.idoTable + " xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE " +
-			ht.idoIdColumn + " > :checkpoint ORDER BY xh." + // requires migrate() to migrate serially, in order
-			ht.idoIdColumn + " LIMIT :bulk"
+		const query = "SELECT last_ido_id FROM ido_migration_progress WHERE history_type=?"
 
-		// As long as the current chunk is lastRowsLen long (doesn't change)...
-		var lastRowsLen int
-
-		// ... we can re-use these:
-		var lastQuery string
-		var lastStmt *sqlx.Stmt
-
-		baseIdbQuery := fmt.Sprintf("SELECT %s FROM %s WHERE %s IN (?)", ht.idbIdColumn, ht.idbTable, ht.idbIdColumn)
-		inc := barIncrementer{ht.bar, time.Now()}
-
-		defer func() {
-			if lastStmt != nil {
-				_ = lastStmt.Close()
-			}
-		}()
-
-		// Stream IDO IDs, ...
-		sliceIdoHistory(ht.snapshot, query, nil, 0, func(rows []ProgressRow) (checkpoint interface{}) {
-			type convertedId struct {
-				ido uint64
-				idb []byte
-			}
-
-			ids := make([]interface{}, 0, len(rows))
-			converted := make([]convertedId, 0, len(rows))
-
-			// ... convert them to Icinga DB ones, ...
-			for _, row := range rows {
-				conv := ht.convertId(row, c.Icinga2.Env)
-				ids = append(ids, conv)
-				converted = append(converted, convertedId{row.Id, conv})
-			}
-
-			// ... prepare a new query if the last one doesn't fit, ...
-			if len(rows) != lastRowsLen {
-				if lastStmt != nil {
-					_ = lastStmt.Close()
-				}
-
-				lastRowsLen = len(rows)
-
-				{
-					var err error
-					lastQuery, _, err = sqlx.In(baseIdbQuery, ids...)
-
-					if err != nil {
-						log.With("query", baseIdbQuery).Fatalf("%+v", errors.Wrap(err, "can't assemble query"))
-					}
-				}
-
-				var err error
-				lastStmt, err = idb.Preparex(lastQuery)
-
-				if err != nil {
-					log.With("query", lastQuery).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
-				}
-			}
-
-			// ... select which have already been migrated, ...
-			var present [][]byte
-			if err := lastStmt.Select(&present, ids...); err != nil {
-				log.With("query", lastQuery).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
-			}
-
-			presentSet := map[[20]byte]struct{}{}
-			for _, row := range present {
-				var key [20]byte
-				copy(key[:], row)
-				presentSet[key] = struct{}{}
-			}
-
-			// ... and in IDO ID order:
-			for _, conv := range converted {
-				var key [20]byte
-				copy(key[:], conv.idb)
-
-				// Stop on the first not yet migrated.
-				if _, ok := presentSet[key]; !ok {
-					return nil
-				}
-
-				// If an ID has already been migrated, increase the actual migration's start point.
-				ht.lastId = conv.ido
-			}
-
-			inc.inc(len(rows))
-			return ht.lastId
-		})
-
-		ht.bar.SetTotal(ht.bar.Current(), true)
+		if err := idb.Get(&ht.lastId, query, ht.name); err != nil {
+			log.With("backend", "Icinga DB", "query", query, "args", []interface{}{ht.name}).
+				Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+		}
 	})
-
-	progress.Wait()
 }
 
 // fillCache fills <f.Cache>/<history type>.sqlite3 (actually types[*].cacheFiller does).
@@ -468,6 +380,17 @@ func migrate(c *Config, idb *icingadb.DB) {
 							}
 
 							_ = stmt.Close()
+						}
+					}
+
+					if lastIdoId := res[2].Interface(); lastIdoId != nil {
+						const stmt = "UPDATE ido_migration_progress SET last_ido_id=:last_ido_id " +
+							"WHERE history_type=:history_type"
+
+						args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
+						if _, err := tx.NamedExec(stmt, args); err != nil {
+							log.With("backend", "Icinga DB", "dml", stmt, "args", args).
+								Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 						}
 					}
 
