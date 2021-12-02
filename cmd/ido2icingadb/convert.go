@@ -9,6 +9,7 @@ import (
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -98,14 +99,11 @@ func convertAcknowledgementRows(
 			name += "!" + row.Name2
 		}
 
-		id := mkDeterministicUuid('a', row.AcknowledgementId)
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
-
-		acknowledgementHistoryId := hashAny([]interface{}{
-			env, strings.Title(typ), name, float64(utils.UnixMilli(set.Time())),
-		})
+		setTime := float64(utils.UnixMilli(set.Time()))
+		acknowledgementHistoryId := hashAny([]interface{}{env, name, setTime})
 
 		if row.AcknowledgementType == 0 { // clear
 			// The set counterpart should already have been inserted.
@@ -115,7 +113,9 @@ func convertAcknowledgementRows(
 
 			h := &history.HistoryAck{
 				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{Id: id},
+					HistoryEntity: history.HistoryEntity{
+						Id: hashAny([]interface{}{env, "ack_clear", name, setTime}),
+					},
 					EnvironmentId: envId,
 					EndpointId:    endpointId,
 					ObjectType:    typ,
@@ -152,7 +152,9 @@ func convertAcknowledgementRows(
 
 			h := &history.HistoryAck{
 				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{Id: id},
+					HistoryEntity: history.HistoryEntity{
+						Id: hashAny([]interface{}{env, "ack_set", name, setTime}),
+					},
 					EnvironmentId: envId,
 					EndpointId:    endpointId,
 					ObjectType:    typ,
@@ -242,7 +244,7 @@ func convertCommentRows(
 
 		h1 := &history.HistoryComment{
 			HistoryMeta: history.HistoryMeta{
-				HistoryEntity: history.HistoryEntity{Id: randomUuid()},
+				HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_add", row.Name})},
 				EnvironmentId: envId,
 				EndpointId:    endpointId,
 				ObjectType:    typ,
@@ -260,7 +262,7 @@ func convertCommentRows(
 		if !removeTime.Time().IsZero() { // remove
 			h2 := &history.HistoryComment{
 				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{Id: randomUuid()},
+					HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_remove", row.Name})},
 					EnvironmentId: envId,
 					EndpointId:    endpointId,
 					ObjectType:    typ,
@@ -391,7 +393,7 @@ func convertDowntimeRows(
 
 		h1 := &history.HistoryDowntime{
 			HistoryMeta: history.HistoryMeta{
-				HistoryEntity: history.HistoryEntity{Id: randomUuid()},
+				HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "downtime_start", row.Name})},
 				EnvironmentId: envId,
 				EndpointId:    endpointId,
 				ObjectType:    typ,
@@ -409,7 +411,7 @@ func convertDowntimeRows(
 		if !actualEnd.Time().IsZero() { // remove
 			h2 := &history.HistoryDowntime{
 				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{Id: randomUuid()},
+					HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "downtime_end", row.Name})},
 					EnvironmentId: envId,
 					EndpointId:    endpointId,
 					ObjectType:    typ,
@@ -517,14 +519,11 @@ func convertFlappingRows(
 			name += "!" + row.Name2
 		}
 
-		id := mkDeterministicUuid('f', row.FlappinghistoryId)
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
-
-		flappingHistoryId := hashAny([]interface{}{
-			env, strings.Title(typ), name, float64(utils.UnixMilli(start.Time())),
-		})
+		startTime := float64(utils.UnixMilli(start.Time()))
+		flappingHistoryId := hashAny([]interface{}{env, name, startTime})
 
 		if row.EventType == 1001 { // end
 			// The start counterpart should already have been inserted.
@@ -532,7 +531,9 @@ func convertFlappingRows(
 
 			h := &history.HistoryFlapping{
 				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{Id: id},
+					HistoryEntity: history.HistoryEntity{
+						Id: hashAny([]interface{}{env, "flapping_end", name, startTime}),
+					},
 					EnvironmentId: envId,
 					EndpointId:    endpointId,
 					ObjectType:    typ,
@@ -569,7 +570,9 @@ func convertFlappingRows(
 
 			h := &history.HistoryFlapping{
 				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{Id: id},
+					HistoryEntity: history.HistoryEntity{
+						Id: hashAny([]interface{}{env, "flapping_start", name, startTime}),
+					},
 					EnvironmentId: envId,
 					EndpointId:    endpointId,
 					ObjectType:    typ,
@@ -602,9 +605,6 @@ const notificationMigrationQuery = "SELECT n.notification_id, n.notification_rea
 	"n.notification_id > :checkpoint " + // where we were interrupted
 	"ORDER BY n.notification_id " + // allows computeProgress() not to check all IDO rows for whether migrated
 	"LIMIT :bulk"
-
-// zeroHash is a NULL alternative for NOT NULL columns.
-var zeroHash = make(icingadbTypes.Binary, 20)
 
 // notificationTypes maps IDO values to Icinga DB ones.
 var notificationTypes = map[uint8]icingadbTypes.NotificationType{5: 1, 6: 2, 7: 4, 8: 8, 1: 16, 2: 128, 3: 256}
@@ -678,11 +678,10 @@ func convertNotificationRows(
 			continue
 		}
 
-		id := mkDeterministicUuid('n', row.NotificationId)
-		typ := objectTypes[row.ObjecttypeId]
-		hostId := calcObjectId(env, row.Name1)
-		serviceId := calcServiceId(env, row.Name1, row.Name2)
-		ts := convertTime(row.EndTime, row.EndTimeUsec)
+		// The IDO tracks only sent notifications, but not notification config objects. We have to improvise.
+		name := strings.Join(
+			[]string{row.Name1, row.Name2, "migrated from IDO", strconv.FormatUint(row.NotificationId, 36)}, "!",
+		)
 
 		var nt icingadbTypes.NotificationType
 		if row.NotificationReason == 0 {
@@ -695,13 +694,30 @@ func convertNotificationRows(
 			nt = notificationTypes[row.NotificationReason]
 		}
 
+		ntEnum, err := nt.Value()
+		if err != nil {
+			// Programming error
+			panic(err)
+		}
+
+		ts := convertTime(row.EndTime, row.EndTimeUsec)
+		notificationHistoryId := hashAny([]interface{}{env, name, ntEnum, ts})
+		id := hashAny([]interface{}{env, "notification", name, ntEnum, ts})
+		typ := objectTypes[row.ObjecttypeId]
+		hostId := calcObjectId(env, row.Name1)
+		serviceId := calcServiceId(env, row.Name1, row.Name2)
+
 		text := row.Output
 		if row.LongOutput.Valid {
 			text += "\n\n" + row.LongOutput.String
 		}
 
 		notificationHistory = append(notificationHistory, &history.NotificationHistory{
-			HistoryTableEntity: history.HistoryTableEntity{Id: id},
+			HistoryTableEntity: history.HistoryTableEntity{
+				EntityWithoutChecksum: v1.EntityWithoutChecksum{
+					IdMeta: v1.IdMeta{Id: notificationHistoryId},
+				},
+			},
 			HistoryTableMeta: history.HistoryTableMeta{
 				EnvironmentId: envId,
 				EndpointId:    endpointId,
@@ -709,7 +725,7 @@ func convertNotificationRows(
 				HostId:        hostId,
 				ServiceId:     serviceId,
 			},
-			NotificationId:    zeroHash,
+			NotificationId:    calcObjectId(env, name),
 			Type:              nt,
 			SendTime:          ts,
 			State:             row.State,
@@ -729,7 +745,7 @@ func convertNotificationRows(
 				ServiceId:     serviceId,
 				EventType:     "notification",
 			},
-			NotificationHistoryId: id,
+			NotificationHistoryId: notificationHistoryId,
 			EventTime:             ts,
 		})
 
@@ -738,7 +754,9 @@ func convertNotificationRows(
 
 			userNotificationHistory = append(userNotificationHistory, &history.UserNotificationHistory{
 				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{Id: utils.Checksum(append(append([]byte(nil), id.UUID[:]...), userId...))},
+					IdMeta: v1.IdMeta{
+						Id: utils.Checksum(append(append([]byte(nil), notificationHistoryId...), userId...)),
+					},
 				},
 				EnvironmentMeta:       v1.EnvironmentMeta{EnvironmentId: envId},
 				NotificationHistoryId: id,
@@ -811,14 +829,20 @@ func convertStateRows(
 			continue
 		}
 
-		id := mkDeterministicUuid('s', row.StatehistoryId)
+		name := strings.Join([]string{row.Name1, row.Name2}, "!")
+		ts := convertTime(row.StateTime, row.StateTimeUsec)
+		stateHistoryId := hashAny([]interface{}{env, name, ts})
+		id := hashAny([]interface{}{env, "state_change", name, ts})
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
-		ts := convertTime(row.StateTime, row.StateTimeUsec)
 
 		stateHistory = append(stateHistory, &history.StateHistory{
-			HistoryTableEntity: history.HistoryTableEntity{Id: id},
+			HistoryTableEntity: history.HistoryTableEntity{
+				EntityWithoutChecksum: v1.EntityWithoutChecksum{
+					IdMeta: v1.IdMeta{Id: stateHistoryId},
+				},
+			},
 			HistoryTableMeta: history.HistoryTableMeta{
 				EnvironmentId: envId,
 				EndpointId:    endpointId,
@@ -849,7 +873,7 @@ func convertStateRows(
 				ServiceId:     serviceId,
 				EventType:     "state_change",
 			},
-			StateHistoryId: id,
+			StateHistoryId: stateHistoryId,
 			EventTime:      ts,
 		})
 
