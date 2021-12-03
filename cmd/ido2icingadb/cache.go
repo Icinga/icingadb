@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -32,6 +33,14 @@ var eventTimeCacheSchema = []string{
 //
 // Similar for acknowledgements. (On non-recoverable errors the whole program exits.)
 func buildEventTimeCache(ht *historyType, idoColumns []string) {
+	type row = struct {
+		Id            uint64
+		EventTime     int64
+		EventTimeUsec uint32
+		EventIsStart  uint8
+		ObjectId      uint64
+	}
+
 	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, onDeleted func(sql.Result), onNewUncommittedDml func()) {
 		var checkpoint struct {
 			Cnt   int64
@@ -51,13 +60,9 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
 				ht.idoIdColumn+" > :checkpoint ORDER BY xh."+ht.idoIdColumn+" LIMIT :bulk",
 			nil, checkpoint.MaxId.Int64, // ... since we were interrupted:
-			func(idoRows []struct {
-				Id            uint64
-				EventTime     int64
-				EventTimeUsec uint32
-				EventIsStart  uint8
-				ObjectId      uint64
-			}) (checkpoint interface{}) {
+			reflect.TypeOf((*row)(nil)).Elem(),
+			func(ir interface{}) (checkpoint interface{}) {
+				idoRows := ir.([]row)
 				for _, idoRow := range idoRows {
 					if idoRow.EventIsStart == 0 {
 						// Ack/flapping end event. Get the start event time:
@@ -144,6 +149,12 @@ var previousHardStateCacheSchema = []string{
 //
 // Similar for notifications. (On non-recoverable errors the whole program exits.)
 func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
+	type row = struct {
+		Id            uint64
+		ObjectId      uint64
+		LastHardState uint8
+	}
+
 	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, onDeleted func(sql.Result), onNewUncommittedDml func()) {
 		var nextIds struct {
 			Cnt   int64
@@ -187,11 +198,9 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
 				ht.idoIdColumn+" < :checkpoint ORDER BY xh."+ht.idoIdColumn+" DESC LIMIT :bulk",
 			nil, checkpoint, // ... since we were interrupted:
-			func(idoRows []struct {
-				Id            uint64
-				ObjectId      uint64
-				LastHardState uint8
-			}) (checkpoint interface{}) {
+			reflect.TypeOf((*row)(nil)).Elem(),
+			func(ir interface{}) (checkpoint interface{}) {
+				idoRows := ir.([]row)
 				for _, idoRow := range idoRows {
 					var nhs []struct{ NextHardState uint8 }
 					cacheSelect(*tx, &nhs, "SELECT next_hard_state FROM next_hard_state WHERE object_id=?", idoRow.ObjectId)

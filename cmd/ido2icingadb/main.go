@@ -349,74 +349,73 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 		// Stream IDO rows, ...
 		sliceIdoHistory(
 			ht.snapshot, ht.migrationQuery, args, ht.lastId,
-			reflect.MakeFunc(reflect.FuncOf([]reflect.Type{tRows}, []reflect.Type{tAny}, false),
-				func(args []reflect.Value) []reflect.Value {
-					vConvertRowsArgs[5] = args[0] // pass the rows
+			tRows.Elem(),
+			func(idoRows interface{}) (checkpoint interface{}) {
+				vConvertRowsArgs[5] = reflect.ValueOf(idoRows) // pass the rows
 
-					// ... convert them, ...
-					res := vConvertRows.Call(vConvertRowsArgs[:])
+				// ... convert them, ...
+				res := vConvertRows.Call(vConvertRowsArgs[:])
 
-					// ... and insert them:
+				// ... and insert them:
 
-					tx, err := idb.Beginx()
-					if err != nil {
-						log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
-					}
+				tx, err := idb.Beginx()
+				if err != nil {
+					log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
+				}
 
-					for _, operation := range [...]struct {
-						data      reflect.Value
-						buildStmt func(subject interface{}) (stmt string, _ int)
-						stmtCache map[reflect.Type]string
-					}{{res[1], idb.BuildUpsertStmt, icingaDbInserts}, {res[0], idb.BuildUpdateStmt, icingaDbUpdates}} {
-						for _, table := range operation.data.Interface().([][]interface{}) {
-							if len(table) < 1 {
-								continue
-							}
-
-							tRow := reflect.TypeOf(table[0])
-
-							query, ok := operation.stmtCache[tRow]
-							if !ok {
-								query, _ = operation.buildStmt(table[0])
-								operation.stmtCache[tRow] = query
-							}
-
-							stmt, err := tx.PrepareNamed(query)
-							if err != nil {
-								log.With("backend", "Icinga DB", "dml", query).
-									Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
-							}
-
-							for _, row := range table {
-								if _, err := stmt.Exec(row); err != nil {
-									log.With("backend", "Icinga DB", "dml", query, "args", row).
-										Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
-								}
-							}
-
-							_ = stmt.Close()
+				for _, operation := range [...]struct {
+					data      reflect.Value
+					buildStmt func(subject interface{}) (stmt string, _ int)
+					stmtCache map[reflect.Type]string
+				}{{res[1], idb.BuildUpsertStmt, icingaDbInserts}, {res[0], idb.BuildUpdateStmt, icingaDbUpdates}} {
+					for _, table := range operation.data.Interface().([][]interface{}) {
+						if len(table) < 1 {
+							continue
 						}
-					}
 
-					if lastIdoId := res[2].Interface(); lastIdoId != nil {
-						const stmt = "UPDATE ido_migration_progress SET last_ido_id=:last_ido_id " +
-							"WHERE history_type=:history_type"
+						tRow := reflect.TypeOf(table[0])
 
-						args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
-						if _, err := tx.NamedExec(stmt, args); err != nil {
-							log.With("backend", "Icinga DB", "dml", stmt, "args", args).
-								Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+						query, ok := operation.stmtCache[tRow]
+						if !ok {
+							query, _ = operation.buildStmt(table[0])
+							operation.stmtCache[tRow] = query
 						}
-					}
 
-					if err := tx.Commit(); err != nil {
-						log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
-					}
+						stmt, err := tx.PrepareNamed(query)
+						if err != nil {
+							log.With("backend", "Icinga DB", "dml", query).
+								Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
+						}
 
-					inc.inc(args[0].Len())
-					return res[2:]
-				},
-			).Interface(),
+						for _, row := range table {
+							if _, err := stmt.Exec(row); err != nil {
+								log.With("backend", "Icinga DB", "dml", query, "args", row).
+									Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+							}
+						}
+
+						_ = stmt.Close()
+					}
+				}
+
+				if lastIdoId := res[2].Interface(); lastIdoId != nil {
+					const stmt = "UPDATE ido_migration_progress SET last_ido_id=:last_ido_id " +
+						"WHERE history_type=:history_type"
+
+					args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
+					if _, err := tx.NamedExec(stmt, args); err != nil {
+						log.With("backend", "Icinga DB", "dml", stmt, "args", args).
+							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+					}
+				}
+
+				if err := tx.Commit(); err != nil {
+					log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
+				}
+
+				inc.inc(vConvertRowsArgs[5].Len())
+				return res[2].Interface()
+			},
 		)
 
 		ht.bar.SetTotal(ht.bar.Current(), true)
