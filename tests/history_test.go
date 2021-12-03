@@ -312,6 +312,7 @@ func testHistory(t *testing.T, numNodes int) {
 
 		req, err = json.Marshal(ActionsRemoveDowntimeRequest{
 			Downtime: downtimeName,
+			Author:   utils.RandomString(8),
 		})
 		require.NoError(t, err, "marshal remove-downtime request")
 		response, err = client.PostJson("/v1/actions/remove-downtime", bytes.NewBuffer(req))
@@ -678,6 +679,7 @@ type ActionsProcessCheckResultRequest struct {
 
 type ActionsRemoveDowntimeRequest struct {
 	Downtime string `json:"downtime"`
+	Author   string `json:"author"`
 }
 
 type ActionsScheduleDowntimeRequest struct {
