@@ -244,6 +244,20 @@ func testHistory(t *testing.T, numNodes int) {
 		require.NoError(t, err, "decode add-comment response")
 		require.Equal(t, 1, len(addResponse.Results), "add-comment should return 1 result")
 		require.Equal(t, http.StatusOK, addResponse.Results[0].Code, "add-comment result should have OK status")
+		commentName := addResponse.Results[0].Name
+
+		// Ensure that downtime events have distinct timestamps in millisecond resolution.
+		time.Sleep(10 * time.Millisecond)
+
+		removedBy := utils.RandomString(8)
+		req, err = json.Marshal(ActionsRemoveCommentRequest{
+			Comment: commentName,
+			Author:  removedBy,
+		})
+		require.NoError(t, err, "marshal remove-comment request")
+		response, err = client.PostJson("/v1/actions/remove-comment", bytes.NewBuffer(req))
+		require.NoError(t, err, "remove-comment")
+		require.Equal(t, 200, response.StatusCode, "remove-comment")
 
 		for _, n := range nodes {
 			assertEventuallyDrained(t, n.RedisClient, stream)
@@ -251,20 +265,26 @@ func testHistory(t *testing.T, numNodes int) {
 
 		eventually.Assert(t, func(t require.TestingT) {
 			type Row struct {
-				Author  string `db:"author"`
-				Comment string `db:"comment"`
+				Type      string `db:"event_type"`
+				Author    string `db:"author"`
+				Comment   string `db:"comment"`
+				RemovedBy string `db:"removed_by"`
 			}
 
 			var rows []Row
-			err = db.Select(&rows, "SELECT c.author, c.comment"+
+			err = db.Select(&rows, "SELECT h.event_type, c.author, c.comment, c.removed_by"+
 				" FROM history h"+
 				" JOIN comment_history c ON c.comment_id = h.comment_history_id"+
-				" JOIN host ON host.id = c.host_id WHERE host.name = ?", hostname)
+				" JOIN host ON host.id = c.host_id WHERE host.name = ?"+
+				" ORDER BY h.event_time", hostname)
 			require.NoError(t, err, "select comment_history")
 
-			require.Equal(t, 1, len(rows), "there should be exactly one comment_history row")
-			assert.Equal(t, author, rows[0].Author, "author should match")
-			assert.Equal(t, comment, rows[0].Comment, "comment text should match")
+			expected := []Row{
+				{Type: "comment_add", Author: author, Comment: comment, RemovedBy: removedBy},
+				{Type: "comment_remove", Author: author, Comment: comment, RemovedBy: removedBy},
+			}
+
+			assert.Equal(t, expected, rows, "comment history should match")
 		}, 5*time.Second, 200*time.Millisecond)
 
 		testConsistency(t, stream)
@@ -668,6 +688,11 @@ type ActionsAddCommentResponse struct {
 		Name     string `json:"name"`
 		Status   string `json:"status"`
 	} `json:"results"`
+}
+
+type ActionsRemoveCommentRequest struct {
+	Comment string `json:"comment"`
+	Author  string `json:"author"`
 }
 
 type ActionsProcessCheckResultRequest struct {
