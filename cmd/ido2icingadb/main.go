@@ -9,6 +9,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
+	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
@@ -161,7 +162,7 @@ func connectAll(c *Config) (ido, idb *icingadb.DB) {
 
 // connect connects to which DB as cfg specifies. (On non-recoverable errors the whole program exits.)
 func connect(which string, cfg *config.Database) *icingadb.DB {
-	db, err := cfg.Open(log)
+	db, err := cfg.Open(logging.NewLogger(log, 20*time.Second))
 	if err != nil {
 		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
 	}
