@@ -55,8 +55,9 @@ type acknowledgementRow = struct {
 
 func convertAcknowledgementRows(
 	env string, envId, endpointId icingadbTypes.Binary,
-	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []acknowledgementRow,
+	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, ir interface{},
 ) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+	idoRows := ir.([]acknowledgementRow)
 	if len(idoRows) < 1 {
 		return
 	}
@@ -208,9 +209,11 @@ type commentRow = struct {
 
 func convertCommentRows(
 	env string, envId, endpointId icingadbTypes.Binary,
-	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []commentRow,
+	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, ir interface{},
 ) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+	idoRows := ir.([]commentRow)
 	var commentHistory, allHistory []interface{}
+
 	for _, row := range idoRows {
 		id := calcObjectId(env, row.Name)
 		typ := objectTypes[row.ObjecttypeId]
@@ -326,9 +329,11 @@ type downtimeRow = struct {
 
 func convertDowntimeRows(
 	env string, envId, endpointId icingadbTypes.Binary,
-	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []downtimeRow,
+	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, ir interface{},
 ) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+	idoRows := ir.([]downtimeRow)
 	var downtimeHistory, allHistory []interface{}
+
 	for _, row := range idoRows {
 		id := calcObjectId(env, row.Name)
 		typ := objectTypes[row.ObjecttypeId]
@@ -475,8 +480,9 @@ type flappingRow = struct {
 
 func convertFlappingRows(
 	env string, envId, endpointId icingadbTypes.Binary,
-	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []flappingRow,
+	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, ir interface{},
 ) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+	idoRows := ir.([]flappingRow)
 	if len(idoRows) < 1 {
 		return
 	}
@@ -625,8 +631,9 @@ type notificationRow = struct {
 
 func convertNotificationRows(
 	env string, envId, endpointId icingadbTypes.Binary,
-	selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []notificationRow,
+	selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, ir interface{},
 ) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+	idoRows := ir.([]notificationRow)
 	if len(idoRows) < 1 {
 		return
 	}
@@ -802,8 +809,9 @@ type stateRow = struct {
 
 func convertStateRows(
 	env string, envId, endpointId icingadbTypes.Binary,
-	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []stateRow,
+	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, ir interface{},
 ) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+	idoRows := ir.([]stateRow)
 	if len(idoRows) < 1 {
 		return
 	}

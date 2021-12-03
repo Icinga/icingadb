@@ -150,8 +150,13 @@ type historyType struct {
 	cacheLimitQuery string
 	// migrationQuery SELECTs source data for actual migration.
 	migrationQuery string
+	// convertRowType specifies convertRows' idoRows.
+	convertRowType reflect.Type
 	// convertRows intention: see migrate().
-	convertRows interface{}
+	// TODO: make idoRows generic[T] one nice day
+	convertRows func(env string, envId, endpointId icingadbTypes.Binary,
+		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
+		idoRows interface{}) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{})
 
 	// cache represents <name>.sqlite3.
 	cache *sqlx.DB
@@ -209,6 +214,7 @@ var types = historyTypes{
 			})
 		},
 		migrationQuery: acknowledgementMigrationQuery,
+		convertRowType: reflect.TypeOf((*acknowledgementRow)(nil)).Elem(),
 		convertRows:    convertAcknowledgementRows,
 	},
 	{
@@ -216,6 +222,7 @@ var types = historyTypes{
 		idoTable:       "icinga_commenthistory",
 		idoIdColumn:    "commenthistory_id",
 		migrationQuery: commentMigrationQuery,
+		convertRowType: reflect.TypeOf((*commentRow)(nil)).Elem(),
 		convertRows:    convertCommentRows,
 	},
 	{
@@ -223,6 +230,7 @@ var types = historyTypes{
 		idoTable:       "icinga_downtimehistory",
 		idoIdColumn:    "downtimehistory_id",
 		migrationQuery: downtimeMigrationQuery,
+		convertRowType: reflect.TypeOf((*downtimeRow)(nil)).Elem(),
 		convertRows:    convertDowntimeRows,
 	},
 	{
@@ -237,6 +245,7 @@ var types = historyTypes{
 			})
 		},
 		migrationQuery: flappingMigrationQuery,
+		convertRowType: reflect.TypeOf((*flappingRow)(nil)).Elem(),
 		convertRows:    convertFlappingRows,
 	},
 	{
@@ -251,6 +260,7 @@ var types = historyTypes{
 		},
 		cacheLimitQuery: "SELECT MAX(history_id) FROM previous_hard_state",
 		migrationQuery:  notificationMigrationQuery,
+		convertRowType:  reflect.TypeOf((*notificationRow)(nil)).Elem(),
 		convertRows:     convertNotificationRows,
 	},
 	{
@@ -263,6 +273,7 @@ var types = historyTypes{
 		},
 		cacheLimitQuery: "SELECT MAX(history_id) FROM previous_hard_state",
 		migrationQuery:  stateMigrationQuery,
+		convertRowType:  reflect.TypeOf((*stateRow)(nil)).Elem(),
 		convertRows:     convertStateRows,
 	},
 }

@@ -9,7 +9,6 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
-	icingadbTypes "github.com/icinga/icingadb/pkg/types"
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
@@ -267,10 +266,6 @@ func fillCache() {
 	progress.Wait()
 }
 
-// tAny can't be created by just using reflect.TypeOf(interface{}(nil)).
-var tAny = reflect.TypeOf((*interface{})(nil)). // *interface{}
-						Elem() // interface{}
-
 // migrate does the actual migration.
 func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 	endpointId := sha1.Sum([]byte(c.Icinga2.Endpoint))
@@ -281,16 +276,6 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 	}
 
 	types.forEach(func(ht *historyType) {
-		// type rowStructPtr = interface{}
-		// type table = []rowStructPtr
-		// func convertRowsFromIdoToIcingaDb(env string, envId, endpointId Binary,
-		// selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []T)
-		// (icingaDbUpdates, icingaDbInserts []table, checkpoint interface{})
-		vConvertRows := reflect.ValueOf(ht.convertRows) // TODO: make historyType#convertRows generic[T] one nice day
-
-		// []T (idoRows)
-		tRows := vConvertRows.Type().In(5)
-
 		var lastQuery string
 		var lastStmt *sqlx.Stmt
 
@@ -300,34 +285,28 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 			}
 		}()
 
-		vConvertRowsArgs := [6]reflect.Value{
-			reflect.ValueOf(c.Icinga2.Env), reflect.ValueOf(icingadbTypes.Binary(envId)),
-			reflect.ValueOf(icingadbTypes.Binary(endpointId[:])),
-			reflect.ValueOf(func(dest interface{}, query string, args ...interface{}) { // selectCache
-				// Prepare new one, if old one doesn't fit anymore.
-				if query != lastQuery {
-					if lastStmt != nil {
-						_ = lastStmt.Close()
-					}
-
-					var err error
-
-					lastStmt, err = ht.cache.Preparex(query)
-					if err != nil {
-						log.With("backend", "cache", "query", query).
-							Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
-					}
-
-					lastQuery = query
+		selectCache := func(dest interface{}, query string, args ...interface{}) {
+			// Prepare new one, if old one doesn't fit anymore.
+			if query != lastQuery {
+				if lastStmt != nil {
+					_ = lastStmt.Close()
 				}
 
-				if err := lastStmt.Select(dest, args...); err != nil {
-					log.With("backend", "cache", "query", query, "args", args).
-						Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+				var err error
+
+				lastStmt, err = ht.cache.Preparex(query)
+				if err != nil {
+					log.With("backend", "cache", "query", query).
+						Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
 				}
-			}),
-			reflect.ValueOf(ht.snapshot),
-			// and the rows (below)
+
+				lastQuery = query
+			}
+
+			if err := lastStmt.Select(dest, args...); err != nil {
+				log.With("backend", "cache", "query", query, "args", args).
+					Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+			}
 		}
 
 		var args map[string]interface{}
@@ -348,13 +327,12 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 
 		// Stream IDO rows, ...
 		sliceIdoHistory(
-			ht.snapshot, ht.migrationQuery, args, ht.lastId,
-			tRows.Elem(),
+			ht.snapshot, ht.migrationQuery, args, ht.lastId, ht.convertRowType,
 			func(idoRows interface{}) (checkpoint interface{}) {
-				vConvertRowsArgs[5] = reflect.ValueOf(idoRows) // pass the rows
-
 				// ... convert them, ...
-				res := vConvertRows.Call(vConvertRowsArgs[:])
+				updates, inserts, lastIdoId := ht.convertRows(
+					c.Icinga2.Env, envId, endpointId[:], selectCache, ht.snapshot, idoRows,
+				)
 
 				// ... and insert them:
 
@@ -364,11 +342,11 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 				}
 
 				for _, operation := range [...]struct {
-					data      reflect.Value
+					data      [][]interface{}
 					buildStmt func(subject interface{}) (stmt string, _ int)
 					stmtCache map[reflect.Type]string
-				}{{res[1], idb.BuildUpsertStmt, icingaDbInserts}, {res[0], idb.BuildUpdateStmt, icingaDbUpdates}} {
-					for _, table := range operation.data.Interface().([][]interface{}) {
+				}{{inserts, idb.BuildUpsertStmt, icingaDbInserts}, {updates, idb.BuildUpdateStmt, icingaDbUpdates}} {
+					for _, table := range operation.data {
 						if len(table) < 1 {
 							continue
 						}
@@ -398,7 +376,7 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 					}
 				}
 
-				if lastIdoId := res[2].Interface(); lastIdoId != nil {
+				if lastIdoId != nil {
 					const stmt = "UPDATE ido_migration_progress SET last_ido_id=:last_ido_id " +
 						"WHERE history_type=:history_type"
 
@@ -413,8 +391,8 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 					log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
 				}
 
-				inc.inc(vConvertRowsArgs[5].Len())
-				return res[2].Interface()
+				inc.inc(reflect.ValueOf(idoRows).Len())
+				return lastIdoId
 			},
 		)
 
