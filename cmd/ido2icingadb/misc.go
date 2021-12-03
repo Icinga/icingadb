@@ -101,7 +101,6 @@ func sliceIdoHistory(snapshot *sqlx.Tx, query string, args map[string]interface{
 	rowsPtr := vNewRows.Interface()
 	vRows := vNewRows.Elem()
 	onRowsArgs := [1]reflect.Value{vRows}
-	vZeroRows := reflect.Zero(tRows)
 
 	if args == nil {
 		args = map[string]interface{}{}
@@ -131,7 +130,7 @@ func sliceIdoHistory(snapshot *sqlx.Tx, query string, args map[string]interface{
 			break
 		}
 
-		vRows.Set(vZeroRows)
+		vRows.Set(vRows.Slice(0, 0))
 		args["checkpoint"] = checkpoint
 	}
 }
