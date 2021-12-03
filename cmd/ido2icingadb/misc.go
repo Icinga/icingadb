@@ -86,21 +86,20 @@ func calcServiceId(env, name1, name2 string) []byte {
 }
 
 // sliceIdoHistory performs query with args+map[string]interface{}{"checkpoint": checkpoint, "bulk": bulk} on snapshot
-// and passes the results to onRows (a func([]T)interface{}) until either an empty result set or onRows() returns nil.
+// and passes the results to onRows (a func([]rowType)interface{})
+// until either an empty result set or onRows() returns nil.
 // Rationale: split the likely large result set of a query by adding a WHERE condition and a LIMIT,
 // both with :named placeholders (:checkpoint, :bulk).
 // checkpoint is the initial value for the WHERE condition, onRows() returns follow-up ones.
 // (On non-recoverable errors the whole program exits.)
-func sliceIdoHistory(snapshot *sqlx.Tx, query string, args map[string]interface{}, checkpoint, onRows interface{}) {
-	vOnRows := reflect.ValueOf(onRows) // TODO: make onRows generic[T] one nice day
-
-	tRows := vOnRows.Type(). // func(rows []T) (checkpoint interface{})
-					In(0) // []T
-
-	vNewRows := reflect.New(tRows)
+// TODO: make onRows generic[T] one nice day
+func sliceIdoHistory(
+	snapshot *sqlx.Tx, query string, args map[string]interface{}, checkpoint interface{},
+	rowType reflect.Type, onRows func(idoRows interface{}) (checkpoint interface{}),
+) {
+	vNewRows := reflect.New(reflect.SliceOf(rowType))
 	rowsPtr := vNewRows.Interface()
 	vRows := vNewRows.Elem()
-	onRowsArgs := [1]reflect.Value{vRows}
 
 	if args == nil {
 		args = map[string]interface{}{}
@@ -126,7 +125,7 @@ func sliceIdoHistory(snapshot *sqlx.Tx, query string, args map[string]interface{
 			break
 		}
 
-		if checkpoint = vOnRows.Call(onRowsArgs[:])[0].Interface(); checkpoint == nil {
+		if checkpoint = onRows(vRows.Interface()); checkpoint == nil {
 			break
 		}
 
