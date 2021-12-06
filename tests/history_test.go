@@ -217,6 +217,13 @@ func testHistory(t *testing.T, numNodes int) {
 
 		const stream = "icinga:history:stream:comment"
 
+		type HistoryEvent struct {
+			Type      string  `db:"event_type"`
+			Author    string  `db:"author"`
+			Comment   string  `db:"comment"`
+			RemovedBy *string `db:"removed_by"`
+		}
+
 		hostname := utils.UniqueName(t, "host")
 		client.CreateHost(t, hostname, map[string]interface{}{
 			"attrs": map[string]interface{}{
@@ -259,19 +266,45 @@ func testHistory(t *testing.T, numNodes int) {
 		require.NoError(t, err, "remove-comment")
 		require.Equal(t, 200, response.StatusCode, "remove-comment")
 
+		expected := []HistoryEvent{
+			{Type: "comment_add", Author: author, Comment: comment, RemovedBy: &removedBy},
+			{Type: "comment_remove", Author: author, Comment: comment, RemovedBy: &removedBy},
+		}
+
+		if !testing.Short() {
+			// Ensure that downtime events have distinct timestamps in millisecond resolution.
+			time.Sleep(10 * time.Millisecond)
+
+			expireAuthor := utils.RandomString(8)
+			expireComment := utils.RandomString(8)
+			expireDelay := time.Second
+			req, err = json.Marshal(ActionsAddCommentRequest{
+				Type:    "Host",
+				Filter:  fmt.Sprintf(`host.name==%q`, hostname),
+				Author:  expireAuthor,
+				Comment: expireComment,
+				Expiry:  float64(time.Now().Add(expireDelay).UnixMilli()) / 1000,
+			})
+			require.NoError(t, err, "marshal request")
+			response, err = client.PostJson("/v1/actions/add-comment", bytes.NewBuffer(req))
+			require.NoError(t, err, "add-comment")
+			require.Equal(t, 200, response.StatusCode, "add-comment")
+
+			// Icinga only expires comments every 60 seconds, so wait this long after the expiry time.
+			time.Sleep(expireDelay + 60*time.Second)
+
+			expected = append(expected,
+				HistoryEvent{Type: "comment_add", Author: expireAuthor, Comment: expireComment},
+				HistoryEvent{Type: "comment_remove", Author: expireAuthor, Comment: expireComment},
+			)
+		}
+
 		for _, n := range nodes {
 			assertEventuallyDrained(t, n.RedisClient, stream)
 		}
 
 		eventually.Assert(t, func(t require.TestingT) {
-			type Row struct {
-				Type      string `db:"event_type"`
-				Author    string `db:"author"`
-				Comment   string `db:"comment"`
-				RemovedBy string `db:"removed_by"`
-			}
-
-			var rows []Row
+			var rows []HistoryEvent
 			err = db.Select(&rows, "SELECT h.event_type, c.author, c.comment, c.removed_by"+
 				" FROM history h"+
 				" JOIN comment_history c ON c.comment_id = h.comment_history_id"+
@@ -279,15 +312,15 @@ func testHistory(t *testing.T, numNodes int) {
 				" ORDER BY h.event_time", hostname)
 			require.NoError(t, err, "select comment_history")
 
-			expected := []Row{
-				{Type: "comment_add", Author: author, Comment: comment, RemovedBy: removedBy},
-				{Type: "comment_remove", Author: author, Comment: comment, RemovedBy: removedBy},
-			}
 
 			assert.Equal(t, expected, rows, "comment history should match")
 		}, 5*time.Second, 200*time.Millisecond)
 
 		testConsistency(t, stream)
+
+		if testing.Short() {
+			t.Skip("skipped comment expiry test")
+		}
 	})
 
 	t.Run("Downtime", func(t *testing.T) {
