@@ -312,7 +312,6 @@ func testHistory(t *testing.T, numNodes int) {
 				" ORDER BY h.event_time", hostname)
 			require.NoError(t, err, "select comment_history")
 
-
 			assert.Equal(t, expected, rows, "comment history should match")
 		}, 5*time.Second, 200*time.Millisecond)
 
@@ -328,6 +327,13 @@ func testHistory(t *testing.T, numNodes int) {
 
 		const stream = "icinga:history:stream:downtime"
 
+		type HistoryEvent struct {
+			Event     string `db:"event_type"`
+			Author    string `db:"author"`
+			Comment   string `db:"comment"`
+			Cancelled string `db:"has_been_cancelled"`
+		}
+
 		hostname := utils.UniqueName(t, "host")
 		client.CreateHost(t, hostname, map[string]interface{}{
 			"attrs": map[string]interface{}{
@@ -339,14 +345,16 @@ func testHistory(t *testing.T, numNodes int) {
 		})
 
 		downtimeStart := time.Now()
+		author := utils.RandomString(8)
+		comment := utils.RandomString(8)
 		req, err := json.Marshal(ActionsScheduleDowntimeRequest{
 			Type:      "Host",
 			Filter:    fmt.Sprintf(`host.name==%q`, hostname),
 			StartTime: downtimeStart.Unix(),
 			EndTime:   downtimeStart.Add(time.Hour).Unix(),
 			Fixed:     true,
-			Author:    utils.RandomString(8),
-			Comment:   utils.RandomString(8),
+			Author:    author,
+			Comment:   comment,
 		})
 		require.NoError(t, err, "marshal request")
 		response, err := client.PostJson("/v1/actions/schedule-downtime", bytes.NewBuffer(req))
@@ -373,13 +381,56 @@ func testHistory(t *testing.T, numNodes int) {
 		require.Equal(t, 200, response.StatusCode, "remove-downtime")
 		downtimeEnd := time.Now()
 
+		expected := []HistoryEvent{
+			{Event: "downtime_start", Author: author, Comment: comment, Cancelled: "y"},
+			{Event: "downtime_end", Author: author, Comment: comment, Cancelled: "y"},
+		}
+
+		if !testing.Short() {
+			// Ensure that downtime events have distinct timestamps in second resolution (for start time).
+			time.Sleep(time.Second)
+
+			expireStart := time.Now()
+			expireAuthor := utils.RandomString(8)
+			expireComment := utils.RandomString(8)
+			req, err := json.Marshal(ActionsScheduleDowntimeRequest{
+				Type:      "Host",
+				Filter:    fmt.Sprintf(`host.name==%q`, hostname),
+				StartTime: expireStart.Unix(),
+				EndTime:   expireStart.Add(time.Second).Unix(),
+				Fixed:     true,
+				Author:    expireAuthor,
+				Comment:   expireComment,
+			})
+			require.NoError(t, err, "marshal request")
+			response, err := client.PostJson("/v1/actions/schedule-downtime", bytes.NewBuffer(req))
+			require.NoError(t, err, "schedule-downtime")
+			require.Equal(t, 200, response.StatusCode, "schedule-downtime")
+
+			var scheduleResponse ActionsScheduleDowntimeResponse
+			err = json.NewDecoder(response.Body).Decode(&scheduleResponse)
+			require.NoError(t, err, "decode schedule-downtime response")
+			require.Equal(t, 1, len(scheduleResponse.Results), "schedule-downtime should return 1 result")
+			require.Equal(t, http.StatusOK, scheduleResponse.Results[0].Code, "schedule-downtime result should have OK status")
+
+			// Icinga only expires downtimes every 60 seconds, so wait this long in addition to the downtime duration.
+			time.Sleep(60*time.Second + 1*time.Second)
+
+			expected = append(expected,
+				HistoryEvent{Event: "downtime_start", Author: expireAuthor, Comment: expireComment, Cancelled: "n"},
+				HistoryEvent{Event: "downtime_end", Author: expireAuthor, Comment: expireComment, Cancelled: "n"},
+			)
+
+			downtimeEnd = time.Now()
+		}
+
 		for _, n := range nodes {
 			assertEventuallyDrained(t, n.RedisClient, stream)
 		}
 
-		eventually.Assert(t, func(t require.TestingT) {
-			var rows []string
-			err = db.Select(&rows, "SELECT h.event_type FROM history h"+
+		if !eventually.Assert(t, func(t require.TestingT) {
+			var got []HistoryEvent
+			err = db.Select(&got, "SELECT h.event_type, d.author, d.comment, d.has_been_cancelled FROM history h"+
 				" JOIN host ON host.id = h.host_id"+
 				// Joining downtime_history checks that events are written to it.
 				" JOIN downtime_history d ON d.downtime_id = h.downtime_history_id"+
@@ -388,11 +439,21 @@ func testHistory(t *testing.T, numNodes int) {
 				hostname, downtimeStart.Add(-time.Second).UnixMilli(), downtimeEnd.Add(time.Second).UnixMilli())
 			require.NoError(t, err, "select downtime_history")
 
-			require.Equal(t, []string{"downtime_start", "downtime_end"}, rows,
-				"downtime history should match expected result")
-		}, 5*time.Second, 200*time.Millisecond)
+			assert.Equal(t, expected, got, "downtime history should match expected result")
+		}, 5*time.Second, 200*time.Millisecond) {
+			t.Logf("\n%s", utils.MustT(t).String(utils.PrettySelect(db,
+				"SELECT h.event_time, h.event_type FROM history h"+
+					" JOIN host ON host.id = h.host_id"+
+					" LEFT JOIN downtime_history d ON d.downtime_id = h.downtime_history_id"+
+					" WHERE host.name = ?"+
+					" ORDER BY h.event_time", hostname)))
+		}
 
 		testConsistency(t, stream)
+
+		if testing.Short() {
+			t.Skip("skipped expiring downtime")
+		}
 	})
 
 	t.Run("Flapping", func(t *testing.T) {
