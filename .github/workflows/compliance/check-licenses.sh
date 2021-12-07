@@ -5,7 +5,7 @@ set -eo pipefail
 find_license_file() {
   MOD_NAME="$1"
   LICENSE_DIR="vendor/$MOD_NAME"
-  LICENSE_FILES=({,../}LICENSE{,.txt,.md})
+  LICENSE_FILES=({,../}{,UN}LICENSE{,.txt,.md})
 
   for LICENSE_FILE in "${LICENSE_FILES[@]}"; do
     LICENSE_FILE="${LICENSE_DIR}/$LICENSE_FILE"
