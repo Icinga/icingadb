@@ -191,3 +191,12 @@ func AppName() string {
 
 	return filepath.Base(exe)
 }
+
+// MaxInt returns the larger of the given integers.
+func MaxInt(x, y int) int {
+	if x > y {
+		return x
+	}
+
+	return y
+}
