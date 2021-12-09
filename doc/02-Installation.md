@@ -206,7 +206,7 @@ mysql -u root -p icingadb </usr/share/icingadb/schema/mysql/schema.sql
 Foreground:
 
 ```
-icingadb -config /etc/icingadb/config.yml
+icingadb --config /etc/icingadb/config.yml
 ```
 
 Systemd service:
