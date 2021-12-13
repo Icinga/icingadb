@@ -13,21 +13,13 @@ CREATE DOMAIN uint AS bigint CONSTRAINT between_0_and_4294967295 CHECK ( VALUE I
 CREATE DOMAIN smalluint AS int CONSTRAINT between_0_and_65535 CHECK ( VALUE IS NULL OR VALUE BETWEEN 0 AND 65535 );
 CREATE DOMAIN tinyuint AS smallint CONSTRAINT between_0_and_255 CHECK ( VALUE IS NULL OR VALUE BETWEEN 0 AND 255 );
 
-CREATE TYPE boolenum_t AS ENUM ( 'n', 'y' );
-CREATE TYPE acked_t AS ENUM ( 'n', 'y', 'sticky' );
-CREATE TYPE state_type_t AS ENUM ( 'hard', 'soft' );
-CREATE TYPE checkable_type_t AS ENUM ( 'host', 'service' );
-CREATE TYPE comment_type_t AS ENUM ( 'comment', 'ack' );
-CREATE TYPE notification_type_t AS ENUM ( 'downtime_start', 'downtime_end', 'downtime_removed', 'custom', 'acknowledgement', 'problem', 'recovery', 'flapping_start', 'flapping_end' );
-CREATE TYPE history_type_t AS ENUM ( 'notification', 'state_change', 'downtime_start', 'downtime_end', 'comment_add', 'comment_remove', 'flapping_start', 'flapping_end', 'ack_set', 'ack_clear' );
-
-CREATE DOMAIN boolenum AS boolenum_t DEFAULT 'n';
-CREATE DOMAIN acked AS acked_t DEFAULT 'n';
-CREATE DOMAIN state_type AS state_type_t DEFAULT 'hard';
-CREATE DOMAIN checkable_type AS checkable_type_t DEFAULT 'host';
-CREATE DOMAIN comment_type AS comment_type_t DEFAULT 'comment';
-CREATE DOMAIN notification_type AS notification_type_t DEFAULT 'downtime_start';
-CREATE DOMAIN history_type AS history_type_t DEFAULT 'notification';
+CREATE TYPE boolenum AS ENUM ( 'n', 'y' );
+CREATE TYPE acked AS ENUM ( 'n', 'y', 'sticky' );
+CREATE TYPE state_type AS ENUM ( 'hard', 'soft' );
+CREATE TYPE checkable_type AS ENUM ( 'host', 'service' );
+CREATE TYPE comment_type AS ENUM ( 'comment', 'ack' );
+CREATE TYPE notification_type AS ENUM ( 'downtime_start', 'downtime_end', 'downtime_removed', 'custom', 'acknowledgement', 'problem', 'recovery', 'flapping_start', 'flapping_end' );
+CREATE TYPE history_type AS ENUM ( 'notification', 'state_change', 'downtime_start', 'downtime_end', 'comment_add', 'comment_remove', 'flapping_start', 'flapping_end', 'ack_set', 'ack_clear' );
 
 CREATE TABLE host (
   id bytea20 NOT NULL,
@@ -56,21 +48,21 @@ CREATE TABLE host (
   check_interval uint NOT NULL,
   check_retry_interval uint NOT NULL,
 
-  active_checks_enabled boolenum NOT NULL,
-  passive_checks_enabled boolenum NOT NULL,
-  event_handler_enabled boolenum NOT NULL,
-  notifications_enabled boolenum NOT NULL,
+  active_checks_enabled boolenum NOT NULL DEFAULT 'n',
+  passive_checks_enabled boolenum NOT NULL DEFAULT 'n',
+  event_handler_enabled boolenum NOT NULL DEFAULT 'n',
+  notifications_enabled boolenum NOT NULL DEFAULT 'n',
 
-  flapping_enabled boolenum NOT NULL,
+  flapping_enabled boolenum NOT NULL DEFAULT 'n',
   flapping_threshold_low float NOT NULL,
   flapping_threshold_high float NOT NULL,
 
-  perfdata_enabled boolenum NOT NULL,
+  perfdata_enabled boolenum NOT NULL DEFAULT 'n',
 
   eventcommand citext NOT NULL,
   eventcommand_id bytea20 DEFAULT NULL,
 
-  is_volatile boolenum NOT NULL,
+  is_volatile boolenum NOT NULL DEFAULT 'n',
 
   action_url_id bytea20 DEFAULT NULL,
   notes_url_id bytea20 DEFAULT NULL,
@@ -237,7 +229,7 @@ CREATE TABLE host_state (
   environment_id bytea20 NOT NULL,
   properties_checksum bytea20 NOT NULL,
 
-  state_type state_type NOT NULL,
+  state_type state_type NOT NULL DEFAULT 'hard',
   soft_state tinyuint NOT NULL,
   hard_state tinyuint NOT NULL,
   previous_soft_state tinyuint NOT NULL,
@@ -252,17 +244,17 @@ CREATE TABLE host_state (
 
   check_commandline text DEFAULT NULL,
 
-  is_problem boolenum NOT NULL,
-  is_handled boolenum NOT NULL,
-  is_reachable boolenum NOT NULL,
-  is_flapping boolenum NOT NULL,
-  is_overdue boolenum NOT NULL,
+  is_problem boolenum NOT NULL DEFAULT 'n',
+  is_handled boolenum NOT NULL DEFAULT 'n',
+  is_reachable boolenum NOT NULL DEFAULT 'n',
+  is_flapping boolenum NOT NULL DEFAULT 'n',
+  is_overdue boolenum NOT NULL DEFAULT 'n',
 
-  is_acknowledged acked NOT NULL,
+  is_acknowledged acked NOT NULL DEFAULT 'n',
   acknowledgement_comment_id bytea20 DEFAULT NULL,
   last_comment_id bytea20 DEFAULT NULL,
 
-  in_downtime boolenum NOT NULL,
+  in_downtime boolenum NOT NULL DEFAULT 'n',
 
   execution_time uint DEFAULT NULL,
   latency uint DEFAULT NULL,
@@ -326,21 +318,21 @@ CREATE TABLE service (
   check_interval uint NOT NULL,
   check_retry_interval uint NOT NULL,
 
-  active_checks_enabled boolenum NOT NULL,
-  passive_checks_enabled boolenum NOT NULL,
-  event_handler_enabled boolenum NOT NULL,
-  notifications_enabled boolenum NOT NULL,
+  active_checks_enabled boolenum NOT NULL DEFAULT 'n',
+  passive_checks_enabled boolenum NOT NULL DEFAULT 'n',
+  event_handler_enabled boolenum NOT NULL DEFAULT 'n',
+  notifications_enabled boolenum NOT NULL DEFAULT 'n',
 
-  flapping_enabled boolenum NOT NULL,
+  flapping_enabled boolenum NOT NULL DEFAULT 'n',
   flapping_threshold_low float NOT NULL,
   flapping_threshold_high float NOT NULL,
 
-  perfdata_enabled boolenum NOT NULL,
+  perfdata_enabled boolenum NOT NULL DEFAULT 'n',
 
   eventcommand citext NOT NULL,
   eventcommand_id bytea20 DEFAULT NULL,
 
-  is_volatile boolenum NOT NULL,
+  is_volatile boolenum NOT NULL DEFAULT 'n',
 
   action_url_id bytea20 DEFAULT NULL,
   notes_url_id bytea20 DEFAULT NULL,
@@ -503,7 +495,7 @@ CREATE TABLE service_state (
   environment_id bytea20 NOT NULL,
   properties_checksum bytea20 NOT NULL,
 
-  state_type state_type NOT NULL,
+  state_type state_type NOT NULL DEFAULT 'hard',
   soft_state tinyuint NOT NULL,
   hard_state tinyuint NOT NULL,
   previous_soft_state tinyuint NOT NULL,
@@ -518,17 +510,17 @@ CREATE TABLE service_state (
 
   check_commandline text DEFAULT NULL,
 
-  is_problem boolenum NOT NULL,
-  is_handled boolenum NOT NULL,
-  is_reachable boolenum NOT NULL,
-  is_flapping boolenum NOT NULL,
-  is_overdue boolenum NOT NULL,
+  is_problem boolenum NOT NULL DEFAULT 'n',
+  is_handled boolenum NOT NULL DEFAULT 'n',
+  is_reachable boolenum NOT NULL DEFAULT 'n',
+  is_flapping boolenum NOT NULL DEFAULT 'n',
+  is_overdue boolenum NOT NULL DEFAULT 'n',
 
-  is_acknowledged acked NOT NULL,
+  is_acknowledged acked NOT NULL DEFAULT 'n',
   acknowledgement_comment_id bytea20 DEFAULT NULL,
   last_comment_id bytea20 DEFAULT NULL,
 
-  in_downtime boolenum NOT NULL,
+  in_downtime boolenum NOT NULL DEFAULT 'n',
 
   execution_time uint DEFAULT NULL,
   latency uint DEFAULT NULL,
@@ -612,16 +604,16 @@ CREATE TABLE icingadb_instance (
   environment_id bytea20 NOT NULL,
   endpoint_id bytea20 DEFAULT NULL,
   heartbeat biguint NOT NULL,
-  responsible boolenum NOT NULL,
+  responsible boolenum NOT NULL DEFAULT 'n',
 
   icinga2_version varchar(255) NOT NULL,
   icinga2_start_time biguint NOT NULL,
-  icinga2_notifications_enabled boolenum NOT NULL,
-  icinga2_active_service_checks_enabled boolenum NOT NULL,
-  icinga2_active_host_checks_enabled boolenum NOT NULL,
-  icinga2_event_handlers_enabled boolenum NOT NULL,
-  icinga2_flap_detection_enabled boolenum NOT NULL,
-  icinga2_performance_data_enabled boolenum NOT NULL,
+  icinga2_notifications_enabled boolenum NOT NULL DEFAULT 'n',
+  icinga2_active_service_checks_enabled boolenum NOT NULL DEFAULT 'n',
+  icinga2_active_host_checks_enabled boolenum NOT NULL DEFAULT 'n',
+  icinga2_event_handlers_enabled boolenum NOT NULL DEFAULT 'n',
+  icinga2_flap_detection_enabled boolenum NOT NULL DEFAULT 'n',
+  icinga2_performance_data_enabled boolenum NOT NULL DEFAULT 'n',
 
   CONSTRAINT pk_icingadb_instance PRIMARY KEY (id)
 );
@@ -675,10 +667,10 @@ CREATE TABLE checkcommand_argument (
   argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
   argument_key_override citext DEFAULT NULL,
-  repeat_key boolenum NOT NULL,
-  required boolenum NOT NULL,
+  repeat_key boolenum NOT NULL DEFAULT 'n',
+  required boolenum NOT NULL DEFAULT 'n',
   set_if varchar(255) DEFAULT NULL,
-  skip_key boolenum NOT NULL,
+  skip_key boolenum NOT NULL DEFAULT 'n',
 
   CONSTRAINT pk_checkcommand_argument PRIMARY KEY (id)
 );
@@ -780,10 +772,10 @@ CREATE TABLE eventcommand_argument (
   argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
   argument_key_override citext DEFAULT NULL,
-  repeat_key boolenum NOT NULL,
-  required boolenum NOT NULL,
+  repeat_key boolenum NOT NULL DEFAULT 'n',
+  required boolenum NOT NULL DEFAULT 'n',
   set_if varchar(255) DEFAULT NULL,
-  skip_key boolenum NOT NULL,
+  skip_key boolenum NOT NULL DEFAULT 'n',
 
   CONSTRAINT pk_eventcommand_argument PRIMARY KEY (id)
 );
@@ -883,10 +875,10 @@ CREATE TABLE notificationcommand_argument (
   argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
   argument_key_override citext DEFAULT NULL,
-  repeat_key boolenum NOT NULL,
-  required boolenum NOT NULL,
+  repeat_key boolenum NOT NULL DEFAULT 'n',
+  required boolenum NOT NULL DEFAULT 'n',
   set_if varchar(255) DEFAULT NULL,
-  skip_key boolenum NOT NULL,
+  skip_key boolenum NOT NULL DEFAULT 'n',
 
   CONSTRAINT pk_notificationcommand_argument PRIMARY KEY (id)
 );
@@ -950,7 +942,7 @@ CREATE TABLE comment (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
 
-  object_type checkable_type NOT NULL,
+  object_type checkable_type NOT NULL DEFAULT 'host',
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
 
@@ -960,10 +952,10 @@ CREATE TABLE comment (
 
   author citext NOT NULL,
   text text NOT NULL,
-  entry_type comment_type NOT NULL,
+  entry_type comment_type NOT NULL DEFAULT 'comment',
   entry_time biguint NOT NULL,
-  is_persistent boolenum NOT NULL,
-  is_sticky boolenum NOT NULL,
+  is_persistent boolenum NOT NULL DEFAULT 'n',
+  is_sticky boolenum NOT NULL DEFAULT 'n',
   expire_time biguint DEFAULT NULL,
 
   zone_id bytea20 DEFAULT NULL,
@@ -1003,7 +995,7 @@ CREATE TABLE downtime (
 
   triggered_by_id bytea20 DEFAULT NULL,
   parent_id bytea20 DEFAULT NULL,
-  object_type checkable_type NOT NULL,
+  object_type checkable_type NOT NULL DEFAULT 'host',
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
 
@@ -1017,10 +1009,10 @@ CREATE TABLE downtime (
   scheduled_start_time biguint NOT NULL,
   scheduled_end_time biguint NOT NULL,
   scheduled_duration biguint NOT NULL,
-  is_flexible boolenum NOT NULL,
+  is_flexible boolenum NOT NULL DEFAULT 'n',
   flexible_duration biguint NOT NULL,
 
-  is_in_effect boolenum NOT NULL,
+  is_in_effect boolenum NOT NULL DEFAULT 'n',
   start_time biguint DEFAULT NULL,
   end_time biguint DEFAULT NULL,
   duration biguint NOT NULL,
@@ -1275,7 +1267,7 @@ CREATE TABLE timeperiod (
   name varchar(255) NOT NULL,
   name_ci citext NOT NULL,
   display_name citext NOT NULL,
-  prefer_includes boolenum NOT NULL,
+  prefer_includes boolenum NOT NULL DEFAULT 'n',
 
   zone_id bytea20 DEFAULT NULL,
 
@@ -1430,7 +1422,7 @@ CREATE TABLE "user" (
   email varchar(255) NOT NULL,
   pager varchar(255) NOT NULL,
 
-  notifications_enabled boolenum NOT NULL,
+  notifications_enabled boolenum NOT NULL DEFAULT 'n',
 
   timeperiod_id bytea20 DEFAULT NULL,
 
@@ -1574,7 +1566,7 @@ CREATE TABLE zone (
   name varchar(255) NOT NULL,
   name_ci citext NOT NULL,
 
-  is_global boolenum NOT NULL,
+  is_global boolenum NOT NULL DEFAULT 'n',
   parent_id bytea20 DEFAULT NULL,
 
   depth tinyuint NOT NULL,
@@ -1601,12 +1593,12 @@ CREATE TABLE notification_history (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   endpoint_id bytea20 DEFAULT NULL,
-  object_type checkable_type NOT NULL,
+  object_type checkable_type NOT NULL DEFAULT 'host',
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
   notification_id bytea20 NOT NULL,
 
-  type notification_type NOT NULL,
+  type notification_type NOT NULL DEFAULT 'downtime_start',
   send_time biguint NOT NULL,
   state tinyuint NOT NULL,
   previous_hard_state tinyuint NOT NULL,
@@ -1660,12 +1652,12 @@ CREATE TABLE state_history (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   endpoint_id bytea20 DEFAULT NULL,
-  object_type checkable_type NOT NULL,
+  object_type checkable_type NOT NULL DEFAULT 'host',
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
 
   event_time biguint NOT NULL,
-  state_type state_type NOT NULL,
+  state_type state_type NOT NULL DEFAULT 'hard',
   soft_state tinyuint NOT NULL,
   hard_state tinyuint NOT NULL,
   previous_soft_state tinyuint NOT NULL,
@@ -1698,7 +1690,7 @@ CREATE TABLE downtime_history (
   endpoint_id bytea20 DEFAULT NULL,
   triggered_by_id bytea20 DEFAULT NULL,
   parent_id bytea20 DEFAULT NULL,
-  object_type checkable_type NOT NULL,
+  object_type checkable_type NOT NULL DEFAULT 'host',
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
 
@@ -1706,14 +1698,14 @@ CREATE TABLE downtime_history (
   author citext NOT NULL,
   cancelled_by citext DEFAULT NULL,
   comment text NOT NULL,
-  is_flexible boolenum NOT NULL,
+  is_flexible boolenum NOT NULL DEFAULT 'n',
   flexible_duration biguint NOT NULL,
   scheduled_start_time biguint NOT NULL,
   scheduled_end_time biguint NOT NULL,
   start_time biguint NOT NULL,
   end_time biguint NOT NULL,
   scheduled_by varchar(767) DEFAULT NULL,
-  has_been_cancelled boolenum NOT NULL,
+  has_been_cancelled boolenum NOT NULL DEFAULT 'n',
   trigger_time biguint NOT NULL,
   cancel_time biguint DEFAULT NULL,
 
@@ -1743,7 +1735,7 @@ CREATE TABLE comment_history (
   comment_id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   endpoint_id bytea20 DEFAULT NULL,
-  object_type checkable_type NOT NULL,
+  object_type checkable_type NOT NULL DEFAULT 'host',
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
 
@@ -1751,12 +1743,12 @@ CREATE TABLE comment_history (
   author citext NOT NULL,
   removed_by citext DEFAULT NULL,
   comment text NOT NULL,
-  entry_type comment_type NOT NULL,
-  is_persistent boolenum NOT NULL,
-  is_sticky boolenum NOT NULL,
+  entry_type comment_type NOT NULL DEFAULT 'comment',
+  is_persistent boolenum NOT NULL DEFAULT 'n',
+  is_sticky boolenum NOT NULL DEFAULT 'n',
   expire_time biguint DEFAULT NULL,
   remove_time biguint DEFAULT NULL,
-  has_been_removed boolenum NOT NULL,
+  has_been_removed boolenum NOT NULL DEFAULT 'n',
 
   CONSTRAINT pk_comment_history PRIMARY KEY (comment_id)
 );
@@ -1777,7 +1769,7 @@ CREATE TABLE flapping_history (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   endpoint_id bytea20 DEFAULT NULL,
-  object_type checkable_type NOT NULL,
+  object_type checkable_type NOT NULL DEFAULT 'host',
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
 
@@ -1807,7 +1799,7 @@ CREATE TABLE acknowledgement_history (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   endpoint_id bytea20 DEFAULT NULL,
-  object_type checkable_type NOT NULL,
+  object_type checkable_type NOT NULL DEFAULT 'host',
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
 
@@ -1843,7 +1835,7 @@ CREATE TABLE history (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   endpoint_id bytea20 DEFAULT NULL,
-  object_type checkable_type NOT NULL,
+  object_type checkable_type NOT NULL DEFAULT 'host',
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
   notification_history_id bytea20 DEFAULT NULL,
@@ -1853,7 +1845,7 @@ CREATE TABLE history (
   flapping_history_id bytea20 DEFAULT NULL,
   acknowledgement_history_id bytea20 DEFAULT NULL,
 
-  event_type history_type NOT NULL,
+  event_type history_type NOT NULL DEFAULT 'notification',
   event_time biguint NOT NULL,
 
   CONSTRAINT pk_history PRIMARY KEY (id),
