@@ -171,7 +171,7 @@ Set up a PostgreSQL database for Icinga DB:
 # su -l postgres
 
 createuser -P icingadb
-createdb -E UTF8 -O icingadb icingadb
+createdb -E UTF8 --locale en_US.UTF-8 -T template0 -O icingadb icingadb
 psql icingadb <<<'CREATE EXTENSION IF NOT EXISTS citext;'
 ```
 
