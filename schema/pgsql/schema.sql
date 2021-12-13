@@ -1,5 +1,9 @@
 -- Icinga DB | (c) 2021 Icinga GmbH | GPLv2+
 
+-- Postgres in Docker: ensure CITEXT columns are available during schema import. DB user is a superuser and can do this unconditionally.
+-- Everything else: assert CITEXT columns are available during schema import. DB user isn't the superuser and can do this only if it's a no-op (`NOTICE:  extension "citext" already exists, skipping`), i.e. if CITEXT columns are already available.
+CREATE EXTENSION IF NOT EXISTS citext;
+
 CREATE DOMAIN bytea20 AS bytea CONSTRAINT exactly_20_bytes_long CHECK ( VALUE IS NULL OR octet_length(VALUE) = 20 );
 CREATE DOMAIN bytea16 AS bytea CONSTRAINT exactly_16_bytes_long CHECK ( VALUE IS NULL OR octet_length(VALUE) = 16 );
 CREATE DOMAIN bytea4 AS bytea CONSTRAINT exactly_4_bytes_long CHECK ( VALUE IS NULL OR octet_length(VALUE) = 4 );
@@ -32,20 +36,20 @@ CREATE TABLE host (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
-  display_name varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
+  display_name citext NOT NULL,
 
   address varchar(255) NOT NULL,
   address6 varchar(255) NOT NULL,
   address_bin bytea4 DEFAULT NULL,
   address6_bin bytea16 DEFAULT NULL,
 
-  checkcommand varchar(255) NOT NULL,
+  checkcommand citext NOT NULL,
   checkcommand_id bytea20 NOT NULL,
 
   max_check_attempts uint NOT NULL,
 
-  check_timeperiod varchar(255) NOT NULL,
+  check_timeperiod citext NOT NULL,
   check_timeperiod_id bytea20 DEFAULT NULL,
 
   check_timeout uint DEFAULT NULL,
@@ -63,7 +67,7 @@ CREATE TABLE host (
 
   perfdata_enabled boolenum NOT NULL,
 
-  eventcommand varchar(255) NOT NULL,
+  eventcommand citext NOT NULL,
   eventcommand_id bytea20 DEFAULT NULL,
 
   is_volatile boolenum NOT NULL,
@@ -74,10 +78,10 @@ CREATE TABLE host (
   icon_image_id bytea20 DEFAULT NULL,
   icon_image_alt varchar(32) NOT NULL,
 
-  zone varchar(255) NOT NULL,
+  zone citext NOT NULL,
   zone_id bytea20 DEFAULT NULL,
 
-  command_endpoint varchar(255) NOT NULL,
+  command_endpoint citext NOT NULL,
   command_endpoint_id bytea20 DEFAULT NULL,
 
   CONSTRAINT pk_host PRIMARY KEY (id)
@@ -101,8 +105,8 @@ ALTER TABLE host ALTER COLUMN command_endpoint_id SET STORAGE PLAIN;
 CREATE INDEX idx_action_url_checksum ON host(action_url_id);
 CREATE INDEX idx_notes_url_checksum ON host(notes_url_id);
 CREATE INDEX idx_icon_image_checksum ON host(icon_image_id);
-CREATE INDEX idx_host_display_name ON host(LOWER(display_name));
-CREATE INDEX idx_host_name_ci ON host(LOWER(name_ci));
+CREATE INDEX idx_host_display_name ON host(display_name);
+CREATE INDEX idx_host_name_ci ON host(name_ci);
 CREATE INDEX idx_host_name ON host(name);
 
 COMMENT ON COLUMN host.id IS 'sha1(environment.id + name)';
@@ -137,8 +141,8 @@ CREATE TABLE hostgroup (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
-  display_name varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
+  display_name citext NOT NULL,
 
   zone_id bytea20 DEFAULT NULL,
 
@@ -307,15 +311,15 @@ CREATE TABLE service (
   host_id bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
-  display_name varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
+  display_name citext NOT NULL,
 
-  checkcommand varchar(255) NOT NULL,
+  checkcommand citext NOT NULL,
   checkcommand_id bytea20 NOT NULL,
 
   max_check_attempts uint NOT NULL,
 
-  check_timeperiod varchar(255) NOT NULL,
+  check_timeperiod citext NOT NULL,
   check_timeperiod_id bytea20 DEFAULT NULL,
 
   check_timeout uint DEFAULT NULL,
@@ -333,7 +337,7 @@ CREATE TABLE service (
 
   perfdata_enabled boolenum NOT NULL,
 
-  eventcommand varchar(255) NOT NULL,
+  eventcommand citext NOT NULL,
   eventcommand_id bytea20 DEFAULT NULL,
 
   is_volatile boolenum NOT NULL,
@@ -344,10 +348,10 @@ CREATE TABLE service (
   icon_image_id bytea20 DEFAULT NULL,
   icon_image_alt varchar(32) NOT NULL,
 
-  zone varchar(255) NOT NULL,
+  zone citext NOT NULL,
   zone_id bytea20 DEFAULT NULL,
 
-  command_endpoint varchar(255) NOT NULL,
+  command_endpoint citext NOT NULL,
   command_endpoint_id bytea20 DEFAULT NULL,
 
   CONSTRAINT pk_service PRIMARY KEY (id)
@@ -367,9 +371,9 @@ ALTER TABLE service ALTER COLUMN icon_image_id SET STORAGE PLAIN;
 ALTER TABLE service ALTER COLUMN zone_id SET STORAGE PLAIN;
 ALTER TABLE service ALTER COLUMN command_endpoint_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_service_display_name ON service(LOWER(display_name));
+CREATE INDEX idx_service_display_name ON service(display_name);
 CREATE INDEX idx_service_host_id ON service(host_id, display_name);
-CREATE INDEX idx_service_name_ci ON service(LOWER(name_ci));
+CREATE INDEX idx_service_name_ci ON service(name_ci);
 CREATE INDEX idx_service_name ON service(name);
 
 COMMENT ON COLUMN service.id IS 'sha1(environment.id + name)';
@@ -403,8 +407,8 @@ CREATE TABLE servicegroup (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
-  display_name varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
+  display_name citext NOT NULL,
 
   zone_id bytea20 DEFAULT NULL,
 
@@ -574,7 +578,7 @@ CREATE TABLE endpoint (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
 
   zone_id bytea20 NOT NULL,
 
@@ -640,7 +644,7 @@ CREATE TABLE checkcommand (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
   command text NOT NULL,
   timeout uint NOT NULL,
 
@@ -670,7 +674,7 @@ CREATE TABLE checkcommand_argument (
   argument_value text DEFAULT NULL,
   argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
-  argument_key_override varchar(64) DEFAULT NULL,
+  argument_key_override citext DEFAULT NULL,
   repeat_key boolenum NOT NULL,
   required boolenum NOT NULL,
   set_if varchar(255) DEFAULT NULL,
@@ -745,7 +749,7 @@ CREATE TABLE eventcommand (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
   command text NOT NULL,
   timeout smalluint NOT NULL,
 
@@ -775,7 +779,7 @@ CREATE TABLE eventcommand_argument (
   argument_value text DEFAULT NULL,
   argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
-  argument_key_override varchar(64) DEFAULT NULL,
+  argument_key_override citext DEFAULT NULL,
   repeat_key boolenum NOT NULL,
   required boolenum NOT NULL,
   set_if varchar(255) DEFAULT NULL,
@@ -848,7 +852,7 @@ CREATE TABLE notificationcommand (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
   command text NOT NULL,
   timeout smalluint NOT NULL,
 
@@ -878,7 +882,7 @@ CREATE TABLE notificationcommand_argument (
   argument_value text DEFAULT NULL,
   argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
-  argument_key_override varchar(64) DEFAULT NULL,
+  argument_key_override citext DEFAULT NULL,
   repeat_key boolenum NOT NULL,
   required boolenum NOT NULL,
   set_if varchar(255) DEFAULT NULL,
@@ -954,7 +958,7 @@ CREATE TABLE comment (
   properties_checksum bytea20 NOT NULL,
   name varchar(548) NOT NULL,
 
-  author varchar(255) NOT NULL,
+  author citext NOT NULL,
   text text NOT NULL,
   entry_type comment_type NOT NULL,
   entry_time biguint NOT NULL,
@@ -1007,7 +1011,7 @@ CREATE TABLE downtime (
   properties_checksum bytea20 NOT NULL,
   name varchar(548) NOT NULL,
 
-  author varchar(255) NOT NULL,
+  author citext NOT NULL,
   comment text NOT NULL,
   entry_time biguint NOT NULL,
   scheduled_start_time biguint NOT NULL,
@@ -1079,7 +1083,7 @@ CREATE TABLE notification (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
 
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
@@ -1216,7 +1220,7 @@ COMMENT ON COLUMN notification_customvar.customvar_id IS 'customvar.id';
 CREATE TABLE icon_image (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
-  icon_image text NOT NULL,
+  icon_image citext NOT NULL,
 
   CONSTRAINT pk_icon_image PRIMARY KEY (environment_id, id)
 );
@@ -1224,7 +1228,7 @@ CREATE TABLE icon_image (
 ALTER TABLE icon_image ALTER COLUMN id SET STORAGE PLAIN;
 ALTER TABLE icon_image ALTER COLUMN environment_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_icon_image ON icon_image(LOWER(icon_image));
+CREATE INDEX idx_icon_image ON icon_image(icon_image);
 
 COMMENT ON COLUMN icon_image.id IS 'sha1(icon_image)';
 COMMENT ON COLUMN icon_image.environment_id IS 'environment.id';
@@ -1232,7 +1236,7 @@ COMMENT ON COLUMN icon_image.environment_id IS 'environment.id';
 CREATE TABLE action_url (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
-  action_url text NOT NULL,
+  action_url citext NOT NULL,
 
   CONSTRAINT pk_action_url PRIMARY KEY (environment_id, id)
 );
@@ -1240,7 +1244,7 @@ CREATE TABLE action_url (
 ALTER TABLE action_url ALTER COLUMN id SET STORAGE PLAIN;
 ALTER TABLE action_url ALTER COLUMN environment_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_action_url ON action_url(LOWER(action_url));
+CREATE INDEX idx_action_url ON action_url(action_url);
 
 COMMENT ON COLUMN action_url.id IS 'sha1(action_url)';
 COMMENT ON COLUMN action_url.environment_id IS 'environment.id';
@@ -1248,7 +1252,7 @@ COMMENT ON COLUMN action_url.environment_id IS 'environment.id';
 CREATE TABLE notes_url (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
-  notes_url text NOT NULL,
+  notes_url citext NOT NULL,
 
   CONSTRAINT pk_notes_url PRIMARY KEY (environment_id, id)
 );
@@ -1256,7 +1260,7 @@ CREATE TABLE notes_url (
 ALTER TABLE notes_url ALTER COLUMN id SET STORAGE PLAIN;
 ALTER TABLE notes_url ALTER COLUMN environment_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_notes_url ON notes_url(LOWER(notes_url));
+CREATE INDEX idx_notes_url ON notes_url(notes_url);
 
 COMMENT ON COLUMN notes_url.id IS 'sha1(notes_url)';
 COMMENT ON COLUMN notes_url.environment_id IS 'environment.id';
@@ -1269,8 +1273,8 @@ CREATE TABLE timeperiod (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
-  display_name varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
+  display_name citext NOT NULL,
   prefer_includes boolenum NOT NULL,
 
   zone_id bytea20 DEFAULT NULL,
@@ -1294,7 +1298,7 @@ CREATE TABLE timeperiod_range (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   timeperiod_id bytea20 NOT NULL,
-  range_key varchar(255) NOT NULL,
+  range_key citext NOT NULL,
 
   range_value varchar(255) NOT NULL,
 
@@ -1420,8 +1424,8 @@ CREATE TABLE "user" (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
-  display_name varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
+  display_name citext NOT NULL,
 
   email varchar(255) NOT NULL,
   pager varchar(255) NOT NULL,
@@ -1445,8 +1449,8 @@ ALTER TABLE "user" ALTER COLUMN properties_checksum SET STORAGE PLAIN;
 ALTER TABLE "user" ALTER COLUMN timeperiod_id SET STORAGE PLAIN;
 ALTER TABLE "user" ALTER COLUMN zone_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_user_display_name ON "user"(LOWER(display_name));
-CREATE INDEX idx_user_name_ci ON "user"(LOWER(name_ci));
+CREATE INDEX idx_user_display_name ON "user"(display_name);
+CREATE INDEX idx_user_name_ci ON "user"(name_ci);
 CREATE INDEX idx_user_name ON "user"(name);
 
 COMMENT ON COLUMN "user".id IS 'sha1(environment.id + name)';
@@ -1467,8 +1471,8 @@ CREATE TABLE usergroup (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
-  display_name varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
+  display_name citext NOT NULL,
 
   zone_id bytea20 DEFAULT NULL,
 
@@ -1481,8 +1485,8 @@ ALTER TABLE usergroup ALTER COLUMN name_checksum SET STORAGE PLAIN;
 ALTER TABLE usergroup ALTER COLUMN properties_checksum SET STORAGE PLAIN;
 ALTER TABLE usergroup ALTER COLUMN zone_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_usergroup_display_name ON usergroup(LOWER(display_name));
-CREATE INDEX idx_usergroup_name_ci ON usergroup(LOWER(name_ci));
+CREATE INDEX idx_usergroup_display_name ON usergroup(display_name);
+CREATE INDEX idx_usergroup_name_ci ON usergroup(name_ci);
 CREATE INDEX idx_usergroup_name ON usergroup(name);
 
 COMMENT ON COLUMN usergroup.id IS 'sha1(environment.id + name)';
@@ -1568,7 +1572,7 @@ CREATE TABLE zone (
   properties_checksum bytea20 NOT NULL,
 
   name varchar(255) NOT NULL,
-  name_ci varchar(255) NOT NULL,
+  name_ci citext NOT NULL,
 
   is_global boolenum NOT NULL,
   parent_id bytea20 DEFAULT NULL,
@@ -1699,8 +1703,8 @@ CREATE TABLE downtime_history (
   service_id bytea20 DEFAULT NULL,
 
   entry_time biguint NOT NULL,
-  author varchar(255) NOT NULL,
-  cancelled_by varchar(255) DEFAULT NULL,
+  author citext NOT NULL,
+  cancelled_by citext DEFAULT NULL,
   comment text NOT NULL,
   is_flexible boolenum NOT NULL,
   flexible_duration biguint NOT NULL,
@@ -1744,8 +1748,8 @@ CREATE TABLE comment_history (
   service_id bytea20 DEFAULT NULL,
 
   entry_time biguint NOT NULL,
-  author varchar(255) NOT NULL,
-  removed_by varchar(255) DEFAULT NULL,
+  author citext NOT NULL,
+  removed_by citext DEFAULT NULL,
   comment text NOT NULL,
   entry_type comment_type NOT NULL,
   is_persistent boolenum NOT NULL,
@@ -1809,8 +1813,8 @@ CREATE TABLE acknowledgement_history (
 
   set_time biguint NOT NULL,
   clear_time biguint DEFAULT NULL,
-  author varchar(255) DEFAULT NULL,
-  cleared_by varchar(255) DEFAULT NULL,
+  author citext DEFAULT NULL,
+  cleared_by citext DEFAULT NULL,
   comment text DEFAULT NULL,
   expire_time biguint DEFAULT NULL,
   is_sticky boolenum DEFAULT NULL,

@@ -172,7 +172,11 @@ Set up a PostgreSQL database for Icinga DB:
 
 createuser -P icingadb
 createdb -E UTF8 -O icingadb icingadb
+psql icingadb <<<'CREATE EXTENSION IF NOT EXISTS citext;'
 ```
+
+The CREATE EXTENSION command requires the postgresql-contrib package.
+(On RHEL/CentOS 7: rh-postgresql95-postgresql-contrib)
 
 Edit `pg_hba.conf`, insert the following before everything else:
 
