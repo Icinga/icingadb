@@ -17,4 +17,5 @@ require (
 	go.uber.org/zap v1.20.0
 	golang.org/x/exp v0.0.0-20210514180818-737f94c0881e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	honnef.co/go/tools v0.1.3
 )
