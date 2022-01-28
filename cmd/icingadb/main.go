@@ -27,7 +27,7 @@ const (
 	ExitSuccess                = 0
 	ExitFailure                = 1
 	expectedRedisSchemaVersion = "4"
-	expectedDbSchemaVersion    = 2
+	expectedDbSchemaVersion    = 3
 )
 
 func main() {

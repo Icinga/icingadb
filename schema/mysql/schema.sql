@@ -945,7 +945,7 @@ CREATE TABLE notification_history (
   state tinyint unsigned NOT NULL,
   previous_hard_state tinyint unsigned NOT NULL,
   author text NOT NULL,
-  `text` text NOT NULL,
+  `text` longtext NOT NULL,
   users_notified smallint unsigned NOT NULL,
 
   PRIMARY KEY (id),
@@ -1121,4 +1121,4 @@ CREATE TABLE icingadb_schema (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (2, CURRENT_TIMESTAMP() * 1000);
+  VALUES (3, CURRENT_TIMESTAMP() * 1000);
