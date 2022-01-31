@@ -132,7 +132,7 @@ func (r *Retention) StartWithCallback(ctx context.Context, c func(table string, 
 			if c != nil {
 				c(stmt.Table, rs)
 			}
-		})
+		}, periodic.Immediate())
 	}
 
 	select {
