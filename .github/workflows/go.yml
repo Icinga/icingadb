@@ -63,3 +63,19 @@ jobs:
             fmtvar="$(gofmt -d .)"
             echo "$fmtvar"
             test -z "$fmtvar"
+
+  modtidy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.16.x
+
+      - name: Run go mod tidy
+        run: |
+            go mod tidy
+            gitdiff="$(git diff -U0)"
+            echo "$gitdiff"
+            test -z "$gitdiff"
