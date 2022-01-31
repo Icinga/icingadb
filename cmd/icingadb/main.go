@@ -131,6 +131,14 @@ func run() int {
 	hs := history.NewSync(db, rc, logs.GetChildLogger("history-sync"))
 	rt := icingadb.NewRuntimeUpdates(db, rc, logs.GetChildLogger("runtime-updates"))
 	ods := overdue.NewSync(db, rc, logs.GetChildLogger("overdue-sync"))
+	ret := history.NewRetention(
+		db,
+		cmd.Config.HistoryRetention.Days,
+		cmd.Config.HistoryRetention.Interval,
+		cmd.Config.HistoryRetention.Count,
+		cmd.Config.HistoryRetention.Options,
+		logs.GetChildLogger("history-retention"),
+	)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
@@ -279,6 +287,20 @@ func run() int {
 							logger.Info("Starting state runtime updates sync")
 
 							return rt.Sync(synctx, v1.StateFactories, runtimeStateUpdateStreams, true)
+						})
+
+						g.Go(func() error {
+							// Wait for config and state sync to avoid putting additional pressure on the database.
+							configInitSync.Wait()
+							stateInitSync.Wait()
+
+							if err := synctx.Err(); err != nil {
+								return err
+							}
+
+							logger.Info("Starting history retention")
+
+							return ret.Start(synctx)
 						})
 
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
