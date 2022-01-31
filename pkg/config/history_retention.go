@@ -21,5 +21,9 @@ func (r *HistoryRetention) Validate() error {
 		return errors.New("retention interval must be positive")
 	}
 
+	if r.Count == 0 {
+		return errors.New("count must be greater than zero")
+	}
+
 	return r.Options.Validate()
 }
