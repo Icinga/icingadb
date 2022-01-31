@@ -987,7 +987,9 @@ CREATE TABLE state_history (
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_state_history_event_time (event_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE downtime_history (
@@ -1015,7 +1017,9 @@ CREATE TABLE downtime_history (
   trigger_time bigint unsigned NOT NULL,
   cancel_time bigint unsigned DEFAULT NULL,
 
-  PRIMARY KEY (downtime_id)
+  PRIMARY KEY (downtime_id),
+
+  INDEX idx_downtime_history_end_time (end_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE comment_history (
@@ -1037,7 +1041,9 @@ CREATE TABLE comment_history (
   remove_time bigint unsigned DEFAULT NULL,
   has_been_removed enum('n', 'y') NOT NULL,
 
-  PRIMARY KEY (comment_id)
+  PRIMARY KEY (comment_id),
+
+  INDEX idx_comment_history_remove_time (remove_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE flapping_history (
@@ -1055,7 +1061,9 @@ CREATE TABLE flapping_history (
   flapping_threshold_low float NOT NULL,
   flapping_threshold_high float NOT NULL,
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_flapping_history_end_time (end_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE acknowledgement_history (
@@ -1075,7 +1083,9 @@ CREATE TABLE acknowledgement_history (
   is_sticky enum('n', 'y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
   is_persistent enum('n', 'y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording',
 
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+
+  INDEX idx_acknowledgement_history_clear_time (clear_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE history (
