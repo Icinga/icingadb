@@ -52,17 +52,28 @@ options                  | **Optional.** Map of component name to logging level 
 
 Component                | Description
 -------------------------|-----------------------------------------------
+config-sync              | Config object synchronization between Redis and MySQL.
 database                 | Database connection status and queries.
-redis                    | Redis connection status and queries.
+dump-signals             | Dump signals received from Icinga.
 heartbeat                | Icinga heartbeats received through Redis.
 high-availability        | Manages responsibility of Icinga DB instances.
-config-sync              | Config object synchronization between Redis and MySQL.
+history-retention        | Deletes historical data that exceed their configured retention period.
 history-sync             | Synchronization of history entries from Redis to MySQL.
-runtime-updates          | Runtime updates of config objects after the initial config synchronization.
 overdue-sync             | Calculation and synchronization of the overdue status of checkables.
-dump-signals             | Dump signals received from Icinga.
+redis                    | Redis connection status and queries.
+runtime-updates          | Runtime updates of config objects after the initial config synchronization.
 
 ### Duration String <a id="duration-string"></a>
 
 A duration string is a sequence of decimal numbers and a unit suffix, such as `"20s"`.
 Valid units are `"ms"`, `"s"`, `"m"` and `"h"`.
+
+## History Retention <a id="configuration-history-retention"></a>
+
+By default, no historical data is deleted, which means that the longer the data is retained, the more disk space is required to store it.
+History retention is an optional feature that allows you to limit the number of days that historical data is available for each history category.
+
+| Option  | Description                                                                                                                                                                                                   |
+|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| days    | **Optional.** Number of days to retain historical data for all history categories. Use `options` in order to enable retention only for specific categories or to override the retention days configured here. |
+| options | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification` and `state`.                        |
