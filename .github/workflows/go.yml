@@ -33,10 +33,9 @@ jobs:
         with:
           go-version: 1.16.x
 
-      - name: Run staticcheck ./...
-        run: |
-            go install honnef.co/go/tools/cmd/staticcheck@4dc1992c9bb4310ba1e98b30c8d7d46444891d3b
-            staticcheck ./...
+      - uses: dominikh/staticcheck-action@29e9b80fb8de0521ba4ed3fdf68fed5bbe82a2d2 # v1.1.0
+        with:
+          install-go: false
 
   vet:
     runs-on: ubuntu-latest
