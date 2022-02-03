@@ -19,13 +19,13 @@ var registerDriverOnce sync.Once
 
 // Database defines database client configuration.
 type Database struct {
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Database string `yaml:"database"`
-	User     string `yaml:"user"`
-	Password string `yaml:"password"`
-	TLS      `yaml:",inline"`
-	Options  icingadb.Options `yaml:"options"`
+	Host       string           `yaml:"host"`
+	Port       int              `yaml:"port"`
+	Database   string           `yaml:"database"`
+	User       string           `yaml:"user"`
+	Password   string           `yaml:"password"`
+	TlsOptions TLS              `yaml:",inline"`
+	Options    icingadb.Options `yaml:"options"`
 }
 
 // Open prepares the DSN string and driver configuration,
@@ -44,7 +44,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 	config.DBName = d.Database
 	config.Timeout = time.Minute
 
-	tlsConfig, err := d.TLS.MakeConfig(config.Addr)
+	tlsConfig, err := d.TlsOptions.MakeConfig(config.Addr)
 	if err != nil {
 		return nil, err
 	}

@@ -83,7 +83,7 @@ func ParseFlags() (*Flags, error) {
 
 // TLS provides TLS configuration options for Redis and Database.
 type TLS struct {
-	Tls      bool   `yaml:"tls"`
+	Enable   bool   `yaml:"tls"`
 	Cert     string `yaml:"cert"`
 	Key      string `yaml:"key"`
 	Ca       string `yaml:"ca"`
@@ -92,7 +92,7 @@ type TLS struct {
 
 // MakeConfig assembles a tls.Config from t and address.
 func (t *TLS) MakeConfig(address string) (*tls.Config, error) {
-	if !t.Tls {
+	if !t.Enable {
 		return nil, nil
 	}
 

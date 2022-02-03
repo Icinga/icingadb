@@ -19,10 +19,10 @@ import (
 
 // Redis defines Redis client configuration.
 type Redis struct {
-	Address  string `yaml:"address"`
-	Password string `yaml:"password"`
-	TLS      `yaml:",inline"`
-	Options  icingaredis.Options `yaml:"options"`
+	Address    string              `yaml:"address"`
+	Password   string              `yaml:"password"`
+	TlsOptions TLS                 `yaml:",inline"`
+	Options    icingaredis.Options `yaml:"options"`
 }
 
 type ctxDialerFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
@@ -30,7 +30,7 @@ type ctxDialerFunc = func(ctx context.Context, network, addr string) (net.Conn, 
 // NewClient prepares Redis client configuration,
 // calls redis.NewClient, but returns *icingaredis.Client.
 func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
-	tlsConfig, err := r.TLS.MakeConfig(r.Address)
+	tlsConfig, err := r.TlsOptions.MakeConfig(r.Address)
 	if err != nil {
 		return nil, err
 	}
