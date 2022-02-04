@@ -2,13 +2,14 @@ package icingadb
 
 import (
 	"context"
-	"database/sql/driver"
+	sqlDriver "database/sql/driver"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/retry"
@@ -128,10 +129,10 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 	var clause string
 
 	switch db.DriverName() {
-	case "icingadb-mysql":
+	case driver.MySQL:
 		// MySQL treats UPDATE id = id as a no-op.
 		clause = "ON DUPLICATE KEY UPDATE id = id"
-	case "icingadb-pgsql":
+	case driver.PostgreSQL:
 		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO NOTHING", table)
 	}
 
@@ -191,10 +192,10 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 
 	var clause, setFormat string
 	switch db.DriverName() {
-	case "icingadb-mysql":
+	case driver.MySQL:
 		clause = "ON DUPLICATE KEY UPDATE"
 		setFormat = "%[1]s = VALUES(%[1]s)"
-	case "icingadb-pgsql":
+	case driver.PostgreSQL:
 		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO UPDATE SET", table)
 		setFormat = "%[1]s = EXCLUDED.%[1]s"
 	}
@@ -584,7 +585,7 @@ func (db *DB) log(ctx context.Context, query string, counter *com.Counter) perio
 
 // IsRetryable checks whether the given error is retryable.
 func IsRetryable(err error) bool {
-	if errors.Is(err, driver.ErrBadConn) {
+	if errors.Is(err, sqlDriver.ErrBadConn) {
 		return true
 	}
 

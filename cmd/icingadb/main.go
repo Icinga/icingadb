@@ -5,6 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
+	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
@@ -320,9 +321,9 @@ func run() int {
 func checkDbSchema(ctx context.Context, db *icingadb.DB) error {
 	var expectedDbSchemaVersion uint16
 	switch db.DriverName() {
-	case "icingadb-mysql":
+	case driver.MySQL:
 		expectedDbSchemaVersion = expectedMysqlSchemaVersion
-	case "icingadb-pgsql":
+	case driver.PostgreSQL:
 		expectedDbSchemaVersion = expectedPostgresSchemaVersion
 	}
 
