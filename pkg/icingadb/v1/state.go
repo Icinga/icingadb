@@ -30,6 +30,7 @@ type State struct {
 	Output                    types.String               `json:"output"`
 	PerformanceData           types.String               `json:"performance_data"`
 	NormalizedPerformanceData types.String               `json:"normalized_performance_data"`
+	PreviousSoftState         uint8                      `json:"previous_soft_state"`
 	PreviousHardState         uint8                      `json:"previous_hard_state"`
 	Severity                  uint16                     `json:"severity"`
 	SoftState                 uint8                      `json:"state"`
