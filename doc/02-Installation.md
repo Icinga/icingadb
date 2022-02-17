@@ -3,7 +3,7 @@
 ## Requirements <a id="installation-requirements"></a>
 
 * Local Redis instance (Will be installed during this documentation)
-* MySQL/MariaDB server with `icingadb` database, user and schema imports (Will be installed during this documentation)
+* MySQL/MariaDB database `icingadb`, user and schema imports (Will be set up during this documentation)
 
 ## Setting up Icinga DB <a id="setting-up-icingadb"></a>
 
@@ -133,50 +133,7 @@ Debian/Ubuntu:
 apt-get install icingadb-redis
 ```
 
-### Configuring MySQL <a id="configuring-icingadb-mysql"></a>
-
-#### Installing MySQL/MariaDB database server <a id="installing-database-mysql-server"></a>
-
-RHEL/CentOS 8/Fedora:
-
-```
-dnf install mariadb-server mariadb
-
-systemctl enable mariadb
-systemctl start mariadb
-
-mysql_secure_installation
-```
-
-RHEL/CentOS 7:
-
-```
-yum install mariadb-server mariadb
-
-systemctl enable mariadb
-systemctl start mariadb
-
-mysql_secure_installation
-```
-
-SUSE:
-
-```
-zypper install mysql mysql-client
-
-systemctl enable mariadb
-systemctl start mariadb
-```
-
-Debian/Ubuntu:
-
-```
-apt-get install mysql-server mysql-client
-
-mysql_secure_installation
-```
-
-#### Setting up the MySQL database <a id="setting-up-mysql-db"></a>
+### Setting up the MySQL database <a id="setting-up-mysql-db"></a>
 
 Note that if you're using a version of MySQL < 5.7 or MariaDB < 10.2, the following server options must be set:
 
