@@ -7,6 +7,7 @@ import (
 	"encoding"
 	"encoding/json"
 	"github.com/icinga/icingadb/internal"
+	"strings"
 )
 
 // String adds JSON support to sql.NullString.
@@ -50,6 +51,17 @@ func (s *String) UnmarshalJSON(data []byte) error {
 	s.Valid = true
 
 	return nil
+}
+
+// Value implements the driver.Valuer interface.
+// Supports SQL NULL.
+func (s String) Value() (driver.Value, error) {
+	if !s.Valid {
+		return nil, nil
+	}
+
+	// PostgreSQL does not allow null bytes in varchar, char and text fields.
+	return strings.ReplaceAll(s.String, "\x00", ""), nil
 }
 
 // Assert interface compliance.
