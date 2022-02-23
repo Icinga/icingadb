@@ -18,6 +18,14 @@ func TestMain(m *testing.M) {
 }
 
 func getDatabase(t testing.TB) services.RelationalDatabase {
+	rdb := getEmptyDatabase(t)
+
+	rdb.ImportIcingaDbSchema()
+
+	return rdb
+}
+
+func getEmptyDatabase(t testing.TB) services.RelationalDatabase {
 	k := "ICINGADB_TESTS_DATABASE_TYPE"
 	v := os.Getenv(k)
 
@@ -31,8 +39,6 @@ func getDatabase(t testing.TB) services.RelationalDatabase {
 	default:
 		panic(fmt.Sprintf(`unknown database in %s environment variable: %q (must be "mysql" or "pgsql")`, k, v))
 	}
-
-	rdb.ImportIcingaDbSchema()
 
 	return rdb
 }
