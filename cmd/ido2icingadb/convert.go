@@ -708,8 +708,9 @@ func convertNotificationRows(
 		}
 
 		ts := convertTime(row.EndTime, row.EndTimeUsec)
-		notificationHistoryId := hashAny([]interface{}{env, name, ntEnum, ts})
-		id := hashAny([]interface{}{env, "notification", name, ntEnum, ts})
+		tsMilli := float64(utils.UnixMilli(ts.Time()))
+		notificationHistoryId := hashAny([]interface{}{env, name, ntEnum, tsMilli})
+		id := hashAny([]interface{}{env, "notification", name, ntEnum, tsMilli})
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
@@ -839,8 +840,9 @@ func convertStateRows(
 
 		name := strings.Join([]string{row.Name1, row.Name2}, "!")
 		ts := convertTime(row.StateTime, row.StateTimeUsec)
-		stateHistoryId := hashAny([]interface{}{env, name, ts})
-		id := hashAny([]interface{}{env, "state_change", name, ts})
+		tsMilli := float64(utils.UnixMilli(ts.Time()))
+		stateHistoryId := hashAny([]interface{}{env, name, tsMilli})
+		id := hashAny([]interface{}{env, "state_change", name, tsMilli})
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
