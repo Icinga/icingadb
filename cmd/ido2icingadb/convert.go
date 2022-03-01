@@ -767,7 +767,7 @@ func convertNotificationRows(
 					},
 				},
 				EnvironmentMeta:       v1.EnvironmentMeta{EnvironmentId: envId},
-				NotificationHistoryId: id,
+				NotificationHistoryId: notificationHistoryId,
 				UserId:                userId,
 			})
 		}
