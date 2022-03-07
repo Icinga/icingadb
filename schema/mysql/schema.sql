@@ -82,7 +82,7 @@ CREATE TABLE hostgroup (
 
   PRIMARY KEY (id),
 
-  INDEX idx_hostroup_name (name) COMMENT 'Host/service/host group list filtered by host group name'
+  INDEX idx_hostgroup_name (name) COMMENT 'Host/service/host group list filtered by host group name'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE hostgroup_member (
