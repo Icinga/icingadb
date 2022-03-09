@@ -150,8 +150,6 @@ func testHistory(t *testing.T, numNodes int) {
 	client := nodes[0].IcingaClient
 
 	t.Run("Acknowledgement", func(t *testing.T) {
-		t.Parallel()
-
 		const stream = "icinga:history:stream:acknowledgement"
 
 		hostname := utils.UniqueName(t, "host")
@@ -213,8 +211,6 @@ func testHistory(t *testing.T, numNodes int) {
 	})
 
 	t.Run("Comment", func(t *testing.T) {
-		t.Parallel()
-
 		const stream = "icinga:history:stream:comment"
 
 		type HistoryEvent struct {
@@ -323,8 +319,6 @@ func testHistory(t *testing.T, numNodes int) {
 	})
 
 	t.Run("Downtime", func(t *testing.T) {
-		t.Parallel()
-
 		const stream = "icinga:history:stream:downtime"
 
 		type HistoryEvent struct {
@@ -457,8 +451,6 @@ func testHistory(t *testing.T, numNodes int) {
 	})
 
 	t.Run("Flapping", func(t *testing.T) {
-		t.Parallel()
-
 		const stream = "icinga:history:stream:flapping"
 
 		hostname := utils.UniqueName(t, "host")
@@ -504,8 +496,6 @@ func testHistory(t *testing.T, numNodes int) {
 	})
 
 	t.Run("Notification", func(t *testing.T) {
-		t.Parallel()
-
 		const stream = "icinga:history:stream:notification"
 
 		hostname := utils.UniqueName(t, "host")
@@ -584,8 +574,6 @@ func testHistory(t *testing.T, numNodes int) {
 	})
 
 	t.Run("State", func(t *testing.T) {
-		t.Parallel()
-
 		const stream = "icinga:history:stream:state"
 
 		hostname := utils.UniqueName(t, "host")
