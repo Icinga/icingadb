@@ -20,6 +20,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"sync"
 	"time"
 )
 
@@ -270,6 +271,7 @@ func fillCache() {
 // migrate does the actual migration.
 func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 	endpointId := sha1.Sum([]byte(c.Icinga2.Endpoint))
+	idbTx := &sync.Mutex{}
 
 	progress := mpb.New()
 	for i := range types {
@@ -336,6 +338,9 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 				)
 
 				// ... and insert them:
+
+				idbTx.Lock()
+				defer idbTx.Unlock()
 
 				tx, err := idb.Beginx()
 				if err != nil {
