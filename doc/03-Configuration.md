@@ -25,6 +25,7 @@ Configuration of the database used by Icinga DB.
 
 Option                   | Description
 -------------------------|-----------------------------------------------
+type                     | **Optional.** Either `mysql` (default) or `pgsql`.
 host                     | **Required.** Database host or absolute Unix socket path.
 port                     | **Required.** Database port.
 database                 | **Required.** Database database.

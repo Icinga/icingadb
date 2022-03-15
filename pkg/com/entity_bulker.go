@@ -8,6 +8,42 @@ import (
 	"time"
 )
 
+// BulkChunkSplitPolicy is a state machine which tracks the items of a chunk a bulker assembles.
+// A call takes an item for the current chunk into account.
+// Output true indicates that the state machine was reset first and the bulker
+// shall finish the current chunk now (not e.g. once $size is reached) without the given item.
+type BulkChunkSplitPolicy func(contracts.Entity) bool
+
+type BulkChunkSplitPolicyFactory func() BulkChunkSplitPolicy
+
+// NeverSplit returns a pseudo state machine which never demands splitting.
+func NeverSplit() BulkChunkSplitPolicy {
+	return neverSplit
+}
+
+// SplitOnDupId returns a state machine which tracks the inputs' IDs.
+// Once an already seen input arrives, it demands splitting.
+func SplitOnDupId() BulkChunkSplitPolicy {
+	seenIds := map[string]struct{}{}
+
+	return func(entity contracts.Entity) bool {
+		id := entity.ID().String()
+
+		_, ok := seenIds[id]
+		if ok {
+			seenIds = map[string]struct{}{id: {}}
+		} else {
+			seenIds[id] = struct{}{}
+		}
+
+		return ok
+	}
+}
+
+func neverSplit(contracts.Entity) bool {
+	return false
+}
+
 // EntityBulker reads all entities from a channel and streams them in chunks into a Bulk channel.
 type EntityBulker struct {
 	ch  chan []contracts.Entity
@@ -16,14 +52,16 @@ type EntityBulker struct {
 }
 
 // NewEntityBulker returns a new EntityBulker and starts streaming.
-func NewEntityBulker(ctx context.Context, ch <-chan contracts.Entity, count int) *EntityBulker {
+func NewEntityBulker(
+	ctx context.Context, ch <-chan contracts.Entity, count int, splitPolicyFactory BulkChunkSplitPolicyFactory,
+) *EntityBulker {
 	b := &EntityBulker{
 		ch:  make(chan []contracts.Entity),
 		ctx: ctx,
 		mu:  sync.Mutex{},
 	}
 
-	go b.run(ch, count)
+	go b.run(ch, count, splitPolicyFactory)
 
 	return b
 }
@@ -33,10 +71,11 @@ func (b *EntityBulker) Bulk() <-chan []contracts.Entity {
 	return b.ch
 }
 
-func (b *EntityBulker) run(ch <-chan contracts.Entity, count int) {
+func (b *EntityBulker) run(ch <-chan contracts.Entity, count int, splitPolicyFactory BulkChunkSplitPolicyFactory) {
 	defer close(b.ch)
 
 	bufCh := make(chan contracts.Entity, count)
+	splitPolicy := splitPolicyFactory()
 	g, ctx := errgroup.WithContext(b.ctx)
 
 	g.Go(func() error {
@@ -71,6 +110,15 @@ func (b *EntityBulker) run(ch <-chan contracts.Entity, count int) {
 						break
 					}
 
+					if splitPolicy(v) {
+						if len(buf) > 0 {
+							b.ch <- buf
+							buf = make([]contracts.Entity, 0, count)
+						}
+
+						timeout = time.After(256 * time.Millisecond)
+					}
+
 					buf = append(buf, v)
 				case <-timeout:
 					drain = false
@@ -82,6 +130,8 @@ func (b *EntityBulker) run(ch <-chan contracts.Entity, count int) {
 			if len(buf) > 0 {
 				b.ch <- buf
 			}
+
+			splitPolicy = splitPolicyFactory()
 		}
 
 		return nil
@@ -93,16 +143,18 @@ func (b *EntityBulker) run(ch <-chan contracts.Entity, count int) {
 }
 
 // BulkEntities reads all entities from a channel and streams them in chunks into a returned channel.
-func BulkEntities(ctx context.Context, ch <-chan contracts.Entity, count int) <-chan []contracts.Entity {
+func BulkEntities(
+	ctx context.Context, ch <-chan contracts.Entity, count int, splitPolicyFactory BulkChunkSplitPolicyFactory,
+) <-chan []contracts.Entity {
 	if count <= 1 {
 		return oneEntityBulk(ctx, ch)
 	}
 
-	return NewEntityBulker(ctx, ch, count).Bulk()
+	return NewEntityBulker(ctx, ch, count, splitPolicyFactory).Bulk()
 }
 
-// oneEntityBulk operates just as NewEntityBulker(ctx, ch, 1).Bulk(),
-// but without the overhead of the actual bulk creation with a buffer channel and timeout.
+// oneEntityBulk operates just as NewEntityBulker(ctx, ch, 1, splitPolicy).Bulk(),
+// but without the overhead of the actual bulk creation with a buffer channel, timeout and BulkChunkSplitPolicy.
 func oneEntityBulk(ctx context.Context, ch <-chan contracts.Entity) <-chan []contracts.Entity {
 	out := make(chan []contracts.Entity)
 	go func() {
@@ -124,3 +176,8 @@ func oneEntityBulk(ctx context.Context, ch <-chan contracts.Entity) <-chan []con
 
 	return out
 }
+
+var (
+	_ BulkChunkSplitPolicyFactory = NeverSplit
+	_ BulkChunkSplitPolicyFactory = SplitOnDupId
+)

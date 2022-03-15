@@ -5,6 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
+	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
@@ -24,10 +25,11 @@ import (
 )
 
 const (
-	ExitSuccess                = 0
-	ExitFailure                = 1
-	expectedRedisSchemaVersion = "4"
-	expectedDbSchemaVersion    = 3
+	ExitSuccess                   = 0
+	ExitFailure                   = 1
+	expectedRedisSchemaVersion    = "4"
+	expectedMysqlSchemaVersion    = 3
+	expectedPostgresSchemaVersion = 1
 )
 
 func main() {
@@ -317,6 +319,14 @@ func run() int {
 
 // checkDbSchema asserts the database schema of the expected version being present.
 func checkDbSchema(ctx context.Context, db *icingadb.DB) error {
+	var expectedDbSchemaVersion uint16
+	switch db.DriverName() {
+	case driver.MySQL:
+		expectedDbSchemaVersion = expectedMysqlSchemaVersion
+	case driver.PostgreSQL:
+		expectedDbSchemaVersion = expectedPostgresSchemaVersion
+	}
+
 	var version uint16
 
 	err := db.QueryRowxContext(ctx, "SELECT version FROM icingadb_schema ORDER BY id DESC LIMIT 1").Scan(&version)

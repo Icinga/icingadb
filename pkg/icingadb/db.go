@@ -2,18 +2,20 @@ package icingadb
 
 import (
 	"context"
-	"database/sql/driver"
+	sqlDriver "database/sql/driver"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -102,7 +104,7 @@ func (db *DB) BuildColumns(subject interface{}) []string {
 // BuildDeleteStmt returns a DELETE statement for the given struct.
 func (db *DB) BuildDeleteStmt(from interface{}) string {
 	return fmt.Sprintf(
-		`DELETE FROM %s WHERE id IN (?)`,
+		`DELETE FROM "%s" WHERE id IN (?)`,
 		utils.TableName(from),
 	)
 }
@@ -112,7 +114,7 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 	columns := db.BuildColumns(into)
 
 	return fmt.Sprintf(
-		`INSERT INTO %s (%s) VALUES (%s)`,
+		`INSERT INTO "%s" (%s) VALUES (%s)`,
 		utils.TableName(into),
 		strings.Join(columns, ", "),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
@@ -122,14 +124,24 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 // BuildInsertIgnoreStmt returns an INSERT statement for the specified struct for
 // which the database ignores rows that have already been inserted.
 func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
+	table := utils.TableName(into)
 	columns := db.BuildColumns(into)
+	var clause string
+
+	switch db.DriverName() {
+	case driver.MySQL:
+		// MySQL treats UPDATE id = id as a no-op.
+		clause = "ON DUPLICATE KEY UPDATE id = id"
+	case driver.PostgreSQL:
+		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO NOTHING", table)
+	}
 
 	return fmt.Sprintf(
-		// MySQL treats UPDATE id = id as a no-op.
-		`INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE id = id`,
-		utils.TableName(into),
+		`INSERT INTO "%s" (%s) VALUES (%s) %s`,
+		table,
 		strings.Join(columns, ", "),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
+		clause,
 	), len(columns)
 }
 
@@ -137,7 +149,7 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 // and the column list from the specified columns struct.
 func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
 	q := fmt.Sprintf(
-		`SELECT %s FROM %s`,
+		`SELECT %s FROM "%s"`,
 		strings.Join(db.BuildColumns(columns), ", "),
 		utils.TableName(table),
 	)
@@ -160,7 +172,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 	}
 
 	return fmt.Sprintf(
-		`UPDATE %s SET %s WHERE id = :id`,
+		`UPDATE "%s" SET %s WHERE id = :id`,
 		utils.TableName(update),
 		strings.Join(set, ", "),
 	), len(columns) + 1 // +1 because of WHERE id = :id
@@ -169,6 +181,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 // BuildUpsertStmt returns an upsert statement for the given struct.
 func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {
 	insertColumns := db.BuildColumns(subject)
+	table := utils.TableName(subject)
 	var updateColumns []string
 
 	if upserter, ok := subject.(contracts.Upserter); ok {
@@ -177,17 +190,28 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 		updateColumns = insertColumns
 	}
 
+	var clause, setFormat string
+	switch db.DriverName() {
+	case driver.MySQL:
+		clause = "ON DUPLICATE KEY UPDATE"
+		setFormat = "%[1]s = VALUES(%[1]s)"
+	case driver.PostgreSQL:
+		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO UPDATE SET", table)
+		setFormat = "%[1]s = EXCLUDED.%[1]s"
+	}
+
 	set := make([]string, 0, len(updateColumns))
 
 	for _, col := range updateColumns {
-		set = append(set, fmt.Sprintf("%s = VALUES(%s)", col, col))
+		set = append(set, fmt.Sprintf(setFormat, col))
 	}
 
 	return fmt.Sprintf(
-		`INSERT INTO %s (%s) VALUES (%s) ON DUPLICATE KEY UPDATE %s`,
-		utils.TableName(subject),
+		`INSERT INTO "%s" (%s) VALUES (%s) %s %s`,
+		table,
 		strings.Join(insertColumns, ","),
 		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
+		clause,
 		strings.Join(set, ","),
 	), len(insertColumns)
 }
@@ -281,13 +305,13 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 // Entities for which the query ran successfully will be streamed on the succeeded channel.
 func (db *DB) NamedBulkExec(
 	ctx context.Context, query string, count int, sem *semaphore.Weighted,
-	arg <-chan contracts.Entity, succeeded chan<- contracts.Entity,
+	arg <-chan contracts.Entity, succeeded chan<- contracts.Entity, splitPolicyFactory com.BulkChunkSplitPolicyFactory,
 ) error {
 	var counter com.Counter
 	defer db.log(ctx, query, &counter).Stop()
 
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.BulkEntities(ctx, arg, count)
+	bulk := com.BulkEntities(ctx, arg, count, splitPolicyFactory)
 
 	g.Go(func() error {
 		for {
@@ -355,7 +379,7 @@ func (db *DB) NamedBulkExecTx(
 	defer db.log(ctx, query, &counter).Stop()
 
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.BulkEntities(ctx, arg, count)
+	bulk := com.BulkEntities(ctx, arg, count, com.NeverSplit)
 
 	g.Go(func() error {
 		for {
@@ -478,7 +502,7 @@ func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Enti
 	sem := db.GetSemaphoreForTable(utils.TableName(first))
 	stmt, placeholders := db.BuildInsertStmt(first)
 
-	return db.NamedBulkExec(ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, nil)
+	return db.NamedBulkExec(ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, nil, com.NeverSplit)
 }
 
 // UpsertStreamed bulk upserts the specified entities via NamedBulkExec.
@@ -494,7 +518,9 @@ func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Enti
 	sem := db.GetSemaphoreForTable(utils.TableName(first))
 	stmt, placeholders := db.BuildUpsertStmt(first)
 
-	return db.NamedBulkExec(ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, succeeded)
+	return db.NamedBulkExec(
+		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, succeeded, com.SplitOnDupId,
+	)
 }
 
 // UpdateStreamed bulk updates the specified entities via NamedBulkExecTx.
@@ -559,7 +585,7 @@ func (db *DB) log(ctx context.Context, query string, counter *com.Counter) perio
 
 // IsRetryable checks whether the given error is retryable.
 func IsRetryable(err error) bool {
-	if errors.Is(err, driver.ErrBadConn) {
+	if errors.Is(err, sqlDriver.ErrBadConn) {
 		return true
 	}
 
@@ -576,6 +602,35 @@ func IsRetryable(err error) bool {
 			// 1213: Deadlock found when trying to get lock
 			// 2006: MySQL server has gone away
 			return true
+		default:
+			return false
+		}
+	}
+
+	var pe *pq.Error
+	if errors.As(err, &pe) {
+		switch pe.Code {
+		case "08000", // connection_exception
+			"08006", // connection_failure
+			"08001", // sqlclient_unable_to_establish_sqlconnection
+			"08004", // sqlserver_rejected_establishment_of_sqlconnection
+			"40001", // serialization_failure
+			"40P01", // deadlock_detected
+			"54000", // program_limit_exceeded
+			"55006", // object_in_use
+			"55P03", // lock_not_available
+			"57P01", // admin_shutdown
+			"57P02", // crash_shutdown
+			"57P03", // cannot_connect_now
+			"58000", // system_error
+			"58030", // io_error
+			"XX000": // internal_error
+			return true
+		default:
+			if strings.HasPrefix(string(pe.Code), "53") {
+				// Class 53 - Insufficient Resources
+				return true
+			}
 		}
 	}
 

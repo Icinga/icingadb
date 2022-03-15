@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/utf8string"
 	"math"
@@ -124,6 +125,16 @@ func IsDeadlock(err error) bool {
 	if errors.As(err, &e) {
 		switch e.Number {
 		case 1205, 1213:
+			return true
+		default:
+			return false
+		}
+	}
+
+	var pe *pq.Error
+	if errors.As(err, &pe) {
+		switch pe.Code {
+		case "40001", "40P01":
 			return true
 		}
 	}

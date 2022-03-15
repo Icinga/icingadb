@@ -8,11 +8,15 @@ import (
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"syscall"
 	"time"
 )
+
+const MySQL = "icingadb-mysql"
+const PostgreSQL = "icingadb-pgsql"
 
 var timeout = time.Minute * 5
 
@@ -75,10 +79,12 @@ func (d Driver) OpenConnector(name string) (driver.Connector, error) {
 	}, nil
 }
 
-// Register makes our database Driver available under the name "icingadb-mysql".
+// Register makes our database Driver available under the name "icingadb-*sql".
 func Register(logger *logging.Logger) {
-	sql.Register("icingadb-mysql", &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
+	sql.Register(MySQL, &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
+	sql.Register(PostgreSQL, &Driver{ctxDriver: PgSQLDriver{}, Logger: logger})
 	_ = mysql.SetLogger(mysqlLogger(func(v ...interface{}) { logger.Debug(v...) }))
+	sqlx.BindDriver(PostgreSQL, sqlx.DOLLAR)
 }
 
 // ctxDriver helps ensure that we only support drivers that implement driver.Driver and driver.DriverContext.
