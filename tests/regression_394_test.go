@@ -21,7 +21,7 @@ func TestRegression394(t *testing.T) {
 	logger := it.Logger(t)
 
 	r := it.RedisServerT(t)
-	m := it.MysqlDatabaseT(t)
+	rdb := getDatabase(t)
 	i := it.Icinga2NodeT(t, "master")
 	i.EnableIcingaDb(r)
 	err := i.Reload()
@@ -34,12 +34,12 @@ func TestRegression394(t *testing.T) {
 
 	// Only after that, start Icinga DB.
 	logger.Debug("starting icingadb")
-	it.IcingaDbInstanceT(t, r, m)
+	it.IcingaDbInstanceT(t, r, rdb)
 
 	client := i.ApiClient()
 
-	db, err := sqlx.Open("mysql", m.DSN())
-	require.NoError(t, err, "connecting to mysql shouldn't fail")
+	db, err := sqlx.Open(rdb.Driver(), rdb.DSN())
+	require.NoError(t, err, "connecting to SQL database shouldn't fail")
 	t.Cleanup(func() { _ = db.Close() })
 
 	waitForPendingRuntimeUpdates := func(t *testing.T) {
@@ -50,7 +50,7 @@ func TestRegression394(t *testing.T) {
 		client.CreateHost(t, markerName, nil)
 		eventually.Require(t, func(t require.TestingT) {
 			var count int
-			err = db.Get(&count, "SELECT COUNT(*) FROM host WHERE name = ?", markerName)
+			err = db.Get(&count, db.Rebind("SELECT COUNT(*) FROM host WHERE name = ?"), markerName)
 			require.NoError(t, err, "select host count from database")
 			assert.Equalf(t, 1, count, "marker host %q should appear in database", markerName)
 		}, 10*time.Second, 100*time.Millisecond)
@@ -58,7 +58,7 @@ func TestRegression394(t *testing.T) {
 		client.DeleteHost(t, markerName, true)
 		eventually.Require(t, func(t require.TestingT) {
 			var count int
-			err = db.Get(&count, "SELECT COUNT(*) FROM host WHERE name = ?", markerName)
+			err = db.Get(&count, db.Rebind("SELECT COUNT(*) FROM host WHERE name = ?"), markerName)
 			require.NoError(t, err, "select host count from database")
 			assert.Zerof(t, count, "marker host %q should disappear from database", markerName)
 		}, 10*time.Second, 100*time.Millisecond)
@@ -82,7 +82,7 @@ func TestRegression394(t *testing.T) {
 		waitForPendingRuntimeUpdates(t)
 
 		var countAfter int
-		err = db.Get(&countAfter, "SELECT COUNT(*) FROM host WHERE name LIKE ?", namePrefix+"%")
+		err = db.Get(&countAfter, db.Rebind("SELECT COUNT(*) FROM host WHERE name LIKE ?"), namePrefix+"%")
 		require.NoError(t, err, "select host count from database")
 		assert.Zero(t, countAfter, "no hosts should be left in database")
 
@@ -106,7 +106,7 @@ func TestRegression394(t *testing.T) {
 		waitForPendingRuntimeUpdates(t)
 
 		var countBefore int
-		err = db.Get(&countBefore, "SELECT COUNT(*) FROM host WHERE name LIKE ?", namePrefix+"%")
+		err = db.Get(&countBefore, db.Rebind("SELECT COUNT(*) FROM host WHERE name LIKE ?"), namePrefix+"%")
 		require.NoError(t, err, "select host count from database")
 		assert.Equal(t, numObjects, countBefore, "all hosts should exist in database before recreation")
 
@@ -118,7 +118,7 @@ func TestRegression394(t *testing.T) {
 		waitForPendingRuntimeUpdates(t)
 
 		var countAfter int
-		err = db.Get(&countAfter, "SELECT COUNT(*) FROM host WHERE name LIKE ?", namePrefix+"%")
+		err = db.Get(&countAfter, db.Rebind("SELECT COUNT(*) FROM host WHERE name LIKE ?"), namePrefix+"%")
 		require.NoError(t, err, "select host count from database")
 		assert.Equal(t, numObjects, countAfter, "all hosts should exist in database after recreation")
 	})

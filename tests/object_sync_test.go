@@ -67,7 +67,7 @@ func TestObjectSync(t *testing.T) {
 	}
 
 	r := it.RedisServerT(t)
-	m := it.MysqlDatabaseT(t)
+	rdb := getDatabase(t)
 	i := it.Icinga2NodeT(t, "master")
 	conf := bytes.NewBuffer(nil)
 	err := testSyncConfTemplate.Execute(conf, data)
@@ -100,10 +100,10 @@ func TestObjectSync(t *testing.T) {
 
 	// Only after that, start Icinga DB.
 	logger.Debug("starting icingadb")
-	it.IcingaDbInstanceT(t, r, m)
+	it.IcingaDbInstanceT(t, r, rdb)
 
-	db, err := sqlx.Open("mysql", m.DSN())
-	require.NoError(t, err, "connecting to mysql shouldn't fail")
+	db, err := sqlx.Open(rdb.Driver(), rdb.DSN())
+	require.NoError(t, err, "connecting to SQL database shouldn't fail")
 	t.Cleanup(func() { _ = db.Close() })
 
 	t.Run("Host", func(t *testing.T) {
@@ -355,7 +355,7 @@ func TestObjectSync(t *testing.T) {
 
 					require.Eventuallyf(t, func() bool {
 						var count int
-						err := db.Get(&count, "SELECT COUNT(*) FROM service WHERE name = ?", service.Name)
+						err := db.Get(&count, db.Rebind("SELECT COUNT(*) FROM service WHERE name = ?"), service.Name)
 						require.NoError(t, err, "querying service count should not fail")
 						return count == 0
 					}, 20*time.Second, 1*time.Second, "service with name=%q should be removed from database", service.Name)
@@ -381,7 +381,7 @@ func TestObjectSync(t *testing.T) {
 						})
 						require.Eventuallyf(t, func() bool {
 							var count int
-							err := db.Get(&count, "SELECT COUNT(*) FROM service WHERE name = ?", service.Name)
+							err := db.Get(&count, db.Rebind("SELECT COUNT(*) FROM service WHERE name = ?"), service.Name)
 							require.NoError(t, err, "querying service count should not fail")
 							return count == 1
 						}, 20*time.Second, 1*time.Second, "service with name=%q should exist in database", service.Name)
@@ -437,7 +437,7 @@ func TestObjectSync(t *testing.T) {
 
 					require.Eventuallyf(t, func() bool {
 						var count int
-						err := db.Get(&count, "SELECT COUNT(*) FROM user WHERE name = ?", user.Name)
+						err := db.Get(&count, db.Rebind(`SELECT COUNT(*) FROM "user" WHERE name = ?`), user.Name)
 						require.NoError(t, err, "querying user count should not fail")
 						return count == 0
 					}, 20*time.Second, 1*time.Second, "user with name=%q should be removed from database", user.Name)
@@ -454,7 +454,7 @@ func TestObjectSync(t *testing.T) {
 				})
 				require.Eventuallyf(t, func() bool {
 					var count int
-					err := db.Get(&count, "SELECT COUNT(*) FROM user WHERE name = ?", userName)
+					err := db.Get(&count, db.Rebind(`SELECT COUNT(*) FROM "user" WHERE name = ?`), userName)
 					require.NoError(t, err, "querying user count should not fail")
 					return count == 1
 				}, 20*time.Second, 1*time.Second, "user with name=%q should exist in database", userName)
@@ -499,7 +499,7 @@ func TestObjectSync(t *testing.T) {
 
 					require.Eventuallyf(t, func() bool {
 						var count int
-						err := db.Get(&count, "SELECT COUNT(*) FROM notification WHERE name = ?", notification.fullName())
+						err := db.Get(&count, db.Rebind("SELECT COUNT(*) FROM notification WHERE name = ?"), notification.fullName())
 						require.NoError(t, err, "querying notification count should not fail")
 						return count == 0
 					}, 20*time.Second, 200*time.Millisecond, "notification with name=%q should be removed from database", notification.fullName())
@@ -525,7 +525,7 @@ func TestObjectSync(t *testing.T) {
 
 				require.Eventuallyf(t, func() bool {
 					var count int
-					err := db.Get(&count, "SELECT COUNT(*) FROM notification WHERE name = ?", baseNotification.fullName())
+					err := db.Get(&count, db.Rebind("SELECT COUNT(*) FROM notification WHERE name = ?"), baseNotification.fullName())
 					require.NoError(t, err, "querying notification count should not fail")
 					return count == 1
 				}, 20*time.Second, 200*time.Millisecond, "notification with name=%q should exist in database", baseNotification.fullName())
@@ -918,10 +918,10 @@ func (n Notification) verify(t require.TestingT, db *sqlx.DB) {
 
 	// Check if the "notification_user" table has been populated correctly
 	{
-		query := "SELECT u.name FROM notification n JOIN notification_user nu ON n.id = nu.notification_id JOIN user u ON u.id = nu.user_id WHERE n.name = ? ORDER BY u.name"
+		query := `SELECT u.name FROM notification n JOIN notification_user nu ON n.id = nu.notification_id JOIN "user" u ON u.id = nu.user_id WHERE n.name = ? ORDER BY u.name`
 		var rows []string
-		err := db.Select(&rows, query, n.fullName())
-		require.NoError(t, err, "mysql query")
+		err := db.Select(&rows, db.Rebind(query), n.fullName())
+		require.NoError(t, err, "SQL query")
 
 		expected := append([]string(nil), n.Users...)
 		sort.Strings(expected)
@@ -933,8 +933,8 @@ func (n Notification) verify(t require.TestingT, db *sqlx.DB) {
 	{
 		query := "SELECT ug.name FROM notification n JOIN notification_usergroup ng ON n.id = ng.notification_id JOIN usergroup ug ON ug.id = ng.usergroup_id WHERE n.name = ? ORDER BY ug.name"
 		var rows []string
-		err := db.Select(&rows, query, n.fullName())
-		require.NoError(t, err, "mysql query")
+		err := db.Select(&rows, db.Rebind(query), n.fullName())
+		require.NoError(t, err, "SQL query")
 
 		expected := append([]string(nil), n.UserGroups...)
 		sort.Strings(expected)
@@ -991,15 +991,15 @@ func (n Notification) verify(t require.TestingT, db *sqlx.DB) {
 
 		query := "SELECT u.name AS username, ug.name AS groupname FROM notification n " +
 			"JOIN notification_recipient nr ON n.id = nr.notification_id " +
-			"LEFT JOIN user u ON u.id = nr.user_id " +
+			`LEFT JOIN "user" u ON u.id = nr.user_id ` +
 			"LEFT JOIN usergroup ug ON ug.id = nr.usergroup_id " +
 			"WHERE n.name = ? " +
-			"ORDER BY u.name, ug.name"
+			"ORDER BY u.name IS NOT NULL, u.name, ug.name IS NOT NULL, ug.name"
 
 		var rows []Row
-		err := db.Select(&rows, query, n.fullName())
+		err := db.Select(&rows, db.Rebind(query), n.fullName())
 
-		require.NoError(t, err, "mysql query")
+		require.NoError(t, err, "SQL query")
 		require.Equal(t, expected, rows, "Recipients in database should be equal")
 	}
 }
@@ -1114,7 +1114,11 @@ func verifyIcingaDbRow(t require.TestingT, db *sqlx.DB, obj interface{}) {
 	joinColumns := func(cs []ColumnValueExpected) string {
 		var c []string
 		for i := range cs {
-			c = append(c, cs[i].Column)
+			var quotedParts []string
+			for _, part := range strings.Split(cs[i].Column, ".") {
+				quotedParts = append(quotedParts, `"`+part+`"`)
+			}
+			c = append(c, strings.Join(quotedParts, "."))
 		}
 		return strings.Join(c, ", ")
 	}
@@ -1153,24 +1157,25 @@ func verifyIcingaDbRow(t require.TestingT, db *sqlx.DB, obj interface{}) {
 
 	joinsQuery := ""
 	for join := range joins {
-		joinsQuery += fmt.Sprintf(" LEFT JOIN %s ON %s.id = %s.%s_id", join, join, table, join)
+		joinsQuery += fmt.Sprintf(` LEFT JOIN "%s" ON "%s"."id" = "%s"."%s_id"`, join, join, table, join)
 	}
 
-	query := "SELECT " + joinColumns(columns) + " FROM " + table + joinsQuery + " WHERE " + table + ".name = ?"
-	rows, err := db.Query(query, name)
-	require.NoError(t, err, "mysql query")
+	query := fmt.Sprintf(`SELECT %s FROM "%s" %s WHERE "%s"."name" = ?`,
+		joinColumns(columns), table, joinsQuery, table)
+	rows, err := db.Query(db.Rebind(query), name)
+	require.NoError(t, err, "SQL query: %s", query)
 	defer func() { _ = rows.Close() }()
-	require.True(t, rows.Next(), "mysql query should return a row")
+	require.True(t, rows.Next(), "SQL query should return a row: %s", query)
 
 	err = rows.Scan(scanSlice(columns)...)
-	require.NoError(t, err, "mysql scan")
+	require.NoError(t, err, "SQL scan: %s", query)
 
 	for _, col := range columns {
 		got := reflect.ValueOf(col.Value).Elem().Interface()
 		assert.Equalf(t, col.Expected, got, "%s should match", col.Column)
 	}
 
-	require.False(t, rows.Next(), "mysql query should return only one row")
+	require.False(t, rows.Next(), "SQL query should return only one row: %s", query)
 }
 
 // newString allocates a new *string and initializes it. This helper function exists as
@@ -1228,9 +1233,9 @@ func (c *CustomVarTestData) verify(t require.TestingT, logger *zap.Logger, db *s
 	}
 	query += "WHERE " + table + ".name = ?"
 
-	rows, err := db.Query(query, name)
-	defer func() { _ = rows.Close() }()
+	rows, err := db.Query(db.Rebind(query), name)
 	require.NoError(t, err, "querying customvars")
+	defer func() { _ = rows.Close() }()
 
 	expectedSrc := c.Vars
 	if flat {

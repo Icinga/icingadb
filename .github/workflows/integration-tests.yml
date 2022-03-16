@@ -10,7 +10,18 @@ on:
 
 jobs:
   integration-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        database:
+          - name: mysql
+            pretty_name: MySQL
+          - name: pgsql
+            pretty_name: PostgreSQL
+
+    name: ${{ matrix.database.pretty_name }}
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -28,8 +39,10 @@ jobs:
       - name: Run Integration Tests
         run: ./icingadb-test -icingatesting.debuglog debug.log -test.v
         env:
+          ICINGADB_TESTS_DATABASE_TYPE: ${{ matrix.database.name }}
           ICINGA_TESTING_ICINGADB_BINARY: ${{ github.workspace }}/icingadb
-          ICINGA_TESTING_ICINGADB_SCHEMA: ${{ github.workspace }}/schema/mysql/schema.sql
+          ICINGA_TESTING_ICINGADB_SCHEMA_MYSQL: ${{ github.workspace }}/schema/mysql/schema.sql
+          ICINGA_TESTING_ICINGADB_SCHEMA_PGSQL: ${{ github.workspace }}/schema/pgsql/schema.sql
       - name: Compress Debug Log
         if: ${{ always() }}
         run: xz -9 debug.log

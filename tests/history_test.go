@@ -40,8 +40,7 @@ func TestHistory(t *testing.T) {
 }
 
 func testHistory(t *testing.T, numNodes int) {
-	m := it.MysqlDatabaseT(t)
-	m.ImportIcingaDbSchema()
+	rdb := getDatabase(t)
 
 	ca, err := pki.NewCA()
 	require.NoError(t, err, "generating a CA should succeed")
@@ -101,7 +100,7 @@ func testHistory(t *testing.T, numNodes int) {
 		n.Icinga2.EnableIcingaDb(n.ConsistencyRedis)
 		err = n.Icinga2.Reload()
 		require.NoError(t, err, "icinga2 should reload without error")
-		it.IcingaDbInstanceT(t, n.Redis, m)
+		it.IcingaDbInstanceT(t, n.Redis, rdb)
 
 		{
 			n := n
@@ -143,7 +142,7 @@ func testHistory(t *testing.T, numNodes int) {
 		}
 	}, 15*time.Second, 200*time.Millisecond)
 
-	db, err := sqlx.Connect("mysql", m.DSN())
+	db, err := sqlx.Connect(rdb.Driver(), rdb.DSN())
 	require.NoError(t, err, "connecting to mysql")
 	t.Cleanup(func() { _ = db.Close() })
 
@@ -195,10 +194,10 @@ func testHistory(t *testing.T, numNodes int) {
 			}
 
 			var rows []Row
-			err = db.Select(&rows, "SELECT a.author, a.comment FROM history h"+
+			err = db.Select(&rows, db.Rebind("SELECT a.author, a.comment FROM history h"+
 				" JOIN host ON host.id = h.host_id"+
 				" JOIN acknowledgement_history a ON a.id = h.acknowledgement_history_id"+
-				" WHERE host.name = ? AND ? < h.event_time AND h.event_time < ?",
+				" WHERE host.name = ? AND ? < h.event_time AND h.event_time < ?"),
 				hostname, ackTime.Add(-time.Second).UnixMilli(), ackTime.Add(time.Second).UnixMilli())
 			require.NoError(t, err, "select acknowledgement_history")
 
@@ -301,11 +300,11 @@ func testHistory(t *testing.T, numNodes int) {
 
 		eventually.Assert(t, func(t require.TestingT) {
 			var rows []HistoryEvent
-			err = db.Select(&rows, "SELECT h.event_type, c.author, c.comment, c.removed_by"+
+			err = db.Select(&rows, db.Rebind("SELECT h.event_type, c.author, c.comment, c.removed_by"+
 				" FROM history h"+
 				" JOIN comment_history c ON c.comment_id = h.comment_history_id"+
 				" JOIN host ON host.id = c.host_id WHERE host.name = ?"+
-				" ORDER BY h.event_time", hostname)
+				" ORDER BY h.event_time"), hostname)
 			require.NoError(t, err, "select comment_history")
 
 			assert.Equal(t, expected, rows, "comment history should match")
@@ -424,12 +423,13 @@ func testHistory(t *testing.T, numNodes int) {
 
 		if !eventually.Assert(t, func(t require.TestingT) {
 			var got []HistoryEvent
-			err = db.Select(&got, "SELECT h.event_type, d.author, d.comment, d.has_been_cancelled FROM history h"+
+			err = db.Select(&got, db.Rebind("SELECT h.event_type, d.author, d.comment, d.has_been_cancelled"+
+				" FROM history h"+
 				" JOIN host ON host.id = h.host_id"+
 				// Joining downtime_history checks that events are written to it.
 				" JOIN downtime_history d ON d.downtime_id = h.downtime_history_id"+
 				" WHERE host.name = ? AND ? < h.event_time AND h.event_time < ?"+
-				" ORDER BY h.event_time",
+				" ORDER BY h.event_time"),
 				hostname, downtimeStart.Add(-time.Second).UnixMilli(), downtimeEnd.Add(time.Second).UnixMilli())
 			require.NoError(t, err, "select downtime_history")
 
@@ -479,12 +479,12 @@ func testHistory(t *testing.T, numNodes int) {
 
 		eventually.Assert(t, func(t require.TestingT) {
 			var rows []string
-			err = db.Select(&rows, "SELECT h.event_type FROM history h"+
+			err = db.Select(&rows, db.Rebind("SELECT h.event_type FROM history h"+
 				" JOIN host ON host.id = h.host_id"+
 				// Joining flapping_history checks that events are written to it.
 				" JOIN flapping_history f ON f.id = h.flapping_history_id"+
 				" WHERE host.name = ? AND ? < h.event_time AND h.event_time < ?"+
-				" ORDER BY h.event_time",
+				" ORDER BY h.event_time"),
 				hostname, timeBefore.Add(-time.Second).UnixMilli(), timeAfter.Add(time.Second).UnixMilli())
 			require.NoError(t, err, "select flapping_history")
 
@@ -557,13 +557,13 @@ func testHistory(t *testing.T, numNodes int) {
 
 		eventually.Assert(t, func(t require.TestingT) {
 			var rows []Notification
-			err = db.Select(&rows, "SELECT n.type, COALESCE(u.name, '') AS username FROM history h"+
+			err = db.Select(&rows, db.Rebind("SELECT n.type, COALESCE(u.name, '') AS username FROM history h"+
 				" JOIN host ON host.id = h.host_id"+
 				" JOIN notification_history n ON n.id = h.notification_history_id"+
 				" LEFT JOIN user_notification_history un ON un.notification_history_id = n.id"+
-				" LEFT JOIN user u ON u.id = un.user_id"+
+				` LEFT JOIN "user" u ON u.id = un.user_id`+
 				" WHERE host.name = ? AND ? < h.event_time AND h.event_time < ?"+
-				" ORDER BY h.event_time, username",
+				" ORDER BY h.event_time, username"),
 				hostname, timeBefore.Add(-time.Second).UnixMilli(), timeAfter.Add(time.Second).UnixMilli())
 			require.NoError(t, err, "select notification_history")
 
@@ -624,10 +624,10 @@ func testHistory(t *testing.T, numNodes int) {
 		eventually.Assert(t, func(t require.TestingT) {
 
 			var rows []State
-			err = db.Select(&rows, "SELECT s.state_type, s.soft_state, s.hard_state FROM history h"+
+			err = db.Select(&rows, db.Rebind("SELECT s.state_type, s.soft_state, s.hard_state FROM history h"+
 				" JOIN host ON host.id = h.host_id JOIN state_history s ON s.id = h.state_history_id"+
 				" WHERE host.name = ? AND ? < h.event_time AND h.event_time < ?"+
-				" ORDER BY h.event_time",
+				" ORDER BY h.event_time"),
 				hostname, timeBefore.Add(-time.Second).UnixMilli(), timeAfter.Add(time.Second).UnixMilli())
 			require.NoError(t, err, "select state_history")
 
