@@ -15,7 +15,7 @@ type NotificationHistory struct {
 	State              uint8                  `json:"state"`
 	PreviousHardState  uint8                  `json:"previous_hard_state"`
 	Author             string                 `json:"author"`
-	Text               string                 `json:"text"`
+	Text               types.String           `json:"text"`
 	UsersNotified      uint16                 `json:"users_notified"`
 }
 

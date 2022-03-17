@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"crypto/sha1"
+	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
 	"github.com/jmoiron/sqlx"
@@ -12,6 +14,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -32,6 +35,26 @@ func (bi *barIncrementer) inc(i int) {
 	bi.bar.IncrBy(i)
 	bi.bar.DecoratorEwmaUpdate(now.Sub(prev))
 }
+
+type IdoMigrationProgressUpserter struct {
+	HistoryType string `json:"history_type"`
+}
+
+// Upsert implements the contracts.Upserter interface.
+func (impu *IdoMigrationProgressUpserter) Upsert() interface{} {
+	return impu
+}
+
+type IdoMigrationProgress struct {
+	IdoMigrationProgressUpserter `json:",inline"`
+	LastIdoId                    uint64 `json:"last_ido_id"`
+}
+
+// Assert interface compliance.
+var (
+	_ contracts.Upserter = (*IdoMigrationProgressUpserter)(nil)
+	_ contracts.Upserter = (*IdoMigrationProgress)(nil)
+)
 
 const bulk = 10000
 
@@ -107,6 +130,10 @@ func sliceIdoHistory(
 
 	args["checkpoint"] = checkpoint
 	args["bulk"] = bulk
+
+	if snapshot.DriverName() != driver.MySQL {
+		query = strings.ReplaceAll(query, " USE INDEX (PRIMARY)", "")
+	}
 
 	for {
 		// TODO: use Tx#SelectNamed() one nice day (https://github.com/jmoiron/sqlx/issues/779)
