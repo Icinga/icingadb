@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/pkg/config"
+	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/jessevdk/go-flags"
@@ -193,26 +194,27 @@ func startIdoTx(ido *icingadb.DB) {
 func computeProgress(idb *icingadb.DB) {
 	{
 		_, err := idb.Exec(`CREATE TABLE IF NOT EXISTS ido_migration_progress (
-    history_type VARCHAR(63) PRIMARY KEY,
-    last_ido_id BIGINT unsigned NOT NULL
+    history_type VARCHAR(63) NOT NULL,
+    last_ido_id BIGINT NOT NULL,
+
+    CONSTRAINT pk_ido_migration_progress PRIMARY KEY (history_type)
 )`)
 		if err != nil {
 			log.Fatalf("%+v", errors.Wrap(err, "can't create table ido_migration_progress"))
 		}
 	}
 
-	types.forEach(func(ht *historyType) {
-		stmt := idb.Rebind(
-			"INSERT INTO ido_migration_progress(history_type, last_ido_id) " +
-				"VALUES (?, 0) ON DUPLICATE KEY UPDATE history_type=history_type",
-		)
+	stmt, _ := idb.BuildUpsertStmt(&IdoMigrationProgress{})
 
-		if _, err := idb.Exec(stmt, ht.name); err != nil {
-			log.With("backend", "Icinga DB", "dml", stmt, "args", []interface{}{ht.name}).
+	types.forEach(func(ht *historyType) {
+		row := &IdoMigrationProgress{IdoMigrationProgressUpserter{ht.name}, 0}
+
+		if _, err := idb.NamedExec(stmt, row); err != nil {
+			log.With("backend", "Icinga DB", "dml", stmt, "args", []interface{}{ht.name, 0}).
 				Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 		}
 
-		const query = "SELECT last_ido_id FROM ido_migration_progress WHERE history_type=?"
+		var query = idb.Rebind("SELECT last_ido_id FROM ido_migration_progress WHERE history_type=?")
 
 		if err := idb.Get(&ht.lastId, query, ht.name); err != nil {
 			log.With("backend", "Icinga DB", "query", query, "args", []interface{}{ht.name}).
@@ -228,11 +230,13 @@ func computeProgress(idb *icingadb.DB) {
 
 		err := ht.snapshot.Select(
 			&rows,
-			// For actual migration icinga_objects will be joined anyway,
-			// so it makes no sense to take vanished objects into account.
-			"SELECT xh."+ht.idoIdColumn+"<=? migrated, COUNT(*) cnt FROM "+ht.idoTable+" xh"+
-				" INNER JOIN icinga_objects o ON o.object_id=xh.object_id GROUP BY xh."+ht.idoIdColumn+"<=?",
-			ht.lastId, ht.lastId,
+			ht.snapshot.Rebind(
+				// For actual migration icinga_objects will be joined anyway,
+				// so it makes no sense to take vanished objects into account.
+				"SELECT CASE WHEN xh."+ht.idoIdColumn+"<=? THEN 1 ELSE 0 END migrated, COUNT(*) cnt FROM "+
+					ht.idoTable+" xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id GROUP BY migrated",
+			),
+			ht.lastId,
 		)
 		if err != nil {
 			log.Fatalf("%+v", errors.Wrap(err, "can't count query"))
@@ -339,8 +343,10 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 
 				// ... and insert them:
 
-				idbTx.Lock()
-				defer idbTx.Unlock()
+				if idb.DriverName() == driver.MySQL {
+					idbTx.Lock()
+					defer idbTx.Unlock()
+				}
 
 				tx, err := idb.Beginx()
 				if err != nil {
