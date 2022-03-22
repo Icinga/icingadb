@@ -14,9 +14,10 @@ import (
 
 // Config defines Icinga DB config.
 type Config struct {
-	Database Database `yaml:"database"`
-	Redis    Redis    `yaml:"redis"`
-	Logging  Logging  `yaml:"logging"`
+	Database         Database         `yaml:"database"`
+	Redis            Redis            `yaml:"redis"`
+	Logging          Logging          `yaml:"logging"`
+	HistoryRetention HistoryRetention `yaml:"history-retention"`
 }
 
 // Validate checks constraints in the supplied configuration and returns an error if they are violated.
@@ -28,6 +29,9 @@ func (c *Config) Validate() error {
 		return err
 	}
 	if err := c.Logging.Validate(); err != nil {
+		return err
+	}
+	if err := c.HistoryRetention.Validate(); err != nil {
 		return err
 	}
 

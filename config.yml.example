@@ -28,12 +28,26 @@ logging:
 
   # Map of component-logging level pairs to define a different log level than the default value for each component.
   options:
+#    config-sync:
 #    database:
-#    redis:
+#    dump-signals:
 #    heartbeat:
 #    high-availability:
-#    config-sync:
+#    history-retention:
 #    history-sync:
-#    runtime-updates:
 #    overdue-sync:
-#    dump-signals:
+#    redis:
+#    runtime-updates:
+
+history-retention:
+  # Number of days to retain historical data. By default, historical data is retained forever.
+#  days:
+  # Map of history category to number of days to retain its data in order to
+  # enable retention only for specific categories or to override the number that has been configured in days.
+  options:
+#    acknowledgement:
+#    comment:
+#    downtime:
+#    flapping:
+#    notification:
+#    state:
