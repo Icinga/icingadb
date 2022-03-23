@@ -57,10 +57,10 @@ database                 | Database connection status and queries.
 dump-signals             | Dump signals received from Icinga.
 heartbeat                | Icinga heartbeats received through Redis.
 high-availability        | Manages responsibility of Icinga DB instances.
-history-retention        | Deletes historical data that exceed their configured retention period.
 history-sync             | Synchronization of history entries from Redis to MySQL.
 overdue-sync             | Calculation and synchronization of the overdue status of checkables.
 redis                    | Redis connection status and queries.
+retention                | Deletes historical data that exceed their configured retention period.
 runtime-updates          | Runtime updates of config objects after the initial config synchronization.
 
 ### Duration String <a id="duration-string"></a>
@@ -68,12 +68,15 @@ runtime-updates          | Runtime updates of config objects after the initial c
 A duration string is a sequence of decimal numbers and a unit suffix, such as `"20s"`.
 Valid units are `"ms"`, `"s"`, `"m"` and `"h"`.
 
-## History Retention <a id="configuration-history-retention"></a>
+## Retention <a id="configuration-retention"></a>
 
 By default, no historical data is deleted, which means that the longer the data is retained, the more disk space is required to store it.
 History retention is an optional feature that allows you to limit the number of days that historical data is available for each history category.
+There are separate options for the full history tables used to display history information in the web interface and
+SLA tables which store the minimal information required for SLA reporting, allowing to keep this information for longer with a smaller storage footprint.
 
-| Option  | Description                                                                                                                                                                                                   |
-|---------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| days    | **Optional.** Number of days to retain historical data for all history categories. Use `options` in order to enable retention only for specific categories or to override the retention days configured here. |
-| options | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification` and `state`.                        |
+| Option       | Description                                                                                                                                                                                                   |
+|--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| history-days | **Optional.** Number of days to retain historical data for all history categories. Use `options` in order to enable retention only for specific categories or to override the retention days configured here. |
+| sla-days     | **Optional.** Number of days to retain historical data for SLA reporting.                                                                                                                                     |
+| options      | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification`, `sla` and `state`.                 |

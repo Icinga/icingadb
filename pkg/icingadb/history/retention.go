@@ -11,39 +11,85 @@ import (
 	"time"
 )
 
+type RetentionType int
+
+const (
+	RetentionHistory RetentionType = iota
+	RetentionSla
+)
+
+type retentionStatement struct {
+	icingadb.CleanupStmt
+	RetentionType
+	Category string
+}
+
 // RetentionStatements maps history categories with corresponding cleanup statements.
-var RetentionStatements = map[string]icingadb.CleanupStmt{
-	"acknowledgement": {
+var RetentionStatements = []retentionStatement{{
+	RetentionType: RetentionHistory,
+	Category:      "acknowledgement",
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "acknowledgement_history",
 		PK:     "id",
 		Column: "clear_time",
 	},
-	"comment": {
+}, {
+	RetentionType: RetentionHistory,
+	Category:      "comment",
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "comment_history",
 		PK:     "comment_id",
 		Column: "remove_time",
 	},
-	"downtime": {
+}, {
+	RetentionType: RetentionHistory,
+	Category:      "downtime",
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "downtime_history",
 		PK:     "downtime_id",
 		Column: "end_time",
 	},
-	"flapping": {
+}, {
+	RetentionType: RetentionHistory,
+	Category:      "flapping",
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "flapping_history",
 		PK:     "id",
 		Column: "end_time",
 	},
-	"notification": {
+}, {
+	RetentionType: RetentionHistory,
+	Category:      "notification",
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "notification_history",
 		PK:     "id",
 		Column: "send_time",
 	},
-	"state": {
+}, {
+	RetentionType: RetentionHistory,
+	Category:      "state",
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "state_history",
 		PK:     "id",
 		Column: "event_time",
 	},
-}
+}, {
+	RetentionType: RetentionSla,
+	Category:      "sla_downtime",
+	CleanupStmt: icingadb.CleanupStmt{
+		Table:  "sla_history_downtime",
+		PK:     "downtime_id",
+		Column: "downtime_end",
+	},
+}, {
+	RetentionType: RetentionSla,
+	Category:      "sla_state",
+	CleanupStmt: icingadb.CleanupStmt{
+		Table:  "sla_history_state",
+		PK:     "id",
+		Column: "event_time",
+	},
+}}
 
 // RetentionOptions defines the non-default mapping of history categories with their retention period in days.
 type RetentionOptions map[string]uint64
@@ -51,8 +97,15 @@ type RetentionOptions map[string]uint64
 // Validate checks constraints in the supplied retention options and
 // returns an error if they are violated.
 func (o RetentionOptions) Validate() error {
+	allowedCategories := make(map[string]struct{})
+	for _, stmt := range RetentionStatements {
+		if stmt.RetentionType == RetentionHistory {
+			allowedCategories[stmt.Category] = struct{}{}
+		}
+	}
+
 	for category := range o {
-		if _, ok := RetentionStatements[category]; !ok {
+		if _, ok := allowedCategories[category]; !ok {
 			return errors.Errorf("invalid key %s for history retention", category)
 		}
 	}
@@ -62,23 +115,28 @@ func (o RetentionOptions) Validate() error {
 
 // Retention deletes rows from history tables that exceed their configured retention period.
 type Retention struct {
-	db       *icingadb.DB
-	logger   *logging.Logger
-	days     uint64
-	interval time.Duration
-	count    uint64
-	options  RetentionOptions
+	db          *icingadb.DB
+	logger      *logging.Logger
+	historyDays uint64
+	slaDays     uint64
+	interval    time.Duration
+	count       uint64
+	options     RetentionOptions
 }
 
 // NewRetention returns a new Retention.
-func NewRetention(db *icingadb.DB, days uint64, interval time.Duration, count uint64, options RetentionOptions, logger *logging.Logger) *Retention {
+func NewRetention(
+	db *icingadb.DB, historyDays uint64, slaDays uint64, interval time.Duration,
+	count uint64, options RetentionOptions, logger *logging.Logger,
+) *Retention {
 	return &Retention{
-		db:       db,
-		logger:   logger,
-		days:     days,
-		interval: interval,
-		count:    count,
-		options:  options,
+		db:          db,
+		logger:      logger,
+		historyDays: historyDays,
+		slaDays:     slaDays,
+		interval:    interval,
+		count:       count,
+		options:     options,
 	}
 }
 
@@ -94,32 +152,39 @@ func (r *Retention) StartWithCallback(ctx context.Context, c func(table string, 
 
 	errs := make(chan error, 1)
 
-	for category, stmt := range RetentionStatements {
-		days, ok := r.options[category]
-		if !ok {
-			days = r.days
+	for _, stmt := range RetentionStatements {
+		var days uint64
+		switch stmt.RetentionType {
+		case RetentionHistory:
+			if d, ok := r.options[stmt.Category]; ok {
+				days = d
+			} else {
+				days = r.historyDays
+			}
+		case RetentionSla:
+			days = r.slaDays
 		}
 
 		if days < 1 {
-			r.logger.Debugf("Skipping history retention for category %s", category)
+			r.logger.Debugf("Skipping history retention for category %s", stmt.Category)
 			continue
 		}
 
 		r.logger.Debugw(
-			fmt.Sprintf("Starting history retention for category %s", category),
+			fmt.Sprintf("Starting history retention for category %s", stmt.Category),
 			zap.Uint64("count", r.count),
 			zap.Duration("interval", r.interval),
 			zap.Uint64("retention-days", days),
 		)
 
-		category := category
 		stmt := stmt
 		periodic.Start(ctx, r.interval, func(tick periodic.Tick) {
 			olderThan := tick.Time.AddDate(0, 0, -int(days))
 
-			r.logger.Debugf("Cleaning up historical data for category %s older than %s", category, olderThan)
+			r.logger.Debugf("Cleaning up historical data for category %s from table %s older than %s",
+				stmt.Category, stmt.Table, olderThan)
 
-			rs, err := r.db.CleanupOlderThan(ctx, stmt, r.count, olderThan)
+			rs, err := r.db.CleanupOlderThan(ctx, stmt.CleanupStmt, r.count, olderThan)
 			if err != nil {
 				select {
 				case errs <- err:

@@ -133,11 +133,12 @@ func run() int {
 	ods := overdue.NewSync(db, rc, logs.GetChildLogger("overdue-sync"))
 	ret := history.NewRetention(
 		db,
-		cmd.Config.HistoryRetention.Days,
-		cmd.Config.HistoryRetention.Interval,
-		cmd.Config.HistoryRetention.Count,
-		cmd.Config.HistoryRetention.Options,
-		logs.GetChildLogger("history-retention"),
+		cmd.Config.Retention.HistoryDays,
+		cmd.Config.Retention.SlaDays,
+		cmd.Config.Retention.Interval,
+		cmd.Config.Retention.Count,
+		cmd.Config.Retention.Options,
+		logs.GetChildLogger("retention"),
 	)
 
 	sig := make(chan os.Signal, 1)
