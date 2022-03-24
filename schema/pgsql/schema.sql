@@ -1370,7 +1370,7 @@ CREATE TABLE customvar (
   environment_id bytea20 NOT NULL,
   name_checksum bytea20 NOT NULL,
 
-  name varchar(255) NOT NULL,
+  name citext NOT NULL,
   value text NOT NULL,
 
   CONSTRAINT pk_customvar PRIMARY KEY (id)
@@ -1390,7 +1390,7 @@ CREATE TABLE customvar_flat (
   customvar_id bytea20 NOT NULL,
   flatname_checksum bytea20 NOT NULL,
 
-  flatname varchar(512) NOT NULL,
+  flatname citext NOT NULL,
   flatvalue text NOT NULL,
 
   CONSTRAINT pk_customvar_flat PRIMARY KEY (id)
