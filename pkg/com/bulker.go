@@ -2,10 +2,47 @@ package com
 
 import (
 	"context"
+	"github.com/icinga/icingadb/pkg/contracts"
 	"golang.org/x/sync/errgroup"
 	"sync"
 	"time"
 )
+
+// BulkChunkSplitPolicy is a state machine which tracks the items of a chunk a bulker assembles.
+// A call takes an item for the current chunk into account.
+// Output true indicates that the state machine was reset first and the bulker
+// shall finish the current chunk now (not e.g. once $size is reached) without the given item.
+type BulkChunkSplitPolicy[T any] func(T) bool
+
+type BulkChunkSplitPolicyFactory[T any] func() BulkChunkSplitPolicy[T]
+
+// NeverSplit returns a pseudo state machine which never demands splitting.
+func NeverSplit[T any]() BulkChunkSplitPolicy[T] {
+	return neverSplit[T]
+}
+
+// SplitOnDupId returns a state machine which tracks the inputs' IDs.
+// Once an already seen input arrives, it demands splitting.
+func SplitOnDupId[T contracts.IDer]() BulkChunkSplitPolicy[T] {
+	seenIds := map[string]struct{}{}
+
+	return func(ider T) bool {
+		id := ider.ID().String()
+
+		_, ok := seenIds[id]
+		if ok {
+			seenIds = map[string]struct{}{id: {}}
+		} else {
+			seenIds[id] = struct{}{}
+		}
+
+		return ok
+	}
+}
+
+func neverSplit[T any](T) bool {
+	return false
+}
 
 // Bulker reads all values from a channel and streams them in chunks into a Bulk channel.
 type Bulker[T any] struct {
@@ -15,14 +52,16 @@ type Bulker[T any] struct {
 }
 
 // NewBulker returns a new Bulker and starts streaming.
-func NewBulker[T any](ctx context.Context, ch <-chan T, count int) *Bulker[T] {
+func NewBulker[T any](
+	ctx context.Context, ch <-chan T, count int, splitPolicyFactory BulkChunkSplitPolicyFactory[T],
+) *Bulker[T] {
 	b := &Bulker[T]{
 		ch:  make(chan []T),
 		ctx: ctx,
 		mu:  sync.Mutex{},
 	}
 
-	go b.run(ch, count)
+	go b.run(ch, count, splitPolicyFactory)
 
 	return b
 }
@@ -32,10 +71,11 @@ func (b *Bulker[T]) Bulk() <-chan []T {
 	return b.ch
 }
 
-func (b *Bulker[T]) run(ch <-chan T, count int) {
+func (b *Bulker[T]) run(ch <-chan T, count int, splitPolicyFactory BulkChunkSplitPolicyFactory[T]) {
 	defer close(b.ch)
 
 	bufCh := make(chan T, count)
+	splitPolicy := splitPolicyFactory()
 	g, ctx := errgroup.WithContext(b.ctx)
 
 	g.Go(func() error {
@@ -70,6 +110,15 @@ func (b *Bulker[T]) run(ch <-chan T, count int) {
 						break
 					}
 
+					if splitPolicy(v) {
+						if len(buf) > 0 {
+							b.ch <- buf
+							buf = make([]T, 0, count)
+						}
+
+						timeout = time.After(256 * time.Millisecond)
+					}
+
 					buf = append(buf, v)
 				case <-timeout:
 					drain = false
@@ -81,6 +130,8 @@ func (b *Bulker[T]) run(ch <-chan T, count int) {
 			if len(buf) > 0 {
 				b.ch <- buf
 			}
+
+			splitPolicy = splitPolicyFactory()
 		}
 
 		return nil
@@ -92,16 +143,18 @@ func (b *Bulker[T]) run(ch <-chan T, count int) {
 }
 
 // Bulk reads all values from a channel and streams them in chunks into a returned channel.
-func Bulk[T any](ctx context.Context, ch <-chan T, count int) <-chan []T {
+func Bulk[T any](
+	ctx context.Context, ch <-chan T, count int, splitPolicyFactory BulkChunkSplitPolicyFactory[T],
+) <-chan []T {
 	if count <= 1 {
 		return oneBulk(ctx, ch)
 	}
 
-	return NewBulker(ctx, ch, count).Bulk()
+	return NewBulker(ctx, ch, count, splitPolicyFactory).Bulk()
 }
 
-// oneBulk operates just as NewBulker(ctx, ch, 1).Bulk(),
-// but without the overhead of the actual bulk creation with a buffer channel and timeout.
+// oneBulk operates just as NewBulker(ctx, ch, 1, splitPolicy).Bulk(),
+// but without the overhead of the actual bulk creation with a buffer channel, timeout and BulkChunkSplitPolicy.
 func oneBulk[T any](ctx context.Context, ch <-chan T) <-chan []T {
 	out := make(chan []T)
 	go func() {
@@ -123,3 +176,8 @@ func oneBulk[T any](ctx context.Context, ch <-chan T) <-chan []T {
 
 	return out
 }
+
+var (
+	_ BulkChunkSplitPolicyFactory[struct{}]         = NeverSplit[struct{}]
+	_ BulkChunkSplitPolicyFactory[contracts.Entity] = SplitOnDupId[contracts.Entity]
+)

@@ -141,7 +141,7 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 		}
 	}).Stop()
 
-	bulks := com.Bulk(ctx, input, s.redis.Options.HScanCount)
+	bulks := com.Bulk(ctx, input, s.redis.Options.HScanCount, com.NeverSplit[redis.XMessage])
 	stream := "icinga:history:stream:" + key
 	for {
 		select {
