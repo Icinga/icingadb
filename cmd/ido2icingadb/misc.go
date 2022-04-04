@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/driver"
+	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
 	"github.com/jmoiron/sqlx"
@@ -13,8 +14,8 @@ import (
 	"github.com/vbauerster/mpb/v6/decor"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"reflect"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -109,21 +110,15 @@ func calcServiceId(env, name1, name2 string) []byte {
 }
 
 // sliceIdoHistory performs query with args+map[string]interface{}{"checkpoint": checkpoint, "bulk": bulk} on snapshot
-// and passes the results to onRows (a func([]rowType)interface{})
-// until either an empty result set or onRows() returns nil.
+// and passes the results to onRows until either an empty result set or onRows() returns nil.
 // Rationale: split the likely large result set of a query by adding a WHERE condition and a LIMIT,
 // both with :named placeholders (:checkpoint, :bulk).
 // checkpoint is the initial value for the WHERE condition, onRows() returns follow-up ones.
 // (On non-recoverable errors the whole program exits.)
-// TODO: make onRows generic[T] one nice day
-func sliceIdoHistory(
-	snapshot *sqlx.Tx, query string, args map[string]interface{}, checkpoint interface{},
-	rowType reflect.Type, onRows func(idoRows interface{}) (checkpoint interface{}),
+func sliceIdoHistory[Row any](
+	snapshot *sqlx.Tx, query string, args map[string]interface{},
+	checkpoint interface{}, onRows func([]Row) (checkpoint interface{}),
 ) {
-	vNewRows := reflect.New(reflect.SliceOf(rowType))
-	rowsPtr := vNewRows.Interface()
-	vRows := vNewRows.Elem()
-
 	if args == nil {
 		args = map[string]interface{}{}
 	}
@@ -142,21 +137,21 @@ func sliceIdoHistory(
 			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
 		}
 
-		if err := stmt.Select(rowsPtr, args); err != nil {
+		var rows []Row
+		if err := stmt.Select(&rows, args); err != nil {
 			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 		}
 
 		_ = stmt.Close()
 
-		if vRows.Len() < 1 {
+		if len(rows) < 1 {
 			break
 		}
 
-		if checkpoint = onRows(vRows.Interface()); checkpoint == nil {
+		if checkpoint = onRows(rows); checkpoint == nil {
 			break
 		}
 
-		vRows.Set(vRows.Slice(0, 0))
 		args["checkpoint"] = checkpoint
 	}
 }
@@ -177,13 +172,9 @@ type historyType struct {
 	cacheLimitQuery string
 	// migrationQuery SELECTs source data for actual migration.
 	migrationQuery string
-	// convertRowType specifies convertRows' idoRows.
-	convertRowType reflect.Type
-	// convertRows intention: see migrate().
-	// TODO: make idoRows generic[T] one nice day
-	convertRows func(env string, envId, endpointId icingadbTypes.Binary,
-		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
-		idoRows interface{}) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{})
+	// migrate does the actual migration.
+	migrate func(c *Config, idb *icingadb.DB, envId []byte,
+		endpointId [sha1.Size]byte, idbTx *sync.Mutex, ht *historyType)
 
 	// cache represents <name>.sqlite3.
 	cache *sqlx.DB
@@ -241,24 +232,27 @@ var types = historyTypes{
 			})
 		},
 		migrationQuery: acknowledgementMigrationQuery,
-		convertRowType: reflect.TypeOf((*acknowledgementRow)(nil)).Elem(),
-		convertRows:    convertAcknowledgementRows,
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertAcknowledgementRows)
+		},
 	},
 	{
 		name:           "comment",
 		idoTable:       "icinga_commenthistory",
 		idoIdColumn:    "commenthistory_id",
 		migrationQuery: commentMigrationQuery,
-		convertRowType: reflect.TypeOf((*commentRow)(nil)).Elem(),
-		convertRows:    convertCommentRows,
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertCommentRows)
+		},
 	},
 	{
 		name:           "downtime",
 		idoTable:       "icinga_downtimehistory",
 		idoIdColumn:    "downtimehistory_id",
 		migrationQuery: downtimeMigrationQuery,
-		convertRowType: reflect.TypeOf((*downtimeRow)(nil)).Elem(),
-		convertRows:    convertDowntimeRows,
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertDowntimeRows)
+		},
 	},
 	{
 		name:        "flapping",
@@ -272,8 +266,9 @@ var types = historyTypes{
 			})
 		},
 		migrationQuery: flappingMigrationQuery,
-		convertRowType: reflect.TypeOf((*flappingRow)(nil)).Elem(),
-		convertRows:    convertFlappingRows,
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertFlappingRows)
+		},
 	},
 	{
 		name:        "notification",
@@ -287,8 +282,9 @@ var types = historyTypes{
 		},
 		cacheLimitQuery: "SELECT MAX(history_id) FROM previous_hard_state",
 		migrationQuery:  notificationMigrationQuery,
-		convertRowType:  reflect.TypeOf((*notificationRow)(nil)).Elem(),
-		convertRows:     convertNotificationRows,
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertNotificationRows)
+		},
 	},
 	{
 		name:        "state",
@@ -300,7 +296,8 @@ var types = historyTypes{
 		},
 		cacheLimitQuery: "SELECT MAX(history_id) FROM previous_hard_state",
 		migrationQuery:  stateMigrationQuery,
-		convertRowType:  reflect.TypeOf((*stateRow)(nil)).Elem(),
-		convertRows:     convertStateRows,
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertStateRows)
+		},
 	},
 }

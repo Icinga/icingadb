@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"reflect"
 	"strings"
 	"time"
 )
@@ -60,9 +59,7 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
 				ht.idoIdColumn+" > :checkpoint ORDER BY xh."+ht.idoIdColumn+" LIMIT :bulk",
 			nil, checkpoint.MaxId.Int64, // ... since we were interrupted:
-			reflect.TypeOf((*row)(nil)).Elem(),
-			func(ir interface{}) (checkpoint interface{}) {
-				idoRows := ir.([]row)
+			func(idoRows []row) (checkpoint interface{}) {
 				for _, idoRow := range idoRows {
 					if idoRow.EventIsStart == 0 {
 						// Ack/flapping end event. Get the start event time:
@@ -198,9 +195,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 				" xh USE INDEX (PRIMARY) INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
 				ht.idoIdColumn+" < :checkpoint ORDER BY xh."+ht.idoIdColumn+" DESC LIMIT :bulk",
 			nil, checkpoint, // ... since we were interrupted:
-			reflect.TypeOf((*row)(nil)).Elem(),
-			func(ir interface{}) (checkpoint interface{}) {
-				idoRows := ir.([]row)
+			func(idoRows []row) (checkpoint interface{}) {
 				for _, idoRow := range idoRows {
 					var nhs []struct{ NextHardState uint8 }
 					cacheSelect(*tx, &nhs, "SELECT next_hard_state FROM next_hard_state WHERE object_id=?", idoRow.ObjectId)

@@ -11,6 +11,7 @@ import (
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
+	icingadbTypes "github.com/icinga/icingadb/pkg/types"
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
@@ -283,133 +284,143 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 	}
 
 	types.forEach(func(ht *historyType) {
-		var lastQuery string
-		var lastStmt *sqlx.Stmt
-
-		defer func() {
-			if lastStmt != nil {
-				_ = lastStmt.Close()
-			}
-		}()
-
-		selectCache := func(dest interface{}, query string, args ...interface{}) {
-			// Prepare new one, if old one doesn't fit anymore.
-			if query != lastQuery {
-				if lastStmt != nil {
-					_ = lastStmt.Close()
-				}
-
-				var err error
-
-				lastStmt, err = ht.cache.Preparex(query)
-				if err != nil {
-					log.With("backend", "cache", "query", query).
-						Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
-				}
-
-				lastQuery = query
-			}
-
-			if err := lastStmt.Select(dest, args...); err != nil {
-				log.With("backend", "cache", "query", query, "args", args).
-					Fatalf("%+v", errors.Wrap(err, "can't perform query"))
-			}
-		}
-
-		var args map[string]interface{}
-
-		// For the case that the cache was older that the IDO,
-		// but ht.cacheFiller couldn't update it, limit (WHERE) our source data set.
-		if ht.cacheLimitQuery != "" {
-			var limit uint64
-			cacheGet(ht.cache, &limit, ht.cacheLimitQuery)
-			args = map[string]interface{}{"cache_limit": limit}
-		}
-
-		icingaDbInserts := map[reflect.Type]string{}
-		icingaDbUpdates := map[reflect.Type]string{}
-
-		ht.bar.SetCurrent(ht.done)
-		inc := barIncrementer{ht.bar, time.Now()}
-
-		// Stream IDO rows, ...
-		sliceIdoHistory(
-			ht.snapshot, ht.migrationQuery, args, ht.lastId, ht.convertRowType,
-			func(idoRows interface{}) (checkpoint interface{}) {
-				// ... convert them, ...
-				updates, inserts, lastIdoId := ht.convertRows(
-					c.Icinga2.Env, envId, endpointId[:], selectCache, ht.snapshot, idoRows,
-				)
-
-				// ... and insert them:
-
-				if idb.DriverName() == driver.MySQL {
-					idbTx.Lock()
-					defer idbTx.Unlock()
-				}
-
-				tx, err := idb.Beginx()
-				if err != nil {
-					log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
-				}
-
-				for _, operation := range [...]struct {
-					data      [][]interface{}
-					buildStmt func(subject interface{}) (stmt string, _ int)
-					stmtCache map[reflect.Type]string
-				}{{inserts, idb.BuildUpsertStmt, icingaDbInserts}, {updates, idb.BuildUpdateStmt, icingaDbUpdates}} {
-					for _, table := range operation.data {
-						if len(table) < 1 {
-							continue
-						}
-
-						tRow := reflect.TypeOf(table[0])
-
-						query, ok := operation.stmtCache[tRow]
-						if !ok {
-							query, _ = operation.buildStmt(table[0])
-							operation.stmtCache[tRow] = query
-						}
-
-						stmt, err := tx.PrepareNamed(query)
-						if err != nil {
-							log.With("backend", "Icinga DB", "dml", query).
-								Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
-						}
-
-						for _, row := range table {
-							if _, err := stmt.Exec(row); err != nil {
-								log.With("backend", "Icinga DB", "dml", query, "args", row).
-									Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
-							}
-						}
-
-						_ = stmt.Close()
-					}
-				}
-
-				if lastIdoId != nil {
-					const stmt = "UPDATE ido_migration_progress SET last_ido_id=:last_ido_id " +
-						"WHERE history_type=:history_type"
-
-					args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
-					if _, err := tx.NamedExec(stmt, args); err != nil {
-						log.With("backend", "Icinga DB", "dml", stmt, "args", args).
-							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
-					}
-				}
-
-				if err := tx.Commit(); err != nil {
-					log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
-				}
-
-				inc.inc(reflect.ValueOf(idoRows).Len())
-				return lastIdoId
-			},
-		)
-
-		ht.bar.SetTotal(ht.bar.Current(), true)
+		ht.migrate(c, idb, envId, endpointId, idbTx, ht)
 	})
 
 	progress.Wait()
+}
+
+// migrate does the actual migration for one history type.
+func migrateOneType[IdoRow any](
+	c *Config, idb *icingadb.DB, envId []byte, endpointId [sha1.Size]byte, idbTx *sync.Mutex, ht *historyType,
+	convertRows func(env string, envId, endpointId icingadbTypes.Binary,
+		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
+		idoRows []IdoRow) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{}),
+) {
+	var lastQuery string
+	var lastStmt *sqlx.Stmt
+
+	defer func() {
+		if lastStmt != nil {
+			_ = lastStmt.Close()
+		}
+	}()
+
+	selectCache := func(dest interface{}, query string, args ...interface{}) {
+		// Prepare new one, if old one doesn't fit anymore.
+		if query != lastQuery {
+			if lastStmt != nil {
+				_ = lastStmt.Close()
+			}
+
+			var err error
+
+			lastStmt, err = ht.cache.Preparex(query)
+			if err != nil {
+				log.With("backend", "cache", "query", query).
+					Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
+			}
+
+			lastQuery = query
+		}
+
+		if err := lastStmt.Select(dest, args...); err != nil {
+			log.With("backend", "cache", "query", query, "args", args).
+				Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+		}
+	}
+
+	var args map[string]interface{}
+
+	// For the case that the cache was older that the IDO,
+	// but ht.cacheFiller couldn't update it, limit (WHERE) our source data set.
+	if ht.cacheLimitQuery != "" {
+		var limit uint64
+		cacheGet(ht.cache, &limit, ht.cacheLimitQuery)
+		args = map[string]interface{}{"cache_limit": limit}
+	}
+
+	icingaDbInserts := map[reflect.Type]string{}
+	icingaDbUpdates := map[reflect.Type]string{}
+
+	ht.bar.SetCurrent(ht.done)
+	inc := barIncrementer{ht.bar, time.Now()}
+
+	// Stream IDO rows, ...
+	sliceIdoHistory(
+		ht.snapshot, ht.migrationQuery, args, ht.lastId,
+		func(idoRows []IdoRow) (checkpoint interface{}) {
+			// ... convert them, ...
+			updates, inserts, lastIdoId := convertRows(
+				c.Icinga2.Env, envId, endpointId[:], selectCache, ht.snapshot, idoRows,
+			)
+
+			// ... and insert them:
+
+			if idb.DriverName() == driver.MySQL {
+				idbTx.Lock()
+				defer idbTx.Unlock()
+			}
+
+			tx, err := idb.Beginx()
+			if err != nil {
+				log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
+			}
+
+			for _, operation := range [...]struct {
+				data      [][]interface{}
+				buildStmt func(subject interface{}) (stmt string, _ int)
+				stmtCache map[reflect.Type]string
+			}{{inserts, idb.BuildUpsertStmt, icingaDbInserts}, {updates, idb.BuildUpdateStmt, icingaDbUpdates}} {
+				for _, table := range operation.data {
+					if len(table) < 1 {
+						continue
+					}
+
+					tRow := reflect.TypeOf(table[0])
+
+					query, ok := operation.stmtCache[tRow]
+					if !ok {
+						query, _ = operation.buildStmt(table[0])
+						operation.stmtCache[tRow] = query
+					}
+
+					stmt, err := tx.PrepareNamed(query)
+					if err != nil {
+						log.With("backend", "Icinga DB", "dml", query).
+							Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
+					}
+
+					for _, row := range table {
+						if _, err := stmt.Exec(row); err != nil {
+							log.With("backend", "Icinga DB", "dml", query, "args", row).
+								Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+						}
+					}
+
+					_ = stmt.Close()
+				}
+			}
+
+			if lastIdoId != nil {
+				const stmt = "UPDATE ido_migration_progress SET last_ido_id=:last_ido_id " +
+					"WHERE history_type=:history_type"
+
+				args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
+				if _, err := tx.NamedExec(stmt, args); err != nil {
+					log.With("backend", "Icinga DB", "dml", stmt, "args", args).
+						Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+				}
+			}
+
+			if err := tx.Commit(); err != nil {
+				log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
+			}
+
+			inc.inc(len(idoRows))
+			return lastIdoId
+		},
+	)
+
+	ht.bar.SetTotal(ht.bar.Current(), true)
 }
