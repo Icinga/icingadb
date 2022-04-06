@@ -6,7 +6,6 @@ import (
 	"github.com/pkg/errors"
 	"math"
 	"strings"
-	"time"
 )
 
 var eventTimeCacheSchema = []string{
@@ -49,7 +48,6 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 		cacheGet(*tx, &checkpoint, "SELECT COUNT(*) cnt, MAX(history_id) max_id FROM end_start_time")
 
 		ht.bar.SetCurrent(checkpoint.Cnt * 2)
-		inc := barIncrementer{ht.bar, time.Now()}
 
 		// Stream source data...
 		sliceIdoHistory(
@@ -106,7 +104,7 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 					checkpoint = idoRow.Id
 				}
 
-				inc.inc(len(idoRows))
+				ht.bar.IncrBy(len(idoRows))
 				return
 			},
 		)
@@ -178,7 +176,6 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 		}
 
 		ht.bar.SetCurrent(previousHardStateCnt + nextIds.Cnt)
-		inc := barIncrementer{ht.bar, time.Now()}
 
 		// We continue where we finished before. As we build the cache in reverse chronological order:
 		// 1. If the history grows between two migration trials, we won't migrate the difference. Workarounds:
@@ -250,7 +247,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 					checkpoint = idoRow.Id
 				}
 
-				inc.inc(len(idoRows))
+				ht.bar.IncrBy(len(idoRows))
 				return
 			},
 		)

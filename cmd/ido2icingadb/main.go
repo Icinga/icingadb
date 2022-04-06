@@ -344,7 +344,6 @@ func migrateOneType[IdoRow any](
 	icingaDbUpdates := map[reflect.Type]string{}
 
 	ht.bar.SetCurrent(ht.done)
-	inc := barIncrementer{ht.bar, time.Now()}
 
 	// Stream IDO rows, ...
 	sliceIdoHistory(
@@ -417,7 +416,7 @@ func migrateOneType[IdoRow any](
 				log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
 			}
 
-			inc.inc(len(idoRows))
+			ht.bar.IncrBy(len(idoRows))
 			return lastIdoId
 		},
 	)
