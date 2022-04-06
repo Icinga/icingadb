@@ -19,23 +19,39 @@ import (
 	"time"
 )
 
-// barIncrementer simplifies incrementing bar.
-type barIncrementer struct {
-	// bar is the bar to increment.
-	bar *mpb.Bar
-	// start shall be the work start time.
-	start time.Time
+// eta indicates the ETA for progresses starting from >0%.
+type eta struct {
+	decor.WC
+
+	// startProgress is the first progress >0 seen by Decor.
+	startProgress int64
+	// startTime tells when is startProgress from.
+	startTime time.Time
 }
 
-// inc increments bi.bar by i.
-func (bi *barIncrementer) inc(i int) {
-	prev := bi.start
-	now := time.Now()
-	bi.start = now
+// Decor implements the decor.Decorator interface.
+func (e *eta) Decor(s decor.Statistics) string {
+	if s.Completed || s.Current < 1 {
+		return ""
+	}
 
-	bi.bar.IncrBy(i)
-	bi.bar.DecoratorEwmaUpdate(now.Sub(prev))
+	if e.startProgress < 1 {
+		e.startProgress = s.Current
+		e.startTime = time.Now()
+		return ""
+	}
+
+	if s.Current == e.startProgress {
+		return ""
+	}
+
+	timePerItem := float64(time.Since(e.startTime)) / float64(s.Current-e.startProgress)
+
+	return e.FormatMsg((time.Duration(float64(s.Total-s.Current)*timePerItem) / time.Second * time.Second).String())
 }
+
+// Assert interface compliance.
+var _ decor.Decorator = (*eta)(nil)
 
 type IdoMigrationProgressUpserter struct {
 	HistoryType string `json:"history_type"`
@@ -192,6 +208,10 @@ type historyType struct {
 
 // setupBar (re-)initializes ht.bar.
 func (ht *historyType) setupBar(progress *mpb.Progress) {
+	e := &eta{WC: decor.WC{W: 4}}
+
+	e.Init()
+
 	ht.bar = progress.AddBar(
 		ht.total,
 		mpb.BarFillerClearOnComplete(),
@@ -199,7 +219,7 @@ func (ht *historyType) setupBar(progress *mpb.Progress) {
 			decor.Name(ht.name, decor.WC{W: len(ht.name) + 1, C: decor.DidentRight}),
 			decor.Percentage(decor.WC{W: 5}),
 		),
-		mpb.AppendDecorators(decor.EwmaETA(decor.ET_STYLE_GO, 6000000, decor.WC{W: 4})),
+		mpb.AppendDecorators(e),
 	)
 }
 
