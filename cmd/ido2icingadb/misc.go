@@ -44,6 +44,7 @@ func (e *eta) Decor(s decor.Statistics) string {
 		e.startTime = time.Now()
 		e.lastProgress = e.startProgress
 		e.lastTime = e.startTime
+
 		return ""
 	}
 
@@ -59,7 +60,7 @@ func (e *eta) Decor(s decor.Statistics) string {
 	timePerItem := float64(e.lastTime.Sub(e.startTime)) / float64(e.lastProgress-e.startProgress)
 	lastETA := time.Duration(float64(s.Total-s.Current) * timePerItem)
 
-	return e.FormatMsg((lastETA - time.Since(e.lastTime)/time.Second*time.Second).String())
+	return e.FormatMsg(((lastETA - time.Since(e.lastTime)) / time.Second * time.Second).String())
 }
 
 // Assert interface compliance.
