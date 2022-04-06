@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-// eta indicates the ETA for progresses starting from >0%.
+// eta indicates the ETA for possibly slowly incrementing progresses possibly starting from >0%.
 type eta struct {
 	decor.WC
 
@@ -27,6 +27,10 @@ type eta struct {
 	startProgress int64
 	// startTime tells when is startProgress from.
 	startTime time.Time
+	// lastProgress is the last progress >0 seen by Decor.
+	lastProgress int64
+	// lastTime tells when is lastProgress from.
+	lastTime time.Time
 }
 
 // Decor implements the decor.Decorator interface.
@@ -38,6 +42,8 @@ func (e *eta) Decor(s decor.Statistics) string {
 	if e.startProgress < 1 {
 		e.startProgress = s.Current
 		e.startTime = time.Now()
+		e.lastProgress = e.startProgress
+		e.lastTime = e.startTime
 		return ""
 	}
 
@@ -45,9 +51,15 @@ func (e *eta) Decor(s decor.Statistics) string {
 		return ""
 	}
 
-	timePerItem := float64(time.Since(e.startTime)) / float64(s.Current-e.startProgress)
+	if s.Current > e.lastProgress {
+		e.lastProgress = s.Current
+		e.lastTime = time.Now()
+	}
 
-	return e.FormatMsg((time.Duration(float64(s.Total-s.Current)*timePerItem) / time.Second * time.Second).String())
+	timePerItem := float64(e.lastTime.Sub(e.startTime)) / float64(e.lastProgress-e.startProgress)
+	lastETA := time.Duration(float64(s.Total-s.Current) * timePerItem)
+
+	return e.FormatMsg((lastETA - time.Since(e.lastTime)/time.Second*time.Second).String())
 }
 
 // Assert interface compliance.
