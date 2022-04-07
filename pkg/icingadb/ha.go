@@ -14,6 +14,7 @@ import (
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"
@@ -145,6 +146,7 @@ func (h *HA) controller() {
 				if tt.Before(now.Add(-1 * timeout)) {
 					h.logger.Errorw("Received heartbeat from the past", zap.Time("time", tt))
 					h.signalHandover()
+					h.realizeLostHeartbeat()
 					continue
 				}
 				s, err := m.Stats().IcingaStatus()
@@ -211,6 +213,7 @@ func (h *HA) controller() {
 			} else {
 				h.logger.Error("Lost heartbeat")
 				h.signalHandover()
+				h.realizeLostHeartbeat()
 			}
 		case <-h.heartbeat.Done():
 			if err := h.heartbeat.Err(); err != nil {
@@ -321,6 +324,13 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 	}
 
 	return nil
+}
+
+func (h *HA) realizeLostHeartbeat() {
+	stmt := h.db.Rebind("UPDATE icingadb_instance SET responsible = ? WHERE id = ?")
+	if _, err := h.db.ExecContext(h.ctx, stmt, "n", h.instanceId); err != nil && !utils.IsContextCanceled(err) {
+		h.logger.Warnw("Can't update instance", zap.Error(internal.CantPerformQuery(err, stmt)))
+	}
 }
 
 // insertEnvironment inserts the environment from the specified state into the database if it does not already exist.
