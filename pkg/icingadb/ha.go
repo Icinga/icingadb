@@ -288,6 +288,15 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 				return internal.CantPerformQuery(err, stmt)
 			}
 
+			if takeover {
+				stmt := h.db.Rebind("UPDATE icingadb_instance SET responsible = ? WHERE environment_id = ? AND id <> ?")
+				_, err := tx.ExecContext(ctx, stmt, "n", envId, h.instanceId)
+
+				if err != nil {
+					return internal.CantPerformQuery(err, stmt)
+				}
+			}
+
 			if err := tx.Commit(); err != nil {
 				return errors.Wrap(err, "can't commit transaction")
 			}
