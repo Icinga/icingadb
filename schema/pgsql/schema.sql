@@ -1214,7 +1214,7 @@ CREATE TABLE icon_image (
   environment_id bytea20 NOT NULL,
   icon_image citext NOT NULL,
 
-  CONSTRAINT pk_icon_image PRIMARY KEY (environment_id, id)
+  CONSTRAINT pk_icon_image PRIMARY KEY (id)
 );
 
 ALTER TABLE icon_image ALTER COLUMN id SET STORAGE PLAIN;
@@ -1222,7 +1222,7 @@ ALTER TABLE icon_image ALTER COLUMN environment_id SET STORAGE PLAIN;
 
 CREATE INDEX idx_icon_image ON icon_image(icon_image);
 
-COMMENT ON COLUMN icon_image.id IS 'sha1(icon_image)';
+COMMENT ON COLUMN icon_image.id IS 'sha1(environment.id + icon_image)';
 COMMENT ON COLUMN icon_image.environment_id IS 'environment.id';
 
 CREATE TABLE action_url (
@@ -1230,7 +1230,7 @@ CREATE TABLE action_url (
   environment_id bytea20 NOT NULL,
   action_url citext NOT NULL,
 
-  CONSTRAINT pk_action_url PRIMARY KEY (environment_id, id)
+  CONSTRAINT pk_action_url PRIMARY KEY (id)
 );
 
 ALTER TABLE action_url ALTER COLUMN id SET STORAGE PLAIN;
@@ -1238,7 +1238,7 @@ ALTER TABLE action_url ALTER COLUMN environment_id SET STORAGE PLAIN;
 
 CREATE INDEX idx_action_url ON action_url(action_url);
 
-COMMENT ON COLUMN action_url.id IS 'sha1(action_url)';
+COMMENT ON COLUMN action_url.id IS 'sha1(environment.id + action_url)';
 COMMENT ON COLUMN action_url.environment_id IS 'environment.id';
 
 CREATE TABLE notes_url (
@@ -1246,7 +1246,7 @@ CREATE TABLE notes_url (
   environment_id bytea20 NOT NULL,
   notes_url citext NOT NULL,
 
-  CONSTRAINT pk_notes_url PRIMARY KEY (environment_id, id)
+  CONSTRAINT pk_notes_url PRIMARY KEY (id)
 );
 
 ALTER TABLE notes_url ALTER COLUMN id SET STORAGE PLAIN;
@@ -1254,7 +1254,7 @@ ALTER TABLE notes_url ALTER COLUMN environment_id SET STORAGE PLAIN;
 
 CREATE INDEX idx_notes_url ON notes_url(notes_url);
 
-COMMENT ON COLUMN notes_url.id IS 'sha1(notes_url)';
+COMMENT ON COLUMN notes_url.id IS 'sha1(environment.id + notes_url)';
 COMMENT ON COLUMN notes_url.environment_id IS 'environment.id';
 
 CREATE TABLE timeperiod (
