@@ -26,6 +26,20 @@ ALTER TABLE flapping_history
 ALTER TABLE state_history
   ADD index idx_state_history_event_time (event_time) COMMENT 'Filter for history retention';
 
+ALTER TABLE icon_image
+  DROP PRIMARY KEY,
+  MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + icon_image)',
+  ADD PRIMARY KEY (id);
+
+ALTER TABLE action_url
+  DROP PRIMARY KEY,
+  MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + action_url)',
+  ADD PRIMARY KEY (id);
+
+ALTER TABLE notes_url
+  DROP PRIMARY KEY,
+  MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + notes_url)',
+  ADD PRIMARY KEY (id);
 
 INSERT INTO icingadb_schema (version, TIMESTAMP)
   VALUES (3, CURRENT_TIMESTAMP() * 1000);
