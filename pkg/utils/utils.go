@@ -27,7 +27,7 @@ func FromUnixMilli(ms int64) time.Time {
 
 // UnixMilli returns milliseconds since the Unix epoch of time t.
 func UnixMilli(t time.Time) int64 {
-	return t.UnixNano() / 1e6
+	return t.UnixMilli()
 }
 
 // Name returns the declared name of type t.
