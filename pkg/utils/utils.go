@@ -25,11 +25,6 @@ func FromUnixMilli(ms int64) time.Time {
 	return time.Unix(int64(sec), int64(dec*(1e9)))
 }
 
-// UnixMilli returns milliseconds since the Unix epoch of time t.
-func UnixMilli(t time.Time) int64 {
-	return t.UnixMilli()
-}
-
 // Name returns the declared name of type t.
 // Name is used in combination with Key
 // to automatically guess an entity's

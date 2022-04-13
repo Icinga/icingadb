@@ -14,7 +14,6 @@ import (
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"
@@ -242,7 +241,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 			instance := &v1.IcingadbInstance{}
 
 			errQuery := tx.QueryRowxContext(
-				ctx, query, envId, "y", h.instanceId, utils.UnixMilli(time.Now().Add(-1*timeout)),
+				ctx, query, envId, "y", h.instanceId, time.Now().Add(-1*timeout).UnixMilli(),
 			).StructScan(instance)
 			switch errQuery {
 			case nil:
