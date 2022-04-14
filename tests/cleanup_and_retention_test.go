@@ -6,7 +6,6 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
@@ -28,7 +27,7 @@ func TestCleanupAndRetention(t *testing.T) {
 		return icingadb.NewDb(db, logging.NewLogger(it.Logger(t).Sugar(), time.Second), &icingadb.Options{})
 	}
 	start := time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	startMilli := utils.UnixMilli(start)
+	startMilli := start.UnixMilli()
 
 	scenarios := []struct {
 		limit        int64
@@ -115,7 +114,7 @@ func TestCleanupAndRetention(t *testing.T) {
 			}
 			values := make([]row, 0, MaxPlaceholders)
 			start := time.Now().AddDate(0, 0, -retentionDays).Add(-1 * time.Millisecond * time.Duration(scenario.rowsToDelete))
-			startMilli := utils.UnixMilli(start)
+			startMilli := start.UnixMilli()
 			for j := int64(0); j < total; j++ {
 				if j == scenario.rowsToDelete {
 					startMilli += int64(2 * time.Minute)

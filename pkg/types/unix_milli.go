@@ -27,7 +27,7 @@ func (t UnixMilli) MarshalJSON() ([]byte, error) {
 		return nil, nil
 	}
 
-	return []byte(strconv.FormatInt(utils.UnixMilli(time.Time(t)), 10)), nil
+	return []byte(strconv.FormatInt(time.Time(t).UnixMilli(), 10)), nil
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
@@ -82,7 +82,7 @@ func (t UnixMilli) Value() (driver.Value, error) {
 		return nil, nil
 	}
 
-	return utils.UnixMilli(t.Time()), nil
+	return t.Time().UnixMilli(), nil
 }
 
 // Assert interface compliance.
