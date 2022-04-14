@@ -109,7 +109,7 @@ func (r *RuntimeUpdates) Sync(
 			sem := semaphore.NewWeighted(1)
 
 			return r.db.NamedBulkExec(
-				ctx, upsertStmt, upsertCount, sem, upsertEntities, upserted, com.SplitOnDupId,
+				ctx, upsertStmt, upsertCount, sem, upsertEntities, upserted, com.SplitOnDupId[contracts.Entity],
 			)
 		})
 		g.Go(func() error {
@@ -213,7 +213,7 @@ func (r *RuntimeUpdates) Sync(
 			sem := semaphore.NewWeighted(1)
 
 			return r.db.NamedBulkExec(
-				ctx, cvStmt, cvCount, sem, customvars, upsertedCustomvars, com.SplitOnDupId,
+				ctx, cvStmt, cvCount, sem, customvars, upsertedCustomvars, com.SplitOnDupId[contracts.Entity],
 			)
 		})
 		g.Go(func() error {
@@ -248,7 +248,8 @@ func (r *RuntimeUpdates) Sync(
 			sem := semaphore.NewWeighted(1)
 
 			return r.db.NamedBulkExec(
-				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars, upsertedFlatCustomvars, com.SplitOnDupId,
+				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars,
+				upsertedFlatCustomvars, com.SplitOnDupId[contracts.Entity],
 			)
 		})
 		g.Go(func() error {
