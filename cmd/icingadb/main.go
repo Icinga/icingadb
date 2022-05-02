@@ -11,6 +11,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/okzk/sdnotify"
@@ -117,6 +118,8 @@ func run() int {
 		}
 		defer db.Close()
 		ha = icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
+
+		telemetry.WriteStats(ctx, rc, logs.GetChildLogger("telemetry"))
 	}
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.

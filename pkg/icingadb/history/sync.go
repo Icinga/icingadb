@@ -10,6 +10,7 @@ import (
 	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/structify"
@@ -157,6 +158,7 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 			}
 
 			counter.Add(uint64(len(ids)))
+			telemetry.Stats.History.Add(uint64(len(ids)))
 		case <-ctx.Done():
 			return ctx.Err()
 		}

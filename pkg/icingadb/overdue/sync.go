@@ -13,6 +13,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/overdue"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/pkg/errors"
@@ -206,6 +207,7 @@ func (s Sync) updateOverdue(
 	}
 
 	counter.Add(uint64(len(ids)))
+	telemetry.Stats.Overdue.Add(uint64(len(ids)))
 
 	var op func(ctx context.Context, key string, members ...interface{}) *redis.IntCmd
 	if overdue {

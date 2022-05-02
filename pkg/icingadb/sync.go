@@ -8,6 +8,7 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -101,6 +102,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
+	stat := getCounterForEntity(delta.Subject.Entity())
 
 	// Create
 	if len(delta.Create) > 0 {
@@ -125,7 +127,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		}
 
 		g.Go(func() error {
-			return s.db.CreateStreamed(ctx, entities)
+			return s.db.CreateStreamed(ctx, entities, OnSuccessIncrement[contracts.Entity](stat))
 		})
 	}
 
@@ -149,7 +151,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		g.Go(func() error {
 			// Using upsert here on purpose as this is the fastest way to do bulk updates.
 			// However, there is a risk that errors in the sync implementation could silently insert new rows.
-			return s.db.UpsertStreamed(ctx, entities)
+			return s.db.UpsertStreamed(ctx, entities, OnSuccessIncrement[contracts.Entity](stat))
 		})
 	}
 
@@ -157,7 +159,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	if len(delta.Delete) > 0 {
 		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		g.Go(func() error {
-			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs())
+			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), OnSuccessIncrement[any](stat))
 		})
 	}
 
@@ -200,4 +202,14 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	})
 
 	return g.Wait()
+}
+
+// getCounterForEntity returns the appropriate counter (config/state) from telemetry.Stats for e.
+func getCounterForEntity(e contracts.Entity) *com.Counter {
+	switch e.(type) {
+	case *v1.HostState, *v1.ServiceState:
+		return &telemetry.Stats.State
+	default:
+		return &telemetry.Stats.Config
+	}
 }

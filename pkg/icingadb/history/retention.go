@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/pkg/errors"
@@ -185,7 +186,10 @@ func (r *Retention) Start(ctx context.Context) error {
 			r.logger.Debugf("Cleaning up historical data for category %s from table %s older than %s",
 				stmt.Category, stmt.Table, olderThan)
 
-			deleted, err := r.db.CleanupOlderThan(ctx, stmt.CleanupStmt, e.Id, r.count, olderThan)
+			deleted, err := r.db.CleanupOlderThan(
+				ctx, stmt.CleanupStmt, e.Id, r.count, olderThan,
+				icingadb.OnSuccessIncrement[struct{}](&telemetry.Stats.HistoryCleanup),
+			)
 			if err != nil {
 				select {
 				case errs <- err:

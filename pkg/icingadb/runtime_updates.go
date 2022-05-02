@@ -9,6 +9,7 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/structify"
@@ -67,6 +68,7 @@ func (r *RuntimeUpdates) Sync(
 
 	for _, factoryFunc := range factoryFuncs {
 		s := common.NewSyncSubject(factoryFunc)
+		stat := getCounterForEntity(s.Entity())
 
 		updateMessages := make(chan redis.XMessage, r.redis.Options.XReadCount)
 		upsertEntities := make(chan contracts.Entity, r.redis.Options.XReadCount)
@@ -107,7 +109,9 @@ func (r *RuntimeUpdates) Sync(
 			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
 			sem := semaphore.NewWeighted(1)
 
-			onSuccess := []OnSuccess[contracts.Entity]{OnSuccessIncrement[contracts.Entity](&counter)}
+			onSuccess := []OnSuccess[contracts.Entity]{
+				OnSuccessIncrement[contracts.Entity](&counter), OnSuccessIncrement[contracts.Entity](stat),
+			}
 			if !allowParallel {
 				onSuccess = append(onSuccess, OnSuccessSendTo(upsertedFifo))
 			}
@@ -127,7 +131,7 @@ func (r *RuntimeUpdates) Sync(
 
 			sem := r.db.GetSemaphoreForTable(utils.TableName(s.Entity()))
 
-			onSuccess := []OnSuccess[any]{OnSuccessIncrement[any](&counter)}
+			onSuccess := []OnSuccess[any]{OnSuccessIncrement[any](&counter), OnSuccessIncrement[any](stat)}
 			if !allowParallel {
 				onSuccess = append(onSuccess, OnSuccessSendTo(deletedFifo))
 			}
@@ -173,6 +177,7 @@ func (r *RuntimeUpdates) Sync(
 			return r.db.NamedBulkExec(
 				ctx, cvStmt, cvCount, sem, customvars, com.SplitOnDupId[contracts.Entity],
 				OnSuccessIncrement[contracts.Entity](&counter),
+				OnSuccessIncrement[contracts.Entity](&telemetry.Stats.Config),
 			)
 		})
 
@@ -192,6 +197,7 @@ func (r *RuntimeUpdates) Sync(
 			return r.db.NamedBulkExec(
 				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars,
 				com.SplitOnDupId[contracts.Entity], OnSuccessIncrement[contracts.Entity](&counter),
+				OnSuccessIncrement[contracts.Entity](&telemetry.Stats.Config),
 			)
 		})
 
