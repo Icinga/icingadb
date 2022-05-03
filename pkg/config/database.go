@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -45,8 +46,15 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 
 		config.User = d.User
 		config.Passwd = d.Password
-		config.Net = "tcp"
-		config.Addr = net.JoinHostPort(d.Host, fmt.Sprint(d.Port))
+
+		if strings.HasPrefix(d.Host, "/") {
+			config.Net = "unix"
+			config.Addr = d.Host
+		} else {
+			config.Net = "tcp"
+			config.Addr = net.JoinHostPort(d.Host, fmt.Sprint(d.Port))
+		}
+
 		config.DBName = d.Database
 		config.Timeout = time.Minute
 		config.Params = map[string]string{"sql_mode": "ANSI_QUOTES"}
@@ -68,15 +76,20 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 		uri := &url.URL{
 			Scheme: "postgres",
 			User:   url.UserPassword(d.User, d.Password),
-			Host:   net.JoinHostPort(d.Host, strconv.FormatInt(int64(d.Port), 10)),
 			Path:   "/" + url.PathEscape(d.Database),
+		}
+
+		query := url.Values{"connect_timeout": {"60"}, "binary_parameters": {"yes"}}
+		if strings.HasPrefix(d.Host, "/") {
+			query["host"] = []string{d.Host} // https://github.com/lib/pq/issues/796
+		} else {
+			uri.Host = net.JoinHostPort(d.Host, strconv.FormatInt(int64(d.Port), 10))
 		}
 
 		if _, err := d.TlsOptions.MakeConfig(uri.Host); err != nil {
 			return nil, err
 		}
 
-		query := url.Values{"connect_timeout": {"60"}, "binary_parameters": {"yes"}}
 		if d.TlsOptions.Enable {
 			if d.TlsOptions.Insecure {
 				query["sslmode"] = []string{"require"}

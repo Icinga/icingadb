@@ -11,7 +11,7 @@ Configuration of the Redis that Icinga writes to.
 
 Option                   | Description
 -------------------------|-----------------------------------------------
-address                  | **Required.** Redis host:port address.
+address                  | **Required.** Redis host:port address or absolute Unix socket path.
 password                 | **Optional.** The password to use.
 tls                      | **Optional.** Whether to use TLS.
 cert                     | **Optional.** Path to TLS client certificate.
