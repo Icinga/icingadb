@@ -102,7 +102,7 @@ func (log mysqlLogger) Print(v ...interface{}) {
 }
 
 func shouldRetry(err error) bool {
-	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, syscall.ECONNREFUSED) {
+	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.EAGAIN) {
 		return true
 	}
 
