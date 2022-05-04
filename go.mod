@@ -14,7 +14,7 @@ require (
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pkg/errors v0.9.1
 	github.com/ssgreg/journald v1.0.0
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	go.uber.org/zap v1.21.0
 	golang.org/x/exp v0.0.0-20210514180818-737f94c0881e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
