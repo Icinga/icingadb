@@ -74,7 +74,7 @@ func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc
 			func(err error) bool {
 				if op, ok := err.(*net.OpError); ok {
 					sys, ok := op.Err.(*os.SyscallError)
-					return ok && sys.Err == syscall.ECONNREFUSED
+					return ok && (sys.Err == syscall.ECONNREFUSED || sys.Err == syscall.EAGAIN)
 				}
 				return false
 			},
