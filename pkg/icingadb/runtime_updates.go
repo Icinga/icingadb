@@ -15,9 +15,12 @@ import (
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"reflect"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -249,6 +252,7 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 				return icingaredis.WrapCmdErr(cmd)
 			}
 
+			pipe := r.redis.Pipeline()
 			for _, stream := range rs {
 				var id string
 
@@ -271,7 +275,24 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 						return ctx.Err()
 					}
 				}
+
+				tsAndSerial := strings.Split(id, "-")
+				if s, err := strconv.ParseUint(tsAndSerial[1], 10, 64); err == nil {
+					tsAndSerial[1] = strconv.FormatUint(s+1, 10)
+				}
+
+				pipe.XTrimMinIDApprox(ctx, stream.Stream, strings.Join(tsAndSerial, "-"), 0)
 				streams[stream.Stream] = id
+			}
+
+			if cmds, err := pipe.Exec(ctx); err != nil {
+				r.logger.Errorw("Can't execute Redis pipeline", zap.Error(errors.WithStack(err)))
+			} else {
+				for _, cmd := range cmds {
+					if cmd.Err() != nil {
+						r.logger.Errorw("Can't trim runtime updates stream", zap.Error(icingaredis.WrapCmdErr(cmd)))
+					}
+				}
 			}
 		}
 	}
