@@ -2,6 +2,7 @@ package overdue
 
 import (
 	"context"
+	_ "embed"
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
@@ -16,7 +17,9 @@ import (
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -129,39 +132,12 @@ func (s Sync) log(ctx context.Context, objectType string, counter *com.Counter) 
 	})
 }
 
-// luaGetOverdues takes the following KEYS:
-// * either icinga:nextupdate:host or icinga:nextupdate:service
-// * either icingadb:overdue:host or icingadb:overdue:service
-// * a random one
-//
-// It takes the following ARGV:
-// * the current date and time as *nix timestamp float in seconds
-//
-// It returns the following:
-// * overdue monitored objects not yet marked overdue
-// * not overdue monitored objects not yet unmarked overdue
-var luaGetOverdues = redis.NewScript(`
+//go:embed get_overdues.lua
+var getOverduesLua string
 
-local icingaNextupdate = KEYS[1]
-local icingadbOverdue = KEYS[2]
-local tempOverdue = KEYS[3]
-local now = ARGV[1]
-
-redis.call('DEL', tempOverdue)
-
-local zrbs = redis.call('ZRANGEBYSCORE', icingaNextupdate, '-inf', '(' .. now)
-for i = 1, #zrbs do
-	redis.call('SADD', tempOverdue, zrbs[i])
-end
-zrbs = nil
-
-local res = {redis.call('SDIFF', tempOverdue, icingadbOverdue), redis.call('SDIFF', icingadbOverdue, tempOverdue)}
-
-redis.call('DEL', tempOverdue)
-
-return res
-
-`)
+var luaGetOverdues = redis.NewScript(strings.TrimSpace(
+	regexp.MustCompile(`(?m)^--.*?$`).ReplaceAllString(getOverduesLua, ""),
+))
 
 // sync synchronizes Redis overdue sets from s.redis to s.db for objectType.
 func (s Sync) sync(ctx context.Context, objectType string, factory factory, counter *com.Counter) error {
