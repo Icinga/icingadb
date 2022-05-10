@@ -47,7 +47,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 		config.User = d.User
 		config.Passwd = d.Password
 
-		if strings.HasPrefix(d.Host, "/") {
+		if d.isUnixAddr() {
 			config.Net = "unix"
 			config.Addr = d.Host
 		} else {
@@ -151,7 +151,23 @@ func (d *Database) Validate() error {
 		return unknownDbType(d.Type)
 	}
 
+	if d.Host == "" {
+		return errors.New("database host missing")
+	}
+
+	if d.User == "" {
+		return errors.New("database user missing")
+	}
+
+	if d.Database == "" {
+		return errors.New("database name missing")
+	}
+
 	return d.Options.Validate()
+}
+
+func (d *Database) isUnixAddr() bool {
+	return strings.HasPrefix(d.Host, "/")
 }
 
 func unknownDbType(t string) error {
