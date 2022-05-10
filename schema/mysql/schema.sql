@@ -809,7 +809,7 @@ CREATE TABLE customvar (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
 
-  name varchar(255) NOT NULL,
+  name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   value text NOT NULL,
 
   PRIMARY KEY (id)
@@ -821,7 +821,7 @@ CREATE TABLE customvar_flat (
   customvar_id binary(20) NOT NULL COMMENT 'sha1(customvar.id)',
   flatname_checksum binary(20) NOT NULL COMMENT 'sha1(flatname after conversion)',
 
-  flatname varchar(512) NOT NULL COMMENT 'Path converted with `.` and `[ ]`',
+  flatname varchar(512) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Path converted with `.` and `[ ]`',
   flatvalue text NOT NULL,
 
   PRIMARY KEY (id),

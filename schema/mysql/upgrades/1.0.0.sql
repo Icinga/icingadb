@@ -41,5 +41,11 @@ ALTER TABLE notes_url
   MODIFY id binary(20) NOT NULL COMMENT 'sha1(environment.id + notes_url)',
   ADD PRIMARY KEY (id);
 
+ALTER TABLE customvar
+  MODIFY name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL;
+
+ALTER TABLE customvar_flat
+  MODIFY flatname varchar(512) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Path converted with `.` and `[ ]`';
+
 INSERT INTO icingadb_schema (version, TIMESTAMP)
   VALUES (3, CURRENT_TIMESTAMP() * 1000);
