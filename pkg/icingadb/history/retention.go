@@ -129,6 +129,10 @@ func (r *Retention) StartWithCallback(ctx context.Context, c func(table string, 
 				return
 			}
 
+			if rs.Count > 0 {
+				r.logger.Infof("Removed %d old %s history items", rs.Count, category)
+			}
+
 			if c != nil {
 				c(stmt.Table, rs)
 			}
