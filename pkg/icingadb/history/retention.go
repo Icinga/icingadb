@@ -142,11 +142,6 @@ func NewRetention(
 
 // Start starts the retention.
 func (r *Retention) Start(ctx context.Context) error {
-	return r.StartWithCallback(ctx, nil)
-}
-
-// StartWithCallback starts retention and executes the specified callback each time a retention run completes.
-func (r *Retention) StartWithCallback(ctx context.Context, c func(table string, rs icingadb.CleanupResult)) error {
 	ctx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
 
@@ -196,10 +191,6 @@ func (r *Retention) StartWithCallback(ctx context.Context, c func(table string, 
 
 			if rs.Count > 0 {
 				r.logger.Infof("Removed %d old %s history items", rs.Count, stmt.Category)
-			}
-
-			if c != nil {
-				c(stmt.Table, rs)
 			}
 		}, periodic.Immediate())
 	}
