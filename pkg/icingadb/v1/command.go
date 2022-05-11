@@ -25,6 +25,7 @@ type CommandArgument struct {
 	RepeatKey           types.Bool   `json:"repeat_key"`
 	Required            types.Bool   `json:"required"`
 	SetIf               types.String `json:"set_if"`
+	Separator           types.String `json:"separator"`
 	SkipKey             types.Bool   `json:"skip_key"`
 }
 

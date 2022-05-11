@@ -411,6 +411,7 @@ CREATE TABLE checkcommand_argument (
   repeat_key enum('n', 'y') NOT NULL,
   required enum('n', 'y') NOT NULL,
   set_if varchar(255) DEFAULT NULL,
+  `separator` varchar(255) DEFAULT NULL,
   skip_key enum('n', 'y') NOT NULL,
 
   PRIMARY KEY (id)
@@ -474,6 +475,7 @@ CREATE TABLE eventcommand_argument (
   repeat_key enum('n', 'y') NOT NULL,
   required enum('n', 'y') NOT NULL,
   set_if varchar(255) DEFAULT NULL,
+  `separator` varchar(255) DEFAULT NULL,
   skip_key enum('n', 'y') NOT NULL,
 
   PRIMARY KEY (id)
@@ -535,6 +537,7 @@ CREATE TABLE notificationcommand_argument (
   repeat_key enum('n', 'y') NOT NULL,
   required enum('n', 'y') NOT NULL,
   set_if varchar(255) DEFAULT NULL,
+  `separator` varchar(255) DEFAULT NULL,
   skip_key enum('n', 'y') NOT NULL,
 
   PRIMARY KEY (id)

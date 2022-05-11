@@ -11,6 +11,15 @@ ALTER TABLE host_state
 ALTER TABLE service_state
   ADD COLUMN previous_soft_state tinyint unsigned NOT NULL AFTER hard_state;
 
+ALTER TABLE checkcommand_argument
+  ADD COLUMN `separator` varchar(255) DEFAULT NULL AFTER set_if;
+
+ALTER TABLE eventcommand_argument
+  ADD COLUMN `separator` varchar(255) DEFAULT NULL AFTER set_if;
+
+ALTER TABLE notificationcommand_argument
+  ADD COLUMN `separator` varchar(255) DEFAULT NULL AFTER set_if;
+
 ALTER TABLE acknowledgement_history
   ADD index idx_acknowledgement_history_clear_time (clear_time) COMMENT 'Filter for history retention';
 
