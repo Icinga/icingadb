@@ -7,7 +7,6 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/utils"
 	goflags "github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"os"
@@ -38,7 +37,8 @@ func New() *Command {
 
 	cfg, err := config.FromYAMLFile(flags.Config)
 	if err != nil {
-		utils.Fatal(err)
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(2)
 	}
 
 	return &Command{
