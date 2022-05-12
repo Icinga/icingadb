@@ -79,14 +79,20 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			Path:   "/" + url.PathEscape(d.Database),
 		}
 
-		query := url.Values{"connect_timeout": {"60"}, "binary_parameters": {"yes"}}
-		if strings.HasPrefix(d.Host, "/") {
-			query["host"] = []string{d.Host} // https://github.com/lib/pq/issues/796
-		} else {
-			uri.Host = net.JoinHostPort(d.Host, strconv.FormatInt(int64(d.Port), 10))
+		query := url.Values{
+			"connect_timeout":   {"60"},
+			"binary_parameters": {"yes"},
+
+			// Host and port can alternatively be specified in the query string. lib/pq can't parse the connection URI
+			// if a Unix domain socket path is specified in the host part of the URI, therefore always use the query
+			// string. See also https://github.com/lib/pq/issues/796
+			"host": {d.Host},
+		}
+		if d.Port != 0 {
+			query["port"] = []string{strconv.FormatInt(int64(d.Port), 10)}
 		}
 
-		if _, err := d.TlsOptions.MakeConfig(uri.Host); err != nil {
+		if _, err := d.TlsOptions.MakeConfig(d.Host); err != nil {
 			return nil, err
 		}
 
