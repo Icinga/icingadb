@@ -52,7 +52,11 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			config.Addr = d.Host
 		} else {
 			config.Net = "tcp"
-			config.Addr = net.JoinHostPort(d.Host, fmt.Sprint(d.Port))
+			port := d.Port
+			if port == 0 {
+				port = 3306
+			}
+			config.Addr = net.JoinHostPort(d.Host, fmt.Sprint(port))
 		}
 
 		config.DBName = d.Database
