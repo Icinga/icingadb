@@ -102,7 +102,7 @@ func convertAcknowledgementRows(
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
-		setTime := float64(utils.UnixMilli(set.Time()))
+		setTime := float64(set.Time().UnixMilli())
 		acknowledgementHistoryId := hashAny([]interface{}{env, name, setTime})
 
 		if row.AcknowledgementType == 0 { // clear
@@ -524,7 +524,7 @@ func convertFlappingRows(
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
-		startTime := float64(utils.UnixMilli(start.Time()))
+		startTime := float64(start.Time().UnixMilli())
 		flappingHistoryId := hashAny([]interface{}{env, name, startTime})
 
 		if row.EventType == 1001 { // end
@@ -705,7 +705,7 @@ func convertNotificationRows(
 		}
 
 		ts := convertTime(row.EndTime, row.EndTimeUsec)
-		tsMilli := float64(utils.UnixMilli(ts.Time()))
+		tsMilli := float64(ts.Time().UnixMilli())
 		notificationHistoryId := hashAny([]interface{}{env, name, ntEnum, tsMilli})
 		id := hashAny([]interface{}{env, "notification", name, ntEnum, tsMilli})
 		typ := objectTypes[row.ObjecttypeId]
@@ -841,7 +841,7 @@ func convertStateRows(
 
 		name := strings.Join([]string{row.Name1, row.Name2}, "!")
 		ts := convertTime(row.StateTime, row.StateTimeUsec)
-		tsMilli := float64(utils.UnixMilli(ts.Time()))
+		tsMilli := float64(ts.Time().UnixMilli())
 		stateHistoryId := hashAny([]interface{}{env, name, tsMilli})
 		id := hashAny([]interface{}{env, "state_change", name, tsMilli})
 		typ := objectTypes[row.ObjecttypeId]
