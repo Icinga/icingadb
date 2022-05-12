@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"database/sql"
+	_ "embed"
 	"encoding/hex"
 	"fmt"
 	"github.com/goccy/go-yaml"
@@ -121,7 +122,7 @@ func mkCache(f *Flags, mapper *reflectx.Mapper) {
 	}
 
 	types.forEach(func(ht *historyType) {
-		if ht.cacheSchema == nil {
+		if ht.cacheSchema == "" {
 			return
 		}
 
@@ -135,11 +136,9 @@ func mkCache(f *Flags, mapper *reflectx.Mapper) {
 
 		ht.cache.Mapper = mapper
 
-		for _, ddl := range ht.cacheSchema {
-			if _, err := ht.cache.Exec(ddl); err != nil {
-				log.With("file", file, "ddl", ddl).
-					Fatalf("%+v", errors.Wrap(err, "can't import schema into SQLite database"))
-			}
+		if _, err := ht.cache.Exec(ht.cacheSchema); err != nil {
+			log.With("file", file, "ddl", ht.cacheSchema).
+				Fatalf("%+v", errors.Wrap(err, "can't import schema into SQLite database"))
 		}
 	})
 }
@@ -190,19 +189,14 @@ func startIdoTx(ido *icingadb.DB) {
 	})
 }
 
+//go:embed embed/ido_migration_progress_schema.sql
+var idoMigrationProgressSchema string
+
 // computeProgress initializes types[*].lastId, types[*].total and types[*].done.
 // (On non-recoverable errors the whole program exits.)
 func computeProgress(idb *icingadb.DB) {
-	{
-		_, err := idb.Exec(`CREATE TABLE IF NOT EXISTS ido_migration_progress (
-    history_type VARCHAR(63) NOT NULL,
-    last_ido_id BIGINT NOT NULL,
-
-    CONSTRAINT pk_ido_migration_progress PRIMARY KEY (history_type)
-)`)
-		if err != nil {
-			log.Fatalf("%+v", errors.Wrap(err, "can't create table ido_migration_progress"))
-		}
+	if _, err := idb.Exec(idoMigrationProgressSchema); err != nil {
+		log.Fatalf("%+v", errors.Wrap(err, "can't create table ido_migration_progress"))
 	}
 
 	stmt, _ := idb.BuildUpsertStmt(&IdoMigrationProgress{})

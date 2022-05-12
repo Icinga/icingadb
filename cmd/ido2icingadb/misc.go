@@ -194,7 +194,7 @@ type historyType struct {
 	// idoIdColumn specifies idoTable's primary key.
 	idoIdColumn string
 	// cacheSchema specifies <name>.sqlite3's structure.
-	cacheSchema []string
+	cacheSchema string
 	// cacheFiller fills cache from snapshot.
 	cacheFiller func(*historyType)
 	// cacheLimitQuery rationale: see migrate().
