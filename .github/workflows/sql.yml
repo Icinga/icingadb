@@ -1,0 +1,58 @@
+name: SQL
+
+on:
+  push:
+    branches:
+      - master
+  pull_request: {}
+
+jobs:
+  sql:
+    name: ${{ matrix.database.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        database:
+          - {type: MYSQL, name: MySQL 5.5,         image: "icinga/icingadb-mysql:5.5"}
+          - {type: MYSQL, name: MySQL 5.6,         image: "icinga/icingadb-mysql:5.6"}
+          - {type: MYSQL, name: MySQL 5.7,         image: "mysql:5.7"}
+          - {type: MYSQL, name: MySQL latest,      image: "mysql:latest"}
+          - {type: MYSQL, name: MariaDB 10.1,      image: "mariadb:10.1"}
+          - {type: MYSQL, name: MariaDB 10.2,      image: "mariadb:10.2"}
+          - {type: MYSQL, name: MariaDB 10.3,      image: "mariadb:10.3"}
+          - {type: MYSQL, name: MariaDB 10.4,      image: "mariadb:10.4"}
+          - {type: MYSQL, name: MariaDB 10.5,      image: "mariadb:10.5"}
+          - {type: MYSQL, name: MariaDB 10.6,      image: "mariadb:10.6"}
+          - {type: MYSQL, name: MariaDB 10.7,      image: "mariadb:10.7"}
+          - {type: MYSQL, name: MariaDB latest,    image: "mariadb:latest"}
+          - {type: PGSQL, name: PostgreSQL 9.6,    image: "postgres:9.6"}
+          - {type: PGSQL, name: PostgreSQL 10,     image: "postgres:10"}
+          - {type: PGSQL, name: PostgreSQL 11,     image: "postgres:11"}
+          - {type: PGSQL, name: PostgreSQL 12,     image: "postgres:12"}
+          - {type: PGSQL, name: PostgreSQL 13,     image: "postgres:13"}
+          - {type: PGSQL, name: PostgreSQL latest, image: "postgres:latest"}
+
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v1
+        with:
+          go-version: '^1.16'
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Download dependencies
+        run: go get -v -t -d ./...
+        working-directory: tests/
+
+      - name: Run tests
+        env:
+          ICINGADB_TESTS_DATABASE_TYPE: ${{ matrix.database.type }}
+          ICINGA_TESTING_${{ matrix.database.type }}_IMAGE: ${{ matrix.database.image }}
+          ICINGA_TESTING_ICINGADB_SCHEMA_MYSQL: ${{ github.workspace }}/schema/mysql/schema.sql
+          ICINGA_TESTING_ICINGADB_SCHEMA_PGSQL: ${{ github.workspace }}/schema/pgsql/schema.sql
+        timeout-minutes: 10
+        run: go test -v -timeout 5m ./sql
+        working-directory: tests/

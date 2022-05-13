@@ -46,10 +46,15 @@ func badStateType(t interface{}) error {
 	return errors.Errorf("bad state type: %#v", t)
 }
 
+const (
+	StateSoft = StateType(0)
+	StateHard = StateType(1)
+)
+
 // stateTypes maps all valid StateType values to their SQL representation.
 var stateTypes = map[StateType]string{
-	0: "soft",
-	1: "hard",
+	StateSoft: "soft",
+	StateHard: "hard",
 }
 
 // Assert interface compliance.

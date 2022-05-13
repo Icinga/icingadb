@@ -9,6 +9,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"strings"
 	"testing"
 	"time"
 )
@@ -22,13 +23,24 @@ func TestCleanupAndRetention(t *testing.T) {
 	t.Cleanup(func() { _ = db.Close() })
 
 	reten := retention{
-		Days: 7,
+		HistoryDays: 7,
+		SlaDays:     30,
 		Options: map[string]int{
 			"acknowledgement": 0, // No cleanup.
 			"comment":         1,
 			"downtime":        2,
 			// notification and state default to 7.
 		},
+	}
+
+	daysForCategory := func(category string) int {
+		if strings.HasPrefix(category, "sla_") {
+			return reten.SlaDays
+		} else if d, ok := reten.Options[category]; ok {
+			return d
+		} else {
+			return reten.HistoryDays
+		}
 	}
 
 	rowsToDelete := 10000
@@ -38,11 +50,7 @@ func TestCleanupAndRetention(t *testing.T) {
 		err := dropNotNullColumns(db, stmt)
 		assert.NoError(t, err)
 
-		retentionDays, ok := reten.Options[category]
-		if !ok {
-			retentionDays = reten.Days
-		}
-
+		retentionDays := daysForCategory(category)
 		start := time.Now().AddDate(0, 0, -retentionDays).Add(-1 * time.Millisecond * time.Duration(rowsToDelete))
 		startMilli := start.UnixMilli()
 
@@ -75,18 +83,14 @@ func TestCleanupAndRetention(t *testing.T) {
 	i.Reload()
 	waitForDumpDoneSignal(t, r, 20*time.Second, 100*time.Millisecond)
 	config, err := yaml.Marshal(struct {
-		Retention retention `yaml:"history-retention"`
+		Retention retention `yaml:"retention"`
 	}{reten})
 	assert.NoError(t, err)
 	it.IcingaDbInstanceT(t, r, rdb, services.WithIcingaDbConfig(string(config)))
 
 	eventually.Assert(t, func(t require.TestingT) {
 		for category, stmt := range retentionStatements {
-			retentionDays, ok := reten.Options[category]
-			if !ok {
-				retentionDays = reten.Days
-			}
-
+			retentionDays := daysForCategory(category)
 			threshold := time.Now().AddDate(0, 0, -retentionDays)
 			thresholdMilli := threshold.UnixMilli()
 
@@ -106,10 +110,10 @@ func TestCleanupAndRetention(t *testing.T) {
 
 			if retentionDays == 0 {
 				// No cleanup.
-				assert.Equal(t, rowsToDelete+rowsToSpare, rowsLeft+rowsSpared, "all rows should still be there")
+				assert.Equal(t, rowsToDelete+rowsToSpare, rowsLeft+rowsSpared, "all rows should still be there for %s", category)
 			} else {
-				assert.Equal(t, 0, rowsLeft, "rows left in retention period")
-				assert.Equal(t, rowsToSpare, rowsSpared, "rows spared")
+				assert.Equal(t, 0, rowsLeft, "rows left in retention period for %s", category)
+				assert.Equal(t, rowsToSpare, rowsSpared, "rows spared for %s", category)
 			}
 		}
 	}, time.Minute, time.Second)
@@ -122,8 +126,9 @@ type cleanupStmt struct {
 }
 
 type retention struct {
-	Days    int            `yaml:"days"`
-	Options map[string]int `yaml:"options"`
+	HistoryDays int            `yaml:"history-days"`
+	SlaDays     int            `yaml:"sla-days"`
+	Options     map[string]int `yaml:"options"`
 }
 
 var retentionStatements = map[string]cleanupStmt{
@@ -154,6 +159,16 @@ var retentionStatements = map[string]cleanupStmt{
 	},
 	"state": {
 		Table:  "state_history",
+		PK:     "id",
+		Column: "event_time",
+	},
+	"sla_downtime": {
+		Table:  "sla_history_downtime",
+		PK:     "downtime_id",
+		Column: "downtime_end",
+	},
+	"sla_state": {
+		Table:  "sla_history_state",
 		PK:     "id",
 		Column: "event_time",
 	},
