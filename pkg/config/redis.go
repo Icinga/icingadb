@@ -103,5 +103,9 @@ func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc
 
 // Validate checks constraints in the supplied Redis configuration and returns an error if they are violated.
 func (r *Redis) Validate() error {
+	if r.Address == "" {
+		return errors.New("Redis address missing")
+	}
+
 	return r.Options.Validate()
 }
