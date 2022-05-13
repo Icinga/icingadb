@@ -142,11 +142,6 @@ func NewRetention(
 
 // Start starts the retention.
 func (r *Retention) Start(ctx context.Context) error {
-	return r.StartWithCallback(ctx, nil)
-}
-
-// StartWithCallback starts retention and executes the specified callback each time a retention run completes.
-func (r *Retention) StartWithCallback(ctx context.Context, c func(table string, rs icingadb.CleanupResult)) error {
 	ctx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
 
@@ -184,7 +179,7 @@ func (r *Retention) StartWithCallback(ctx context.Context, c func(table string, 
 			r.logger.Debugf("Cleaning up historical data for category %s from table %s older than %s",
 				stmt.Category, stmt.Table, olderThan)
 
-			rs, err := r.db.CleanupOlderThan(ctx, stmt.CleanupStmt, r.count, olderThan)
+			deleted, err := r.db.CleanupOlderThan(ctx, stmt.CleanupStmt, r.count, olderThan)
 			if err != nil {
 				select {
 				case errs <- err:
@@ -194,12 +189,8 @@ func (r *Retention) StartWithCallback(ctx context.Context, c func(table string, 
 				return
 			}
 
-			if rs.Count > 0 {
-				r.logger.Infof("Removed %d old %s history items", rs.Count, category)
-			}
-
-			if c != nil {
-				c(stmt.Table, rs)
+			if deleted > 0 {
+				r.logger.Infof("Removed %d old %s history items", deleted, stmt.Category)
 			}
 		}, periodic.Immediate())
 	}
