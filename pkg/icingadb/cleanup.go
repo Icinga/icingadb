@@ -10,13 +10,6 @@ import (
 	"time"
 )
 
-// CleanupResult is the result of executing a cleanup routine and
-// stores how many rows were deleted and how many statements were executed for that.
-type CleanupResult struct {
-	Count  uint64
-	Rounds uint64
-}
-
 // CleanupStmt defines information needed to compose cleanup statements.
 type CleanupStmt struct {
 	Table  string
@@ -40,37 +33,31 @@ DELETE FROM %[2]s WHERE %[1]s IN (SELECT %[1]s FROM rows)`, stmt.PK, stmt.Table,
 }
 
 // CleanupOlderThan deletes all rows with the specified statement that are older than the given time.
-// Deletes a maximum of as many rows per round as defined in count.
-func (db *DB) CleanupOlderThan(ctx context.Context, stmt CleanupStmt, count uint64, olderThan time.Time) (CleanupResult, error) {
+// Deletes a maximum of as many rows per round as defined in count. Returns the number of rows deleted.
+func (db *DB) CleanupOlderThan(ctx context.Context, stmt CleanupStmt, count uint64, olderThan time.Time) (uint64, error) {
 	var counter com.Counter
 	defer db.log(ctx, stmt.Build(db.DriverName(), 0), &counter).Stop()
-
-	var rounds uint64
 
 	for {
 		q := db.Rebind(stmt.Build(db.DriverName(), count))
 		rs, err := db.NamedExecContext(ctx, q, cleanupWhere{types.UnixMilli(olderThan)})
 		if err != nil {
-			return CleanupResult{}, internal.CantPerformQuery(err, q)
+			return 0, internal.CantPerformQuery(err, q)
 		}
 
 		n, err := rs.RowsAffected()
 		if err != nil {
-			return CleanupResult{}, err
+			return 0, err
 		}
 
 		counter.Add(uint64(n))
-
-		if n > 0 {
-			rounds++
-		}
 
 		if n < int64(count) {
 			break
 		}
 	}
 
-	return CleanupResult{counter.Total(), rounds}, nil
+	return counter.Total(), nil
 }
 
 type cleanupWhere struct {

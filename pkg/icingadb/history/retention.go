@@ -179,7 +179,7 @@ func (r *Retention) Start(ctx context.Context) error {
 			r.logger.Debugf("Cleaning up historical data for category %s from table %s older than %s",
 				stmt.Category, stmt.Table, olderThan)
 
-			rs, err := r.db.CleanupOlderThan(ctx, stmt.CleanupStmt, r.count, olderThan)
+			deleted, err := r.db.CleanupOlderThan(ctx, stmt.CleanupStmt, r.count, olderThan)
 			if err != nil {
 				select {
 				case errs <- err:
@@ -189,8 +189,8 @@ func (r *Retention) Start(ctx context.Context) error {
 				return
 			}
 
-			if rs.Count > 0 {
-				r.logger.Infof("Removed %d old %s history items", rs.Count, stmt.Category)
+			if deleted > 0 {
+				r.logger.Infof("Removed %d old %s history items", deleted, stmt.Category)
 			}
 		}, periodic.Immediate())
 	}
