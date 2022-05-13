@@ -8,8 +8,17 @@ database:
   user: icingadb
   password: icingadb
 
+# Connection configuration for the Redis where Icinga writes its configuration, state and history.
+# This is the same connection as configured in the 'icingadb' feature of the corresponding Icinga node.
+# High availability setups require a dedicated Redis server per Icinga node and
+# therefore a dedicated Icinga DB instance that connects to it.
 redis:
-  address: localhost:6380
+  # Redis host or absolute Unix socket path.
+  host: localhost
+
+  # Redis port. The Redis server provided by the icingadb-redis package listens on port '6380'.
+  # If not specified, the standard Redis port '6379' is used instead.
+  port: 6380
 
 logging:
   # Default logging level. Can be set to 'fatal', 'error', 'warn', 'info' or 'debug'.

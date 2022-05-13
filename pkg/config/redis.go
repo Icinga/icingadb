@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -13,13 +14,15 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"os"
+	"strings"
 	"syscall"
 	"time"
 )
 
 // Redis defines Redis client configuration.
 type Redis struct {
-	Address    string              `yaml:"address"`
+	Host       string              `yaml:"host"`
+	Port       int                 `yaml:"port" default:"6379"`
 	Password   string              `yaml:"password"`
 	TlsOptions TLS                 `yaml:",inline"`
 	Options    icingaredis.Options `yaml:"options"`
@@ -30,7 +33,7 @@ type ctxDialerFunc = func(ctx context.Context, network, addr string) (net.Conn, 
 // NewClient prepares Redis client configuration,
 // calls redis.NewClient, but returns *icingaredis.Client.
 func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
-	tlsConfig, err := r.TlsOptions.MakeConfig(r.Address)
+	tlsConfig, err := r.TlsOptions.MakeConfig(r.Host)
 	if err != nil {
 		return nil, err
 	}
@@ -44,14 +47,23 @@ func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
 		dialer = (&tls.Dialer{NetDialer: dl, Config: tlsConfig}).DialContext
 	}
 
-	c := redis.NewClient(&redis.Options{
-		Addr:        r.Address,
+	options := &redis.Options{
 		Dialer:      dialWithLogging(dialer, logger),
 		Password:    r.Password,
 		DB:          0, // Use default DB,
 		ReadTimeout: r.Options.Timeout,
 		TLSConfig:   tlsConfig,
-	})
+	}
+
+	if strings.HasPrefix(r.Host, "/") {
+		options.Network = "unix"
+		options.Addr = r.Host
+	} else {
+		options.Network = "tcp"
+		options.Addr = net.JoinHostPort(r.Host, fmt.Sprint(r.Port))
+	}
+
+	c := redis.NewClient(options)
 
 	opts := c.Options()
 	opts.MaxRetries = opts.PoolSize + 1 // https://github.com/go-redis/redis/issues/1737
@@ -103,8 +115,8 @@ func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc
 
 // Validate checks constraints in the supplied Redis configuration and returns an error if they are violated.
 func (r *Redis) Validate() error {
-	if r.Address == "" {
-		return errors.New("Redis address missing")
+	if r.Host == "" {
+		return errors.New("Redis host missing")
 	}
 
 	return r.Options.Validate()
