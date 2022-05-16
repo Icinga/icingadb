@@ -8,7 +8,6 @@ import (
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"io/ioutil"
-	"net"
 	"os"
 )
 
@@ -94,8 +93,8 @@ type TLS struct {
 	Insecure bool   `yaml:"insecure"`
 }
 
-// MakeConfig assembles a tls.Config from t and address.
-func (t *TLS) MakeConfig(address string) (*tls.Config, error) {
+// MakeConfig assembles a tls.Config from t and serverName.
+func (t *TLS) MakeConfig(serverName string) (*tls.Config, error) {
 	if !t.Enable {
 		return nil, nil
 	}
@@ -130,11 +129,7 @@ func (t *TLS) MakeConfig(address string) (*tls.Config, error) {
 		}
 	}
 
-	if host, _, err := net.SplitHostPort(address); err == nil {
-		tlsConfig.ServerName = host
-	} else {
-		tlsConfig.ServerName = address
-	}
+	tlsConfig.ServerName = serverName
 
 	return tlsConfig, nil
 }

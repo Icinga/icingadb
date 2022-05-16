@@ -63,7 +63,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 		config.Timeout = time.Minute
 		config.Params = map[string]string{"sql_mode": "ANSI_QUOTES"}
 
-		tlsConfig, err := d.TlsOptions.MakeConfig(config.Addr)
+		tlsConfig, err := d.TlsOptions.MakeConfig(d.Host)
 		if err != nil {
 			return nil, err
 		}
