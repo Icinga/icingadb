@@ -3,7 +3,10 @@
 database:
   type: mysql
   host: localhost
-  port: 3306
+
+  # Database port. By default, the MySQL or PostgreSQL port, depending on the database type.
+#  port:
+
   database: icingadb
   user: icingadb
   password: CHANGEME
