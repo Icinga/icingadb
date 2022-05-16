@@ -67,8 +67,10 @@ logging:
 retention:
   # Number of days to retain full historical data. By default, historical data is retained forever.
 #  history-days:
+
   # Number of days to retain historical data for SLA reporting. By default, it is retained forever.
 #  sla-days:
+
   # Map of history category to number of days to retain its data in order to
   # enable retention only for specific categories or to override the number that has been configured in days.
   options:
