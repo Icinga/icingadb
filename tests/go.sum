@@ -406,8 +406,10 @@ github.com/hashicorp/golang-lru v0.5.1/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ
 github.com/hashicorp/hcl v1.0.0/go.mod h1:E5yfLk+7swimpb2L/Alb/PJmXilQ/rhwaUYs4T20WEQ=
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
-github.com/icinga/icinga-testing v0.0.0-20220513095329-9c98d3145b01 h1:0dwlZFGWPnmmhvHr2P7chxMwzbW7+R3iX6SyeFBd+WM=
-github.com/icinga/icinga-testing v0.0.0-20220513095329-9c98d3145b01/go.mod h1:ZP0pyqhmrRwwQ6FpAfz7UZMgmH7i3vOjEOm9JcFwOw0=
+github.com/icinga/icinga-testing v0.0.0-20220513144038-4aef51dce82a h1:d0pnssSfJwMsEDB1CIQSkQ3XACVhVIzkVgcirMfLfkM=
+github.com/icinga/icinga-testing v0.0.0-20220513144038-4aef51dce82a/go.mod h1:ZP0pyqhmrRwwQ6FpAfz7UZMgmH7i3vOjEOm9JcFwOw0=
+github.com/icinga/icinga-testing v0.0.0-20220516144008-9600081b7a69 h1:M5KN3s3TuHpGPnP78h5cFogtQrywapFIaYfvohQHc7I=
+github.com/icinga/icinga-testing v0.0.0-20220516144008-9600081b7a69/go.mod h1:ZP0pyqhmrRwwQ6FpAfz7UZMgmH7i3vOjEOm9JcFwOw0=
 github.com/imdario/mergo v0.3.5/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/imdario/mergo v0.3.8/go.mod h1:2EnlNZ0deacrJVfApfmtdGgDfMuh/nq6Ok1EcJh5FfA=
 github.com/imdario/mergo v0.3.10/go.mod h1:jmQim1M+e3UYxmgPu/WyfjB3N3VflVyUjjjwH0dnCYA=

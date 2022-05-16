@@ -8,7 +8,7 @@ require (
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/goccy/go-yaml v1.9.5
 	github.com/google/uuid v1.3.0
-	github.com/icinga/icinga-testing v0.0.0-20220513095329-9c98d3145b01
+	github.com/icinga/icinga-testing v0.0.0-20220516144008-9600081b7a69
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/lib/pq v1.10.5
 	github.com/stretchr/testify v1.7.0
