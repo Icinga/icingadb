@@ -29,7 +29,7 @@ Option                   | Description
 type                     | **Optional.** Either `mysql` (default) or `pgsql`.
 host                     | **Required.** Database host or absolute Unix socket path.
 port                     | **Required.** Database port.
-database                 | **Required.** Database database.
+database                 | **Required.** Database name.
 user                     | **Required.** Database username.
 password                 | **Required.** Database password.
 tls                      | **Optional.** Whether to use TLS.
