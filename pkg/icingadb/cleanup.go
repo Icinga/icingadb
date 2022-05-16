@@ -21,10 +21,11 @@ type CleanupStmt struct {
 func (stmt *CleanupStmt) Build(driverName string, limit uint64) string {
 	switch driverName {
 	case driver.MySQL, "mysql":
-		return fmt.Sprintf(`DELETE FROM %[1]s WHERE %[2]s < :time ORDER BY %[2]s LIMIT %[3]d`, stmt.Table, stmt.Column, limit)
+		return fmt.Sprintf(`DELETE FROM %[1]s WHERE environment_id = :environment_id AND %[2]s < :time
+ORDER BY %[2]s LIMIT %[3]d`, stmt.Table, stmt.Column, limit)
 	case driver.PostgreSQL, "postgres":
 		return fmt.Sprintf(`WITH rows AS (
-SELECT %[1]s FROM %[2]s WHERE %[3]s < :time ORDER BY %[3]s LIMIT %[4]d
+SELECT %[1]s FROM %[2]s WHERE environment_id = :environment_id AND %[3]s < :time ORDER BY %[3]s LIMIT %[4]d
 )
 DELETE FROM %[2]s WHERE %[1]s IN (SELECT %[1]s FROM rows)`, stmt.PK, stmt.Table, stmt.Column, limit)
 	default:
@@ -34,13 +35,18 @@ DELETE FROM %[2]s WHERE %[1]s IN (SELECT %[1]s FROM rows)`, stmt.PK, stmt.Table,
 
 // CleanupOlderThan deletes all rows with the specified statement that are older than the given time.
 // Deletes a maximum of as many rows per round as defined in count. Returns the number of rows deleted.
-func (db *DB) CleanupOlderThan(ctx context.Context, stmt CleanupStmt, count uint64, olderThan time.Time) (uint64, error) {
+func (db *DB) CleanupOlderThan(
+	ctx context.Context, stmt CleanupStmt, envId types.Binary, count uint64, olderThan time.Time,
+) (uint64, error) {
 	var counter com.Counter
 	defer db.log(ctx, stmt.Build(db.DriverName(), 0), &counter).Stop()
 
 	for {
 		q := db.Rebind(stmt.Build(db.DriverName(), count))
-		rs, err := db.NamedExecContext(ctx, q, cleanupWhere{types.UnixMilli(olderThan)})
+		rs, err := db.NamedExecContext(ctx, q, cleanupWhere{
+			EnvironmentId: envId,
+			Time:          types.UnixMilli(olderThan),
+		})
 		if err != nil {
 			return 0, internal.CantPerformQuery(err, q)
 		}
@@ -61,5 +67,6 @@ func (db *DB) CleanupOlderThan(ctx context.Context, stmt CleanupStmt, count uint
 }
 
 type cleanupWhere struct {
-	Time types.UnixMilli
+	EnvironmentId types.Binary
+	Time          types.UnixMilli
 }

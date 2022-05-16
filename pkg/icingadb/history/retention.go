@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/icinga/icingadb/pkg/icingadb"
+	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/pkg/errors"
@@ -145,6 +146,11 @@ func (r *Retention) Start(ctx context.Context) error {
 	ctx, cancelCtx := context.WithCancel(ctx)
 	defer cancelCtx()
 
+	e, ok := v1.EnvironmentFromContext(ctx)
+	if !ok {
+		return errors.New("can't get environment from context")
+	}
+
 	errs := make(chan error, 1)
 
 	for _, stmt := range RetentionStatements {
@@ -179,7 +185,7 @@ func (r *Retention) Start(ctx context.Context) error {
 			r.logger.Debugf("Cleaning up historical data for category %s from table %s older than %s",
 				stmt.Category, stmt.Table, olderThan)
 
-			deleted, err := r.db.CleanupOlderThan(ctx, stmt.CleanupStmt, r.count, olderThan)
+			deleted, err := r.db.CleanupOlderThan(ctx, stmt.CleanupStmt, e.Id, r.count, olderThan)
 			if err != nil {
 				select {
 				case errs <- err:

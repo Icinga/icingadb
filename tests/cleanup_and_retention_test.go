@@ -6,6 +6,7 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icinga-testing/services"
 	"github.com/icinga/icinga-testing/utils/eventually"
+	"github.com/icinga/icingadb/tests/internal/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,9 +15,12 @@ import (
 	"time"
 )
 
-const MaxPlaceholders = 1 << 13
-
 func TestCleanupAndRetention(t *testing.T) {
+	r := it.RedisServerT(t)
+	i := it.Icinga2NodeT(t, "master")
+	i.EnableIcingaDb(r)
+	i.Reload()
+
 	rdb := getDatabase(t)
 	db, err := sqlx.Open(rdb.Driver(), rdb.DSN())
 	require.NoError(t, err, "connecting to SQL database shouldn't fail")
@@ -43,44 +47,52 @@ func TestCleanupAndRetention(t *testing.T) {
 		}
 	}
 
+	envId := utils.GetEnvironmentIdFromRedis(t, r)
+	otherEnvId := append([]byte(nil), envId...)
+	otherEnvId[0]++
+
 	rowsToDelete := 10000
 	rowsToSpare := 1000
+	rowsInOtherEnv := 1000
 
 	for category, stmt := range retentionStatements {
 		err := dropNotNullColumns(db, stmt)
 		assert.NoError(t, err)
 
 		retentionDays := daysForCategory(category)
-		start := time.Now().AddDate(0, 0, -retentionDays).Add(-1 * time.Millisecond * time.Duration(rowsToDelete))
+		start := time.Now().AddDate(0, 0, -retentionDays)
 		startMilli := start.UnixMilli()
 
 		type row struct {
+			Env  []byte
 			Id   []byte
 			Time int64
 		}
-		values := make([]row, 0, MaxPlaceholders)
-		for j := 0; j < (rowsToDelete + rowsToSpare); j++ {
-			if j == rowsToDelete {
-				startMilli += int64(2 * time.Minute)
-			}
 
+		nextId := 1
+		getId := func() []byte {
 			id := make([]byte, 20)
-			binary.LittleEndian.PutUint64(id, uint64(j))
-
-			values = append(values, row{id[:], startMilli + int64(j)})
-
-			if len(values) == MaxPlaceholders || j == (rowsToDelete+rowsToSpare-1) {
-				_, err := db.NamedExec(fmt.Sprintf(`INSERT INTO %s (%s, %s) VALUES (:id, :time)`, stmt.Table, stmt.PK, stmt.Column), values)
-				require.NoError(t, err)
-				values = values[:0]
-			}
+			binary.LittleEndian.PutUint64(id, uint64(nextId))
+			nextId++
+			return id
 		}
+		values := make([]row, 0, rowsToDelete+rowsToSpare+rowsInOtherEnv)
+
+		for j := 0; j < rowsToDelete; j++ {
+			values = append(values, row{envId, getId(), startMilli - int64(j)})
+		}
+		for j := 0; j < rowsToSpare; j++ {
+			values = append(values, row{envId, getId(), startMilli + (2 * time.Minute).Milliseconds() + int64(j)})
+		}
+		for j := 0; j < rowsInOtherEnv; j++ {
+			values = append(values, row{otherEnvId, getId(), startMilli - int64(j)})
+		}
+
+		_, err = db.NamedExec(fmt.Sprintf(`INSERT INTO %s (environment_id, %s, %s) VALUES (:env, :id, :time)`,
+			stmt.Table, stmt.PK, stmt.Column), values)
+		require.NoError(t, err)
 	}
 
-	r := it.RedisServerT(t)
-	i := it.Icinga2NodeT(t, "master")
-	i.EnableIcingaDb(r)
-	i.Reload()
 	waitForDumpDoneSignal(t, r, 20*time.Second, 100*time.Millisecond)
 	config, err := yaml.Marshal(struct {
 		Retention retention `yaml:"retention"`
@@ -96,14 +108,16 @@ func TestCleanupAndRetention(t *testing.T) {
 
 			var rowsLeft int
 			err := db.QueryRow(
-				db.Rebind(fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE %s < ?`, stmt.Table, stmt.Column)),
+				db.Rebind(fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE environment_id = ? AND %s < ?`, stmt.Table, stmt.Column)),
+				envId,
 				thresholdMilli,
 			).Scan(&rowsLeft)
 			assert.NoError(t, err)
 
 			var rowsSpared int
 			err = db.QueryRow(
-				db.Rebind(fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE %s >= ?`, stmt.Table, stmt.Column)),
+				db.Rebind(fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE environment_id = ? AND %s >= ?`, stmt.Table, stmt.Column)),
+				envId,
 				thresholdMilli,
 			).Scan(&rowsSpared)
 			assert.NoError(t, err)
@@ -115,6 +129,15 @@ func TestCleanupAndRetention(t *testing.T) {
 				assert.Equal(t, 0, rowsLeft, "rows left in retention period for %s", category)
 				assert.Equal(t, rowsToSpare, rowsSpared, "rows spared for %s", category)
 			}
+
+			var rowsSparedOtherEnv int
+			err = db.QueryRow(
+				db.Rebind(fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE environment_id <> ?`, stmt.Table)),
+				envId,
+			).Scan(&rowsSparedOtherEnv)
+			assert.NoError(t, err)
+
+			assert.Equal(t, rowsInOtherEnv, rowsSparedOtherEnv, "should not delete rows in other environment for %s", category)
 		}
 	}, time.Minute, time.Second)
 }
@@ -189,9 +212,9 @@ func dropNotNullColumns(db *sqlx.DB, stmt cleanupStmt) error {
 	err := db.Select(&cols, db.Rebind(fmt.Sprintf(`
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = %s AND table_name = ? AND column_name NOT IN (?, ?) AND is_nullable = ?`,
+WHERE table_schema = %s AND table_name = ? AND column_name NOT IN (?, ?, ?) AND is_nullable = ?`,
 		schema)),
-		stmt.Table, stmt.PK, stmt.Column, "NO")
+		stmt.Table, "environment_id", stmt.PK, stmt.Column, "NO")
 	if err != nil {
 		return err
 	}

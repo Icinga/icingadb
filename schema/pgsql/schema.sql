@@ -1836,11 +1836,15 @@ ALTER TABLE state_history ALTER COLUMN endpoint_id SET STORAGE PLAIN;
 ALTER TABLE state_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE state_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
+CREATE INDEX idx_state_history_event_time ON state_history(event_time);
+
 COMMENT ON COLUMN state_history.id IS 'sha1(environment.name + host|service.name + event_time)';
 COMMENT ON COLUMN state_history.environment_id IS 'environment.id';
 COMMENT ON COLUMN state_history.endpoint_id IS 'endpoint.id';
 COMMENT ON COLUMN state_history.host_id IS 'host.id';
 COMMENT ON COLUMN state_history.service_id IS 'service.id';
+
+COMMENT ON INDEX idx_state_history_event_time IS 'Filter for history retention';
 
 CREATE TABLE downtime_history (
   downtime_id bytea20 NOT NULL,
@@ -1878,6 +1882,8 @@ ALTER TABLE downtime_history ALTER COLUMN parent_id SET STORAGE PLAIN;
 ALTER TABLE downtime_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE downtime_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
+CREATE INDEX idx_downtime_history_end_time ON downtime_history(end_time);
+
 COMMENT ON COLUMN downtime_history.downtime_id IS 'downtime.id';
 COMMENT ON COLUMN downtime_history.environment_id IS 'environment.id';
 COMMENT ON COLUMN downtime_history.endpoint_id IS 'endpoint.id';
@@ -1888,6 +1894,8 @@ COMMENT ON COLUMN downtime_history.service_id IS 'service.id';
 COMMENT ON COLUMN downtime_history.start_time IS 'Time when the host went into a problem state during the downtimes timeframe';
 COMMENT ON COLUMN downtime_history.end_time IS 'Problem state assumed: scheduled_end_time if fixed, start_time + duration otherwise';
 COMMENT ON COLUMN downtime_history.scheduled_by IS 'Name of the ScheduledDowntime which created this Downtime. 255+1+255+1+255, i.e. "host.name!service.name!scheduled-downtime-name"';
+
+COMMENT ON INDEX idx_downtime_history_end_time IS 'Filter for history retention';
 
 CREATE TABLE comment_history (
   comment_id bytea20 NOT NULL,
@@ -1917,11 +1925,15 @@ ALTER TABLE comment_history ALTER COLUMN endpoint_id SET STORAGE PLAIN;
 ALTER TABLE comment_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE comment_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
+CREATE INDEX idx_comment_history_remove_time ON comment_history(remove_time);
+
 COMMENT ON COLUMN comment_history.comment_id IS 'comment.id';
 COMMENT ON COLUMN comment_history.environment_id IS 'environment.id';
 COMMENT ON COLUMN comment_history.endpoint_id IS 'endpoint.id';
 COMMENT ON COLUMN comment_history.host_id IS 'host.id';
 COMMENT ON COLUMN comment_history.service_id IS 'service.id';
+
+COMMENT ON INDEX idx_comment_history_remove_time IS 'Filter for history retention';
 
 CREATE TABLE flapping_history (
   id bytea20 NOT NULL,
@@ -1947,11 +1959,15 @@ ALTER TABLE flapping_history ALTER COLUMN endpoint_id SET STORAGE PLAIN;
 ALTER TABLE flapping_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE flapping_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
+CREATE INDEX idx_flapping_history_end_time ON flapping_history(end_time);
+
 COMMENT ON COLUMN flapping_history.id IS 'sha1(environment.id + "Host"|"Service" + host|service.name + start_time)';
 COMMENT ON COLUMN flapping_history.environment_id IS 'environment.id';
 COMMENT ON COLUMN flapping_history.endpoint_id IS 'endpoint.id';
 COMMENT ON COLUMN flapping_history.host_id IS 'host.id';
 COMMENT ON COLUMN flapping_history.service_id IS 'service.id';
+
+COMMENT ON INDEX idx_flapping_history_end_time IS 'Filter for history retention';
 
 CREATE TABLE acknowledgement_history (
   id bytea20 NOT NULL,
@@ -1979,6 +1995,8 @@ ALTER TABLE acknowledgement_history ALTER COLUMN endpoint_id SET STORAGE PLAIN;
 ALTER TABLE acknowledgement_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE acknowledgement_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
+CREATE INDEX idx_acknowledgement_history_clear_time ON acknowledgement_history(clear_time);
+
 COMMENT ON COLUMN acknowledgement_history.id IS 'sha1(environment.id + "Host"|"Service" + host|service.name + set_time)';
 COMMENT ON COLUMN acknowledgement_history.environment_id IS 'environment.id';
 COMMENT ON COLUMN acknowledgement_history.endpoint_id IS 'endpoint.id';
@@ -1988,6 +2006,8 @@ COMMENT ON COLUMN acknowledgement_history.author IS 'NULL if ack_set event happe
 COMMENT ON COLUMN acknowledgement_history.comment IS 'NULL if ack_set event happened before Icinga DB history recording';
 COMMENT ON COLUMN acknowledgement_history.is_sticky IS 'NULL if ack_set event happened before Icinga DB history recording';
 COMMENT ON COLUMN acknowledgement_history.is_persistent IS 'NULL if ack_set event happened before Icinga DB history recording';
+
+COMMENT ON INDEX idx_acknowledgement_history_clear_time IS 'Filter for history retention';
 
 CREATE TABLE history (
   id bytea20 NOT NULL,
