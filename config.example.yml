@@ -6,7 +6,7 @@ database:
   port: 3306
   database: icingadb
   user: icingadb
-  password: icingadb
+  password: CHANGEME
 
 # Connection configuration for the Redis where Icinga writes its configuration, state and history.
 # This is the same connection as configured in the 'icingadb' feature of the corresponding Icinga node.

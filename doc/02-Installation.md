@@ -153,7 +153,7 @@ Set up a MySQL database for Icinga DB:
 # mysql -u root -p
 
 CREATE DATABASE icingadb;
-CREATE USER 'icingadb'@'localhost' IDENTIFIED BY 'icingadb';
+CREATE USER 'icingadb'@'localhost' IDENTIFIED BY 'CHANGEME';
 GRANT ALL ON icingadb.* TO 'icingadb'@'localhost';
 ```
 
