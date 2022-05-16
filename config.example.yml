@@ -1,5 +1,8 @@
 # This is the configuration file for Icinga DB.
 
+# Connection configuration for the database to which Icinga DB synchronizes monitoring data.
+# This is also the database used in Icinga DB Web to view and work with the data.
+# In high availability setups, all Icinga DB instances must write to the same database.
 database:
   # Database type. Either 'mysql' for MySQL or 'pgsql' for PostgreSQL.
   # Defaults to 'mysql'.
@@ -11,13 +14,18 @@ database:
   # Database port. By default, the MySQL or PostgreSQL port, depending on the database type.
 #  port:
 
+  # Database name.
   database: icingadb
+
+  # Database user.
   user: icingadb
+
+  # Database password.
   password: CHANGEME
 
-# Connection configuration for the Redis where Icinga writes its configuration, state and history.
-# This is the same connection as configured in the 'icingadb' feature of the corresponding Icinga node.
-# High availability setups require a dedicated Redis server per Icinga node and
+# Connection configuration for the Redis server where Icinga 2 writes its configuration, state and history items.
+# This is the same connection as configured in the 'icingadb' feature of the corresponding Icinga 2 node.
+# High availability setups require a dedicated Redis server per Icinga 2 node and
 # therefore a dedicated Icinga DB instance that connects to it.
 redis:
   # Redis host or absolute Unix socket path.
