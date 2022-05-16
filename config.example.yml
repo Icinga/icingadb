@@ -1,7 +1,11 @@
 # This is the configuration file for Icinga DB.
 
 database:
-  type: mysql
+  # Database type. Either 'mysql' for MySQL or 'pgsql' for PostgreSQL.
+  # Defaults to 'mysql'.
+#  type: mysql
+
+  # Database host or absolute Unix socket path.
   host: localhost
 
   # Database port. By default, the MySQL or PostgreSQL port, depending on the database type.
