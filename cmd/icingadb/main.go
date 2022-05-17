@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -119,7 +120,9 @@ func run() int {
 		defer db.Close()
 		ha = icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
 
-		telemetry.WriteStats(ctx, rc, logs.GetChildLogger("telemetry"))
+		telemetryLogger := logs.GetChildLogger("telemetry")
+		telemetry.StartHeartbeat(ctx, rc, telemetryLogger, ha, heartbeat)
+		telemetry.WriteStats(ctx, rc, telemetryLogger)
 	}
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
@@ -205,6 +208,8 @@ func run() int {
 						})
 
 						syncStart := time.Now()
+						atomic.StoreInt64(&telemetry.OngoingSyncStartMilli, syncStart.UnixMilli())
+
 						logger.Info("Starting config sync")
 						for _, factory := range v1.ConfigFactories {
 							factory := factory
@@ -243,10 +248,18 @@ func run() int {
 
 						g.Go(func() error {
 							configInitSync.Wait()
+							atomic.StoreInt64(&telemetry.OngoingSyncStartMilli, 0)
 
-							elapsed := time.Since(syncStart)
+							syncEnd := time.Now()
+							elapsed := syncEnd.Sub(syncStart)
 							logger := logs.GetChildLogger("config-sync")
+
 							if synctx.Err() == nil {
+								telemetry.LastSuccessfulSync.Store(telemetry.SuccessfulSync{
+									FinishMilli:   syncEnd.UnixMilli(),
+									DurationMilli: elapsed.Milliseconds(),
+								})
+
 								logger.Infof("Finished config sync in %s", elapsed)
 							} else {
 								logger.Warnf("Aborted config sync after %s", elapsed)

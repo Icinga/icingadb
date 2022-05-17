@@ -12,6 +12,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -22,14 +23,15 @@ var timeout = 60 * time.Second
 // Heartbeat periodically reads heartbeats from a Redis stream and signals in Beat channels when they are received.
 // Also signals on if the heartbeat is Lost.
 type Heartbeat struct {
-	active    bool
-	events    chan *HeartbeatMessage
-	cancelCtx context.CancelFunc
-	client    *Client
-	done      chan struct{}
-	errMu     sync.Mutex
-	err       error
-	logger    *logging.Logger
+	active         bool
+	events         chan *HeartbeatMessage
+	lastReceivedMs int64
+	cancelCtx      context.CancelFunc
+	client         *Client
+	done           chan struct{}
+	errMu          sync.Mutex
+	err            error
+	logger         *logging.Logger
 }
 
 // NewHeartbeat returns a new Heartbeat and starts the heartbeat controller loop.
@@ -54,6 +56,11 @@ func NewHeartbeat(ctx context.Context, client *Client, logger *logging.Logger) *
 // A non-nil pointer signals that a heartbeat was received from Icinga 2 whereas a nil pointer signals a heartbeat loss.
 func (h *Heartbeat) Events() <-chan *HeartbeatMessage {
 	return h.events
+}
+
+// LastReceived returns the last heartbeat's receive time in ms.
+func (h *Heartbeat) LastReceived() int64 {
+	return atomic.LoadInt64(&h.lastReceivedMs)
 }
 
 // Close stops the heartbeat controller loop, waits for it to finish, and returns an error if any.
@@ -132,6 +139,8 @@ func (h *Heartbeat) controller(ctx context.Context) {
 					h.logger.Infow("Received Icinga heartbeat", zap.String("environment", envId.String()))
 					h.active = true
 				}
+
+				atomic.StoreInt64(&h.lastReceivedMs, m.received.UnixMilli())
 				h.sendEvent(m)
 			case <-time.After(timeout):
 				if h.active {
@@ -141,6 +150,8 @@ func (h *Heartbeat) controller(ctx context.Context) {
 				} else {
 					h.logger.Warn("Waiting for Icinga heartbeat")
 				}
+
+				atomic.StoreInt64(&h.lastReceivedMs, 0)
 			case <-ctx.Done():
 				return ctx.Err()
 			}

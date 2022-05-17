@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/jmoiron/sqlx"
@@ -39,11 +40,15 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		retry.Settings{
 			Timeout: timeout,
 			OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+				updateCurrentDbConnErr(err)
+
 				if lastErr == nil || err.Error() != lastErr.Error() {
 					c.driver.Logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
 				}
 			},
 			OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
+				updateCurrentDbConnErr(nil)
+
 				if attempt > 0 {
 					c.driver.Logger.Infow("Reconnected to database",
 						zap.Duration("after", elapsed), zap.Uint64("attempts", attempt+1))
@@ -52,6 +57,30 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		},
 	), "can't connect to database")
 	return conn, err
+}
+
+// updateCurrentDbConnErr updates telemetry.CurrentDbConnErr if necessary.
+func updateCurrentDbConnErr(err error) {
+	ours := telemetry.DbConnErr{SinceMilli: time.Now().UnixMilli()}
+	if err != nil {
+		ours.Message = err.Error()
+	}
+
+	for {
+		theirs, _ := telemetry.CurrentDbConnErr.Load()
+		if theirs.SinceMilli >= ours.SinceMilli || theirs.Message == ours.Message {
+			break
+		}
+
+		merge := ours
+		if theirs.Message != "" && ours.Message != "" {
+			merge.SinceMilli = theirs.SinceMilli
+		}
+
+		if telemetry.CurrentDbConnErr.CompareAndSwap(theirs, merge) {
+			break
+		}
+	}
 }
 
 // Driver implements part of the driver.Connector interface.
