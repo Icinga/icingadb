@@ -114,9 +114,9 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 	columns := db.BuildColumns(into)
 
 	return fmt.Sprintf(
-		`INSERT INTO "%s" (%s) VALUES (%s)`,
+		`INSERT INTO "%s" ("%s") VALUES (%s)`,
 		utils.TableName(into),
-		strings.Join(columns, ", "),
+		strings.Join(columns, `", "`),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 	), len(columns)
 }
@@ -137,9 +137,9 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 	}
 
 	return fmt.Sprintf(
-		`INSERT INTO "%s" (%s) VALUES (%s) %s`,
+		`INSERT INTO "%s" ("%s") VALUES (%s) %s`,
 		table,
-		strings.Join(columns, ", "),
+		strings.Join(columns, `", "`),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 		clause,
 	), len(columns)
@@ -149,8 +149,8 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 // and the column list from the specified columns struct.
 func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
 	q := fmt.Sprintf(
-		`SELECT %s FROM "%s"`,
-		strings.Join(db.BuildColumns(columns), ", "),
+		`SELECT "%s" FROM "%s"`,
+		strings.Join(db.BuildColumns(columns), `", "`),
 		utils.TableName(table),
 	)
 
@@ -168,7 +168,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 	set := make([]string, 0, len(columns))
 
 	for _, col := range columns {
-		set = append(set, fmt.Sprintf("%s = :%s", col, col))
+		set = append(set, fmt.Sprintf(`"%s" = :%s`, col, col))
 	}
 
 	return fmt.Sprintf(
@@ -194,10 +194,10 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 	switch db.DriverName() {
 	case driver.MySQL:
 		clause = "ON DUPLICATE KEY UPDATE"
-		setFormat = "%[1]s = VALUES(%[1]s)"
+		setFormat = `"%[1]s" = VALUES("%[1]s")`
 	case driver.PostgreSQL:
 		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO UPDATE SET", table)
-		setFormat = "%[1]s = EXCLUDED.%[1]s"
+		setFormat = `"%[1]s" = EXCLUDED."%[1]s"`
 	}
 
 	set := make([]string, 0, len(updateColumns))
@@ -207,9 +207,9 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 	}
 
 	return fmt.Sprintf(
-		`INSERT INTO "%s" (%s) VALUES (%s) %s %s`,
+		`INSERT INTO "%s" ("%s") VALUES (%s) %s %s`,
 		table,
-		strings.Join(insertColumns, ","),
+		strings.Join(insertColumns, `", "`),
 		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
 		clause,
 		strings.Join(set, ","),
@@ -222,7 +222,7 @@ func (db *DB) BuildWhere(subject interface{}) (string, int) {
 	columns := db.BuildColumns(subject)
 	where := make([]string, 0, len(columns))
 	for _, col := range columns {
-		where = append(where, fmt.Sprintf("%s = :%s", col, col))
+		where = append(where, fmt.Sprintf(`"%s" = :%s`, col, col))
 	}
 
 	return strings.Join(where, ` AND `), len(columns)
