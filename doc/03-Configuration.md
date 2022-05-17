@@ -28,7 +28,7 @@ Option                   | Description
 -------------------------|-----------------------------------------------
 type                     | **Optional.** Either `mysql` (default) or `pgsql`.
 host                     | **Required.** Database host or absolute Unix socket path.
-port                     | **Required.** Database port.
+port                     | **Optional.** Database port. By default, the MySQL or PostgreSQL port, depending on the database type.
 database                 | **Required.** Database name.
 user                     | **Required.** Database username.
 password                 | **Required.** Database password.
