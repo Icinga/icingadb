@@ -67,6 +67,8 @@ logging:
 #    runtime-updates:
 #    telemetry:
 
+# Retention is an optional feature to limit the number of days that historical data is available,
+# as no historical data is deleted by default.
 retention:
   # Number of days to retain full historical data. By default, historical data is retained forever.
 #  history-days:
