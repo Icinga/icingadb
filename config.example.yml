@@ -72,7 +72,8 @@ retention:
 #  sla-days:
 
   # Map of history category to number of days to retain its data in order to
-  # enable retention only for specific categories or to override the number that has been configured in days.
+  # enable retention only for specific categories or to
+  # override the number that has been configured in history-days.
   options:
 #    acknowledgement:
 #    comment:
