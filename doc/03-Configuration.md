@@ -31,7 +31,7 @@ host                     | **Required.** Database host or absolute Unix socket p
 port                     | **Optional.** Database port. By default, the MySQL or PostgreSQL port, depending on the database type.
 database                 | **Required.** Database name.
 user                     | **Required.** Database username.
-password                 | **Required.** Database password.
+password                 | **Optional.** Database password.
 tls                      | **Optional.** Whether to use TLS.
 cert                     | **Optional.** Path to TLS client certificate.
 key                      | **Optional.** Path to TLS private key.
