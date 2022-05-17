@@ -2,7 +2,7 @@
 
 ## Requirements <a id="installation-requirements"></a>
 
-* Local Redis (≥6.2) instance (Will be installed during this documentation)
+* Redis server where Icinga writes its monitoring data using the [icingadb feature](https://icinga.com/docs/icinga-2/latest/doc/14-features/#icinga-db)
 * MySQL (≥5.5), MariaDB (≥10.1), or PostgreSQL (≥9.6): database, user and schema imports (Will be set up during this documentation)
 
 ## Setting up Icinga DB <a id="setting-up-icingadb"></a>
@@ -98,41 +98,6 @@ Debian/Ubuntu:
 apt-get install icingadb
 ```
 
-### Installing Icinga DB Redis <a id="configuring-icingadb-mysql"></a>
-
-RHEL/CentOS 8/Fedora:
-
-```
-dnf install icingadb-redis
-
-systemctl enable icingadb-redis
-systemctl start icingadb-redis
-```
-
-RHEL/CentOS 7:
-
-```
-yum install icingadb-redis
-
-systemctl enable icingadb-redis
-systemctl start icingadb-redis
-```
-
-SUSE:
-
-```
-zypper install icingadb-redis
-
-systemctl enable icingadb-redis
-systemctl start icingadb-redis
-```
-
-Debian/Ubuntu:
-
-```
-apt-get install icingadb-redis
-```
-
 ### Setting up the Database <a id="setting-up-db"></a>
 
 A MySQL/MariaDB or PostgreSQL database is required.
@@ -208,16 +173,6 @@ Systemd service:
 systemctl enable icingadb
 systemctl start icingadb
 ```
-
-### Enable remote Redis connections <a id="remote-redis"></a>
-
-By default `icingadb-redis` listens only on `127.0.0.1`. If you want to change that, e.g. for Icinga Web 2 or Icinga 2
-running on another node, just change `bind 127.0.0.1 ::1` and `protected-mode yes`
-in `/etc/icingadb-redis/icingadb-redis.conf` to the interface you want to use and to `protected-mode no`.
-
-> WARNING: By default, Redis does not have any authentication that prevents others from accessing it.
-> If you open Redis to an external interface, make sure that you set up appropriate firewall rules or configure TLS
-> with certificate authentication on Redis and its consumers, i.e. Icinga 2, Icinga DB and Icinga Web 2.
 
 ### Icinga DB Web
 
