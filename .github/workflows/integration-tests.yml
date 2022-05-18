@@ -50,6 +50,6 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v2
         with:
-          name: debug.log.xz
+          name: ${{ matrix.database.name }}-debug.log.xz
           path: debug.log.xz
           retention-days: 1
