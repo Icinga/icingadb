@@ -236,15 +236,15 @@ func (ht *historyType) setupBar(progress *mpb.Progress) {
 	)
 }
 
-type historyTypes [6]historyType
+type historyTypes []*historyType
 
-// forEach performs f per *ht in parallel.
-func (ht *historyTypes) forEach(f func(*historyType)) {
+// forEach performs f per hts in parallel.
+func (hts historyTypes) forEach(f func(*historyType)) {
 	eg, _ := errgroup.WithContext(context.Background())
-	for i := range *ht {
-		i := i
+	for _, ht := range hts {
+		ht := ht
 		eg.Go(func() error {
-			f(&(*ht)[i])
+			f(ht)
 			return nil
 		})
 	}

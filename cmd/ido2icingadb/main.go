@@ -252,9 +252,9 @@ func computeProgress(idb *icingadb.DB) {
 // fillCache fills <f.Cache>/<history type>.sqlite3 (actually types[*].cacheFiller does).
 func fillCache() {
 	progress := mpb.New()
-	for i := range types {
-		if types[i].cacheFiller != nil {
-			types[i].setupBar(progress)
+	for _, ht := range types {
+		if ht.cacheFiller != nil {
+			ht.setupBar(progress)
 		}
 	}
 
@@ -273,8 +273,8 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 	idbTx := &sync.Mutex{}
 
 	progress := mpb.New()
-	for i := range types {
-		types[i].setupBar(progress)
+	for _, ht := range types {
+		ht.setupBar(progress)
 	}
 
 	types.forEach(func(ht *historyType) {
