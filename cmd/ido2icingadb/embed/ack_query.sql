@@ -4,5 +4,5 @@ SELECT ah.acknowledgement_id, UNIX_TIMESTAMP(ah.entry_time) entry_time, ah.entry
 FROM icinga_acknowledgements ah USE INDEX (PRIMARY)
 INNER JOIN icinga_objects o ON o.object_id=ah.object_id
 WHERE ah.acknowledgement_id > :checkpoint -- where we were interrupted
-ORDER BY ah.acknowledgement_id -- allows computeProgress() not to check all IDO rows for whether migrated
+ORDER BY ah.acknowledgement_id -- this way we know what has already been migrated from just the last row's ID
 LIMIT :bulk

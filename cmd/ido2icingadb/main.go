@@ -351,6 +351,8 @@ func migrateOneType[IdoRow any](
 			// ... and insert them:
 
 			if idb.DriverName() == driver.MySQL {
+				// Avoid MySQL error 1205 (Lock wait timeout exceeded; try restarting transaction)
+				// due to concurrent transactions upsert the same table (history).
 				idbTx.Lock()
 				defer idbTx.Unlock()
 			}

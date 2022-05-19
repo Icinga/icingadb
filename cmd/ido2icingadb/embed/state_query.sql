@@ -4,5 +4,5 @@ SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_time) state_time, sh.state_ti
 FROM icinga_statehistory sh USE INDEX (PRIMARY)
 INNER JOIN icinga_objects o ON o.object_id=sh.object_id
 WHERE sh.statehistory_id <= :cache_limit AND sh.statehistory_id > :checkpoint -- where we were interrupted
-ORDER BY sh.statehistory_id -- allows computeProgress() not to check all IDO rows for whether migrated
+ORDER BY sh.statehistory_id -- this way we know what has already been migrated from just the last row's ID
 LIMIT :bulk

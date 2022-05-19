@@ -9,5 +9,5 @@ FROM icinga_downtimehistory dh USE INDEX (PRIMARY)
 INNER JOIN icinga_objects o ON o.object_id=dh.object_id
 LEFT JOIN icinga_scheduleddowntime sd ON sd.scheduleddowntime_id=dh.triggered_by_id
 WHERE dh.downtimehistory_id > :checkpoint -- where we were interrupted
-ORDER BY dh.downtimehistory_id -- allows computeProgress() not to check all IDO rows for whether migrated
+ORDER BY dh.downtimehistory_id -- this way we know what has already been migrated from just the last row's ID
 LIMIT :bulk

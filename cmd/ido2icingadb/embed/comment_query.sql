@@ -6,5 +6,5 @@ SELECT ch.commenthistory_id, UNIX_TIMESTAMP(ch.entry_time) entry_time,
 FROM icinga_commenthistory ch USE INDEX (PRIMARY)
 INNER JOIN icinga_objects o ON o.object_id=ch.object_id
 WHERE ch.commenthistory_id > :checkpoint -- where we were interrupted
-ORDER BY ch.commenthistory_id -- allows computeProgress() not to check all IDO rows for whether migrated
+ORDER BY ch.commenthistory_id -- this way we know what has already been migrated from just the last row's ID
 LIMIT :bulk

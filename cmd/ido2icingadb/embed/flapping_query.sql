@@ -4,5 +4,5 @@ SELECT fh.flappinghistory_id, UNIX_TIMESTAMP(fh.event_time) event_time,
 FROM icinga_flappinghistory fh USE INDEX (PRIMARY)
 INNER JOIN icinga_objects o ON o.object_id=fh.object_id
 WHERE fh.flappinghistory_id > :checkpoint -- where we were interrupted
-ORDER BY fh.flappinghistory_id -- allows computeProgress() not to check all IDO rows for whether migrated
+ORDER BY fh.flappinghistory_id -- this way we know what has already been migrated from just the last row's ID
 LIMIT :bulk
