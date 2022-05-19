@@ -312,7 +312,7 @@ func convertDowntimeRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []downtimeRow,
 ) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
-	var downtimeHistory, allHistory []interface{}
+	var downtimeHistory, allHistory, sla []interface{}
 
 	for _, row := range idoRows {
 		id := calcObjectId(env, row.Name)
@@ -324,7 +324,7 @@ func convertDowntimeRows(
 		triggerTime := convertTime(row.TriggerTime, 0)
 		actualStart := convertTime(row.ActualStartTime, row.ActualStartTimeUsec)
 		actualEnd := convertTime(row.ActualEndTime, row.ActualEndTimeUsec)
-		var startTime, endTime, cancelTime icingadbTypes.UnixMilli
+		var startTime, endTime, cancelTime, slaEndTime icingadbTypes.UnixMilli
 
 		if scheduledEnd.Time().IsZero() {
 			scheduledEnd = icingadbTypes.UnixMilli(scheduledStart.Time().Add(time.Duration(row.Duration) * time.Second))
@@ -346,8 +346,10 @@ func convertDowntimeRows(
 			triggerTime = startTime
 		}
 
+		slaEndTime = endTime
 		if row.WasCancelled != 0 {
 			cancelTime = actualEnd
+			slaEndTime = cancelTime
 		}
 
 		downtimeHistory = append(downtimeHistory, &history.DowntimeHistory{
@@ -415,10 +417,28 @@ func convertDowntimeRows(
 			allHistory = append(allHistory, h2)
 		}
 
+		s := &history.SlaHistoryDowntime{
+			DowntimeHistoryEntity: history.DowntimeHistoryEntity{DowntimeId: id},
+			HistoryTableMeta: history.HistoryTableMeta{
+				EnvironmentId: envId,
+				EndpointId:    endpointId,
+				ObjectType:    typ,
+				HostId:        hostId,
+				ServiceId:     serviceId,
+			},
+			DowntimeStart:    startTime,
+			HasBeenCancelled: icingadbTypes.Bool{Bool: row.WasCancelled != 0, Valid: true},
+			CancelTime:       cancelTime,
+			EndTime:          slaEndTime,
+		}
+
+		s.DowntimeEnd.History = s
+		sla = append(sla, s)
+
 		checkpoint = row.DowntimehistoryId
 	}
 
-	icingaDbInserts = [][]interface{}{downtimeHistory, allHistory}
+	icingaDbInserts = [][]interface{}{downtimeHistory, allHistory, sla}
 	return
 }
 
@@ -785,7 +805,7 @@ func convertStateRows(
 		cachedById[c.HistoryId] = c.PreviousHardState
 	}
 
-	var stateHistory, allHistory []interface{}
+	var stateHistory, allHistory, sla []interface{}
 	for _, row := range idoRows {
 		previousHardState, ok := cachedById[row.StatehistoryId]
 		if !ok {
@@ -841,9 +861,32 @@ func convertStateRows(
 			EventTime:      ts,
 		})
 
+		if icingadbTypes.StateType(row.StateType) == icingadbTypes.StateHard {
+			// only hard state changes are relevant for SLA history, discard all others
+
+			sla = append(sla, &history.SlaHistoryState{
+				HistoryTableEntity: history.HistoryTableEntity{
+					EntityWithoutChecksum: v1.EntityWithoutChecksum{
+						IdMeta: v1.IdMeta{Id: stateHistoryId},
+					},
+				},
+				HistoryTableMeta: history.HistoryTableMeta{
+					EnvironmentId: envId,
+					EndpointId:    endpointId,
+					ObjectType:    typ,
+					HostId:        hostId,
+					ServiceId:     serviceId,
+				},
+				EventTime:         ts,
+				StateType:         icingadbTypes.StateType(row.StateType),
+				HardState:         row.LastHardState,
+				PreviousHardState: previousHardState,
+			})
+		}
+
 		checkpoint = row.StatehistoryId
 	}
 
-	icingaDbInserts = [][]interface{}{stateHistory, allHistory}
+	icingaDbInserts = [][]interface{}{stateHistory, allHistory, sla}
 	return
 }
