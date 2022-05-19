@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	_ "embed"
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
@@ -14,15 +15,23 @@ import (
 	"time"
 )
 
-const acknowledgementMigrationQuery = "SELECT ah.acknowledgement_id, UNIX_TIMESTAMP(ah.entry_time) entry_time, " +
-	"ah.entry_time_usec, ah.acknowledgement_type, ah.author_name, ah.comment_data, ah.is_sticky, " +
-	"ah.persistent_comment, UNIX_TIMESTAMP(ah.end_time) end_time, o.objecttype_id, o.name1, " +
-	"COALESCE(o.name2, '') name2 " +
-	"FROM icinga_acknowledgements ah USE INDEX (PRIMARY) " +
-	"INNER JOIN icinga_objects o ON o.object_id=ah.object_id " +
-	"WHERE ah.acknowledgement_id > :checkpoint " + // where we were interrupted
-	"ORDER BY ah.acknowledgement_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT :bulk"
+//go:embed embed/ack_query.sql
+var acknowledgementMigrationQuery string
+
+//go:embed embed/comment_query.sql
+var commentMigrationQuery string
+
+//go:embed embed/downtime_query.sql
+var downtimeMigrationQuery string
+
+//go:embed embed/flapping_query.sql
+var flappingMigrationQuery string
+
+//go:embed embed/notification_query.sql
+var notificationMigrationQuery string
+
+//go:embed embed/state_query.sql
+var stateMigrationQuery string
 
 // AckClear updates an already migrated ack event with the clear event info.
 type AckClear struct {
@@ -178,17 +187,6 @@ func convertAcknowledgementRows(
 	return
 }
 
-const commentMigrationQuery = "SELECT ch.commenthistory_id, UNIX_TIMESTAMP(ch.entry_time) entry_time, " +
-	"ch.entry_time_usec, ch.entry_type, ch.author_name, ch.comment_data, ch.is_persistent, " +
-	"COALESCE(UNIX_TIMESTAMP(ch.expiration_time), 0) expiration_time, " +
-	"COALESCE(UNIX_TIMESTAMP(ch.deletion_time), 0) deletion_time, ch.deletion_time_usec, ch.name, " +
-	"o.objecttype_id, o.name1, COALESCE(o.name2, '') name2 " +
-	"FROM icinga_commenthistory ch USE INDEX (PRIMARY) " +
-	"INNER JOIN icinga_objects o ON o.object_id=ch.object_id " +
-	"WHERE ch.commenthistory_id > :checkpoint " + // where we were interrupted
-	"ORDER BY ch.commenthistory_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT :bulk"
-
 type commentRow = struct {
 	CommenthistoryId uint64
 	EntryTime        int64
@@ -287,21 +285,6 @@ func convertCommentRows(
 	icingaDbInserts = [][]interface{}{commentHistory, allHistory}
 	return
 }
-
-const downtimeMigrationQuery = "SELECT dh.downtimehistory_id, UNIX_TIMESTAMP(dh.entry_time) entry_time, " +
-	"dh.author_name, dh.comment_data, dh.is_fixed, dh.duration, " +
-	"UNIX_TIMESTAMP(dh.scheduled_start_time) scheduled_start_time, " +
-	"COALESCE(UNIX_TIMESTAMP(dh.scheduled_end_time), 0) scheduled_end_time, " +
-	"COALESCE(UNIX_TIMESTAMP(dh.actual_start_time), 0) actual_start_time, dh.actual_start_time_usec, " +
-	"COALESCE(UNIX_TIMESTAMP(dh.actual_end_time), 0) actual_end_time, dh.actual_end_time_usec, dh.was_cancelled, " +
-	"COALESCE(UNIX_TIMESTAMP(dh.trigger_time), 0) trigger_time, dh.name, o.objecttype_id, o.name1, " +
-	"COALESCE(o.name2, '') name2, COALESCE(sd.name, '') triggered_by " +
-	"FROM icinga_downtimehistory dh USE INDEX (PRIMARY) " +
-	"INNER JOIN icinga_objects o ON o.object_id=dh.object_id " +
-	"LEFT JOIN icinga_scheduleddowntime sd ON sd.scheduleddowntime_id=dh.triggered_by_id " +
-	"WHERE dh.downtimehistory_id > :checkpoint " + // where we were interrupted
-	"ORDER BY dh.downtimehistory_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT :bulk"
 
 type downtimeRow = struct {
 	DowntimehistoryId   uint64
@@ -438,15 +421,6 @@ func convertDowntimeRows(
 	icingaDbInserts = [][]interface{}{downtimeHistory, allHistory}
 	return
 }
-
-const flappingMigrationQuery = "SELECT fh.flappinghistory_id, UNIX_TIMESTAMP(fh.event_time) event_time, " +
-	"fh.event_time_usec, fh.event_type, fh.percent_state_change, fh.low_threshold, " +
-	"fh.high_threshold, o.objecttype_id, o.name1, COALESCE(o.name2, '') name2 " +
-	"FROM icinga_flappinghistory fh USE INDEX (PRIMARY) " +
-	"INNER JOIN icinga_objects o ON o.object_id=fh.object_id " +
-	"WHERE fh.flappinghistory_id > :checkpoint " + // where we were interrupted
-	"ORDER BY fh.flappinghistory_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT :bulk"
 
 // FlappingEnd updates an already migrated start event with the end event info.
 type FlappingEnd struct {
@@ -597,16 +571,6 @@ func convertFlappingRows(
 	icingaDbInserts = [][]interface{}{flappingHistory, allHistory}
 	return
 }
-
-const notificationMigrationQuery = "SELECT n.notification_id, n.notification_reason, " +
-	"UNIX_TIMESTAMP(n.end_time) end_time, n.end_time_usec, n.state, COALESCE(n.output, '') output, " +
-	"n.long_output, n.contacts_notified, o.objecttype_id, o.name1, COALESCE(o.name2, '') name2 " +
-	"FROM icinga_notifications n USE INDEX (PRIMARY) " +
-	"INNER JOIN icinga_objects o ON o.object_id=n.object_id " +
-	"WHERE n.notification_id <= :cache_limit AND " +
-	"n.notification_id > :checkpoint " + // where we were interrupted
-	"ORDER BY n.notification_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT :bulk"
 
 // notificationTypes maps IDO values to Icinga DB ones.
 var notificationTypes = map[uint8]icingadbTypes.NotificationType{5: 1, 6: 2, 7: 4, 8: 8, 1: 16, 2: 128, 3: 256}
@@ -780,17 +744,6 @@ func convertNotificationRows(
 	icingaDbInserts = [][]interface{}{notificationHistory, userNotificationHistory, allHistory}
 	return
 }
-
-const stateMigrationQuery = "SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_time) state_time, " +
-	"sh.state_time_usec, sh.state, sh.state_type, sh.current_check_attempt, " +
-	"sh.max_check_attempts, sh.last_state, sh.last_hard_state, sh.output, sh.long_output, " +
-	"sh.check_source, o.objecttype_id, o.name1, COALESCE(o.name2, '') name2 " +
-	"FROM icinga_statehistory sh USE INDEX (PRIMARY) " +
-	"INNER JOIN icinga_objects o ON o.object_id=sh.object_id " +
-	"WHERE sh.statehistory_id <= :cache_limit AND " +
-	"sh.statehistory_id > :checkpoint " + // where we were interrupted
-	"ORDER BY sh.statehistory_id " + // allows computeProgress() not to check all IDO rows for whether migrated
-	"LIMIT :bulk"
 
 type stateRow = struct {
 	StatehistoryId      uint64
