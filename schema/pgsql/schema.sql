@@ -828,6 +828,7 @@ CREATE TABLE checkcommand_argument (
   repeat_key boolenum NOT NULL DEFAULT 'n',
   required boolenum NOT NULL DEFAULT 'n',
   set_if varchar(255) DEFAULT NULL,
+  separator varchar(255) DEFAULT NULL,
   skip_key boolenum NOT NULL DEFAULT 'n',
 
   CONSTRAINT pk_checkcommand_argument PRIMARY KEY (id)
@@ -933,6 +934,7 @@ CREATE TABLE eventcommand_argument (
   repeat_key boolenum NOT NULL DEFAULT 'n',
   required boolenum NOT NULL DEFAULT 'n',
   set_if varchar(255) DEFAULT NULL,
+  separator varchar(255) DEFAULT NULL,
   skip_key boolenum NOT NULL DEFAULT 'n',
 
   CONSTRAINT pk_eventcommand_argument PRIMARY KEY (id)
@@ -1036,6 +1038,7 @@ CREATE TABLE notificationcommand_argument (
   repeat_key boolenum NOT NULL DEFAULT 'n',
   required boolenum NOT NULL DEFAULT 'n',
   set_if varchar(255) DEFAULT NULL,
+  separator varchar(255) DEFAULT NULL,
   skip_key boolenum NOT NULL DEFAULT 'n',
 
   CONSTRAINT pk_notificationcommand_argument PRIMARY KEY (id)
