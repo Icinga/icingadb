@@ -194,12 +194,12 @@ CREATE TABLE host (
   address_bin bytea4 DEFAULT NULL,
   address6_bin bytea16 DEFAULT NULL,
 
-  checkcommand citext NOT NULL,
+  checkcommand_name citext NOT NULL,
   checkcommand_id bytea20 NOT NULL,
 
   max_check_attempts uint NOT NULL,
 
-  check_timeperiod citext NOT NULL,
+  check_timeperiod_name citext NOT NULL,
   check_timeperiod_id bytea20 DEFAULT NULL,
 
   check_timeout uint DEFAULT NULL,
@@ -217,7 +217,7 @@ CREATE TABLE host (
 
   perfdata_enabled boolenum NOT NULL DEFAULT 'n',
 
-  eventcommand citext NOT NULL,
+  eventcommand_name citext NOT NULL,
   eventcommand_id bytea20 DEFAULT NULL,
 
   is_volatile boolenum NOT NULL DEFAULT 'n',
@@ -228,10 +228,10 @@ CREATE TABLE host (
   icon_image_id bytea20 DEFAULT NULL,
   icon_image_alt varchar(32) NOT NULL,
 
-  zone citext NOT NULL,
+  zone_name citext NOT NULL,
   zone_id bytea20 DEFAULT NULL,
 
-  command_endpoint citext NOT NULL,
+  command_endpoint_name citext NOT NULL,
   command_endpoint_id bytea20 DEFAULT NULL,
 
   CONSTRAINT pk_host PRIMARY KEY (id)
@@ -263,18 +263,18 @@ COMMENT ON COLUMN host.id IS 'sha1(environment.id + name)';
 COMMENT ON COLUMN host.environment_id IS 'environment.id';
 COMMENT ON COLUMN host.name_checksum IS 'sha1(name)';
 COMMENT ON COLUMN host.properties_checksum IS 'sha1(all properties)';
-COMMENT ON COLUMN host.checkcommand IS 'checkcommand.name';
+COMMENT ON COLUMN host.checkcommand_name IS 'checkcommand.name';
 COMMENT ON COLUMN host.checkcommand_id IS 'checkcommand.id';
-COMMENT ON COLUMN host.check_timeperiod IS 'timeperiod.name';
+COMMENT ON COLUMN host.check_timeperiod_name IS 'timeperiod.name';
 COMMENT ON COLUMN host.check_timeperiod_id IS 'timeperiod.id';
-COMMENT ON COLUMN host.eventcommand IS 'eventcommand.name';
+COMMENT ON COLUMN host.eventcommand_name IS 'eventcommand.name';
 COMMENT ON COLUMN host.eventcommand_id IS 'eventcommand.id';
 COMMENT ON COLUMN host.action_url_id IS 'action_url.id';
 COMMENT ON COLUMN host.notes_url_id IS 'notes_url.id';
 COMMENT ON COLUMN host.icon_image_id IS 'icon_image.id';
-COMMENT ON COLUMN host.zone IS 'zone.name';
+COMMENT ON COLUMN host.zone_name IS 'zone.name';
 COMMENT ON COLUMN host.zone_id IS 'zone.id';
-COMMENT ON COLUMN host.command_endpoint IS 'endpoint.name';
+COMMENT ON COLUMN host.command_endpoint_name IS 'endpoint.name';
 COMMENT ON COLUMN host.command_endpoint_id IS 'endpoint.id';
 
 COMMENT ON INDEX idx_action_url_checksum IS 'cleanup';
@@ -464,12 +464,12 @@ CREATE TABLE service (
   name_ci citext NOT NULL,
   display_name citext NOT NULL,
 
-  checkcommand citext NOT NULL,
+  checkcommand_name citext NOT NULL,
   checkcommand_id bytea20 NOT NULL,
 
   max_check_attempts uint NOT NULL,
 
-  check_timeperiod citext NOT NULL,
+  check_timeperiod_name citext NOT NULL,
   check_timeperiod_id bytea20 DEFAULT NULL,
 
   check_timeout uint DEFAULT NULL,
@@ -487,7 +487,7 @@ CREATE TABLE service (
 
   perfdata_enabled boolenum NOT NULL DEFAULT 'n',
 
-  eventcommand citext NOT NULL,
+  eventcommand_name citext NOT NULL,
   eventcommand_id bytea20 DEFAULT NULL,
 
   is_volatile boolenum NOT NULL DEFAULT 'n',
@@ -498,10 +498,10 @@ CREATE TABLE service (
   icon_image_id bytea20 DEFAULT NULL,
   icon_image_alt varchar(32) NOT NULL,
 
-  zone citext NOT NULL,
+  zone_name citext NOT NULL,
   zone_id bytea20 DEFAULT NULL,
 
-  command_endpoint citext NOT NULL,
+  command_endpoint_name citext NOT NULL,
   command_endpoint_id bytea20 DEFAULT NULL,
 
   CONSTRAINT pk_service PRIMARY KEY (id)
@@ -531,18 +531,18 @@ COMMENT ON COLUMN service.environment_id IS 'environment.id';
 COMMENT ON COLUMN service.name_checksum IS 'sha1(name)';
 COMMENT ON COLUMN service.properties_checksum IS 'sha1(all properties)';
 COMMENT ON COLUMN service.host_id IS 'sha1(host.id)';
-COMMENT ON COLUMN service.checkcommand IS 'checkcommand.name';
+COMMENT ON COLUMN service.checkcommand_name IS 'checkcommand.name';
 COMMENT ON COLUMN service.checkcommand_id IS 'checkcommand.id';
-COMMENT ON COLUMN service.check_timeperiod IS 'timeperiod.name';
+COMMENT ON COLUMN service.check_timeperiod_name IS 'timeperiod.name';
 COMMENT ON COLUMN service.check_timeperiod_id IS 'timeperiod.id';
-COMMENT ON COLUMN service.eventcommand IS 'eventcommand.name';
+COMMENT ON COLUMN service.eventcommand_name IS 'eventcommand.name';
 COMMENT ON COLUMN service.eventcommand_id IS 'eventcommand.id';
 COMMENT ON COLUMN service.action_url_id IS 'action_url.id';
 COMMENT ON COLUMN service.notes_url_id IS 'notes_url.id';
 COMMENT ON COLUMN service.icon_image_id IS 'icon_image.id';
-COMMENT ON COLUMN service.zone IS 'zone.name';
+COMMENT ON COLUMN service.zone_name IS 'zone.name';
 COMMENT ON COLUMN service.zone_id IS 'zone.id';
-COMMENT ON COLUMN service.command_endpoint IS 'endpoint.name';
+COMMENT ON COLUMN service.command_endpoint_name IS 'endpoint.name';
 COMMENT ON COLUMN service.command_endpoint_id IS 'endpoint.id';
 
 COMMENT ON INDEX idx_service_display_name IS 'Service list filtered/ordered by display_name';

@@ -176,12 +176,12 @@ CREATE TABLE host (
   address_bin binary(4) DEFAULT NULL,
   address6_bin binary(16) DEFAULT NULL,
 
-  checkcommand varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'checkcommand.name',
+  checkcommand_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'checkcommand.name',
   checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
 
   max_check_attempts int unsigned NOT NULL,
 
-  check_timeperiod varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
+  check_timeperiod_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
   check_timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
   check_timeout int unsigned DEFAULT NULL,
@@ -199,7 +199,7 @@ CREATE TABLE host (
 
   perfdata_enabled enum('n', 'y') NOT NULL,
 
-  eventcommand varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'eventcommand.name',
+  eventcommand_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'eventcommand.name',
   eventcommand_id binary(20) DEFAULT NULL COMMENT 'eventcommand.id',
 
   is_volatile enum('n', 'y') NOT NULL,
@@ -210,10 +210,10 @@ CREATE TABLE host (
   icon_image_id binary(20) DEFAULT NULL COMMENT 'icon_image.id',
   icon_image_alt varchar(32) NOT NULL,
 
-  zone varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'zone.name',
+  zone_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'zone.name',
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  command_endpoint varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'endpoint.name',
+  command_endpoint_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'endpoint.name',
   command_endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
 
   PRIMARY KEY (id),
@@ -342,12 +342,12 @@ CREATE TABLE service (
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   display_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 
-  checkcommand varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'checkcommand.name',
+  checkcommand_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'checkcommand.name',
   checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
 
   max_check_attempts int unsigned NOT NULL,
 
-  check_timeperiod varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
+  check_timeperiod_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
   check_timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
   check_timeout int unsigned DEFAULT NULL,
@@ -365,7 +365,7 @@ CREATE TABLE service (
 
   perfdata_enabled enum('n', 'y') NOT NULL,
 
-  eventcommand varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'eventcommand.name',
+  eventcommand_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'eventcommand.name',
   eventcommand_id binary(20) DEFAULT NULL COMMENT 'eventcommand.id',
 
   is_volatile enum('n', 'y') NOT NULL,
@@ -376,10 +376,10 @@ CREATE TABLE service (
   icon_image_id binary(20) DEFAULT NULL COMMENT 'icon_image.id',
   icon_image_alt varchar(32) NOT NULL,
 
-  zone varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'zone.name',
+  zone_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'zone.name',
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
 
-  command_endpoint varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'endpoint.name',
+  command_endpoint_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'endpoint.name',
   command_endpoint_id binary(20) DEFAULT NULL COMMENT 'endpoint.id',
 
   PRIMARY KEY (id),
