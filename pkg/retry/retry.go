@@ -4,6 +4,8 @@ import (
 	"context"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/pkg/errors"
+	"net"
+	"syscall"
 	"time"
 )
 
@@ -80,4 +82,33 @@ func WithBackoff(
 		case <-time.After(sleep):
 		}
 	}
+}
+
+// Retryable returns true for common errors that are considered retryable,
+// i.e. timeouts, temporary, DNS and connection refused errors.
+func Retryable(err error) bool {
+	if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.EAGAIN) {
+		return true
+	}
+
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
+		return true
+	}
+
+	var temporary interface {
+		Temporary() bool
+	}
+	if errors.As(err, &temporary) && temporary.Temporary() {
+		return true
+	}
+
+	var timeout interface {
+		Timeout() bool
+	}
+	if errors.As(err, &timeout) && timeout.Timeout() {
+		return true
+	}
+
+	return false
 }

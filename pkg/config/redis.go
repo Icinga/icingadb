@@ -13,9 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"net"
-	"os"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -83,13 +81,7 @@ func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc
 				conn, err = dialer(ctx, network, addr)
 				return
 			},
-			func(err error) bool {
-				if op, ok := err.(*net.OpError); ok {
-					sys, ok := op.Err.(*os.SyscallError)
-					return ok && (sys.Err == syscall.ECONNREFUSED || sys.Err == syscall.EAGAIN)
-				}
-				return false
-			},
+			retry.Retryable,
 			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
 			retry.Settings{
 				Timeout: 5 * time.Minute,

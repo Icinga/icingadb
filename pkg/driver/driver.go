@@ -11,7 +11,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"syscall"
 	"time"
 )
 
@@ -102,23 +101,9 @@ func (log mysqlLogger) Print(v ...interface{}) {
 }
 
 func shouldRetry(err error) bool {
-	if errors.Is(err, driver.ErrBadConn) || errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.EAGAIN) {
+	if errors.Is(err, driver.ErrBadConn) {
 		return true
 	}
 
-	type temporary interface {
-		Temporary() bool
-	}
-	if t := temporary(nil); errors.As(err, &t) {
-		return t.Temporary()
-	}
-
-	type timeout interface {
-		Timeout() bool
-	}
-	if t := timeout(nil); errors.As(err, &t) {
-		return t.Timeout()
-	}
-
-	return false
+	return retry.Retryable(err)
 }
