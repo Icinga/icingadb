@@ -72,25 +72,19 @@ func (r *RuntimeUpdates) Sync(
 		upsertEntities := make(chan contracts.Entity, r.redis.Options.XReadCount)
 		deleteIds := make(chan interface{}, r.redis.Options.XReadCount)
 
-		var upserted chan contracts.Entity
 		var upsertedFifo chan contracts.Entity
-		var deleted chan interface{}
 		var deletedFifo chan interface{}
 		var upsertCount int
 		var deleteCount int
 		upsertStmt, upsertPlaceholders := r.db.BuildUpsertStmt(s.Entity())
 		if !allowParallel {
-			upserted = make(chan contracts.Entity, 1)
 			upsertedFifo = make(chan contracts.Entity, 1)
-			deleted = make(chan interface{}, 1)
 			deletedFifo = make(chan interface{}, 1)
 			upsertCount = 1
 			deleteCount = 1
 		} else {
 			upsertCount = r.db.BatchSizeByPlaceholders(upsertPlaceholders)
 			deleteCount = r.db.Options.MaxPlaceholdersPerStatement
-			upserted = make(chan contracts.Entity, upsertCount)
-			deleted = make(chan interface{}, deleteCount)
 		}
 
 		updateMessagesByKey[fmt.Sprintf("icinga:%s", utils.Key(s.Name(), ':'))] = updateMessages
@@ -103,16 +97,6 @@ func (r *RuntimeUpdates) Sync(
 		))
 
 		g.Go(func() error {
-			defer close(upserted)
-
-			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
-			sem := semaphore.NewWeighted(1)
-
-			return r.db.NamedBulkExec(
-				ctx, upsertStmt, upsertCount, sem, upsertEntities, upserted, com.SplitOnDupId[contracts.Entity],
-			)
-		})
-		g.Go(func() error {
 			var counter com.Counter
 			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
 				if count := counter.Reset(); count > 0 {
@@ -120,37 +104,19 @@ func (r *RuntimeUpdates) Sync(
 				}
 			}).Stop()
 
-			for {
-				select {
-				case v, ok := <-upserted:
-					if !ok {
-						return nil
-					}
+			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
+			sem := semaphore.NewWeighted(1)
 
-					counter.Inc()
-
-					if !allowParallel {
-						select {
-						case upsertedFifo <- v:
-						case <-ctx.Done():
-							return ctx.Err()
-						}
-					}
-				case <-ctx.Done():
-					return ctx.Err()
-				}
+			onSuccess := []OnSuccess[contracts.Entity]{OnSuccessIncrement[contracts.Entity](&counter)}
+			if !allowParallel {
+				onSuccess = append(onSuccess, OnSuccessSendTo(upsertedFifo))
 			}
-		})
 
-		g.Go(func() error {
-			defer close(deleted)
-
-			sem := r.db.GetSemaphoreForTable(utils.TableName(s.Entity()))
-
-			return r.db.BulkExec(
-				ctx, r.db.BuildDeleteStmt(s.Entity()), deleteCount, sem, deleteIds, deleted,
+			return r.db.NamedBulkExec(
+				ctx, upsertStmt, upsertCount, sem, upsertEntities, com.SplitOnDupId[contracts.Entity], onSuccess...,
 			)
 		})
+
 		g.Go(func() error {
 			var counter com.Counter
 			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
@@ -159,26 +125,14 @@ func (r *RuntimeUpdates) Sync(
 				}
 			}).Stop()
 
-			for {
-				select {
-				case v, ok := <-deleted:
-					if !ok {
-						return nil
-					}
+			sem := r.db.GetSemaphoreForTable(utils.TableName(s.Entity()))
 
-					counter.Inc()
-
-					if !allowParallel {
-						select {
-						case deletedFifo <- v:
-						case <-ctx.Done():
-							return ctx.Err()
-						}
-					}
-				case <-ctx.Done():
-					return ctx.Err()
-				}
+			onSuccess := []OnSuccess[any]{OnSuccessIncrement[any](&counter)}
+			if !allowParallel {
+				onSuccess = append(onSuccess, OnSuccessSendTo(deletedFifo))
 			}
+
+			return r.db.BulkExec(ctx, r.db.BuildDeleteStmt(s.Entity()), deleteCount, sem, deleteIds, onSuccess...)
 		})
 	}
 
@@ -205,17 +159,6 @@ func (r *RuntimeUpdates) Sync(
 
 		cvStmt, cvPlaceholders := r.db.BuildUpsertStmt(cv.Entity())
 		cvCount := r.db.BatchSizeByPlaceholders(cvPlaceholders)
-		upsertedCustomvars := make(chan contracts.Entity, cvCount)
-		g.Go(func() error {
-			defer close(upsertedCustomvars)
-
-			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
-			sem := semaphore.NewWeighted(1)
-
-			return r.db.NamedBulkExec(
-				ctx, cvStmt, cvCount, sem, customvars, upsertedCustomvars, com.SplitOnDupId[contracts.Entity],
-			)
-		})
 		g.Go(func() error {
 			var counter com.Counter
 			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
@@ -224,34 +167,17 @@ func (r *RuntimeUpdates) Sync(
 				}
 			}).Stop()
 
-			for {
-				select {
-				case _, ok := <-upsertedCustomvars:
-					if !ok {
-						return nil
-					}
-
-					counter.Inc()
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		})
-
-		cvFlatStmt, cvFlatPlaceholders := r.db.BuildUpsertStmt(cvFlat.Entity())
-		cvFlatCount := r.db.BatchSizeByPlaceholders(cvFlatPlaceholders)
-		upsertedFlatCustomvars := make(chan contracts.Entity)
-		g.Go(func() error {
-			defer close(upsertedFlatCustomvars)
-
 			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
 			sem := semaphore.NewWeighted(1)
 
 			return r.db.NamedBulkExec(
-				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars,
-				upsertedFlatCustomvars, com.SplitOnDupId[contracts.Entity],
+				ctx, cvStmt, cvCount, sem, customvars, com.SplitOnDupId[contracts.Entity],
+				OnSuccessIncrement[contracts.Entity](&counter),
 			)
 		})
+
+		cvFlatStmt, cvFlatPlaceholders := r.db.BuildUpsertStmt(cvFlat.Entity())
+		cvFlatCount := r.db.BatchSizeByPlaceholders(cvFlatPlaceholders)
 		g.Go(func() error {
 			var counter com.Counter
 			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
@@ -260,18 +186,13 @@ func (r *RuntimeUpdates) Sync(
 				}
 			}).Stop()
 
-			for {
-				select {
-				case _, ok := <-upsertedFlatCustomvars:
-					if !ok {
-						return nil
-					}
+			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
+			sem := semaphore.NewWeighted(1)
 
-					counter.Inc()
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
+			return r.db.NamedBulkExec(
+				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars,
+				com.SplitOnDupId[contracts.Entity], OnSuccessIncrement[contracts.Entity](&counter),
+			)
 		})
 
 		g.Go(func() error {

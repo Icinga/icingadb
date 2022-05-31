@@ -149,7 +149,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		g.Go(func() error {
 			// Using upsert here on purpose as this is the fastest way to do bulk updates.
 			// However, there is a risk that errors in the sync implementation could silently insert new rows.
-			return s.db.UpsertStreamed(ctx, entities, nil)
+			return s.db.UpsertStreamed(ctx, entities)
 		})
 	}
 

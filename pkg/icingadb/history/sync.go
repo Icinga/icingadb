@@ -253,7 +253,7 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 		g.Go(func() error {
 			defer close(inserted)
 
-			return s.db.UpsertStreamed(ctx, insert, inserted)
+			return s.db.UpsertStreamed(ctx, insert, icingadb.OnSuccessSendTo[contracts.Entity](inserted))
 		})
 
 		g.Go(func() error {

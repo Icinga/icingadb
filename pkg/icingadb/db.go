@@ -228,13 +228,39 @@ func (db *DB) BuildWhere(subject interface{}) (string, int) {
 	return strings.Join(where, ` AND `), len(columns)
 }
 
+// OnSuccess is a callback for successful (bulk) DML operations.
+type OnSuccess[T any] func(ctx context.Context, affectedRows []T) (err error)
+
+func OnSuccessIncrement[T any](counter *com.Counter) OnSuccess[T] {
+	return func(_ context.Context, rows []T) error {
+		counter.Add(uint64(len(rows)))
+		return nil
+	}
+}
+
+func OnSuccessSendTo[T any](ch chan<- T) OnSuccess[T] {
+	return func(ctx context.Context, rows []T) error {
+		for _, row := range rows {
+			select {
+			case ch <- row:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+
+		return nil
+	}
+}
+
 // BulkExec bulk executes queries with a single slice placeholder in the form of `IN (?)`.
 // Takes in up to the number of arguments specified in count from the arg stream,
 // derives and expands a query and executes it with this set of arguments until the arg stream has been processed.
 // The derived queries are executed in a separate goroutine with a weighting of 1
 // and can be executed concurrently to the extent allowed by the semaphore passed in sem.
-// Arguments for which the query ran successfully will be streamed on the succeeded channel.
-func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan interface{}, succeeded chan<- interface{}) error {
+// Arguments for which the query ran successfully will be passed to onSuccess.
+func (db *DB) BulkExec(
+	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan any, onSuccess ...OnSuccess[any],
+) error {
 	var counter com.Counter
 	defer db.log(ctx, query, &counter).Stop()
 
@@ -270,13 +296,9 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 
 							counter.Add(uint64(len(b)))
 
-							if succeeded != nil {
-								for _, row := range b {
-									select {
-									case <-ctx.Done():
-										return ctx.Err()
-									case succeeded <- row:
-									}
+							for _, onSuccess := range onSuccess {
+								if err := onSuccess(ctx, b); err != nil {
+									return err
 								}
 							}
 
@@ -302,10 +324,10 @@ func (db *DB) BulkExec(ctx context.Context, query string, count int, sem *semaph
 // this set of arguments, until the arg stream has been processed.
 // The queries are executed in a separate goroutine with a weighting of 1
 // and can be executed concurrently to the extent allowed by the semaphore passed in sem.
-// Entities for which the query ran successfully will be streamed on the succeeded channel.
+// Entities for which the query ran successfully will be passed to onSuccess.
 func (db *DB) NamedBulkExec(
 	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan contracts.Entity,
-	succeeded chan<- contracts.Entity, splitPolicyFactory com.BulkChunkSplitPolicyFactory[contracts.Entity],
+	splitPolicyFactory com.BulkChunkSplitPolicyFactory[contracts.Entity], onSuccess ...OnSuccess[contracts.Entity],
 ) error {
 	var counter com.Counter
 	defer db.log(ctx, query, &counter).Stop()
@@ -339,13 +361,9 @@ func (db *DB) NamedBulkExec(
 
 								counter.Add(uint64(len(b)))
 
-								if succeeded != nil {
-									for _, row := range b {
-										select {
-										case <-ctx.Done():
-											return ctx.Err()
-										case succeeded <- row:
-										}
+								for _, onSuccess := range onSuccess {
+									if err := onSuccess(ctx, b); err != nil {
+										return err
 									}
 								}
 
@@ -503,7 +521,7 @@ func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Enti
 	stmt, placeholders := db.BuildInsertStmt(first)
 
 	return db.NamedBulkExec(
-		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, nil, com.NeverSplit[contracts.Entity],
+		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem, forward, com.NeverSplit[contracts.Entity],
 	)
 }
 
@@ -511,7 +529,10 @@ func (db *DB) CreateStreamed(ctx context.Context, entities <-chan contracts.Enti
 // The upsert statement is created using BuildUpsertStmt with the first entity from the entities stream.
 // Bulk size is controlled via Options.MaxPlaceholdersPerStatement and
 // concurrency is controlled via Options.MaxConnectionsPerTable.
-func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Entity, succeeded chan<- contracts.Entity) error {
+// Entities for which the query ran successfully will be passed to onSuccess.
+func (db *DB) UpsertStreamed(
+	ctx context.Context, entities <-chan contracts.Entity, onSuccess ...OnSuccess[contracts.Entity],
+) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
 		return errors.Wrap(err, "can't copy first entity")
@@ -522,7 +543,7 @@ func (db *DB) UpsertStreamed(ctx context.Context, entities <-chan contracts.Enti
 
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
-		forward, succeeded, com.SplitOnDupId[contracts.Entity],
+		forward, com.SplitOnDupId[contracts.Entity], onSuccess...,
 	)
 }
 
@@ -545,10 +566,14 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Enti
 // The delete statement is created using BuildDeleteStmt with the passed entityType.
 // Bulk size is controlled via Options.MaxPlaceholdersPerStatement and
 // concurrency is controlled via Options.MaxConnectionsPerTable.
-// IDs for which the query ran successfully will be streamed on the succeeded channel.
-func (db *DB) DeleteStreamed(ctx context.Context, entityType contracts.Entity, ids <-chan interface{}, succeeded chan<- interface{}) error {
+// IDs for which the query ran successfully will be passed to onSuccess.
+func (db *DB) DeleteStreamed(
+	ctx context.Context, entityType contracts.Entity, ids <-chan interface{}, onSuccess ...OnSuccess[any],
+) error {
 	sem := db.GetSemaphoreForTable(utils.TableName(entityType))
-	return db.BulkExec(ctx, db.BuildDeleteStmt(entityType), db.Options.MaxPlaceholdersPerStatement, sem, ids, succeeded)
+	return db.BulkExec(
+		ctx, db.BuildDeleteStmt(entityType), db.Options.MaxPlaceholdersPerStatement, sem, ids, onSuccess...,
+	)
 }
 
 // Delete creates a channel from the specified ids and
@@ -560,7 +585,7 @@ func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []int
 	}
 	close(idsCh)
 
-	return db.DeleteStreamed(ctx, entityType, idsCh, nil)
+	return db.DeleteStreamed(ctx, entityType, idsCh)
 }
 
 func (db *DB) GetSemaphoreForTable(table string) *semaphore.Weighted {
