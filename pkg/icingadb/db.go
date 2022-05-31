@@ -582,14 +582,17 @@ func (db *DB) DeleteStreamed(
 
 // Delete creates a channel from the specified ids and
 // bulk deletes them by passing the channel along with the entityType to DeleteStreamed.
-func (db *DB) Delete(ctx context.Context, entityType contracts.Entity, ids []interface{}) error {
+// IDs for which the query ran successfully will be passed to onSuccess.
+func (db *DB) Delete(
+	ctx context.Context, entityType contracts.Entity, ids []interface{}, onSuccess ...OnSuccess[any],
+) error {
 	idsCh := make(chan interface{}, len(ids))
 	for _, id := range ids {
 		idsCh <- id
 	}
 	close(idsCh)
 
-	return db.DeleteStreamed(ctx, entityType, idsCh)
+	return db.DeleteStreamed(ctx, entityType, idsCh, onSuccess...)
 }
 
 func (db *DB) GetSemaphoreForTable(table string) *semaphore.Weighted {
