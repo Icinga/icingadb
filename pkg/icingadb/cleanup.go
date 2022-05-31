@@ -34,9 +34,11 @@ DELETE FROM %[2]s WHERE %[1]s IN (SELECT %[1]s FROM rows)`, stmt.PK, stmt.Table,
 }
 
 // CleanupOlderThan deletes all rows with the specified statement that are older than the given time.
-// Deletes a maximum of as many rows per round as defined in count. Returns the number of rows deleted.
+// Deletes a maximum of as many rows per round as defined in count. Actually deleted rows will be passed to onSuccess.
+// Returns the total number of rows deleted.
 func (db *DB) CleanupOlderThan(
-	ctx context.Context, stmt CleanupStmt, envId types.Binary, count uint64, olderThan time.Time,
+	ctx context.Context, stmt CleanupStmt, envId types.Binary,
+	count uint64, olderThan time.Time, onSuccess ...OnSuccess[struct{}],
 ) (uint64, error) {
 	var counter com.Counter
 	defer db.log(ctx, stmt.Build(db.DriverName(), 0), &counter).Stop()
@@ -57,6 +59,12 @@ func (db *DB) CleanupOlderThan(
 		}
 
 		counter.Add(uint64(n))
+
+		for _, onSuccess := range onSuccess {
+			if err := onSuccess(ctx, make([]struct{}, n)); err != nil {
+				return 0, err
+			}
+		}
 
 		if n < int64(count) {
 			break
