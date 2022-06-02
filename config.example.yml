@@ -31,9 +31,9 @@ redis:
   # Redis host or absolute Unix socket path.
   host: localhost
 
-  # Redis port. The Redis server provided by the icingadb-redis package listens on port '6380'.
-  # If not specified, the standard Redis port '6379' is used instead.
-  port: 6380
+  # Redis port.
+  # Defaults to '6380' since the Redis server provided by the 'icingadb-redis' package listens on that port.
+#  port: 6380
 
 # Icinga DB logs its activities at various severity levels and any errors that occur either
 # on the console or in systemd's journal. The latter is used automatically when running under systemd.

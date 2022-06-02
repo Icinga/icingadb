@@ -20,7 +20,7 @@ import (
 // Redis defines Redis client configuration.
 type Redis struct {
 	Host       string              `yaml:"host"`
-	Port       int                 `yaml:"port" default:"6379"`
+	Port       int                 `yaml:"port" default:"6380"`
 	Password   string              `yaml:"password"`
 	TlsOptions TLS                 `yaml:",inline"`
 	Options    icingaredis.Options `yaml:"options"`

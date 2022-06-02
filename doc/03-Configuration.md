@@ -9,16 +9,16 @@ See [config.example.yml](../config.example.yml) for an example configuration.
 
 Configuration of the Redis that Icinga writes to.
 
-| Option   | Description                                                                                         |
-|----------|-----------------------------------------------------------------------------------------------------|
-| host     | **Required.** Redis host or absolute Unix socket path.                                              |
-| port     | **Optional.** Redis port. Defaults to `6379`. Specify `6380` if using the `icingadb-redis` package. |
-| password | **Optional.** The password to use.                                                                  |
-| tls      | **Optional.** Whether to use TLS.                                                                   |
-| cert     | **Optional.** Path to TLS client certificate.                                                       |
-| key      | **Optional.** Path to TLS private key.                                                              |
-| ca       | **Optional.** Path to TLS CA certificate.                                                           |
-| insecure | **Optional.** Whether not to verify the peer.                                                       |
+| Option   | Description                                                                                                                        |
+|----------|------------------------------------------------------------------------------------------------------------------------------------|
+| host     | **Required.** Redis host or absolute Unix socket path.                                                                             |
+| port     | **Optional.** Redis port. Defaults to `6380` since the Redis server provided by the `icingadb-redis` package listens on that port. |
+| password | **Optional.** The password to use.                                                                                                 |
+| tls      | **Optional.** Whether to use TLS.                                                                                                  |
+| cert     | **Optional.** Path to TLS client certificate.                                                                                      |
+| key      | **Optional.** Path to TLS private key.                                                                                             |
+| ca       | **Optional.** Path to TLS CA certificate.                                                                                          |
+| insecure | **Optional.** Whether not to verify the peer.                                                                                      |
 
 ## Database Configuration <a id="configuration-database"></a>
 
