@@ -29,7 +29,19 @@ type VersionInfo struct {
 // When exported using `git archive`, the placeholders are replaced in the file and this version information is
 // preferred. Otherwise the hardcoded version is used and augmented with commit information from the build metadata.
 func Version(version, gitDescribe, gitHash string) *VersionInfo {
+	const hashLen = 7 // Same truncation length for the commit hash as used by git describe.
+
 	if !strings.HasPrefix(gitDescribe, "$") && !strings.HasPrefix(gitHash, "$") {
+		if strings.HasPrefix(gitDescribe, "%") {
+			// Only Git 2.32+ supports %(describe), older versions don't expand it but keep it as-is.
+			// Fall back to the hardcoded version augmented with the commit hash.
+			gitDescribe = version
+
+			if len(gitHash) >= hashLen {
+				gitDescribe += "-g" + gitHash[:hashLen]
+			}
+		}
+
 		return &VersionInfo{
 			Version: gitDescribe,
 			Commit:  gitHash,
@@ -48,8 +60,6 @@ func Version(version, gitDescribe, gitHash string) *VersionInfo {
 					modified, _ = strconv.ParseBool(setting.Value)
 				}
 			}
-
-			const hashLen = 7 // Same truncation length for the commit hash as used by git describe.
 
 			if len(commit) >= hashLen {
 				version += "-g" + commit[:hashLen]
