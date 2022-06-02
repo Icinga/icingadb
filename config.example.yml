@@ -35,6 +35,9 @@ redis:
   # Defaults to '6380' since the Redis server provided by the 'icingadb-redis' package listens on that port.
 #  port: 6380
 
+  # Redis password.
+#  password:
+
 # Icinga DB logs its activities at various severity levels and any errors that occur either
 # on the console or in systemd's journal. The latter is used automatically when running under systemd.
 # In any case, the default log level is 'info'.
