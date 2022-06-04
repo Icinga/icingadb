@@ -1,7 +1,5 @@
 # Configuration <a id="configuration"></a>
 
-## Overview <a id="configuration-overview"></a>
-
 The configuration is stored in `/etc/icingadb/config.yml`.
 See [config.example.yml](../config.example.yml) for an example configuration.
 
@@ -72,10 +70,12 @@ Valid units are `"ms"`, `"s"`, `"m"` and `"h"`.
 
 ## Retention <a id="configuration-retention"></a>
 
-By default, no historical data is deleted, which means that the longer the data is retained, the more disk space is required to store it.
-History retention is an optional feature that allows you to limit the number of days that historical data is available for each history category.
+By default, no historical data is deleted, which means that the longer the data is retained,
+the more disk space is required to store it.  History retention is an optional feature that allows to
+limit the number of days that historical data is available for each history category.
 There are separate options for the full history tables used to display history information in the web interface and
-SLA tables which store the minimal information required for SLA reporting, allowing to keep this information for longer with a smaller storage footprint.
+SLA tables which store the minimal information required for SLA reporting,
+allowing to keep this information for longer with a smaller storage footprint.
 
 | Option       | Description                                                                                                                                                                                                   |
 |--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|

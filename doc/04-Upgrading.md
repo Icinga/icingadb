@@ -1,4 +1,4 @@
-# Upgrading Icinga DB <a id="upgrading"></a>
+# Upgrading Icinga DB
 
 ## Upgrading to Icinga DB RC2
 
