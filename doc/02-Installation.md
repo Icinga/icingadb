@@ -153,8 +153,8 @@ Set up a MySQL database for Icinga DB:
 # mysql -u root -p
 
 CREATE DATABASE icingadb;
-CREATE USER 'icingadb'@'127.0.0.1' IDENTIFIED BY 'icingadb';
-GRANT ALL ON icingadb.* TO 'icingadb'@'127.0.0.1';
+CREATE USER 'icingadb'@'localhost' IDENTIFIED BY 'icingadb';
+GRANT ALL ON icingadb.* TO 'icingadb'@'localhost';
 ```
 
 After creating the database, you can import the Icinga DB schema using the following command:
