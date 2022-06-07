@@ -1,11 +1,15 @@
-# Configuration <a id="configuration"></a>
+# Configuration
 
 The configuration is stored in `/etc/icingadb/config.yml`.
 See [config.example.yml](../config.example.yml) for an example configuration.
 
-## Redis Configuration <a id="configuration-redis"></a>
+## Redis Configuration
 
-Configuration of the Redis that Icinga writes to.
+Connection configuration for the Redis server where Icinga 2 writes its configuration, state and history items.
+This is the same connection as configured in the
+[Icinga DB feature](https://icinga.com/docs/icinga-2/latest/doc/14-features/#icinga-db) of
+the corresponding Icinga 2 node. High availability setups require a dedicated Redis server per Icinga 2 node and
+therefore a dedicated Icinga DB instance that connects to it.
 
 | Option   | Description                                                                                                                        |
 |----------|------------------------------------------------------------------------------------------------------------------------------------|
@@ -18,9 +22,12 @@ Configuration of the Redis that Icinga writes to.
 | ca       | **Optional.** Path to TLS CA certificate.                                                                                          |
 | insecure | **Optional.** Whether not to verify the peer.                                                                                      |
 
-## Database Configuration <a id="configuration-database"></a>
+## Database Configuration
 
-Configuration of the database used by Icinga DB.
+Connection configuration for the database to which Icinga DB synchronizes monitoring data.
+This is also the database used in
+[Icinga DB Web](https://icinga.com/docs/icinga-db/latest/icinga-db-web/doc/01-About/) to view and work with the data.
+In high availability setups, all Icinga DB instances must write to the same database.
 
 | Option   | Description                                                                                            |
 |----------|--------------------------------------------------------------------------------------------------------|
@@ -36,7 +43,7 @@ Configuration of the database used by Icinga DB.
 | ca       | **Optional.** Path to TLS CA certificate.                                                              |
 | insecure | **Optional.** Whether not to verify the peer.                                                          |
 
-## Logging Configuration <a id="configuration-logging"></a>
+## Logging Configuration
 
 Configuration of the logging component used by Icinga DB.
 
@@ -47,7 +54,7 @@ Configuration of the logging component used by Icinga DB.
 | interval | **Optional.** Interval for periodic logging defined as [duration string](#duration-string). Defaults to `"20s"`.                                                                                         |
 | options  | **Optional.** Map of component name to logging level in order to set a different logging level for each component instead of the default one. See [logging components](#logging-components) for details. |
 
-### Logging Components <a id="logging-components"></a>
+### Logging Components
 
 | Component         | Description                                                                    |
 |-------------------|--------------------------------------------------------------------------------|
@@ -63,12 +70,7 @@ Configuration of the logging component used by Icinga DB.
 | runtime-updates   | Runtime updates of config objects after the initial config synchronization.    |
 | telemetry         | Reporting of Icinga DB status to Icinga 2 via Redis (for monitoring purposes). |
 
-### Duration String <a id="duration-string"></a>
-
-A duration string is a sequence of decimal numbers and a unit suffix, such as `"20s"`.
-Valid units are `"ms"`, `"s"`, `"m"` and `"h"`.
-
-## Retention <a id="configuration-retention"></a>
+## Retention
 
 By default, no historical data is deleted, which means that the longer the data is retained,
 the more disk space is required to store it.  History retention is an optional feature that allows to
@@ -82,3 +84,10 @@ allowing to keep this information for longer with a smaller storage footprint.
 | history-days | **Optional.** Number of days to retain historical data for all history categories. Use `options` in order to enable retention only for specific categories or to override the retention days configured here. |
 | sla-days     | **Optional.** Number of days to retain historical data for SLA reporting.                                                                                                                                     |
 | options      | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification`, `sla` and `state`.                 |
+
+## Appendix
+
+### Duration String
+
+A duration string is a sequence of decimal numbers and a unit suffix, such as `"20s"`.
+Valid units are `"ms"`, `"s"`, `"m"` and `"h"`.
