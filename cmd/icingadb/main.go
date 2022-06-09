@@ -27,7 +27,7 @@ import (
 const (
 	ExitSuccess                   = 0
 	ExitFailure                   = 1
-	expectedRedisSchemaVersion    = "4"
+	expectedRedisSchemaVersion    = "5"
 	expectedMysqlSchemaVersion    = 3
 	expectedPostgresSchemaVersion = 1
 )

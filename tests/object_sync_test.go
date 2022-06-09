@@ -376,7 +376,7 @@ func TestObjectSync(t *testing.T) {
 						client.CreateObject(t, "services", *service.HostName+"!"+service.Name, map[string]interface{}{
 							"attrs": map[string]interface{}{
 								"check_command": "default-checkcommand",
-								"zone":          service.Zone,
+								"zone":          service.ZoneName,
 							},
 						})
 						require.Eventuallyf(t, func() bool {
@@ -652,9 +652,9 @@ type Host struct {
 	DisplayName           string             `icinga2:"display_name"            icingadb:"display_name"`
 	Address               string             `icinga2:"address"                 icingadb:"address"`
 	Address6              string             `icinga2:"address6"                icingadb:"address6"`
-	CheckCommand          string             `icinga2:"check_command"           icingadb:"checkcommand"`
+	CheckCommandName      string             `icinga2:"check_command"           icingadb:"checkcommand_name"`
 	MaxCheckAttempts      float64            `icinga2:"max_check_attempts"      icingadb:"max_check_attempts"`
-	CheckPeriod           string             `icinga2:"check_period"            icingadb:"check_timeperiod"`
+	CheckPeriodName       string             `icinga2:"check_period"            icingadb:"check_timeperiod_name"`
 	CheckTimeout          float64            `icinga2:"check_timeout"           icingadb:"check_timeout"`
 	CheckInterval         float64            `icinga2:"check_interval"          icingadb:"check_interval"`
 	RetryInterval         float64            `icinga2:"retry_interval"          icingadb:"check_retry_interval"`
@@ -666,10 +666,10 @@ type Host struct {
 	FlappingThresholdHigh float64            `icinga2:"flapping_threshold_high" icingadb:"flapping_threshold_high"`
 	FlappingThresholdLow  float64            `icinga2:"flapping_threshold_low"  icingadb:"flapping_threshold_low"`
 	EnablePerfdata        bool               `icinga2:"enable_perfdata"         icingadb:"perfdata_enabled"`
-	EventCommand          string             `icinga2:"event_command"           icingadb:"eventcommand"`
+	EventCommandName      string             `icinga2:"event_command"           icingadb:"eventcommand_name"`
 	Volatile              bool               `icinga2:"volatile"                icingadb:"is_volatile"`
-	Zone                  string             `icinga2:"zone"                    icingadb:"zone"`
-	CommandEndpoint       string             `icinga2:"command_endpoint"        icingadb:"command_endpoint"`
+	ZoneName              string             `icinga2:"zone"                    icingadb:"zone_name"`
+	CommandEndpointName   string             `icinga2:"command_endpoint"        icingadb:"command_endpoint_name"`
 	Notes                 string             `icinga2:"notes"                   icingadb:"notes"`
 	NotesUrl              *string            `icinga2:"notes_url"               icingadb:"notes_url.notes_url"`
 	ActionUrl             *string            `icinga2:"action_url"              icingadb:"action_url.action_url"`
@@ -685,7 +685,7 @@ func makeTestSyncHosts(t *testing.T) []Host {
 	host := Host{
 		Address:               "127.0.0.1",
 		Address6:              "::1",
-		CheckCommand:          "hostalive",
+		CheckCommandName:      "hostalive",
 		MaxCheckAttempts:      3,
 		CheckTimeout:          60,
 		CheckInterval:         10,
@@ -698,9 +698,9 @@ func makeTestSyncHosts(t *testing.T) []Host {
 		Vary("DisplayName", "Some Display Name", "Other Display Name").
 		Vary("Address", "192.0.2.23", "192.0.2.42").
 		Vary("Address6", "2001:db8::23", "2001:db8::42").
-		Vary("CheckCommand", "some-checkcommand", "other-checkcommand").
+		Vary("CheckCommandName", "some-checkcommand", "other-checkcommand").
 		Vary("MaxCheckAttempts", 5.0, 7.0).
-		Vary("CheckPeriod", "some-timeperiod", "other-timeperiod").
+		Vary("CheckPeriodName", "some-timeperiod", "other-timeperiod").
 		Vary("CheckTimeout", 30. /* TODO(jb): 5 */, 120.0).
 		Vary("CheckInterval", 20. /* TODO(jb): 5 */, 30.0).
 		Vary("RetryInterval", 1. /* TODO(jb): 5 */, 2.0).
@@ -712,10 +712,10 @@ func makeTestSyncHosts(t *testing.T) []Host {
 		Vary("FlappingThresholdHigh", 90.0, 95.5).
 		Vary("FlappingThresholdLow", 5.5, 10.0).
 		Vary("EnablePerfdata", true, false).
-		Vary("EventCommand", "some-eventcommand", "other-eventcommand").
+		Vary("EventCommandName", "some-eventcommand", "other-eventcommand").
 		Vary("Volatile", true, false).
-		Vary("Zone", "some-zone", "other-zone").
-		Vary("CommandEndpoint", "some-endpoint", "other-endpoint").
+		Vary("ZoneName", "some-zone", "other-zone").
+		Vary("CommandEndpointName", "some-endpoint", "other-endpoint").
 		Vary("Notes", "Some Notes", "Other Notes").
 		Vary("NotesUrl", newString("https://some.notes.invalid/host"), newString("http://other.notes.invalid/host")).
 		Vary("ActionUrl", newString("https://some.action.invalid/host"), newString("http://other.actions.invalid/host")).
@@ -732,8 +732,8 @@ func makeTestSyncHosts(t *testing.T) []Host {
 			hosts[i].DisplayName = hosts[i].Name
 		}
 
-		if hosts[i].Zone == "" {
-			hosts[i].Zone = "master"
+		if hosts[i].ZoneName == "" {
+			hosts[i].ZoneName = "master"
 		}
 	}
 
@@ -744,9 +744,9 @@ type Service struct {
 	Name                  string             `                                  icingadb:"name"`
 	DisplayName           string             `icinga2:"display_name"            icingadb:"display_name"`
 	HostName              *string            `icinga2:"host_name"               icingadb:"host.name"`
-	CheckCommand          string             `icinga2:"check_command"           icingadb:"checkcommand"`
+	CheckCommandName      string             `icinga2:"check_command"           icingadb:"checkcommand_name"`
 	MaxCheckAttempts      float64            `icinga2:"max_check_attempts"      icingadb:"max_check_attempts"`
-	CheckPeriod           string             `icinga2:"check_period"            icingadb:"check_timeperiod"`
+	CheckPeriodName       string             `icinga2:"check_period"            icingadb:"check_timeperiod_name"`
 	CheckTimeout          float64            `icinga2:"check_timeout"           icingadb:"check_timeout"`
 	CheckInterval         float64            `icinga2:"check_interval"          icingadb:"check_interval"`
 	RetryInterval         float64            `icinga2:"retry_interval"          icingadb:"check_retry_interval"`
@@ -758,10 +758,10 @@ type Service struct {
 	FlappingThresholdHigh float64            `icinga2:"flapping_threshold_high" icingadb:"flapping_threshold_high"`
 	FlappingThresholdLow  float64            `icinga2:"flapping_threshold_low"  icingadb:"flapping_threshold_low"`
 	EnablePerfdata        bool               `icinga2:"enable_perfdata"         icingadb:"perfdata_enabled"`
-	EventCommand          string             `icinga2:"event_command"           icingadb:"eventcommand"`
+	EventCommandName      string             `icinga2:"event_command"           icingadb:"eventcommand_name"`
 	Volatile              bool               `icinga2:"volatile"                icingadb:"is_volatile"`
-	Zone                  string             `icinga2:"zone"                    icingadb:"zone"`
-	CommandEndpoint       string             `icinga2:"command_endpoint"        icingadb:"command_endpoint"`
+	ZoneName              string             `icinga2:"zone"                    icingadb:"zone_name"`
+	CommandEndpointName   string             `icinga2:"command_endpoint"        icingadb:"command_endpoint_name"`
 	Notes                 string             `icinga2:"notes"                   icingadb:"notes"`
 	NotesUrl              *string            `icinga2:"notes_url"               icingadb:"notes_url.notes_url"`
 	ActionUrl             *string            `icinga2:"action_url"              icingadb:"action_url.action_url"`
@@ -776,7 +776,7 @@ type Service struct {
 func makeTestSyncServices(t *testing.T) []Service {
 	service := Service{
 		HostName:              newString("default-host"),
-		CheckCommand:          "default-checkcommand",
+		CheckCommandName:      "default-checkcommand",
 		MaxCheckAttempts:      3,
 		CheckTimeout:          60,
 		CheckInterval:         10,
@@ -795,9 +795,9 @@ func makeTestSyncServices(t *testing.T) []Service {
 	services := utils.MakeVariants(service).
 		Vary("HostName", newString("some-host"), newString("other-host")).
 		Vary("DisplayName", "Some Display Name", "Other Display Name").
-		Vary("CheckCommand", "some-checkcommand", "other-checkcommand").
+		Vary("CheckCommandName", "some-checkcommand", "other-checkcommand").
 		Vary("MaxCheckAttempts", 5.0, 7.0).
-		Vary("CheckPeriod", "some-timeperiod", "other-timeperiod").
+		Vary("CheckPeriodName", "some-timeperiod", "other-timeperiod").
 		Vary("CheckTimeout", 23.0 /* TODO(jb): .42 */, 120.0).
 		Vary("CheckInterval", 20.0, 42.0 /* TODO(jb): .23 */).
 		Vary("RetryInterval", 1.0 /* TODO(jb): .5 */, 15.0).
@@ -809,10 +809,10 @@ func makeTestSyncServices(t *testing.T) []Service {
 		Vary("FlappingThresholdHigh", 95.0, 99.5).
 		Vary("FlappingThresholdLow", 0.5, 10.0).
 		Vary("EnablePerfdata", true, false).
-		Vary("EventCommand", "some-eventcommand", "other-eventcommand").
+		Vary("EventCommandName", "some-eventcommand", "other-eventcommand").
 		Vary("Volatile", true, false).
-		Vary("Zone", "some-zone", "other-zone").
-		Vary("CommandEndpoint", "some-endpoint", "other-endpoint").
+		Vary("ZoneName", "some-zone", "other-zone").
+		Vary("CommandEndpointName", "some-endpoint", "other-endpoint").
 		Vary("Notes", "Some Notes", "Other Notes").
 		Vary("NotesUrl", newString("https://some.notes.invalid/service"), newString("http://other.notes.invalid/service")).
 		Vary("ActionUrl", newString("https://some.action.invalid/service"), newString("http://other.actions.invalid/service")).
@@ -829,8 +829,8 @@ func makeTestSyncServices(t *testing.T) []Service {
 			services[i].DisplayName = services[i].Name
 		}
 
-		if services[i].Zone == "" {
-			services[i].Zone = "master"
+		if services[i].ZoneName == "" {
+			services[i].ZoneName = "master"
 		}
 	}
 

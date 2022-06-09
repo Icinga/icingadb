@@ -214,6 +214,22 @@ ALTER TABLE customvar
 ALTER TABLE customvar_flat
   MODIFY flatname varchar(512) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Path converted with `.` and `[ ]`';
 
+ALTER TABLE host
+  CHANGE checkcommand checkcommand_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'checkcommand.name',
+  CHANGE check_timeperiod
+    check_timeperiod_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
+  CHANGE eventcommand eventcommand_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'eventcommand.name',
+  CHANGE zone zone_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'zone.name',
+  CHANGE command_endpoint command_endpoint_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'endpoint.name';
+
+ALTER TABLE service
+  CHANGE checkcommand checkcommand_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'checkcommand.name',
+  CHANGE check_timeperiod
+    check_timeperiod_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
+  CHANGE eventcommand eventcommand_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'eventcommand.name',
+  CHANGE zone zone_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'zone.name',
+  CHANGE command_endpoint command_endpoint_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'endpoint.name';
+
 CREATE TABLE sla_history_state (
   id binary(20) NOT NULL COMMENT 'state_history.id (may reference already deleted rows)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
