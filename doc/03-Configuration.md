@@ -3,7 +3,7 @@
 ## Overview <a id="configuration-overview"></a>
 
 The configuration is stored in `/etc/icingadb/config.yml`.
-See [config.yml.example](../config.yml.example) for an example configuration.
+See [config.example.yml](../config.example.yml) for an example configuration.
 
 ## Redis Configuration <a id="configuration-redis"></a>
 
