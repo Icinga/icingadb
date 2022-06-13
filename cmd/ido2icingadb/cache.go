@@ -32,7 +32,7 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 		ObjectId      uint64
 	}
 
-	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, onDeleted func(sql.Result), onNewUncommittedDml func()) {
+	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, onNewUncommittedDml func()) {
 		var checkpoint struct {
 			Cnt   int64
 			MaxId sql.NullInt64
@@ -67,27 +67,22 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 						if len(lst) > 0 {
 							// ... save the start event time for the actual migration:
 							cacheExec(
-								*tx, false,
+								*tx,
 								"INSERT INTO end_start_time(history_id, event_time, event_time_usec) VALUES (?, ?, ?)",
 								idoRow.Id, lst[0].EventTime, lst[0].EventTimeUsec,
 							)
 
 							// This previously queried info isn't needed anymore.
-							onDeleted(cacheExec(
-								*tx, false, "DELETE FROM last_start_time WHERE object_id=?", idoRow.ObjectId,
-							))
+							cacheExec(*tx, "DELETE FROM last_start_time WHERE object_id=?", idoRow.ObjectId)
 						}
 					} else {
 						// Ack/flapping start event directly after another start event (per checkable).
 						// The old one won't have (but the new one will) an end event (which will need its time).
-						onDeleted(cacheExec(
-							*tx, false, "DELETE FROM last_start_time WHERE object_id=?", idoRow.ObjectId,
-						))
+						cacheExec(*tx, "DELETE FROM last_start_time WHERE object_id=?", idoRow.ObjectId)
 
 						// An ack/flapping start event. The following end event (per checkable) will need its time.
 						cacheExec(
-							*tx, false,
-							"INSERT INTO last_start_time(object_id, event_time, event_time_usec) VALUES (?, ?, ?)",
+							*tx, "INSERT INTO last_start_time(object_id, event_time, event_time_usec) VALUES (?, ?, ?)",
 							idoRow.ObjectId, idoRow.EventTime, idoRow.EventTimeUsec,
 						)
 					}
@@ -102,7 +97,7 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 		)
 
 		// This never queried info isn't needed anymore.
-		onDeleted(cacheExec(*tx, false, "DELETE FROM last_start_time"))
+		cacheExec(*tx, "DELETE FROM last_start_time")
 	})
 
 	ht.bar.SetTotal(ht.bar.Current(), true)
@@ -123,7 +118,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 		LastHardState uint8
 	}
 
-	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, onDeleted func(sql.Result), onNewUncommittedDml func()) {
+	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, onNewUncommittedDml func()) {
 		var nextIds struct {
 			Cnt   int64
 			MinId sql.NullInt64
@@ -173,44 +168,45 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 					if len(nhs) < 1 { // we just started (per checkable)
 						// At the moment (we're "travelling back in time") that's the checkable's hard state:
 						cacheExec(
-							*tx, false, "INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
+							*tx, "INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
 							idoRow.ObjectId, idoRow.LastHardState,
 						)
 
 						// But for the current time point the previous hard state isn't known, yet:
 						cacheExec(
-							*tx, false, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
+							*tx, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
 							idoRow.Id, idoRow.ObjectId,
 						)
 					} else if idoRow.LastHardState == nhs[0].NextHardState {
 						// The hard state didn't change yet (per checkable),
 						// so this time point also awaits the previous hard state.
 						cacheExec(
-							*tx, false, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
+							*tx, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
 							idoRow.Id, idoRow.ObjectId,
 						)
 					} else { // the hard state changed (per checkable)
 						// That past hard state is now available for the processed future time points:
 						cacheExec(
-							*tx, false, "INSERT INTO previous_hard_state(history_id, previous_hard_state) "+
+							*tx,
+							"INSERT INTO previous_hard_state(history_id, previous_hard_state) "+
 								"SELECT history_id, ? FROM next_ids WHERE object_id=?",
 							idoRow.LastHardState, idoRow.ObjectId,
 						)
 
 						// Now they have what they wanted:
-						onDeleted(cacheExec(*tx, false, "DELETE FROM next_hard_state WHERE object_id=?", idoRow.ObjectId))
-						onDeleted(cacheExec(*tx, false, "DELETE FROM next_ids WHERE object_id=?", idoRow.ObjectId))
+						cacheExec(*tx, "DELETE FROM next_hard_state WHERE object_id=?", idoRow.ObjectId)
+						cacheExec(*tx, "DELETE FROM next_ids WHERE object_id=?", idoRow.ObjectId)
 
 						// That's done.
 						// Now do the same thing as in the "we just started" case above, for the same reason:
 
 						cacheExec(
-							*tx, false, "INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
+							*tx, "INSERT INTO next_hard_state(object_id, next_hard_state) VALUES (?, ?)",
 							idoRow.ObjectId, idoRow.LastHardState,
 						)
 
 						cacheExec(
-							*tx, false, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
+							*tx, "INSERT INTO next_ids(history_id, object_id) VALUES (?, ?)",
 							idoRow.Id, idoRow.ObjectId,
 						)
 					}
@@ -226,25 +222,22 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 
 		// No past hard state is available for the processed future time points, assuming pending:
 		cacheExec(
-			*tx, false, "INSERT INTO previous_hard_state(history_id, previous_hard_state) "+
-				"SELECT history_id, 99 FROM next_ids",
+			*tx, "INSERT INTO previous_hard_state(history_id, previous_hard_state) SELECT history_id, 99 FROM next_ids",
 		)
 
 		// Now they should have what they wanted:
-		onDeleted(cacheExec(*tx, false, "DELETE FROM next_hard_state"))
-		onDeleted(cacheExec(*tx, false, "DELETE FROM next_ids"))
+		cacheExec(*tx, "DELETE FROM next_hard_state")
+		cacheExec(*tx, "DELETE FROM next_ids")
 	})
 
 	ht.bar.SetTotal(ht.bar.Current(), true)
 }
 
 // chunkCacheTx rationale: during do operate on cache via *tx. On every completed operation call onNewUncommittedDml()
-// which periodically commits *tx and starts a new tx. (That's why tx is a **, not just a *.) On every DELETE
-// call onDeleted() which will cause a VACUUM after do if any rows were affected to save some space.
+// which periodically commits *tx and starts a new tx. (That's why tx is a **, not just a *.)
 // (On non-recoverable errors the whole program exits.)
-func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, onDeleted func(sql.Result), onNewUncommittedDml func())) {
+func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, onNewUncommittedDml func())) {
 	logger := log.With("backend", "cache")
-	var totalAffectedByDeletes int64
 	var onNewUncommittedDmlCallsSinceLastTx int
 
 	tx, err := cache.Beginx()
@@ -254,13 +247,6 @@ func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, onDeleted func(sql.Resul
 
 	do(
 		&tx,
-		func(result sql.Result) { // onDeleted
-			if affected, err := result.RowsAffected(); err == nil {
-				totalAffectedByDeletes += affected
-			} else {
-				log.Errorf("%+v", errors.Wrap(err, "can't get affected rows"))
-			}
-		},
 		func() { // onNewUncommittedDml
 			onNewUncommittedDmlCallsSinceLastTx++
 			if onNewUncommittedDmlCallsSinceLastTx == bulk {
@@ -303,19 +289,9 @@ func cacheSelect(cacheTx *sqlx.Tx, dest interface{}, query string, args ...inter
 	}
 }
 
-// cacheExec does cache.Exec(dml, args...). On non-recoverable errors the whole program exits if !allowFailure.
-func cacheExec(cache sqlx.Execer, allowFailure bool, dml string, args ...interface{}) sql.Result {
-	res, err := cache.Exec(dml, args...)
-	if err != nil {
-		logger := log.With("backend", "cache", "dml", dml, "args", args)
-
-		level := logger.Fatalf
-		if allowFailure {
-			level = logger.Errorf
-		}
-
-		level("%+v", errors.Wrap(err, "can't perform DML"))
+// cacheExec does cacheTx.Exec(dml, args...). On non-recoverable errors the whole program exits.
+func cacheExec(cacheTx *sqlx.Tx, dml string, args ...interface{}) {
+	if _, err := cacheTx.Exec(dml, args...); err != nil {
+		log.With("backend", "cache", "dml", dml, "args", args).Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 	}
-
-	return res
 }
