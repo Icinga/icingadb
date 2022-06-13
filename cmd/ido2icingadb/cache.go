@@ -32,7 +32,7 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 		ObjectId      uint64
 	}
 
-	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, onNewUncommittedDml func()) {
+	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, commitPeriodically func()) {
 		var checkpoint struct {
 			Cnt   int64
 			MaxId sql.NullInt64
@@ -87,7 +87,7 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 						)
 					}
 
-					onNewUncommittedDml()
+					commitPeriodically()
 					checkpoint = idoRow.Id
 				}
 
@@ -118,7 +118,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 		LastHardState uint8
 	}
 
-	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, onNewUncommittedDml func()) {
+	chunkCacheTx(ht.cache, func(tx **sqlx.Tx, commitPeriodically func()) {
 		var nextIds struct {
 			Cnt   int64
 			MinId sql.NullInt64
@@ -211,7 +211,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 						)
 					}
 
-					onNewUncommittedDml()
+					commitPeriodically()
 					checkpoint = idoRow.Id
 				}
 
@@ -233,38 +233,35 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 	ht.bar.SetTotal(ht.bar.Current(), true)
 }
 
-// chunkCacheTx rationale: during do operate on cache via *tx. On every completed operation call onNewUncommittedDml()
+// chunkCacheTx rationale: during do operate on cache via *tx. After every completed operation call commitPeriodically()
 // which periodically commits *tx and starts a new tx. (That's why tx is a **, not just a *.)
 // (On non-recoverable errors the whole program exits.)
-func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, onNewUncommittedDml func())) {
+func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, commitPeriodically func())) {
 	logger := log.With("backend", "cache")
-	var onNewUncommittedDmlCallsSinceLastTx int
+	var callsSinceLastTx int
 
 	tx, err := cache.Beginx()
 	if err != nil {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
 	}
 
-	do(
-		&tx,
-		func() { // onNewUncommittedDml
-			onNewUncommittedDmlCallsSinceLastTx++
-			if onNewUncommittedDmlCallsSinceLastTx == bulk {
-				if err := tx.Commit(); err != nil {
-					logger.Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
-				}
-
-				var err error
-
-				tx, err = cache.Beginx()
-				if err != nil {
-					logger.Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
-				}
-
-				onNewUncommittedDmlCallsSinceLastTx = 0
+	do(&tx, func() { // commitPeriodically
+		callsSinceLastTx++
+		if callsSinceLastTx == bulk {
+			if err := tx.Commit(); err != nil {
+				logger.Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
 			}
-		},
-	)
+
+			var err error
+
+			tx, err = cache.Beginx()
+			if err != nil {
+				logger.Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
+			}
+
+			callsSinceLastTx = 0
+		}
+	})
 
 	if err := tx.Commit(); err != nil {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
