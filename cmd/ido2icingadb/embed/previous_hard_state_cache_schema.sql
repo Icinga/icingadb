@@ -1,3 +1,5 @@
+PRAGMA main.auto_vacuum = 1;
+
 -- Icinga DB's state_history#previous_hard_state per IDO's icinga_statehistory#statehistory_id.
 CREATE TABLE IF NOT EXISTS previous_hard_state (
     history_id          INT PRIMARY KEY,

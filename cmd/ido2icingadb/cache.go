@@ -283,10 +283,6 @@ func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, onDeleted func(sql.Resul
 	if err := tx.Commit(); err != nil {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
 	}
-
-	if totalAffectedByDeletes > 0 {
-		cacheExec(cache, true, "VACUUM")
-	}
 }
 
 // cacheGet does cache.Get(dest, query, args...). (On non-recoverable errors the whole program exits.)

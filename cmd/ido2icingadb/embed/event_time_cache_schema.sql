@@ -1,3 +1,5 @@
+PRAGMA main.auto_vacuum = 1;
+
 -- Icinga DB's flapping_history#start_time per flapping_end row (IDO's icinga_flappinghistory#flappinghistory_id).
 CREATE TABLE IF NOT EXISTS end_start_time (
     history_id      INT PRIMARY KEY,
