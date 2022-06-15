@@ -1113,7 +1113,8 @@ CREATE TABLE notification_history (
 
   PRIMARY KEY (id),
 
-  INDEX idx_notification_history_send_time (send_time DESC) COMMENT 'Notification list filtered/ordered by send_time'
+  INDEX idx_notification_history_send_time (send_time DESC) COMMENT 'Notification list filtered/ordered by send_time',
+  INDEX idx_notification_history_env_send_time (environment_id, send_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user_notification_history (
@@ -1150,7 +1151,7 @@ CREATE TABLE state_history (
 
   PRIMARY KEY (id),
 
-  INDEX idx_state_history_event_time (event_time) COMMENT 'Filter for history retention'
+  INDEX idx_state_history_env_event_time (environment_id, event_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE downtime_history (
@@ -1180,7 +1181,7 @@ CREATE TABLE downtime_history (
 
   PRIMARY KEY (downtime_id),
 
-  INDEX idx_downtime_history_end_time (end_time) COMMENT 'Filter for history retention'
+  INDEX idx_downtime_history_env_end_time (environment_id, end_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE comment_history (
@@ -1204,7 +1205,7 @@ CREATE TABLE comment_history (
 
   PRIMARY KEY (comment_id),
 
-  INDEX idx_comment_history_remove_time (remove_time) COMMENT 'Filter for history retention'
+  INDEX idx_comment_history_env_remove_time (environment_id, remove_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE flapping_history (
@@ -1224,7 +1225,7 @@ CREATE TABLE flapping_history (
 
   PRIMARY KEY (id),
 
-  INDEX idx_flapping_history_end_time (end_time) COMMENT 'Filter for history retention'
+  INDEX idx_flapping_history_env_end_time (environment_id, end_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE acknowledgement_history (
@@ -1246,7 +1247,7 @@ CREATE TABLE acknowledgement_history (
 
   PRIMARY KEY (id),
 
-  INDEX idx_acknowledgement_history_clear_time (clear_time) COMMENT 'Filter for history retention'
+  INDEX idx_acknowledgement_history_env_clear_time (environment_id, clear_time) COMMENT 'Filter for history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE history (
@@ -1299,7 +1300,8 @@ CREATE TABLE sla_history_state (
 
   PRIMARY KEY (id),
 
-  INDEX idx_sla_history_state_event (host_id, service_id, event_time)
+  INDEX idx_sla_history_state_event (host_id, service_id, event_time) COMMENT 'Filter for calculating the sla reports',
+  INDEX idx_sla_history_state_env_event_time (environment_id, event_time) COMMENT 'Filter for sla history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE sla_history_downtime (
@@ -1315,7 +1317,8 @@ CREATE TABLE sla_history_downtime (
 
   PRIMARY KEY (downtime_id),
 
-  INDEX idx_sla_history_downtime_event (host_id, service_id, downtime_start, downtime_end)
+  INDEX idx_sla_history_downtime_event (host_id, service_id, downtime_start, downtime_end) COMMENT 'Filter for calculating the sla reports',
+  INDEX idx_sla_history_downtime_env_downtime_end (environment_id, downtime_end) COMMENT 'Filter for sla history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icingadb_schema (

@@ -1778,6 +1778,7 @@ ALTER TABLE notification_history ALTER COLUMN service_id SET STORAGE PLAIN;
 ALTER TABLE notification_history ALTER COLUMN notification_id SET STORAGE PLAIN;
 
 CREATE INDEX idx_notification_history_send_time ON notification_history(send_time DESC);
+CREATE INDEX idx_notification_history_env_send_time ON notification_history(environment_id, send_time);
 
 COMMENT ON COLUMN notification_history.id IS 'sha1(environment.name + notification.name + type + send_time)';
 COMMENT ON COLUMN notification_history.environment_id IS 'environment.id';
@@ -1787,6 +1788,7 @@ COMMENT ON COLUMN notification_history.service_id IS 'service.id';
 COMMENT ON COLUMN notification_history.notification_id IS 'notification.id';
 
 COMMENT ON INDEX idx_notification_history_send_time IS 'Notification list filtered/ordered by send_time';
+COMMENT ON INDEX idx_notification_history_env_send_time IS 'Filter for history retention';
 
 CREATE TABLE user_notification_history (
   id bytea20 NOT NULL,
@@ -1839,7 +1841,7 @@ ALTER TABLE state_history ALTER COLUMN endpoint_id SET STORAGE PLAIN;
 ALTER TABLE state_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE state_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_state_history_event_time ON state_history(event_time);
+CREATE INDEX idx_state_history_env_event_time ON state_history(environment_id, event_time);
 
 COMMENT ON COLUMN state_history.id IS 'sha1(environment.name + host|service.name + event_time)';
 COMMENT ON COLUMN state_history.environment_id IS 'environment.id';
@@ -1847,7 +1849,7 @@ COMMENT ON COLUMN state_history.endpoint_id IS 'endpoint.id';
 COMMENT ON COLUMN state_history.host_id IS 'host.id';
 COMMENT ON COLUMN state_history.service_id IS 'service.id';
 
-COMMENT ON INDEX idx_state_history_event_time IS 'Filter for history retention';
+COMMENT ON INDEX idx_state_history_env_event_time IS 'Filter for history retention';
 
 CREATE TABLE downtime_history (
   downtime_id bytea20 NOT NULL,
@@ -1885,7 +1887,7 @@ ALTER TABLE downtime_history ALTER COLUMN parent_id SET STORAGE PLAIN;
 ALTER TABLE downtime_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE downtime_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_downtime_history_end_time ON downtime_history(end_time);
+CREATE INDEX idx_downtime_history_env_end_time ON downtime_history(environment_id, end_time);
 
 COMMENT ON COLUMN downtime_history.downtime_id IS 'downtime.id';
 COMMENT ON COLUMN downtime_history.environment_id IS 'environment.id';
@@ -1898,7 +1900,7 @@ COMMENT ON COLUMN downtime_history.start_time IS 'Time when the host went into a
 COMMENT ON COLUMN downtime_history.end_time IS 'Problem state assumed: scheduled_end_time if fixed, start_time + duration otherwise';
 COMMENT ON COLUMN downtime_history.scheduled_by IS 'Name of the ScheduledDowntime which created this Downtime. 255+1+255+1+255, i.e. "host.name!service.name!scheduled-downtime-name"';
 
-COMMENT ON INDEX idx_downtime_history_end_time IS 'Filter for history retention';
+COMMENT ON INDEX idx_downtime_history_env_end_time IS 'Filter for history retention';
 
 CREATE TABLE comment_history (
   comment_id bytea20 NOT NULL,
@@ -1928,7 +1930,7 @@ ALTER TABLE comment_history ALTER COLUMN endpoint_id SET STORAGE PLAIN;
 ALTER TABLE comment_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE comment_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_comment_history_remove_time ON comment_history(remove_time);
+CREATE INDEX idx_comment_history_env_remove_time ON comment_history(environment_id, remove_time);
 
 COMMENT ON COLUMN comment_history.comment_id IS 'comment.id';
 COMMENT ON COLUMN comment_history.environment_id IS 'environment.id';
@@ -1936,7 +1938,7 @@ COMMENT ON COLUMN comment_history.endpoint_id IS 'endpoint.id';
 COMMENT ON COLUMN comment_history.host_id IS 'host.id';
 COMMENT ON COLUMN comment_history.service_id IS 'service.id';
 
-COMMENT ON INDEX idx_comment_history_remove_time IS 'Filter for history retention';
+COMMENT ON INDEX idx_comment_history_env_remove_time IS 'Filter for history retention';
 
 CREATE TABLE flapping_history (
   id bytea20 NOT NULL,
@@ -1962,7 +1964,7 @@ ALTER TABLE flapping_history ALTER COLUMN endpoint_id SET STORAGE PLAIN;
 ALTER TABLE flapping_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE flapping_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_flapping_history_end_time ON flapping_history(end_time);
+CREATE INDEX idx_flapping_history_env_end_time ON flapping_history(environment_id, end_time);
 
 COMMENT ON COLUMN flapping_history.id IS 'sha1(environment.id + "Host"|"Service" + host|service.name + start_time)';
 COMMENT ON COLUMN flapping_history.environment_id IS 'environment.id';
@@ -1970,7 +1972,7 @@ COMMENT ON COLUMN flapping_history.endpoint_id IS 'endpoint.id';
 COMMENT ON COLUMN flapping_history.host_id IS 'host.id';
 COMMENT ON COLUMN flapping_history.service_id IS 'service.id';
 
-COMMENT ON INDEX idx_flapping_history_end_time IS 'Filter for history retention';
+COMMENT ON INDEX idx_flapping_history_env_end_time IS 'Filter for history retention';
 
 CREATE TABLE acknowledgement_history (
   id bytea20 NOT NULL,
@@ -1998,7 +2000,7 @@ ALTER TABLE acknowledgement_history ALTER COLUMN endpoint_id SET STORAGE PLAIN;
 ALTER TABLE acknowledgement_history ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE acknowledgement_history ALTER COLUMN service_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_acknowledgement_history_clear_time ON acknowledgement_history(clear_time);
+CREATE INDEX idx_acknowledgement_history_env_clear_time ON acknowledgement_history(environment_id, clear_time);
 
 COMMENT ON COLUMN acknowledgement_history.id IS 'sha1(environment.id + "Host"|"Service" + host|service.name + set_time)';
 COMMENT ON COLUMN acknowledgement_history.environment_id IS 'environment.id';
@@ -2010,7 +2012,7 @@ COMMENT ON COLUMN acknowledgement_history.comment IS 'NULL if ack_set event happ
 COMMENT ON COLUMN acknowledgement_history.is_sticky IS 'NULL if ack_set event happened before Icinga DB history recording';
 COMMENT ON COLUMN acknowledgement_history.is_persistent IS 'NULL if ack_set event happened before Icinga DB history recording';
 
-COMMENT ON INDEX idx_acknowledgement_history_clear_time IS 'Filter for history retention';
+COMMENT ON INDEX idx_acknowledgement_history_env_clear_time IS 'Filter for history retention';
 
 CREATE TABLE history (
   id bytea20 NOT NULL,
@@ -2097,6 +2099,7 @@ ALTER TABLE sla_history_state ALTER COLUMN host_id SET STORAGE PLAIN;
 ALTER TABLE sla_history_state ALTER COLUMN service_id SET STORAGE PLAIN;
 
 CREATE INDEX idx_sla_history_state_event ON sla_history_state(host_id, service_id, event_time);
+CREATE INDEX idx_sla_history_state_env_event_time ON sla_history_state (environment_id, event_time);
 
 COMMENT ON COLUMN sla_history_state.id IS 'state_history.id (may reference already deleted rows)';
 COMMENT ON COLUMN sla_history_state.environment_id IS 'environment.id';
@@ -2106,6 +2109,9 @@ COMMENT ON COLUMN sla_history_state.service_id IS 'service.id';
 COMMENT ON COLUMN sla_history_state.event_time IS 'unix timestamp the event occurred';
 COMMENT ON COLUMN sla_history_state.hard_state IS 'hard state after this event';
 COMMENT ON COLUMN sla_history_state.previous_hard_state IS 'hard state before this event';
+
+COMMENT ON INDEX idx_sla_history_state_event IS 'Filter for calculating the sla reports';
+COMMENT ON INDEX idx_sla_history_state_env_event_time IS 'Filter for history retention';
 
 CREATE TABLE sla_history_downtime (
   environment_id bytea20 NOT NULL,
@@ -2128,6 +2134,10 @@ ALTER TABLE sla_history_downtime ALTER COLUMN service_id SET STORAGE PLAIN;
 ALTER TABLE sla_history_downtime ALTER COLUMN downtime_id SET STORAGE PLAIN;
 
 CREATE INDEX idx_sla_history_downtime_event ON sla_history_downtime(host_id, service_id, downtime_start, downtime_end);
+CREATE INDEX idx_sla_history_downtime_env_downtime_end ON sla_history_downtime (environment_id, downtime_end);
+
+COMMENT ON INDEX idx_sla_history_downtime_event IS 'Filter for calculating the sla reports';
+COMMENT ON INDEX idx_sla_history_downtime_env_downtime_end IS 'Filter for sla history retention';
 
 COMMENT ON COLUMN sla_history_downtime.environment_id IS 'environment.id';
 COMMENT ON COLUMN sla_history_downtime.endpoint_id IS 'endpoint.id';
