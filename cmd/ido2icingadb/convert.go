@@ -324,7 +324,7 @@ func convertDowntimeRows(
 		triggerTime := convertTime(row.TriggerTime, 0)
 		actualStart := convertTime(row.ActualStartTime, row.ActualStartTimeUsec)
 		actualEnd := convertTime(row.ActualEndTime, row.ActualEndTimeUsec)
-		var startTime, endTime, cancelTime, slaEndTime icingadbTypes.UnixMilli
+		var startTime, endTime, cancelTime icingadbTypes.UnixMilli
 
 		if scheduledEnd.Time().IsZero() {
 			scheduledEnd = icingadbTypes.UnixMilli(scheduledStart.Time().Add(time.Duration(row.Duration) * time.Second))
@@ -346,10 +346,8 @@ func convertDowntimeRows(
 			triggerTime = startTime
 		}
 
-		slaEndTime = endTime
 		if row.WasCancelled != 0 {
 			cancelTime = actualEnd
-			slaEndTime = cancelTime
 		}
 
 		downtimeHistory = append(downtimeHistory, &history.DowntimeHistory{
@@ -429,7 +427,7 @@ func convertDowntimeRows(
 			DowntimeStart:    startTime,
 			HasBeenCancelled: icingadbTypes.Bool{Bool: row.WasCancelled != 0, Valid: true},
 			CancelTime:       cancelTime,
-			EndTime:          slaEndTime,
+			EndTime:          endTime,
 		}
 
 		s.DowntimeEnd.History = s
