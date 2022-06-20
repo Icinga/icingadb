@@ -67,7 +67,7 @@ func (e *eta) Decor(s decor.Statistics) string {
 var _ decor.Decorator = (*eta)(nil)
 
 type IdoMigrationProgressUpserter struct {
-	HistoryType string `json:"history_type"`
+	LastIdoId any `json:"last_ido_id"`
 }
 
 // Upsert implements the contracts.Upserter interface.
@@ -77,7 +77,7 @@ func (impu *IdoMigrationProgressUpserter) Upsert() interface{} {
 
 type IdoMigrationProgress struct {
 	IdoMigrationProgressUpserter `json:",inline"`
-	LastIdoId                    uint64 `json:"last_ido_id"`
+	HistoryType                  string `json:"history_type"`
 }
 
 // Assert interface compliance.

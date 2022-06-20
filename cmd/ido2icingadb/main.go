@@ -199,19 +199,12 @@ func computeProgress(idb *icingadb.DB) {
 		log.Fatalf("%+v", errors.Wrap(err, "can't create table ido_migration_progress"))
 	}
 
-	stmt, _ := idb.BuildUpsertStmt(&IdoMigrationProgress{})
-
 	types.forEach(func(ht *historyType) {
-		row := &IdoMigrationProgress{IdoMigrationProgressUpserter{ht.name}, 0}
-
-		if _, err := idb.NamedExec(stmt, row); err != nil {
-			log.With("backend", "Icinga DB", "dml", stmt, "args", []interface{}{ht.name, 0}).
-				Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
-		}
-
 		var query = idb.Rebind("SELECT last_ido_id FROM ido_migration_progress WHERE history_type=?")
 
-		if err := idb.Get(&ht.lastId, query, ht.name); err != nil {
+		switch err := idb.Get(&ht.lastId, query, ht.name); err {
+		case nil, sql.ErrNoRows:
+		default:
 			log.With("backend", "Icinga DB", "query", query, "args", []interface{}{ht.name}).
 				Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 		}
@@ -336,6 +329,7 @@ func migrateOneType[IdoRow any](
 
 	icingaDbInserts := map[reflect.Type]string{}
 	icingaDbUpdates := map[reflect.Type]string{}
+	upsertProgress, _ := idb.BuildUpsertStmt(&IdoMigrationProgress{})
 
 	ht.bar.SetCurrent(ht.done)
 
@@ -398,12 +392,13 @@ func migrateOneType[IdoRow any](
 			}
 
 			if lastIdoId != nil {
-				const stmt = "UPDATE ido_migration_progress SET last_ido_id=:last_ido_id " +
-					"WHERE history_type=:history_type"
-
 				args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
-				if _, err := tx.NamedExec(stmt, args); err != nil {
-					log.With("backend", "Icinga DB", "dml", stmt, "args", args).
+
+				_, err := tx.NamedExec(upsertProgress, &IdoMigrationProgress{
+					IdoMigrationProgressUpserter{lastIdoId}, ht.name,
+				})
+				if err != nil {
+					log.With("backend", "Icinga DB", "dml", upsertProgress, "args", args).
 						Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 				}
 			}
