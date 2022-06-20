@@ -1,5 +1,19 @@
 # Upgrading Icinga DB
 
+Specific version upgrades are described below. Please note that version upgrades are incremental.
+If you are upgrading across multiple versions, make sure to follow the steps for each of them.
+
+## Upgrading to Icinga DB v1.0
+
+**Requirements**
+
+* You need at least Icinga 2 version 2.13.4 to run Icinga DB v1.0.0.
+
+**Database Schema**
+
+* For MySQL databases, please apply the `1.0.0.sql` upgrade script.
+  For package installations, you can find this file at `/usr/share/doc/icingadb/schema/mysql/upgrades/`.
+
 ## Upgrading to Icinga DB RC2
 
 Icinga DB RC2 is a complete rewrite compared to RC1. Because of this, a lot has changed in the Redis and database
