@@ -592,7 +592,10 @@ func convertFlappingRows(
 	return
 }
 
-// notificationTypes maps IDO values to Icinga DB ones.
+// notificationTypes maps IDO values[1] to Icinga DB ones[2].
+//
+// [1]: https://github.com/Icinga/icinga2/blob/32c7f7730db154ba0dff5856a8985d125791c/lib/db_ido/dbevents.cpp#L1507-L1524
+// [2]: https://github.com/Icinga/icingadb/blob/8f31ac143875498797725adb9bfacf3d4/pkg/types/notification_type.go#L53-L61
 var notificationTypes = map[uint8]icingadbTypes.NotificationType{5: 1, 6: 2, 7: 4, 8: 8, 1: 16, 2: 128, 3: 256}
 
 type notificationRow = struct {
@@ -666,10 +669,11 @@ func convertNotificationRows(
 			continue
 		}
 
-		// The IDO tracks only sent notifications, but not notification config objects. We have to improvise.
-		name := strings.Join(
-			[]string{row.Name1, row.Name2, "migrated from IDO", strconv.FormatUint(row.NotificationId, 36)}, "!",
-		)
+		// The IDO tracks only sent notifications, but not notification config objects, nor even their names.
+		// We have to improvise. By the way we avoid unwanted collisions between synced and migrated data via "ID"
+		// instead of "HOST[!SERVICE]!NOTIFICATION" (ok as this name won't be parsed, but only hashed) and between
+		// migrated data itself via the history ID as object name, i.e. one "virtual object" per sent notification.
+		name := strconv.FormatUint(row.NotificationId, 10)
 
 		var nt icingadbTypes.NotificationType
 		if row.NotificationReason == 0 {
