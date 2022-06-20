@@ -358,7 +358,13 @@ func checkDbSchema(ctx context.Context, db *icingadb.DB) error {
 	}
 
 	if version != expectedDbSchemaVersion {
-		return errors.Errorf("expected database schema v%d, got v%d", expectedDbSchemaVersion, version)
+		// Since these error messages are trivial and mostly caused by users, we don't need
+		// to print a stack trace here. However, since errors.Errorf() does this automatically,
+		// we need to use fmt instead.
+		return fmt.Errorf(
+			"unexpected database schema version: v%d (expected v%d), please make sure you have applied all database"+
+				" migrations after upgrading Icinga DB", version, expectedDbSchemaVersion,
+		)
 	}
 
 	return nil
@@ -379,9 +385,11 @@ func monitorRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos stri
 // checkRedisSchema verifies rc's icinga:schema version.
 func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) (newPos string, err error) {
 	if pos == "0-0" {
-		defer time.AfterFunc(3*time.Second, func() { logger.Info("Waiting for current Redis schema version") }).Stop()
+		defer time.AfterFunc(3*time.Second, func() {
+			logger.Info("Waiting for Icinga 2 to write into Redis, please make sure you have started Icinga 2 and the Icinga DB feature is enabled")
+		}).Stop()
 	} else {
-		logger.Debug("Waiting for new Redis schema version")
+		logger.Debug("Checking Icinga 2 and Icinga DB compatibility")
 	}
 
 	cmd := rc.XRead(context.Background(), &redis.XReadArgs{Streams: []string{"icinga:schema", pos}})
@@ -393,8 +401,12 @@ func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string
 
 	message := xRead[0].Messages[0]
 	if version := message.Values["version"]; version != expectedRedisSchemaVersion {
-		return "", errors.Errorf(
-			"unexpected Redis schema version: %q (expected %q)", version, expectedRedisSchemaVersion,
+		// Since these error messages are trivial and mostly caused by users, we don't need
+		// to print a stack trace here. However, since errors.Errorf() does this automatically,
+		// we need to use fmt instead.
+		return "", fmt.Errorf(
+			"unexpected Redis schema version: %q (expected %q), please make sure you are running compatible"+
+				" versions of Icinga 2 and Icinga DB", version, expectedRedisSchemaVersion,
 		)
 	}
 
