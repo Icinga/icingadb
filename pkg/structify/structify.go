@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/pkg/errors"
+	"golang.org/x/exp/constraints"
 	"reflect"
 	"strconv"
 	"strings"
@@ -118,66 +119,61 @@ func parseString(src string, dest interface{}) error {
 		*ptr = &src
 		return nil
 	case *uint8:
-		i, err := strconv.ParseUint(src, 10, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = uint8(i)
-		}
-		return err
+		return parseUint(src, ptr)
 	case *uint16:
-		i, err := strconv.ParseUint(src, 10, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = uint16(i)
-		}
-		return err
+		return parseUint(src, ptr)
 	case *uint32:
-		i, err := strconv.ParseUint(src, 10, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = uint32(i)
-		}
-		return err
+		return parseUint(src, ptr)
 	case *uint64:
-		i, err := strconv.ParseUint(src, 10, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = i
-		}
-		return err
+		return parseUint(src, ptr)
 	case *int8:
-		i, err := strconv.ParseInt(src, 10, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = int8(i)
-		}
-		return err
+		return parseInt(src, ptr)
 	case *int16:
-		i, err := strconv.ParseInt(src, 10, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = int16(i)
-		}
-		return err
+		return parseInt(src, ptr)
 	case *int32:
-		i, err := strconv.ParseInt(src, 10, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = int32(i)
-		}
-		return err
+		return parseInt(src, ptr)
 	case *int64:
-		i, err := strconv.ParseInt(src, 10, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = i
-		}
-		return err
+		return parseInt(src, ptr)
 	case *float32:
-		f, err := strconv.ParseFloat(src, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = float32(f)
-		}
-		return err
+		return parseFloat(src, ptr)
 	case *float64:
-		f, err := strconv.ParseFloat(src, int(unsafe.Sizeof(*ptr)*8))
-		if err == nil {
-			*ptr = f
-		}
-		return err
+		return parseFloat(src, ptr)
 	default:
 		panic(fmt.Sprintf("unsupported type: %T", dest))
 	}
+}
+
+// parseUint parses src into *dest.
+func parseUint[T constraints.Unsigned](src string, dest *T) error {
+	i, err := strconv.ParseUint(src, 10, bitSizeOf[T]())
+	if err == nil {
+		*dest = T(i)
+	}
+
+	return err
+}
+
+// parseInt parses src into *dest.
+func parseInt[T constraints.Signed](src string, dest *T) error {
+	i, err := strconv.ParseInt(src, 10, bitSizeOf[T]())
+	if err == nil {
+		*dest = T(i)
+	}
+
+	return err
+}
+
+// parseFloat parses src into *dest.
+func parseFloat[T constraints.Float](src string, dest *T) error {
+	f, err := strconv.ParseFloat(src, bitSizeOf[T]())
+	if err == nil {
+		*dest = T(f)
+	}
+
+	return err
+}
+
+func bitSizeOf[T any]() int {
+	var x T
+	return int(unsafe.Sizeof(x) * 8)
 }
