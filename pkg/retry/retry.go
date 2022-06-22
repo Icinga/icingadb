@@ -85,17 +85,8 @@ func WithBackoff(
 }
 
 // Retryable returns true for common errors that are considered retryable,
-// i.e. timeouts, temporary, DNS and connection refused errors.
+// i.e. temporary, timeouts, DNS and connection refused errors.
 func Retryable(err error) bool {
-	if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.EAGAIN) {
-		return true
-	}
-
-	var dnsError *net.DNSError
-	if errors.As(err, &dnsError) {
-		return true
-	}
-
 	var temporary interface {
 		Temporary() bool
 	}
@@ -107,6 +98,24 @@ func Retryable(err error) bool {
 		Timeout() bool
 	}
 	if errors.As(err, &timeout) && timeout.Timeout() {
+		return true
+	}
+
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
+		return true
+	}
+
+	var opError *net.OpError
+	if errors.As(err, &opError) {
+		// OpError provides Temporary() and Timeout(), but not Unwrap(),
+		// so we have to extract the underlying error ourselves to also check for ECONNREFUSED,
+		// which is not considered temporary or timed out by Go.
+		err = opError.Err
+	}
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		// syscall errors provide Temporary() and Timeout(),
+		// which do not include ECONNREFUSED, so we check this ourselves.
 		return true
 	}
 
