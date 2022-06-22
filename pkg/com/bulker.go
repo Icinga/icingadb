@@ -162,7 +162,11 @@ func oneBulk[T any](ctx context.Context, ch <-chan T) <-chan []T {
 
 		for {
 			select {
-			case item := <-ch:
+			case item, ok := <-ch:
+				if !ok {
+					return
+				}
+
 				select {
 				case out <- []T{item}:
 				case <-ctx.Done():
