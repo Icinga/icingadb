@@ -100,15 +100,12 @@ func (h *Heartbeat) controller(ctx context.Context) {
 		throttle := time.NewTicker(time.Second * 3)
 		defer throttle.Stop()
 
-		for {
-			cmd := h.client.XRead(ctx, &redis.XReadArgs{
-				Streams: []string{"icinga:stats", "$"},
-				Block:   0, // TODO(el): Might make sense to use a non-blocking variant here
+		for id := "$"; ; {
+			streams, err := h.client.XReadUntilResult(ctx, &redis.XReadArgs{
+				Streams: []string{"icinga:stats", id},
 			})
-
-			streams, err := cmd.Result()
 			if err != nil {
-				return WrapCmdErr(cmd)
+				return errors.Wrap(err, "can't read Icinga heartbeat")
 			}
 
 			m := &HeartbeatMessage{
@@ -121,6 +118,8 @@ func (h *Heartbeat) controller(ctx context.Context) {
 			case <-ctx.Done():
 				return ctx.Err()
 			}
+
+			id = streams[0].Messages[0].ID
 
 			<-throttle.C
 		}
