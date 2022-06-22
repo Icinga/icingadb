@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"fmt"
+	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/config"
@@ -104,6 +105,11 @@ func parseConfig(f *Flags) (_ *Config, exit int) {
 	defer func() { _ = cf.Close() }()
 
 	c := &Config{}
+	if err := defaults.Set(c); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "can't set config defaults: %s\n", err.Error())
+		return nil, 2
+	}
+
 	if err := yaml.NewDecoder(cf).Decode(c); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "can't parse config file: %s\n", err.Error())
 		return nil, 2
