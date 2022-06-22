@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/goccy/go-yaml"
+	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
@@ -22,7 +23,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"os"
 	"path"
-	"reflect"
 	"sync"
 	"time"
 )
@@ -327,8 +327,6 @@ func migrateOneType[IdoRow any](
 		args = map[string]interface{}{"cache_limit": limit}
 	}
 
-	icingaDbInserts := map[reflect.Type]string{}
-	icingaDbUpdates := map[reflect.Type]string{}
 	upsertProgress, _ := idb.BuildUpsertStmt(&IdoMigrationProgress{})
 
 	ht.bar.SetCurrent(ht.done)
@@ -356,39 +354,52 @@ func migrateOneType[IdoRow any](
 				log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
 			}
 
-			for _, operation := range [...]struct {
-				data      [][]interface{}
-				buildStmt func(subject interface{}) (stmt string, _ int)
-				stmtCache map[reflect.Type]string
-			}{{inserts, idb.BuildUpsertStmt, icingaDbInserts}, {updates, idb.BuildUpdateStmt, icingaDbUpdates}} {
-				for _, table := range operation.data {
-					if len(table) < 1 {
-						continue
-					}
-
-					tRow := reflect.TypeOf(table[0])
-
-					query, ok := operation.stmtCache[tRow]
-					if !ok {
-						query, _ = operation.buildStmt(table[0])
-						operation.stmtCache[tRow] = query
-					}
-
-					stmt, err := tx.PrepareNamed(query)
-					if err != nil {
-						log.With("backend", "Icinga DB", "dml", query).
-							Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
-					}
-
-					for _, row := range table {
-						if _, err := stmt.Exec(row); err != nil {
-							log.With("backend", "Icinga DB", "dml", query, "args", row).
-								Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
-						}
-					}
-
-					_ = stmt.Close()
+			for _, table := range inserts {
+				if len(table) < 1 {
+					continue
 				}
+
+				query, placeholders := idb.BuildUpsertStmt(table[0])
+
+				ch := make(chan any, len(table))
+				for _, row := range table {
+					ch <- row
+				}
+
+				close(ch)
+
+				bulk := com.Bulk(
+					context.Background(), ch, idb.BatchSizeByPlaceholders(placeholders), com.NeverSplit[any],
+				)
+				for rows := range bulk {
+					if _, err := tx.NamedExec(query, rows); err != nil {
+						log.With("backend", "Icinga DB", "dml", query, "args", rows).
+							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+					}
+				}
+			}
+
+			for _, table := range updates {
+				if len(table) < 1 {
+					continue
+				}
+
+				query, _ := idb.BuildUpdateStmt(table[0])
+
+				stmt, err := tx.PrepareNamed(query)
+				if err != nil {
+					log.With("backend", "Icinga DB", "dml", query).
+						Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
+				}
+
+				for _, row := range table {
+					if _, err := stmt.Exec(row); err != nil {
+						log.With("backend", "Icinga DB", "dml", query, "args", row).
+							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+					}
+				}
+
+				_ = stmt.Close()
 			}
 
 			if lastIdoId != nil {
