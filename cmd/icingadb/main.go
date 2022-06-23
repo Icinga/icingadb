@@ -172,9 +172,9 @@ func run() int {
 						configInitSync := sync.WaitGroup{}
 						stateInitSync := &sync.WaitGroup{}
 
-						// Get the last IDs of the runtime update streams before starting anything else,
+						// Clear the runtime update streams before starting anything else (rather than after the sync),
 						// otherwise updates may be lost.
-						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.Streams(synctx)
+						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.ClearStreams(synctx)
 						if err != nil {
 							logger.Fatalf("%+v", err)
 						}

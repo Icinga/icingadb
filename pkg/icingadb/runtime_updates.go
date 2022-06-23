@@ -40,22 +40,20 @@ func NewRuntimeUpdates(db *DB, redis *icingaredis.Client, logger *logging.Logger
 	}
 }
 
-// Streams returns the stream key to ID mapping of the runtime update streams for later use in Sync.
-func (r *RuntimeUpdates) Streams(ctx context.Context) (config, state icingaredis.Streams, err error) {
+// ClearStreams returns the stream key to ID mapping of the runtime update streams
+// for later use in Sync and clears the streams themselves.
+func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state icingaredis.Streams, err error) {
 	config = icingaredis.Streams{"icinga:runtime": "0-0"}
 	state = icingaredis.Streams{"icinga:runtime:state": "0-0"}
 
+	var keys []string
 	for _, streams := range [...]icingaredis.Streams{config, state} {
 		for key := range streams {
-			id, err := r.redis.StreamLastId(ctx, key)
-			if err != nil {
-				return nil, nil, err
-			}
-
-			streams[key] = id
+			keys = append(keys, key)
 		}
 	}
 
+	err = icingaredis.WrapCmdErr(r.redis.Del(ctx, keys...))
 	return
 }
 
