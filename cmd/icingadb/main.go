@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
@@ -17,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -63,7 +65,7 @@ func run() int {
 	}
 	defer db.Close()
 	{
-		logger.Info("Connecting to database")
+		logger.Infof("Connecting to database at '%s'", net.JoinHostPort(cmd.Config.Database.Host, fmt.Sprint(cmd.Config.Database.Port)))
 		err := db.Ping()
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
@@ -79,7 +81,7 @@ func run() int {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
 	}
 	{
-		logger.Info("Connecting to Redis")
+		logger.Infof("Connecting to Redis at '%s'", net.JoinHostPort(cmd.Config.Redis.Host, fmt.Sprint(cmd.Config.Redis.Port)))
 		_, err := rc.Ping(context.Background()).Result()
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to Redis"))
@@ -358,7 +360,13 @@ func checkDbSchema(ctx context.Context, db *icingadb.DB) error {
 	}
 
 	if version != expectedDbSchemaVersion {
-		return errors.Errorf("expected database schema v%d, got v%d", expectedDbSchemaVersion, version)
+		// Since these error messages are trivial and mostly caused by users, we don't need
+		// to print a stack trace here. However, since errors.Errorf() does this automatically,
+		// we need to use fmt instead.
+		return fmt.Errorf(
+			"unexpected database schema version: v%d (expected v%d), please make sure you have applied all database"+
+				" migrations after upgrading Icinga DB", version, expectedDbSchemaVersion,
+		)
 	}
 
 	return nil
@@ -379,9 +387,11 @@ func monitorRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos stri
 // checkRedisSchema verifies rc's icinga:schema version.
 func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) (newPos string, err error) {
 	if pos == "0-0" {
-		defer time.AfterFunc(3*time.Second, func() { logger.Info("Waiting for current Redis schema version") }).Stop()
+		defer time.AfterFunc(3*time.Second, func() {
+			logger.Info("Waiting for Icinga 2 to write into Redis, please make sure you have started Icinga 2 and the Icinga DB feature is enabled")
+		}).Stop()
 	} else {
-		logger.Debug("Waiting for new Redis schema version")
+		logger.Debug("Checking Icinga 2 and Icinga DB compatibility")
 	}
 
 	cmd := rc.XRead(context.Background(), &redis.XReadArgs{Streams: []string{"icinga:schema", pos}})
@@ -393,8 +403,12 @@ func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string
 
 	message := xRead[0].Messages[0]
 	if version := message.Values["version"]; version != expectedRedisSchemaVersion {
-		return "", errors.Errorf(
-			"unexpected Redis schema version: %q (expected %q)", version, expectedRedisSchemaVersion,
+		// Since these error messages are trivial and mostly caused by users, we don't need
+		// to print a stack trace here. However, since errors.Errorf() does this automatically,
+		// we need to use fmt instead.
+		return "", fmt.Errorf(
+			"unexpected Redis schema version: %q (expected %q), please make sure you are running compatible"+
+				" versions of Icinga 2 and Icinga DB", version, expectedRedisSchemaVersion,
 		)
 	}
 
