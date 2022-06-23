@@ -9,14 +9,14 @@ type State struct {
 	EnvironmentMeta           `json:",inline"`
 	AcknowledgementCommentId  types.Binary               `json:"acknowledgement_comment_id"`
 	LastCommentId             types.Binary               `json:"last_comment_id"`
-	Attempt                   uint8                      `json:"check_attempt"`
-	CheckCommandline          types.String               `json:"commandline"`
+	CheckAttempt              uint8                      `json:"check_attempt"`
+	CheckCommandline          types.String               `json:"check_commandline"`
 	CheckSource               types.String               `json:"check_source"`
 	SchedulingSource          types.String               `json:"scheduling_source"`
 	ExecutionTime             float64                    `json:"execution_time"`
 	HardState                 uint8                      `json:"hard_state"`
 	InDowntime                types.Bool                 `json:"in_downtime"`
-	IsAcknowledged            types.AcknowledgementState `json:"acknowledgement"`
+	IsAcknowledged            types.AcknowledgementState `json:"is_acknowledged"`
 	IsFlapping                types.Bool                 `json:"is_flapping"`
 	IsHandled                 types.Bool                 `json:"is_handled"`
 	IsProblem                 types.Bool                 `json:"is_problem"`
@@ -35,5 +35,5 @@ type State struct {
 	Severity                  uint16                     `json:"severity"`
 	SoftState                 uint8                      `json:"state"`
 	StateType                 types.StateType            `json:"state_type"`
-	Timeout                   float64                    `json:"check_timeout"`
+	CheckTimeout              float64                    `json:"check_timeout"`
 }

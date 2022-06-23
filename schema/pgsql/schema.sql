@@ -392,7 +392,7 @@ CREATE TABLE host_state (
   hard_state tinyuint NOT NULL,
   previous_soft_state tinyuint NOT NULL,
   previous_hard_state tinyuint NOT NULL,
-  attempt tinyuint NOT NULL,
+  check_attempt tinyuint NOT NULL,
   severity smalluint NOT NULL,
 
   output text DEFAULT NULL,
@@ -416,7 +416,7 @@ CREATE TABLE host_state (
 
   execution_time uint DEFAULT NULL,
   latency uint DEFAULT NULL,
-  timeout uint DEFAULT NULL,
+  check_timeout uint DEFAULT NULL,
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
 
@@ -658,7 +658,7 @@ CREATE TABLE service_state (
   hard_state tinyuint NOT NULL,
   previous_soft_state tinyuint NOT NULL,
   previous_hard_state tinyuint NOT NULL,
-  attempt tinyuint NOT NULL,
+  check_attempt tinyuint NOT NULL,
   severity smalluint NOT NULL,
 
   output text DEFAULT NULL,
@@ -682,7 +682,7 @@ CREATE TABLE service_state (
 
   execution_time uint DEFAULT NULL,
   latency uint DEFAULT NULL,
-  timeout uint DEFAULT NULL,
+  check_timeout uint DEFAULT NULL,
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
 
@@ -1823,7 +1823,7 @@ CREATE TABLE state_history (
   hard_state tinyuint NOT NULL,
   previous_soft_state tinyuint NOT NULL,
   previous_hard_state tinyuint NOT NULL,
-  attempt tinyuint NOT NULL,
+  check_attempt tinyuint NOT NULL,
   output text DEFAULT NULL,
   long_output text DEFAULT NULL,
   max_check_attempts uint NOT NULL,

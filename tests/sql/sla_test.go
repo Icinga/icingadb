@@ -342,14 +342,14 @@ func (c *CurrentState) WriteSlaEventToDatabase(db *sqlx.DB, m *SlaHistoryMeta) e
 	if len(m.ServiceId) == 0 {
 		_, err := db.NamedExec("INSERT INTO host_state"+
 			" (id, host_id, environment_id, properties_checksum, soft_state, previous_soft_state,"+
-			" hard_state, previous_hard_state, attempt, severity, last_state_change, next_check, next_update)"+
+			" hard_state, previous_hard_state, check_attempt, severity, last_state_change, next_check, next_update)"+
 			" VALUES (:host_id, :host_id, :environment_id, :properties_checksum, :state, :state, :state, :state, 0, 0, 0, 0, 0)",
 			&v)
 		return err
 	} else {
 		_, err := db.NamedExec("INSERT INTO service_state"+
 			" (id, host_id, service_id, environment_id, properties_checksum, soft_state, previous_soft_state,"+
-			" hard_state, previous_hard_state, attempt, severity, last_state_change, next_check, next_update)"+
+			" hard_state, previous_hard_state, check_attempt, severity, last_state_change, next_check, next_update)"+
 			" VALUES (:service_id, :host_id, :service_id, :environment_id, :properties_checksum, :state, :state, :state, :state, 0, 0, 0, 0, 0)",
 			&v)
 		return err

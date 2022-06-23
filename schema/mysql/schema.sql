@@ -290,7 +290,7 @@ CREATE TABLE host_state (
   hard_state tinyint unsigned NOT NULL,
   previous_soft_state tinyint unsigned NOT NULL,
   previous_hard_state tinyint unsigned NOT NULL,
-  attempt tinyint unsigned NOT NULL,
+  check_attempt tinyint unsigned NOT NULL,
   severity smallint unsigned NOT NULL,
 
   output longtext DEFAULT NULL,
@@ -313,7 +313,7 @@ CREATE TABLE host_state (
 
   execution_time int unsigned DEFAULT NULL,
   latency int unsigned DEFAULT NULL,
-  timeout int unsigned DEFAULT NULL,
+  check_timeout int unsigned DEFAULT NULL,
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
 
@@ -456,7 +456,7 @@ CREATE TABLE service_state (
   hard_state tinyint unsigned NOT NULL,
   previous_soft_state tinyint unsigned NOT NULL,
   previous_hard_state tinyint unsigned NOT NULL,
-  attempt tinyint unsigned NOT NULL,
+  check_attempt tinyint unsigned NOT NULL,
   severity smallint unsigned NOT NULL,
 
   output longtext DEFAULT NULL,
@@ -480,7 +480,7 @@ CREATE TABLE service_state (
 
   execution_time int unsigned DEFAULT NULL,
   latency int unsigned DEFAULT NULL,
-  timeout int unsigned DEFAULT NULL,
+  check_timeout int unsigned DEFAULT NULL,
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
 
@@ -1141,7 +1141,7 @@ CREATE TABLE state_history (
   hard_state tinyint unsigned NOT NULL,
   previous_soft_state tinyint unsigned NOT NULL,
   previous_hard_state tinyint unsigned NOT NULL,
-  attempt tinyint unsigned NOT NULL,
+  check_attempt tinyint unsigned NOT NULL,
   output longtext DEFAULT NULL,
   long_output longtext DEFAULT NULL,
   max_check_attempts int unsigned NOT NULL,
