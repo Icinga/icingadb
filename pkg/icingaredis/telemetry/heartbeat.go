@@ -2,7 +2,7 @@ package telemetry
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
@@ -12,8 +12,10 @@ import (
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"regexp"
 	"runtime/metrics"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -21,23 +23,6 @@ import (
 // ha represents icingadb.HA to avoid import cycles.
 type ha interface {
 	State() (weResponsibleMilli int64, weResponsible, otherResponsible bool)
-}
-
-// jsonMetricValue allows JSON-encoding a metrics.Value.
-type jsonMetricValue struct {
-	v *metrics.Value
-}
-
-// MarshalJSON implements the json.Marshaler interface.
-func (jmv jsonMetricValue) MarshalJSON() ([]byte, error) {
-	switch kind := jmv.v.Kind(); kind {
-	case metrics.KindUint64:
-		return json.Marshal(jmv.v.Uint64())
-	case metrics.KindFloat64:
-		return json.Marshal(jmv.v.Float64())
-	default:
-		return nil, errors.Errorf("can't JSON-encode Go metric value of kind %d", int(kind))
-	}
 }
 
 type SuccessfulSync struct {
@@ -66,20 +51,7 @@ var startTime = time.Now().UnixMilli()
 func StartHeartbeat(
 	ctx context.Context, client *icingaredis.Client, logger *logging.Logger, ha ha, heartbeat *icingaredis.Heartbeat,
 ) {
-	allMetrics := metrics.All()
-	samples := make([]metrics.Sample, 0, len(allMetrics))
-	cumulative := map[string]jsonMetricValue{}
-	notCumulative := map[string]jsonMetricValue{}
-	byCumulative := map[bool]map[string]jsonMetricValue{true: cumulative, false: notCumulative}
-	mtrcs := map[string]map[string]jsonMetricValue{"cumulative": cumulative, "not-cumulative": notCumulative}
-
-	for _, m := range allMetrics {
-		switch m.Kind {
-		case metrics.KindUint64, metrics.KindFloat64:
-			samples = append(samples, metrics.Sample{Name: m.Name})
-			byCumulative[m.Cumulative][m.Name] = jsonMetricValue{&samples[len(samples)-1].Value}
-		}
-	}
+	goMetrics := NewGoMetrics()
 
 	const interval = time.Second
 
@@ -87,8 +59,6 @@ func StartHeartbeat(
 	var silenceUntil time.Time
 
 	periodic.Start(ctx, interval, func(tick periodic.Tick) {
-		metrics.Read(samples)
-
 		heartbeat := heartbeat.LastReceived()
 		responsibleTsMilli, responsible, otherResponsible := ha.State()
 		ongoingSyncStart := atomic.LoadInt64(&OngoingSyncStartMilli)
@@ -96,28 +66,20 @@ func StartHeartbeat(
 		dbConnErr, _ := CurrentDbConnErr.Load()
 		now := time.Now()
 
-		var metricsStr string
-		if metricsBytes, err := json.Marshal(mtrcs); err == nil {
-			metricsStr = string(metricsBytes)
-		} else {
-			metricsStr = "{}"
-			logger.Warnw("Can't JSON-encode Go metrics", zap.Error(errors.WithStack(err)))
-		}
-
 		values := map[string]string{
-			"general:version":         internal.Version.Version,
-			"general:time":            strconv.FormatInt(now.UnixMilli(), 10),
-			"general:start-time":      strconv.FormatInt(startTime, 10),
-			"general:err":             dbConnErr.Message,
-			"general:err-since":       strconv.FormatInt(dbConnErr.SinceMilli, 10),
-			"go:metrics":              metricsStr,
-			"heartbeat:last-received": strconv.FormatInt(heartbeat, 10),
-			"ha:responsible":          boolToStr[responsible],
-			"ha:responsible-ts":       strconv.FormatInt(responsibleTsMilli, 10),
-			"ha:other-responsible":    boolToStr[otherResponsible],
-			"sync:ongoing-since":      strconv.FormatInt(ongoingSyncStart, 10),
-			"sync:success-finish":     strconv.FormatInt(sync.FinishMilli, 10),
-			"sync:success-duration":   strconv.FormatInt(sync.DurationMilli, 10),
+			"general:version":          internal.Version.Version,
+			"general:time":             strconv.FormatInt(now.UnixMilli(), 10),
+			"general:start-time":       strconv.FormatInt(startTime, 10),
+			"general:err":              dbConnErr.Message,
+			"general:err-since":        strconv.FormatInt(dbConnErr.SinceMilli, 10),
+			"general:performance-data": goMetrics.PerformanceData(),
+			"heartbeat:last-received":  strconv.FormatInt(heartbeat, 10),
+			"ha:responsible":           boolToStr[responsible],
+			"ha:responsible-ts":        strconv.FormatInt(responsibleTsMilli, 10),
+			"ha:other-responsible":     boolToStr[otherResponsible],
+			"sync:ongoing-since":       strconv.FormatInt(ongoingSyncStart, 10),
+			"sync:success-finish":      strconv.FormatInt(sync.FinishMilli, 10),
+			"sync:success-duration":    strconv.FormatInt(sync.DurationMilli, 10),
 		}
 
 		ctx, cancel := context.WithDeadline(ctx, tick.Time.Add(interval))
@@ -146,5 +108,57 @@ func StartHeartbeat(
 	})
 }
 
-// Assert interface compliance.
-var _ json.Marshaler = jsonMetricValue{}
+type goMetrics struct {
+	names   []string
+	units   []string
+	samples []metrics.Sample
+}
+
+func NewGoMetrics() *goMetrics {
+	m := &goMetrics{}
+
+	forbiddenRe := regexp.MustCompile(`\W`)
+
+	for _, d := range metrics.All() {
+		switch d.Kind {
+		case metrics.KindUint64, metrics.KindFloat64:
+			name := "go_" + strings.TrimLeft(forbiddenRe.ReplaceAllString(d.Name, "_"), "_")
+
+			unit := ""
+			if strings.HasSuffix(d.Name, ":bytes") {
+				unit = "B"
+			} else if strings.HasSuffix(d.Name, ":seconds") {
+				unit = "s"
+			} else if d.Cumulative {
+				unit = "c"
+			}
+
+			m.names = append(m.names, name)
+			m.units = append(m.units, unit)
+			m.samples = append(m.samples, metrics.Sample{Name: d.Name})
+		}
+	}
+
+	return m
+}
+
+func (g *goMetrics) PerformanceData() string {
+	metrics.Read(g.samples)
+
+	var buf strings.Builder
+
+	for i, sample := range g.samples {
+		if i > 0 {
+			buf.WriteByte(' ')
+		}
+
+		switch sample.Value.Kind() {
+		case metrics.KindUint64:
+			_, _ = fmt.Fprintf(&buf, "%s=%d%s", g.names[i], sample.Value.Uint64(), g.units[i])
+		case metrics.KindFloat64:
+			_, _ = fmt.Fprintf(&buf, "%s=%f%s", g.names[i], sample.Value.Float64(), g.units[i])
+		}
+	}
+
+	return buf.String()
+}
