@@ -67,19 +67,19 @@ func StartHeartbeat(
 		now := time.Now()
 
 		values := map[string]string{
-			"general:version":          internal.Version.Version,
-			"general:time":             strconv.FormatInt(now.UnixMilli(), 10),
-			"general:start-time":       strconv.FormatInt(startTime, 10),
-			"general:err":              dbConnErr.Message,
-			"general:err-since":        strconv.FormatInt(dbConnErr.SinceMilli, 10),
-			"general:performance-data": goMetrics.PerformanceData(),
-			"heartbeat:last-received":  strconv.FormatInt(heartbeat, 10),
-			"ha:responsible":           boolToStr[responsible],
-			"ha:responsible-ts":        strconv.FormatInt(responsibleTsMilli, 10),
-			"ha:other-responsible":     boolToStr[otherResponsible],
-			"sync:ongoing-since":       strconv.FormatInt(ongoingSyncStart, 10),
-			"sync:success-finish":      strconv.FormatInt(sync.FinishMilli, 10),
-			"sync:success-duration":    strconv.FormatInt(sync.DurationMilli, 10),
+			"version":                 internal.Version.Version,
+			"time":                    strconv.FormatInt(now.UnixMilli(), 10),
+			"start-time":              strconv.FormatInt(startTime, 10),
+			"error":                   dbConnErr.Message,
+			"error-since":             strconv.FormatInt(dbConnErr.SinceMilli, 10),
+			"performance-data":        goMetrics.PerformanceData(),
+			"last-heartbeat-received": strconv.FormatInt(heartbeat, 10),
+			"ha-responsible":          boolToStr[responsible],
+			"ha-responsible-ts":       strconv.FormatInt(responsibleTsMilli, 10),
+			"ha-other-responsible":    boolToStr[otherResponsible],
+			"sync-ongoing-since":      strconv.FormatInt(ongoingSyncStart, 10),
+			"sync-success-finish":     strconv.FormatInt(sync.FinishMilli, 10),
+			"sync-success-duration":   strconv.FormatInt(sync.DurationMilli, 10),
 		}
 
 		ctx, cancel := context.WithDeadline(ctx, tick.Time.Add(interval))
