@@ -21,11 +21,11 @@ var Stats struct {
 // WriteStats periodically forwards Stats to Redis for being monitored by Icinga 2.
 func WriteStats(ctx context.Context, client *icingaredis.Client, logger *logging.Logger) {
 	counters := map[string]*com.Counter{
-		"sync_config":     &Stats.Config,
-		"sync_state":      &Stats.State,
-		"sync_history":    &Stats.History,
-		"sync_overdue":    &Stats.Overdue,
-		"cleanup_history": &Stats.HistoryCleanup,
+		"config_sync":     &Stats.Config,
+		"state_sync":      &Stats.State,
+		"history_sync":    &Stats.History,
+		"overdue_sync":    &Stats.Overdue,
+		"history_cleanup": &Stats.HistoryCleanup,
 	}
 
 	periodic.Start(ctx, time.Second, func(_ periodic.Tick) {
