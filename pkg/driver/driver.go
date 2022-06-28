@@ -40,14 +40,14 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		retry.Settings{
 			Timeout: timeout,
 			OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
-				updateCurrentDbConnErr(err)
+				telemetry.UpdateCurrentDbConnErr(err)
 
 				if lastErr == nil || err.Error() != lastErr.Error() {
 					c.driver.Logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
 				}
 			},
 			OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
-				updateCurrentDbConnErr(nil)
+				telemetry.UpdateCurrentDbConnErr(nil)
 
 				if attempt > 0 {
 					c.driver.Logger.Infow("Reconnected to database",
@@ -57,30 +57,6 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		},
 	), "can't connect to database")
 	return conn, err
-}
-
-// updateCurrentDbConnErr updates telemetry.CurrentDbConnErr if necessary.
-func updateCurrentDbConnErr(err error) {
-	ours := telemetry.DbConnErr{SinceMilli: time.Now().UnixMilli()}
-	if err != nil {
-		ours.Message = err.Error()
-	}
-
-	for {
-		theirs, _ := telemetry.CurrentDbConnErr.Load()
-		if theirs.SinceMilli >= ours.SinceMilli || theirs.Message == ours.Message {
-			break
-		}
-
-		merge := ours
-		if theirs.Message != "" && ours.Message != "" {
-			merge.SinceMilli = theirs.SinceMilli
-		}
-
-		if telemetry.CurrentDbConnErr.CompareAndSwap(theirs, merge) {
-			break
-		}
-	}
 }
 
 // Driver implements part of the driver.Connector interface.
