@@ -118,6 +118,10 @@ func Retryable(err error) bool {
 		// which do not include ECONNREFUSED, so we check this ourselves.
 		return true
 	}
+	if errors.Is(err, syscall.ECONNRESET) {
+		// ECONNRESET is treated as a temporary error by Go only if it comes from calling accept.
+		return true
+	}
 
 	return false
 }
