@@ -164,10 +164,14 @@ ALTER TABLE notification_history
   MODIFY `text` longtext NOT NULL;
 
 ALTER TABLE host_state
-  ADD COLUMN previous_soft_state tinyint unsigned NOT NULL AFTER hard_state;
+  ADD COLUMN previous_soft_state tinyint unsigned NOT NULL AFTER hard_state,
+  CHANGE attempt check_attempt tinyint unsigned NOT NULL,
+  CHANGE timeout check_timeout int unsigned DEFAULT NULL;
 
 ALTER TABLE service_state
-  ADD COLUMN previous_soft_state tinyint unsigned NOT NULL AFTER hard_state;
+  ADD COLUMN previous_soft_state tinyint unsigned NOT NULL AFTER hard_state,
+  CHANGE attempt check_attempt tinyint unsigned NOT NULL,
+  CHANGE timeout check_timeout int unsigned DEFAULT NULL;
 
 ALTER TABLE checkcommand_argument
   ADD COLUMN `separator` varchar(255) DEFAULT NULL AFTER set_if;
@@ -191,7 +195,8 @@ ALTER TABLE flapping_history
   ADD index idx_flapping_history_end_time (end_time) COMMENT 'Filter for history retention';
 
 ALTER TABLE state_history
-  ADD index idx_state_history_event_time (event_time) COMMENT 'Filter for history retention';
+  ADD index idx_state_history_event_time (event_time) COMMENT 'Filter for history retention',
+  CHANGE attempt check_attempt tinyint unsigned NOT NULL;
 
 ALTER TABLE icon_image
   DROP PRIMARY KEY,
