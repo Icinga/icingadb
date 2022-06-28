@@ -73,7 +73,8 @@ func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
 
 // dialWithLogging returns a Redis Dialer with logging capabilities.
 func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc {
-	// dial behaves like net.Dialer#DialContext, but re-tries on syscall.ECONNREFUSED.
+	// dial behaves like net.Dialer#DialContext,
+	// but re-tries on common errors that are considered retryable.
 	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
 		err = retry.WithBackoff(
 			ctx,
