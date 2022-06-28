@@ -63,6 +63,7 @@ overdue-sync             | Calculation and synchronization of the overdue status
 redis                    | Redis connection status and queries.
 retention                | Deletes historical data that exceed their configured retention period.
 runtime-updates          | Runtime updates of config objects after the initial config synchronization.
+telemetry                | Reporting of Icinga DB status to Icinga 2 via Redis (for monitoring purposes).
 
 ### Duration String <a id="duration-string"></a>
 

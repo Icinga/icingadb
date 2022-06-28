@@ -12,6 +12,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/okzk/sdnotify"
@@ -22,6 +23,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 )
@@ -119,6 +121,10 @@ func run() int {
 		}
 		defer db.Close()
 		ha = icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
+
+		telemetryLogger := logs.GetChildLogger("telemetry")
+		telemetry.StartHeartbeat(ctx, rc, telemetryLogger, ha, heartbeat)
+		telemetry.WriteStats(ctx, rc, telemetryLogger)
 	}
 	// Closing ha on exit ensures that this instance retracts its heartbeat
 	// from the database so that another instance can take over immediately.
@@ -171,9 +177,9 @@ func run() int {
 						configInitSync := sync.WaitGroup{}
 						stateInitSync := &sync.WaitGroup{}
 
-						// Get the last IDs of the runtime update streams before starting anything else,
+						// Clear the runtime update streams before starting anything else (rather than after the sync),
 						// otherwise updates may be lost.
-						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.Streams(synctx)
+						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.ClearStreams(synctx)
 						if err != nil {
 							logger.Fatalf("%+v", err)
 						}
@@ -204,6 +210,8 @@ func run() int {
 						})
 
 						syncStart := time.Now()
+						atomic.StoreInt64(&telemetry.OngoingSyncStartMilli, syncStart.UnixMilli())
+
 						logger.Info("Starting config sync")
 						for _, factory := range v1.ConfigFactories {
 							factory := factory
@@ -242,10 +250,18 @@ func run() int {
 
 						g.Go(func() error {
 							configInitSync.Wait()
+							atomic.StoreInt64(&telemetry.OngoingSyncStartMilli, 0)
 
-							elapsed := time.Since(syncStart)
+							syncEnd := time.Now()
+							elapsed := syncEnd.Sub(syncStart)
 							logger := logs.GetChildLogger("config-sync")
+
 							if synctx.Err() == nil {
+								telemetry.LastSuccessfulSync.Store(telemetry.SuccessfulSync{
+									FinishMilli:   syncEnd.UnixMilli(),
+									DurationMilli: elapsed.Milliseconds(),
+								})
+
 								logger.Infof("Finished config sync in %s", elapsed)
 							} else {
 								logger.Warnf("Aborted config sync after %s", elapsed)

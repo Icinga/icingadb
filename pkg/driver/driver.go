@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/jmoiron/sqlx"
@@ -39,11 +40,15 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		retry.Settings{
 			Timeout: timeout,
 			OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+				telemetry.UpdateCurrentDbConnErr(err)
+
 				if lastErr == nil || err.Error() != lastErr.Error() {
 					c.driver.Logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
 				}
 			},
 			OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
+				telemetry.UpdateCurrentDbConnErr(nil)
+
 				if attempt > 0 {
 					c.driver.Logger.Infow("Reconnected to database",
 						zap.Duration("after", elapsed), zap.Uint64("attempts", attempt+1))

@@ -182,24 +182,6 @@ func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-c
 	}))
 }
 
-// StreamLastId fetches the last message of a stream and returns its ID.
-func (c *Client) StreamLastId(ctx context.Context, stream string) (string, error) {
-	lastId := "0-0"
-
-	cmd := c.XRevRangeN(ctx, stream, "+", "-", 1)
-	messages, err := cmd.Result()
-
-	if err != nil {
-		return "", WrapCmdErr(cmd)
-	}
-
-	for _, message := range messages {
-		lastId = message.ID
-	}
-
-	return lastId, nil
-}
-
 // YieldAll yields all entities from Redis that belong to the specified SyncSubject.
 func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-chan contracts.Entity, <-chan error) {
 	key := utils.Key(utils.Name(subject.Entity()), ':')

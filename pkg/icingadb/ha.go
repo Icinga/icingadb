@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
+	"github.com/icinga/icingadb/pkg/com"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
@@ -23,8 +24,15 @@ import (
 
 var timeout = 60 * time.Second
 
+type haState struct {
+	responsibleTsMilli int64
+	responsible        bool
+	otherResponsible   bool
+}
+
 // HA provides high availability and indicates whether a Takeover or Handover must be made.
 type HA struct {
+	state         com.Atomic[haState]
 	ctx           context.Context
 	cancelCtx     context.CancelFunc
 	instanceId    types.Binary
@@ -106,6 +114,12 @@ func (h *HA) Handover() chan struct{} {
 // Takeover returns a channel with which takeovers are signaled.
 func (h *HA) Takeover() chan struct{} {
 	return h.takeover
+}
+
+// State returns the status quo.
+func (h *HA) State() (responsibleTsMilli int64, responsible, otherResponsible bool) {
+	state, _ := h.state.Load()
+	return state.responsibleTsMilli, state.responsible, state.otherResponsible
 }
 
 func (h *HA) abort(err error) {
@@ -226,12 +240,13 @@ func (h *HA) controller() {
 }
 
 func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *types.UnixMilli, envId types.Binary, shouldLog bool) error {
-	var takeover bool
+	var takeover, otherResponsible bool
 
 	err := retry.WithBackoff(
 		ctx,
 		func(ctx context.Context) error {
 			takeover = false
+			otherResponsible = false
 
 			tx, errBegin := h.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 			if errBegin != nil {
@@ -248,6 +263,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 			).StructScan(instance)
 			switch errQuery {
 			case nil:
+				otherResponsible = true
 				if shouldLog {
 					h.logger.Infow("Another instance is active",
 						zap.String("instance_id", instance.Id.String()),
@@ -330,6 +346,11 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 		}
 
 		h.signalTakeover()
+	} else if otherResponsible {
+		if state, _ := h.state.Load(); !state.otherResponsible {
+			state.otherResponsible = true
+			h.state.Store(state)
+		}
 	}
 
 	return nil
@@ -392,6 +413,12 @@ func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus, envId types.Binar
 
 func (h *HA) signalHandover() {
 	if h.responsible {
+		h.state.Store(haState{
+			responsibleTsMilli: time.Now().UnixMilli(),
+			responsible:        false,
+			otherResponsible:   false,
+		})
+
 		select {
 		case h.handover <- struct{}{}:
 			h.responsible = false
@@ -403,6 +430,12 @@ func (h *HA) signalHandover() {
 
 func (h *HA) signalTakeover() {
 	if !h.responsible {
+		h.state.Store(haState{
+			responsibleTsMilli: time.Now().UnixMilli(),
+			responsible:        true,
+			otherResponsible:   false,
+		})
+
 		select {
 		case h.takeover <- struct{}{}:
 			h.responsible = true

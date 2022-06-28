@@ -47,6 +47,7 @@ logging:
 #    redis:
 #    retention:
 #    runtime-updates:
+#    telemetry:
 
 retention:
   # Number of days to retain full historical data. By default, historical data is retained forever.
