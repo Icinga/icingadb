@@ -33,7 +33,7 @@ type State struct {
 	PreviousSoftState         uint8                      `json:"previous_soft_state"`
 	PreviousHardState         uint8                      `json:"previous_hard_state"`
 	Severity                  uint16                     `json:"severity"`
-	SoftState                 uint8                      `json:"state"`
+	SoftState                 uint8                      `json:"soft_state"`
 	StateType                 types.StateType            `json:"state_type"`
 	CheckTimeout              float64                    `json:"check_timeout"`
 }
