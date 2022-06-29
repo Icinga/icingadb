@@ -85,7 +85,8 @@ func WithBackoff(
 }
 
 // Retryable returns true for common errors that are considered retryable,
-// i.e. temporary, timeouts, DNS and connection refused errors.
+// i.e. temporary, timeout, DNS, connection refused and reset, host down and unreachable and
+// network down and unreachable errors.
 func Retryable(err error) bool {
 	var temporary interface {
 		Temporary() bool
@@ -120,6 +121,12 @@ func Retryable(err error) bool {
 	}
 	if errors.Is(err, syscall.ECONNRESET) {
 		// ECONNRESET is treated as a temporary error by Go only if it comes from calling accept.
+		return true
+	}
+	if errors.Is(err, syscall.EHOSTDOWN) || errors.Is(err, syscall.EHOSTUNREACH) {
+		return true
+	}
+	if errors.Is(err, syscall.ENETDOWN) || errors.Is(err, syscall.ENETUNREACH) {
 		return true
 	}
 
