@@ -1,25 +1,46 @@
 # This is the configuration file for Icinga DB.
 
+# Connection configuration for the database to which Icinga DB synchronizes monitoring data.
+# This is also the database used in Icinga DB Web to view and work with the data.
+# In high availability setups, all Icinga DB instances must write to the same database.
 database:
-  type: mysql
-  host: localhost
-  port: 3306
-  database: icingadb
-  user: icingadb
-  password: icingadb
+  # Database type. Either 'mysql' for MySQL or 'pgsql' for PostgreSQL.
+  # Defaults to 'mysql'.
+#  type: mysql
 
-# Connection configuration for the Redis where Icinga writes its configuration, state and history.
-# This is the same connection as configured in the 'icingadb' feature of the corresponding Icinga node.
-# High availability setups require a dedicated Redis server per Icinga node and
+  # Database host or absolute Unix socket path.
+  host: localhost
+
+  # Database port. By default, the MySQL or PostgreSQL port, depending on the database type.
+#  port:
+
+  # Database name.
+  database: icingadb
+
+  # Database user.
+  user: icingadb
+
+  # Database password.
+  password: CHANGEME
+
+# Connection configuration for the Redis server where Icinga 2 writes its configuration, state and history items.
+# This is the same connection as configured in the 'icingadb' feature of the corresponding Icinga 2 node.
+# High availability setups require a dedicated Redis server per Icinga 2 node and
 # therefore a dedicated Icinga DB instance that connects to it.
 redis:
   # Redis host or absolute Unix socket path.
   host: localhost
 
-  # Redis port. The Redis server provided by the icingadb-redis package listens on port '6380'.
-  # If not specified, the standard Redis port '6379' is used instead.
-  port: 6380
+  # Redis port.
+  # Defaults to '6380' since the Redis server provided by the 'icingadb-redis' package listens on that port.
+#  port: 6380
 
+  # Redis password.
+#  password:
+
+# Icinga DB logs its activities at various severity levels and any errors that occur either
+# on the console or in systemd's journal. The latter is used automatically when running under systemd.
+# In any case, the default log level is 'info'.
 logging:
   # Default logging level. Can be set to 'fatal', 'error', 'warn', 'info' or 'debug'.
   # If not set, defaults to 'info'.
@@ -49,13 +70,18 @@ logging:
 #    runtime-updates:
 #    telemetry:
 
+# Retention is an optional feature to limit the number of days that historical data is available,
+# as no historical data is deleted by default.
 retention:
   # Number of days to retain full historical data. By default, historical data is retained forever.
 #  history-days:
+
   # Number of days to retain historical data for SLA reporting. By default, it is retained forever.
 #  sla-days:
+
   # Map of history category to number of days to retain its data in order to
-  # enable retention only for specific categories or to override the number that has been configured in days.
+  # enable retention only for specific categories or to
+  # override the number that has been configured in history-days.
   options:
 #    acknowledgement:
 #    comment:

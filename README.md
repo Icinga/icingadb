@@ -1,49 +1,23 @@
 # Icinga DB
 
-![Icinga Logo](https://icinga.com/wp-content/uploads/2014/06/icinga_logo.png)
+Icinga DB is a set of components for publishing, synchronizing and
+visualizing monitoring data in the Icinga ecosystem, consisting of:
 
-#### Table of Contents
+* The Icinga DB daemon, which synchronizes monitoring data between a Redis server and a database
+* Icinga 2 with its [Icinga DB feature](https://icinga.com/docs/icinga-2/latest/doc/14-features/#icinga-db) enabled,
+  responsible for publishing the data to the Redis server, i.e. configuration and its runtime updates, check results,
+  state changes, downtimes, acknowledgements, notifications, and other events such as flapping
+* And Icinga Web with the
+  [Icinga DB Web](https://icinga.com/docs/icinga-db-web) module enabled,
+  which connects to both Redis and the database to display and work with the most up-to-date data
 
-- [About](#about)
-- [License](#license)
-- [Installation](#installation)
-- [Documentation](#documentation)
-- [Support](#support)
-- [Contributing](#contributing)
-
-## About
-
-Icinga DB serves as a synchronisation daemon between Icinga 2 (Redis) and Icinga Web 2 (MySQL/MariaDB/PostgreSQL database).
-It synchronises configuration, state and history of an Icinga 2 environment using checksums.
-
-Icinga DB also supports reading from multiple environments and writing into a single database.
-
-## License
-
-Icinga DB and the Icinga DB documentation are licensed under the terms of the GNU
-General Public License Version 2, you will find a copy of this license in the
-LICENSE file included in the source package.
-
-## Installation
-
-For installing Icinga DB please check the [installation chapter](https://icinga.com/docs/icingadb/latest/doc/02-Installation/)
-in the documentation.
+![Icinga DB Architecture](doc/images/icingadb-architecture.png)
 
 ## Documentation
 
-The documentation is located in the [doc/](doc/) directory and also available
-on [icinga.com/docs](https://icinga.com/docs/icingadb/latest/).
+Icinga DB documentation is available at [icinga.com/docs](https://icinga.com/docs/icinga-db).
 
-## Support
+## License
 
-Check the [project website](https://icinga.com) for status updates. Join the
-[community channels](https://icinga.com/community/) for questions
-or ask an Icinga partner for [professional support](https://icinga.com/support/).
-
-## Contributing
-
-There are many ways to contribute to Icinga -- whether it be sending patches,
-testing, reporting bugs, or reviewing and updating the documentation. Every
-contribution is appreciated!
-
-Please continue reading in the [contributing chapter](CONTRIBUTING.md).
+Icinga DB and the Icinga DB documentation are licensed under the terms of the
+[GNU General Public License Version 2](LICENSE).
