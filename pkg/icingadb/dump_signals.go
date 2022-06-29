@@ -61,16 +61,14 @@ func (s *DumpSignals) Listen(ctx context.Context) error {
 			return errors.Wrap(err, "can't listen for dump signals")
 		}
 
-		cmd := s.redis.XRead(ctx, &redis.XReadArgs{
+		streams, err := s.redis.XReadUntilResult(ctx, &redis.XReadArgs{
 			Streams: []string{"icinga:dump", lastStreamId},
-			Block:   0, // block indefinitely
 		})
-		result, err := cmd.Result()
 		if err != nil {
-			return icingaredis.WrapCmdErr(cmd)
+			return errors.Wrap(err, "can't read dump signals")
 		}
 
-		for _, entry := range result[0].Messages {
+		for _, entry := range streams[0].Messages {
 			lastStreamId = entry.ID
 			key := entry.Values["key"].(string)
 			done := entry.Values["state"].(string) == "done"

@@ -64,8 +64,8 @@ func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
 	c := redis.NewClient(options)
 
 	opts := c.Options()
-	opts.MaxRetries = opts.PoolSize + 1 // https://github.com/go-redis/redis/issues/1737
 	opts.PoolSize = utils.MaxInt(32, opts.PoolSize)
+	opts.MaxRetries = opts.PoolSize + 1 // https://github.com/go-redis/redis/issues/1737
 	c = redis.NewClient(opts)
 
 	return icingaredis.NewClient(c, logger, &r.Options), nil
@@ -73,7 +73,8 @@ func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
 
 // dialWithLogging returns a Redis Dialer with logging capabilities.
 func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc {
-	// dial behaves like net.Dialer#DialContext, but re-tries on syscall.ECONNREFUSED.
+	// dial behaves like net.Dialer#DialContext,
+	// but re-tries on common errors that are considered retryable.
 	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
 		err = retry.WithBackoff(
 			ctx,

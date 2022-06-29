@@ -410,14 +410,14 @@ func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string
 		logger.Debug("Checking Icinga 2 and Icinga DB compatibility")
 	}
 
-	cmd := rc.XRead(context.Background(), &redis.XReadArgs{Streams: []string{"icinga:schema", pos}})
-	xRead, err := cmd.Result()
-
+	streams, err := rc.XReadUntilResult(context.Background(), &redis.XReadArgs{
+		Streams: []string{"icinga:schema", pos},
+	})
 	if err != nil {
-		return "", icingaredis.WrapCmdErr(cmd)
+		return "", errors.Wrap(err, "can't read Redis schema version")
 	}
 
-	message := xRead[0].Messages[0]
+	message := streams[0].Messages[0]
 	if version := message.Values["version"]; version != expectedRedisSchemaVersion {
 		// Since these error messages are trivial and mostly caused by users, we don't need
 		// to print a stack trace here. However, since errors.Errorf() does this automatically,

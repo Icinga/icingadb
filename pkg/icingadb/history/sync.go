@@ -111,11 +111,9 @@ func (s Sync) readFromRedis(ctx context.Context, key string, output chan<- redis
 	}
 
 	for {
-		cmd := s.redis.XRead(ctx, xra)
-		streams, err := cmd.Result()
-
+		streams, err := s.redis.XReadUntilResult(ctx, xra)
 		if err != nil {
-			return icingaredis.WrapCmdErr(cmd)
+			return errors.Wrap(err, "can't read history")
 		}
 
 		for _, stream := range streams {

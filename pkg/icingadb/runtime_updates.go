@@ -237,17 +237,12 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 		}()
 
 		for {
-			xra := &redis.XReadArgs{
+			rs, err := r.redis.XReadUntilResult(ctx, &redis.XReadArgs{
 				Streams: streams.Option(),
 				Count:   int64(r.redis.Options.XReadCount),
-				Block:   0,
-			}
-
-			cmd := r.redis.XRead(ctx, xra)
-			rs, err := cmd.Result()
-
+			})
 			if err != nil {
-				return icingaredis.WrapCmdErr(cmd)
+				return errors.Wrap(err, "can't read runtime updates")
 			}
 
 			pipe := r.redis.Pipeline()

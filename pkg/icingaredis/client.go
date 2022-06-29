@@ -28,26 +28,30 @@ type Client struct {
 
 // Options define user configurable Redis options.
 type Options struct {
-	Timeout             time.Duration `yaml:"timeout"               default:"30s"`
-	MaxHMGetConnections int           `yaml:"max_hmget_connections" default:"8"`
+	BlockTimeout        time.Duration `yaml:"block_timeout"         default:"1s"`
 	HMGetCount          int           `yaml:"hmget_count"           default:"4096"`
 	HScanCount          int           `yaml:"hscan_count"           default:"4096"`
+	MaxHMGetConnections int           `yaml:"max_hmget_connections" default:"8"`
+	Timeout             time.Duration `yaml:"timeout"               default:"30s"`
 	XReadCount          int           `yaml:"xread_count"           default:"4096"`
 }
 
 // Validate checks constraints in the supplied Redis options and returns an error if they are violated.
 func (o *Options) Validate() error {
-	if o.Timeout == 0 {
-		return errors.New("timeout cannot be 0. Configure a value greater than zero, or use -1 for no timeout")
-	}
-	if o.MaxHMGetConnections < 1 {
-		return errors.New("max_hmget_connections must be at least 1")
+	if o.BlockTimeout <= 0 {
+		return errors.New("block_timeout must be positive")
 	}
 	if o.HMGetCount < 1 {
 		return errors.New("hmget_count must be at least 1")
 	}
 	if o.HScanCount < 1 {
 		return errors.New("hscan_count must be at least 1")
+	}
+	if o.MaxHMGetConnections < 1 {
+		return errors.New("max_hmget_connections must be at least 1")
+	}
+	if o.Timeout == 0 {
+		return errors.New("timeout cannot be 0. Configure a value greater than zero, or use -1 for no timeout")
 	}
 	if o.XReadCount < 1 {
 		return errors.New("xread_count must be at least 1")
@@ -180,6 +184,28 @@ func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-c
 
 		return g.Wait()
 	}))
+}
+
+// XReadUntilResult (repeatedly) calls XREAD with the specified arguments until a result is returned.
+// Each call blocks at most for the duration specified in Options.BlockTimeout until data
+// is available before it times out and the next call is made.
+// This also means that an already set block timeout is overridden.
+func (c *Client) XReadUntilResult(ctx context.Context, a *redis.XReadArgs) ([]redis.XStream, error) {
+	a.Block = c.Options.BlockTimeout
+
+	for {
+		cmd := c.XRead(ctx, a)
+		streams, err := cmd.Result()
+		if err != nil {
+			if errors.Is(err, redis.Nil) {
+				continue
+			}
+
+			return streams, WrapCmdErr(cmd)
+		}
+
+		return streams, nil
+	}
 }
 
 // YieldAll yields all entities from Redis that belong to the specified SyncSubject.
