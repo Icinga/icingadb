@@ -182,20 +182,23 @@ ALTER TABLE eventcommand_argument
 ALTER TABLE notificationcommand_argument
   ADD COLUMN `separator` varchar(255) DEFAULT NULL AFTER set_if;
 
+ALTER TABLE notification_history
+  ADD INDEX idx_notification_history_env_send_time (environment_id, send_time) COMMENT 'Filter for history retention';
+
 ALTER TABLE acknowledgement_history
-  ADD index idx_acknowledgement_history_clear_time (clear_time) COMMENT 'Filter for history retention';
+  ADD INDEX idx_acknowledgement_history_env_clear_time (environment_id, clear_time) COMMENT 'Filter for history retention';
 
 ALTER TABLE comment_history
-  ADD index idx_comment_history_remove_time (remove_time) COMMENT 'Filter for history retention';
+  ADD INDEX idx_comment_history_env_remove_time (environment_id, remove_time) COMMENT 'Filter for history retention';
 
 ALTER TABLE downtime_history
-  ADD index idx_downtime_history_end_time (end_time) COMMENT 'Filter for history retention';
+  ADD INDEX idx_downtime_history_env_end_time (environment_id, end_time) COMMENT 'Filter for history retention';
 
 ALTER TABLE flapping_history
-  ADD index idx_flapping_history_end_time (end_time) COMMENT 'Filter for history retention';
+  ADD INDEX idx_flapping_history_env_end_time (environment_id, end_time) COMMENT 'Filter for history retention';
 
 ALTER TABLE state_history
-  ADD index idx_state_history_event_time (event_time) COMMENT 'Filter for history retention',
+  ADD INDEX idx_state_history_env_event_time (environment_id, event_time) COMMENT 'Filter for history retention',
   CHANGE attempt check_attempt tinyint unsigned NOT NULL;
 
 ALTER TABLE icon_image
@@ -249,7 +252,8 @@ CREATE TABLE sla_history_state (
 
   PRIMARY KEY (id),
 
-  INDEX idx_sla_history_state_event (host_id, service_id, event_time)
+  INDEX idx_sla_history_state_event (host_id, service_id, event_time) COMMENT 'Filter for calculating the sla reports',
+  INDEX idx_sla_history_state_env_event_time (environment_id, event_time) COMMENT 'Filter for sla history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 INSERT INTO sla_history_state
@@ -272,7 +276,8 @@ CREATE TABLE sla_history_downtime (
 
   PRIMARY KEY (downtime_id),
 
-  INDEX idx_sla_history_downtime_event (host_id, service_id, downtime_start, downtime_end)
+  INDEX idx_sla_history_downtime_event (host_id, service_id, downtime_start, downtime_end) COMMENT 'Filter for calculating the sla reports',
+  INDEX idx_sla_history_downtime_env_downtime_end (environment_id, downtime_end) COMMENT 'Filter for sla history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 INSERT INTO sla_history_downtime
