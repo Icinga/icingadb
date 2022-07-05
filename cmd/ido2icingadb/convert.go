@@ -721,7 +721,6 @@ func convertNotificationRows(
 			SendTime:          ts,
 			State:             row.State,
 			PreviousHardState: previousHardState,
-			Author:            "-",
 			Text: icingadbTypes.String{
 				NullString: sql.NullString{
 					String: text,
