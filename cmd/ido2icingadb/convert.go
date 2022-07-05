@@ -442,8 +442,8 @@ func convertDowntimeRows(
 
 // FlappingEnd updates an already migrated start event with the end event info.
 type FlappingEnd struct {
-	Id      icingadbTypes.Binary
-	EndTime icingadbTypes.UnixMilli
+	Id      icingadbTypes.Binary    `json:"id"`
+	EndTime icingadbTypes.UnixMilli `json:"end_time"`
 }
 
 // Assert interface compliance.

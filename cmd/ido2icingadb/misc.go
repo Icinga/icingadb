@@ -295,7 +295,7 @@ var types = historyTypes{
 		cacheFiller: func(ht *historyType) {
 			buildEventTimeCache(ht, []string{
 				"xh.flappinghistory_id id", "UNIX_TIMESTAMP(xh.event_time) event_time",
-				"xh.event_time_usec", "xh.event_type-1000 event_is_start", "xh.object_id",
+				"xh.event_time_usec", "1001-xh.event_type event_is_start", "xh.object_id",
 			})
 		},
 		migrationQuery: flappingMigrationQuery,
