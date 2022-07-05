@@ -842,7 +842,7 @@ func convertStateRows(
 			HardState:         row.LastHardState,
 			PreviousSoftState: row.LastState,
 			PreviousHardState: previousHardState,
-			Attempt:           uint8(row.CurrentCheckAttempt),
+			CheckAttempt:      uint8(row.CurrentCheckAttempt),
 			Output:            icingadbTypes.String{NullString: row.Output},
 			LongOutput:        icingadbTypes.String{NullString: row.LongOutput},
 			MaxCheckAttempts:  uint32(row.MaxCheckAttempts),
