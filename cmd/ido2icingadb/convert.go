@@ -478,7 +478,7 @@ func convertFlappingRows(
 
 			h.EventTime.History = h
 			allHistory = append(allHistory, h)
-		} else { // end
+		} else {
 			flappingHistory = append(flappingHistory, &history.FlappingHistory{
 				EntityWithoutChecksum: v1.EntityWithoutChecksum{
 					IdMeta: v1.IdMeta{Id: flappingHistoryId},
