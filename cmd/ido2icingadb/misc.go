@@ -187,7 +187,7 @@ func sliceIdoHistory[Row any](
 
 // historyType specifies a history data type.
 type historyType struct {
-	// name is a human-readable, but machine-friendly common name.
+	// name is a human-readable common name.
 	name string
 	// idoTable specifies the source table.
 	idoTable string
@@ -254,23 +254,7 @@ func (hts historyTypes) forEach(f func(*historyType)) {
 
 var types = historyTypes{
 	{
-		name:        "acknowledgement",
-		idoTable:    "icinga_acknowledgements",
-		idoIdColumn: "acknowledgement_id",
-		cacheSchema: eventTimeCacheSchema,
-		cacheFiller: func(ht *historyType) {
-			buildEventTimeCache(ht, []string{
-				"xh.acknowledgement_id id", "UNIX_TIMESTAMP(xh.entry_time) event_time",
-				"xh.entry_time_usec event_time_usec", "xh.acknowledgement_type event_is_start", "xh.object_id",
-			})
-		},
-		migrationQuery: acknowledgementMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
-			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertAcknowledgementRows)
-		},
-	},
-	{
-		name:           "comment",
+		name:           "ack & comment",
 		idoTable:       "icinga_commenthistory",
 		idoIdColumn:    "commenthistory_id",
 		migrationQuery: commentMigrationQuery,

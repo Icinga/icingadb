@@ -24,6 +24,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"os"
 	"path"
+	"regexp"
 	"sync"
 	"time"
 )
@@ -118,6 +119,8 @@ func parseConfig(f *Flags) (_ *Config, exit int) {
 	return c, -1
 }
 
+var nonWords = regexp.MustCompile(`\W+`)
+
 // mkCache ensures <f.Cache>/<history type>.sqlite3 files are present and contain their schema
 // and initializes types[*].cache. (On non-recoverable errors the whole program exits.)
 func mkCache(f *Flags, mapper *reflectx.Mapper) {
@@ -132,7 +135,7 @@ func mkCache(f *Flags, mapper *reflectx.Mapper) {
 			return
 		}
 
-		file := path.Join(f.Cache, ht.name+".sqlite3")
+		file := path.Join(f.Cache, nonWords.ReplaceAllLiteralString(ht.name, "_")+".sqlite3")
 		var err error
 
 		ht.cache, err = sqlx.Open("sqlite3", "file:"+file)

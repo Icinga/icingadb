@@ -15,9 +15,6 @@ import (
 	"time"
 )
 
-//go:embed embed/ack_query.sql
-var acknowledgementMigrationQuery string
-
 //go:embed embed/comment_query.sql
 var commentMigrationQuery string
 
@@ -32,160 +29,6 @@ var notificationMigrationQuery string
 
 //go:embed embed/state_query.sql
 var stateMigrationQuery string
-
-// AckClear updates an already migrated ack event with the clear event info.
-type AckClear struct {
-	Id        icingadbTypes.Binary
-	ClearTime icingadbTypes.UnixMilli
-}
-
-// Assert interface compliance.
-var _ contracts.TableNamer = (*AckClear)(nil)
-
-// TableName implements the contracts.TableNamer interface.
-func (*AckClear) TableName() string {
-	return "acknowledgement_history"
-}
-
-type acknowledgementRow = struct {
-	AcknowledgementId   uint64
-	EntryTime           int64
-	EntryTimeUsec       uint32
-	AcknowledgementType uint8
-	AuthorName          sql.NullString
-	CommentData         sql.NullString
-	IsSticky            uint8
-	PersistentComment   uint8
-	EndTime             sql.NullInt64
-	ObjecttypeId        uint8
-	Name1               string
-	Name2               string
-}
-
-func convertAcknowledgementRows(
-	env string, envId, endpointId icingadbTypes.Binary,
-	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []acknowledgementRow,
-) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{}) {
-	if len(idoRows) < 1 {
-		return
-	}
-
-	var cached []struct {
-		HistoryId     uint64
-		EventTime     int64
-		EventTimeUsec uint32
-	}
-	selectCache(
-		&cached, "SELECT history_id, event_time, event_time_usec FROM end_start_time WHERE history_id BETWEEN ? AND ?",
-		idoRows[0].AcknowledgementId, idoRows[len(idoRows)-1].AcknowledgementId,
-	)
-
-	// Needed for set time (see below).
-	cachedById := make(map[uint64]icingadbTypes.UnixMilli, len(cached))
-	for _, c := range cached {
-		cachedById[c.HistoryId] = convertTime(c.EventTime, c.EventTimeUsec)
-	}
-
-	var acknowledgementHistory, acknowledgementHistoryUpdates, allHistory []interface{}
-	for _, row := range idoRows {
-		ts := convertTime(row.EntryTime, row.EntryTimeUsec)
-
-		// Needed for ID (see below).
-		var set icingadbTypes.UnixMilli
-		if row.AcknowledgementType == 0 { // clear
-			var ok bool
-			set, ok = cachedById[row.AcknowledgementId]
-
-			if !ok {
-				continue
-			}
-		} else {
-			set = ts
-		}
-
-		name := row.Name1
-		if row.Name2 != "" {
-			name += "!" + row.Name2
-		}
-
-		typ := objectTypes[row.ObjecttypeId]
-		hostId := calcObjectId(env, row.Name1)
-		serviceId := calcServiceId(env, row.Name1, row.Name2)
-		setTime := float64(set.Time().UnixMilli())
-		acknowledgementHistoryId := hashAny([]interface{}{env, name, setTime})
-
-		if row.AcknowledgementType == 0 { // clear
-			// The set counterpart should already have been inserted.
-			acknowledgementHistoryUpdates = append(acknowledgementHistoryUpdates, &AckClear{
-				acknowledgementHistoryId, ts,
-			})
-
-			h := &history.HistoryAck{
-				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{
-						Id: hashAny([]interface{}{env, "ack_clear", name, setTime}),
-					},
-					EnvironmentId: envId,
-					EndpointId:    endpointId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-					EventType:     "ack_clear",
-				},
-				AcknowledgementHistoryId: acknowledgementHistoryId,
-				SetTime:                  set,
-				ClearTime:                ts,
-			}
-
-			h.EventTime.History = h
-			allHistory = append(allHistory, h)
-		} else { // set
-			acknowledgementHistory = append(acknowledgementHistory, &history.AcknowledgementHistory{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{Id: acknowledgementHistoryId},
-				},
-				HistoryTableMeta: history.HistoryTableMeta{
-					EnvironmentId: envId,
-					EndpointId:    endpointId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-				},
-				SetTime:      set,
-				Author:       icingadbTypes.String{NullString: row.AuthorName},
-				Comment:      icingadbTypes.String{NullString: row.CommentData},
-				ExpireTime:   convertTime(row.EndTime.Int64, 0),
-				IsPersistent: icingadbTypes.Bool{Bool: row.PersistentComment != 0, Valid: true},
-				IsSticky:     icingadbTypes.Bool{Bool: row.IsSticky != 0, Valid: true},
-			})
-
-			h := &history.HistoryAck{
-				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{
-						Id: hashAny([]interface{}{env, "ack_set", name, setTime}),
-					},
-					EnvironmentId: envId,
-					EndpointId:    endpointId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-					EventType:     "ack_set",
-				},
-				AcknowledgementHistoryId: acknowledgementHistoryId,
-				SetTime:                  set,
-			}
-
-			h.EventTime.History = h
-			allHistory = append(allHistory, h)
-		}
-
-		checkpoint = row.AcknowledgementId
-	}
-
-	icingaDbUpdates = [][]interface{}{acknowledgementHistoryUpdates}
-	icingaDbInserts = [][]interface{}{acknowledgementHistory, allHistory}
-	return
-}
 
 type commentRow = struct {
 	CommenthistoryId uint64
@@ -208,81 +51,169 @@ func convertCommentRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []commentRow,
 ) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
-	var commentHistory, allHistory []interface{}
+	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []any
 
 	for _, row := range idoRows {
-		id := calcObjectId(env, row.Name)
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
-		entryTime := convertTime(row.EntryTime, row.EntryTimeUsec)
-		removeTime := convertTime(row.DeletionTime, row.DeletionTimeUsec)
-		expireTime := convertTime(row.ExpirationTime, 0)
 
-		commentHistory = append(commentHistory, &history.CommentHistory{
-			CommentHistoryEntity: history.CommentHistoryEntity{CommentId: id},
-			HistoryTableMeta: history.HistoryTableMeta{
-				EnvironmentId: envId,
-				EndpointId:    endpointId,
-				ObjectType:    typ,
-				HostId:        hostId,
-				ServiceId:     serviceId,
-			},
-			CommentHistoryUpserter: history.CommentHistoryUpserter{
-				RemoveTime:     removeTime,
-				HasBeenRemoved: icingadbTypes.Bool{Bool: !removeTime.Time().IsZero(), Valid: true},
-			},
-			EntryTime:    entryTime,
-			Author:       row.AuthorName,
-			Comment:      row.CommentData,
-			EntryType:    icingadbTypes.CommentType(row.EntryType),
-			IsPersistent: icingadbTypes.Bool{Bool: row.IsPersistent != 0, Valid: true},
-			IsSticky:     icingadbTypes.Bool{Bool: false, Valid: true},
-			ExpireTime:   expireTime,
-		})
+		switch row.EntryType {
+		case 1: // user
+			id := calcObjectId(env, row.Name)
+			entryTime := convertTime(row.EntryTime, row.EntryTimeUsec)
+			removeTime := convertTime(row.DeletionTime, row.DeletionTimeUsec)
+			expireTime := convertTime(row.ExpirationTime, 0)
 
-		h1 := &history.HistoryComment{
-			HistoryMeta: history.HistoryMeta{
-				HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_add", row.Name})},
-				EnvironmentId: envId,
-				EndpointId:    endpointId,
-				ObjectType:    typ,
-				HostId:        hostId,
-				ServiceId:     serviceId,
-				EventType:     "comment_add",
-			},
-			CommentHistoryId: id,
-			EntryTime:        entryTime,
-		}
-
-		h1.EventTime.History = h1
-		allHistory = append(allHistory, h1)
-
-		if !removeTime.Time().IsZero() { // remove
-			h2 := &history.HistoryComment{
-				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_remove", row.Name})},
+			commentHistory = append(commentHistory, &history.CommentHistory{
+				CommentHistoryEntity: history.CommentHistoryEntity{CommentId: id},
+				HistoryTableMeta: history.HistoryTableMeta{
 					EnvironmentId: envId,
 					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
-					EventType:     "comment_remove",
+				},
+				CommentHistoryUpserter: history.CommentHistoryUpserter{
+					RemoveTime:     removeTime,
+					HasBeenRemoved: icingadbTypes.Bool{Bool: !removeTime.Time().IsZero(), Valid: true},
+				},
+				EntryTime:    entryTime,
+				Author:       row.AuthorName,
+				Comment:      row.CommentData,
+				EntryType:    icingadbTypes.CommentType(row.EntryType),
+				IsPersistent: icingadbTypes.Bool{Bool: row.IsPersistent != 0, Valid: true},
+				IsSticky:     icingadbTypes.Bool{Bool: false, Valid: true},
+				ExpireTime:   expireTime,
+			})
+
+			h1 := &history.HistoryComment{
+				HistoryMeta: history.HistoryMeta{
+					HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_add", row.Name})},
+					EnvironmentId: envId,
+					EndpointId:    endpointId,
+					ObjectType:    typ,
+					HostId:        hostId,
+					ServiceId:     serviceId,
+					EventType:     "comment_add",
 				},
 				CommentHistoryId: id,
 				EntryTime:        entryTime,
-				RemoveTime:       removeTime,
-				ExpireTime:       expireTime,
 			}
 
-			h2.EventTime.History = h2
-			allHistory = append(allHistory, h2)
+			h1.EventTime.History = h1
+			allHistoryComment = append(allHistoryComment, h1)
+
+			if !removeTime.Time().IsZero() { // remove
+				h2 := &history.HistoryComment{
+					HistoryMeta: history.HistoryMeta{
+						HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_remove", row.Name})},
+						EnvironmentId: envId,
+						EndpointId:    endpointId,
+						ObjectType:    typ,
+						HostId:        hostId,
+						ServiceId:     serviceId,
+						EventType:     "comment_remove",
+					},
+					CommentHistoryId: id,
+					EntryTime:        entryTime,
+					RemoveTime:       removeTime,
+					ExpireTime:       expireTime,
+				}
+
+				h2.EventTime.History = h2
+				allHistoryComment = append(allHistoryComment, h2)
+			}
+		case 4: // ack
+			name := row.Name1
+			if row.Name2 != "" {
+				name += "!" + row.Name2
+			}
+
+			setTime := convertTime(row.EntryTime, row.EntryTimeUsec)
+			setTs := float64(setTime.Time().UnixMilli())
+			clearTime := convertTime(row.DeletionTime, row.DeletionTimeUsec)
+			acknowledgementHistoryId := hashAny([]any{env, name, setTs})
+
+			acknowledgementHistory = append(acknowledgementHistory, &history.AcknowledgementHistory{
+				EntityWithoutChecksum: v1.EntityWithoutChecksum{
+					IdMeta: v1.IdMeta{Id: acknowledgementHistoryId},
+				},
+				HistoryTableMeta: history.HistoryTableMeta{
+					EnvironmentId: envId,
+					EndpointId:    endpointId,
+					ObjectType:    typ,
+					HostId:        hostId,
+					ServiceId:     serviceId,
+				},
+				AckHistoryUpserter: history.AckHistoryUpserter{ClearTime: clearTime},
+				SetTime:            setTime,
+				Author: icingadbTypes.String{
+					NullString: sql.NullString{
+						String: row.AuthorName,
+						Valid:  true,
+					},
+				},
+				Comment: icingadbTypes.String{
+					NullString: sql.NullString{
+						String: row.CommentData,
+						Valid:  true,
+					},
+				},
+				ExpireTime: convertTime(row.ExpirationTime, 0),
+				IsPersistent: icingadbTypes.Bool{
+					Bool:  row.IsPersistent != 0,
+					Valid: true,
+				},
+			})
+
+			h1 := &history.HistoryAck{
+				HistoryMeta: history.HistoryMeta{
+					HistoryEntity: history.HistoryEntity{
+						Id: hashAny([]any{env, "ack_set", name, setTs}),
+					},
+					EnvironmentId: envId,
+					EndpointId:    endpointId,
+					ObjectType:    typ,
+					HostId:        hostId,
+					ServiceId:     serviceId,
+					EventType:     "ack_set",
+				},
+				AcknowledgementHistoryId: acknowledgementHistoryId,
+				SetTime:                  setTime,
+				ClearTime:                clearTime,
+			}
+
+			h1.EventTime.History = h1
+			allHistoryAck = append(allHistoryAck, h1)
+
+			if !clearTime.Time().IsZero() {
+				h2 := &history.HistoryAck{
+					HistoryMeta: history.HistoryMeta{
+						HistoryEntity: history.HistoryEntity{
+							Id: hashAny([]any{env, "ack_clear", name, setTs}),
+						},
+						EnvironmentId: envId,
+						EndpointId:    endpointId,
+						ObjectType:    typ,
+						HostId:        hostId,
+						ServiceId:     serviceId,
+						EventType:     "ack_clear",
+					},
+					AcknowledgementHistoryId: acknowledgementHistoryId,
+					SetTime:                  setTime,
+					ClearTime:                clearTime,
+				}
+
+				h2.EventTime.History = h2
+				allHistoryAck = append(allHistoryAck, h2)
+			}
 		}
 
 		checkpoint = row.CommenthistoryId
 	}
 
-	icingaDbInserts = [][]interface{}{commentHistory, allHistory}
+	icingaDbInserts = [][]any{commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck}
 	return
 }
 
