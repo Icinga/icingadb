@@ -368,7 +368,7 @@ func migrateOneType[IdoRow any](
 					continue
 				}
 
-				query, placeholders := idb.BuildUpsertStmt(table[0])
+				query, placeholders := idb.BuildInsertIgnoreStmt(table[0])
 
 				ch := make(chan any, len(table))
 				for _, row := range table {
