@@ -373,8 +373,9 @@ func convertDowntimeRows(
 
 // FlappingEnd updates an already migrated start event with the end event info.
 type FlappingEnd struct {
-	Id      icingadbTypes.Binary    `json:"id"`
-	EndTime icingadbTypes.UnixMilli `json:"end_time"`
+	Id                    icingadbTypes.Binary    `json:"id"`
+	EndTime               icingadbTypes.UnixMilli `json:"end_time"`
+	PercentStateChangeEnd icingadbTypes.Float     `json:"percent_state_change_end"`
 }
 
 // Assert interface compliance.
@@ -452,7 +453,11 @@ func convertFlappingRows(
 
 		if row.EventType == 1001 { // end
 			// The start counterpart should already have been inserted.
-			flappingHistoryUpdates = append(flappingHistoryUpdates, &FlappingEnd{flappingHistoryId, ts})
+			flappingHistoryUpdates = append(flappingHistoryUpdates, &FlappingEnd{
+				Id:                    flappingHistoryId,
+				EndTime:               ts,
+				PercentStateChangeEnd: icingadbTypes.Float{NullFloat64: row.PercentStateChange},
+			})
 
 			h := &history.HistoryFlapping{
 				HistoryMeta: history.HistoryMeta{
