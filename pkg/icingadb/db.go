@@ -131,7 +131,7 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 	switch db.DriverName() {
 	case driver.MySQL:
 		// MySQL treats UPDATE id = id as a no-op.
-		clause = "ON DUPLICATE KEY UPDATE id = id"
+		clause = fmt.Sprintf(`ON DUPLICATE KEY UPDATE "%s" = "%s"`, columns[0], columns[0])
 	case driver.PostgreSQL:
 		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO NOTHING", table)
 	}
