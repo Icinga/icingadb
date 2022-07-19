@@ -205,7 +205,9 @@ type historyType struct {
 	migrate func(c *Config, idb *icingadb.DB, envId []byte,
 		endpointId [sha1.Size]byte, idbTx *sync.Mutex, ht *historyType)
 
-	// cache represents <name>.sqlite3.
+	// cacheFile locates <name>.sqlite3.
+	cacheFile string
+	// cache represents <cacheFile>.
 	cache *sqlx.DB
 	// snapshot represents the data source.
 	snapshot *sqlx.Tx

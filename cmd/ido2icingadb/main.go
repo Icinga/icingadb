@@ -94,6 +94,9 @@ func main() {
 
 	log.Info("Actually migrating")
 	migrate(c, idb, envId)
+
+	log.Info("Cleaning up cache")
+	cleanupCache()
 }
 
 // parseConfig validates the f.Config file and returns the config and -1 or - on failure - nil and an exit code.
@@ -143,6 +146,7 @@ func mkCache(f *Flags, mapper *reflectx.Mapper) {
 			log.With("file", file).Fatalf("%+v", errors.Wrap(err, "can't open SQLite database"))
 		}
 
+		ht.cacheFile = file
 		ht.cache.Mapper = mapper
 
 		if _, err := ht.cache.Exec(ht.cacheSchema); err != nil {
@@ -433,4 +437,19 @@ func migrateOneType[IdoRow any](
 	)
 
 	ht.bar.SetTotal(ht.bar.Current(), true)
+}
+
+// cleanupCache removes <f.Cache>/<history type>.sqlite3 files.
+func cleanupCache() {
+	types.forEach(func(ht *historyType) {
+		if ht.cacheFile != "" {
+			if err := ht.cache.Close(); err != nil {
+				log.With("file", ht.cacheFile).Warnf("%+v", errors.Wrap(err, "can't close SQLite database"))
+			}
+
+			if err := os.Remove(ht.cacheFile); err != nil {
+				log.With("file", ht.cacheFile).Warnf("%+v", errors.Wrap(err, "can't remove SQLite database"))
+			}
+		}
+	})
 }
