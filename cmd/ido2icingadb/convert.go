@@ -50,7 +50,7 @@ type commentRow = struct {
 func convertCommentRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []commentRow,
-) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+) (_, icingaDbInserts, _ [][]any, checkpoint any) {
 	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []any
 
 	for _, row := range idoRows {
@@ -242,7 +242,7 @@ type downtimeRow = struct {
 func convertDowntimeRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []downtimeRow,
-) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+) (_, icingaDbInserts, _ [][]any, checkpoint any) {
 	var downtimeHistory, allHistory, sla []interface{}
 
 	for _, row := range idoRows {
@@ -402,7 +402,7 @@ type flappingRow = struct {
 func convertFlappingRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []flappingRow,
-) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+) (icingaDbUpdates, icingaDbInserts, _ [][]any, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}
@@ -543,7 +543,7 @@ type notificationRow = struct {
 func convertNotificationRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []notificationRow,
-) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+) (_, icingaDbInserts, _ [][]any, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}
@@ -738,7 +738,7 @@ type stateRow = struct {
 func convertStateRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []stateRow,
-) (_, icingaDbInserts [][]interface{}, checkpoint interface{}) {
+) (_, icingaDbInserts, _ [][]any, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}

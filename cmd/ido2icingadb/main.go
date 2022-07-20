@@ -295,7 +295,7 @@ func migrateOneType[IdoRow any](
 	c *Config, idb *icingadb.DB, envId []byte, endpointId [sha1.Size]byte, idbTx *sync.Mutex, ht *historyType,
 	convertRows func(env string, envId, endpointId icingadbTypes.Binary,
 		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
-		idoRows []IdoRow) (icingaDbUpdates, icingaDbInserts [][]interface{}, checkpoint interface{}),
+		idoRows []IdoRow) (icingaDbUpdates, icingaDbInserts, icingaDbUpserts [][]any, checkpoint any),
 ) {
 	var lastQuery string
 	var lastStmt *sqlx.Stmt
@@ -349,7 +349,7 @@ func migrateOneType[IdoRow any](
 		ht.snapshot, ht.migrationQuery, args, ht.lastId,
 		func(idoRows []IdoRow) (checkpoint interface{}) {
 			// ... convert them, ...
-			updates, inserts, lastIdoId := convertRows(
+			updates, inserts, upserts, lastIdoId := convertRows(
 				c.Icinga2.Env, envId, endpointId[:], selectCache, ht.snapshot, idoRows,
 			)
 
@@ -367,27 +367,32 @@ func migrateOneType[IdoRow any](
 				log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
 			}
 
-			for _, table := range inserts {
-				if len(table) < 1 {
-					continue
-				}
+			for _, op := range []struct {
+				data        [][]any
+				stmtBuilder func(any) (string, int)
+			}{{inserts, idb.BuildInsertIgnoreStmt}, {upserts, idb.BuildUpsertStmt}} {
+				for _, table := range op.data {
+					if len(table) < 1 {
+						continue
+					}
 
-				query, placeholders := idb.BuildInsertIgnoreStmt(table[0])
+					query, placeholders := op.stmtBuilder(table[0])
 
-				ch := make(chan any, len(table))
-				for _, row := range table {
-					ch <- row
-				}
+					ch := make(chan any, len(table))
+					for _, row := range table {
+						ch <- row
+					}
 
-				close(ch)
+					close(ch)
 
-				bulk := com.Bulk(
-					context.Background(), ch, idb.BatchSizeByPlaceholders(placeholders), com.NeverSplit[any],
-				)
-				for rows := range bulk {
-					if _, err := tx.NamedExec(query, rows); err != nil {
-						log.With("backend", "Icinga DB", "dml", query, "args", rows).
-							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+					bulk := com.Bulk(
+						context.Background(), ch, idb.BatchSizeByPlaceholders(placeholders), com.NeverSplit[any],
+					)
+					for rows := range bulk {
+						if _, err := tx.NamedExec(query, rows); err != nil {
+							log.With("backend", "Icinga DB", "dml", query, "args", rows).
+								Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+						}
 					}
 				}
 			}
