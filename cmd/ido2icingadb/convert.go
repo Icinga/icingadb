@@ -526,12 +526,6 @@ func convertFlappingRows(
 	return
 }
 
-// notificationTypes maps IDO values[1] to Icinga DB ones[2].
-//
-// [1]: https://github.com/Icinga/icinga2/blob/32c7f7730db154ba0dff5856a8985d125791c/lib/db_ido/dbevents.cpp#L1507-L1524
-// [2]: https://github.com/Icinga/icingadb/blob/8f31ac143875498797725adb9bfacf3d4/pkg/types/notification_type.go#L53-L61
-var notificationTypes = map[uint8]icingadbTypes.NotificationType{5: 1, 6: 2, 7: 4, 8: 8, 1: 16, 2: 128, 3: 256}
-
 type notificationRow = struct {
 	NotificationId     uint64
 	NotificationReason uint8
@@ -609,21 +603,11 @@ func convertNotificationRows(
 		// migrated data itself via the history ID as object name, i.e. one "virtual object" per sent notification.
 		name := strconv.FormatUint(row.NotificationId, 10)
 
-		var nt icingadbTypes.NotificationType
-		if row.NotificationReason == 0 {
-			if row.State == 0 {
-				nt = 64 // recovery
-			} else {
-				nt = 32 // problem
-			}
-		} else {
-			nt = notificationTypes[row.NotificationReason]
-		}
+		nt := convertNotificationType(row.NotificationReason, row.State)
 
 		ntEnum, err := nt.Value()
 		if err != nil {
-			// Programming error
-			panic(err)
+			continue
 		}
 
 		ts := convertTime(row.EndTime, row.EndTimeUsec)
@@ -700,6 +684,37 @@ func convertNotificationRows(
 
 	icingaDbInserts = [][]interface{}{notificationHistory, userNotificationHistory, allHistory}
 	return
+}
+
+// convertNotificationType maps IDO values[1] to Icinga DB ones[2].
+//
+// [1]: https://github.com/Icinga/icinga2/blob/32c7f7730db154ba0dff5856a8985d125791c/lib/db_ido/dbevents.cpp#L1507-L1524
+// [2]: https://github.com/Icinga/icingadb/blob/8f31ac143875498797725adb9bfacf3d4/pkg/types/notification_type.go#L53-L61
+func convertNotificationType(notificationReason, state uint8) icingadbTypes.NotificationType {
+	switch notificationReason {
+	case 0: // state
+		if state == 0 {
+			return 64 // recovery
+		} else {
+			return 32 // problem
+		}
+	case 1: // acknowledgement
+		return 16
+	case 2: // flapping start
+		return 128
+	case 3: // flapping end
+		return 256
+	case 5: // downtime start
+		return 1
+	case 6: // downtime end
+		return 2
+	case 7: // downtime removed
+		return 4
+	case 8: // custom
+		return 8
+	default: // bad notification type
+		return 0
+	}
 }
 
 type stateRow = struct {
