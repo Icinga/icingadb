@@ -402,7 +402,7 @@ type flappingRow = struct {
 func convertFlappingRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []flappingRow,
-) (icingaDbUpdates, icingaDbInserts, _ [][]any, checkpoint any) {
+) (_, icingaDbInserts, icingaDbUpserts [][]any, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}
@@ -423,7 +423,7 @@ func convertFlappingRows(
 		cachedById[c.HistoryId] = convertTime(c.EventTime, c.EventTimeUsec)
 	}
 
-	var flappingHistory, flappingHistoryUpdates, allHistory []interface{}
+	var flappingHistory, flappingHistoryUpserts, allHistory []any
 	for _, row := range idoRows {
 		ts := convertTime(row.EventTime, row.EventTimeUsec)
 
@@ -453,10 +453,24 @@ func convertFlappingRows(
 
 		if row.EventType == 1001 { // end
 			// The start counterpart should already have been inserted.
-			flappingHistoryUpdates = append(flappingHistoryUpdates, &FlappingEnd{
-				Id:                    flappingHistoryId,
-				EndTime:               ts,
-				PercentStateChangeEnd: icingadbTypes.Float{NullFloat64: row.PercentStateChange},
+			flappingHistoryUpserts = append(flappingHistoryUpserts, &history.FlappingHistory{
+				EntityWithoutChecksum: v1.EntityWithoutChecksum{
+					IdMeta: v1.IdMeta{Id: flappingHistoryId},
+				},
+				HistoryTableMeta: history.HistoryTableMeta{
+					EnvironmentId: envId,
+					EndpointId:    endpointId,
+					ObjectType:    typ,
+					HostId:        hostId,
+					ServiceId:     serviceId,
+				},
+				FlappingHistoryUpserter: history.FlappingHistoryUpserter{
+					EndTime:               ts,
+					PercentStateChangeEnd: icingadbTypes.Float{NullFloat64: row.PercentStateChange},
+					FlappingThresholdLow:  float32(row.LowThreshold),
+					FlappingThresholdHigh: float32(row.HighThreshold),
+				},
+				StartTime: start,
 			})
 
 			h := &history.HistoryFlapping{
@@ -521,8 +535,8 @@ func convertFlappingRows(
 		checkpoint = row.FlappinghistoryId
 	}
 
-	icingaDbUpdates = [][]interface{}{flappingHistoryUpdates}
 	icingaDbInserts = [][]interface{}{flappingHistory, allHistory}
+	icingaDbUpserts = [][]interface{}{flappingHistoryUpserts}
 	return
 }
 
