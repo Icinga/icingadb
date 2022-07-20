@@ -295,7 +295,7 @@ func migrateOneType[IdoRow any](
 	c *Config, idb *icingadb.DB, envId []byte, endpointId [sha1.Size]byte, idbTx *sync.Mutex, ht *historyType,
 	convertRows func(env string, envId, endpointId icingadbTypes.Binary,
 		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
-		idoRows []IdoRow) (icingaDbUpdates, icingaDbInserts, icingaDbUpserts [][]any, checkpoint any),
+		idoRows []IdoRow) (icingaDbInserts, icingaDbUpserts [][]any, checkpoint any),
 ) {
 	var lastQuery string
 	var lastStmt *sqlx.Stmt
@@ -349,7 +349,7 @@ func migrateOneType[IdoRow any](
 		ht.snapshot, ht.migrationQuery, args, ht.lastId,
 		func(idoRows []IdoRow) (checkpoint interface{}) {
 			// ... convert them, ...
-			updates, inserts, upserts, lastIdoId := convertRows(
+			inserts, upserts, lastIdoId := convertRows(
 				c.Icinga2.Env, envId, endpointId[:], selectCache, ht.snapshot, idoRows,
 			)
 
@@ -395,29 +395,6 @@ func migrateOneType[IdoRow any](
 						}
 					}
 				}
-			}
-
-			for _, table := range updates {
-				if len(table) < 1 {
-					continue
-				}
-
-				query, _ := idb.BuildUpdateStmt(table[0])
-
-				stmt, err := tx.PrepareNamed(query)
-				if err != nil {
-					log.With("backend", "Icinga DB", "dml", query).
-						Fatalf("%+v", errors.Wrap(err, "can't prepare DML"))
-				}
-
-				for _, row := range table {
-					if _, err := stmt.Exec(row); err != nil {
-						log.With("backend", "Icinga DB", "dml", query, "args", row).
-							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
-					}
-				}
-
-				_ = stmt.Close()
 			}
 
 			if lastIdoId != nil {
