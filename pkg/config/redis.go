@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 	"net"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -73,6 +74,9 @@ func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
 
 // dialWithLogging returns a Redis Dialer with logging capabilities.
 func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc {
+	silenceErrorsUntil := new(int64)
+	silenceSuccessUntil := new(int64)
+
 	// dial behaves like net.Dialer#DialContext,
 	// but re-tries on common errors that are considered retryable.
 	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
@@ -88,12 +92,34 @@ func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc
 				Timeout: 5 * time.Minute,
 				OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
 					if lastErr == nil || err.Error() != lastErr.Error() {
-						logger.Warnw("Can't connect to Redis. Retrying", zap.Error(err))
+						atomic.StoreInt64(silenceSuccessUntil, 0)
+
+						now := time.Now()
+						logw := logger.Debugw
+
+						if seu := atomic.LoadInt64(silenceErrorsUntil); seu < now.UnixMilli() {
+							if atomic.CompareAndSwapInt64(silenceErrorsUntil, seu, now.Add(time.Minute).UnixMilli()) {
+								logw = logger.Warnw
+							}
+						}
+
+						logw("Can't connect to Redis. Retrying", zap.Error(err))
 					}
 				},
 				OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
 					if attempt > 0 {
-						logger.Infow("Reconnected to Redis",
+						atomic.StoreInt64(silenceErrorsUntil, 0)
+
+						now := time.Now()
+						logw := logger.Debugw
+
+						if ssu := atomic.LoadInt64(silenceSuccessUntil); ssu < now.UnixMilli() {
+							if atomic.CompareAndSwapInt64(silenceSuccessUntil, ssu, now.Add(time.Minute).UnixMilli()) {
+								logw = logger.Infow
+							}
+						}
+
+						logw("Reconnected to Redis",
 							zap.Duration("after", elapsed), zap.Uint64("attempts", attempt+1))
 					}
 				},

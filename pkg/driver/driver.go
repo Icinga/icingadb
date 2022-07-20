@@ -12,6 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"sync/atomic"
 	"time"
 )
 
@@ -23,11 +24,14 @@ var timeout = time.Minute * 5
 // RetryConnector wraps driver.Connector with retry logic.
 type RetryConnector struct {
 	driver.Connector
-	driver Driver
+
+	driver              Driver
+	silenceErrorsUntil  int64
+	silenceSuccessUntil int64
 }
 
 // Connect implements part of the driver.Connector interface.
-func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
+func (c *RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	var conn driver.Conn
 	err := errors.Wrap(retry.WithBackoff(
 		ctx,
@@ -43,14 +47,36 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 				telemetry.UpdateCurrentDbConnErr(err)
 
 				if lastErr == nil || err.Error() != lastErr.Error() {
-					c.driver.Logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
+					atomic.StoreInt64(&c.silenceSuccessUntil, 0)
+
+					now := time.Now()
+					logw := c.driver.Logger.Debugw
+
+					if seu := atomic.LoadInt64(&c.silenceErrorsUntil); seu < now.UnixMilli() {
+						if atomic.CompareAndSwapInt64(&c.silenceErrorsUntil, seu, now.Add(time.Minute).UnixMilli()) {
+							logw = c.driver.Logger.Warnw
+						}
+					}
+
+					logw("Can't connect to database. Retrying", zap.Error(err))
 				}
 			},
 			OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
 				telemetry.UpdateCurrentDbConnErr(nil)
 
 				if attempt > 0 {
-					c.driver.Logger.Infow("Reconnected to database",
+					atomic.StoreInt64(&c.silenceErrorsUntil, 0)
+
+					now := time.Now()
+					logw := c.driver.Logger.Debugw
+
+					if ssu := atomic.LoadInt64(&c.silenceSuccessUntil); ssu < now.UnixMilli() {
+						if atomic.CompareAndSwapInt64(&c.silenceSuccessUntil, ssu, now.Add(time.Minute).UnixMilli()) {
+							logw = c.driver.Logger.Infow
+						}
+					}
+
+					logw("Reconnected to database",
 						zap.Duration("after", elapsed), zap.Uint64("attempts", attempt+1))
 				}
 			},
@@ -60,7 +86,7 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 }
 
 // Driver implements part of the driver.Connector interface.
-func (c RetryConnector) Driver() driver.Driver {
+func (c *RetryConnector) Driver() driver.Driver {
 	return c.driver
 }
 
