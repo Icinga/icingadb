@@ -86,7 +86,7 @@ var (
 	_ contracts.Upserter = (*IdoMigrationProgress)(nil)
 )
 
-const bulk = 10000
+const bulk = 100
 
 // log is the root logger.
 var log = func() *zap.SugaredLogger {
