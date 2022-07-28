@@ -87,8 +87,6 @@ var (
 	_ contracts.Upserter = (*IdoMigrationProgress)(nil)
 )
 
-const bulk = 100
-
 // log is the root logger.
 var log = func() *zap.SugaredLogger {
 	logger, err := zap.NewDevelopmentConfig().Build()
@@ -154,7 +152,7 @@ func sliceIdoHistory[Row any](
 	}
 
 	args["checkpoint"] = checkpoint
-	args["bulk"] = bulk
+	args["bulk"] = 100
 
 	if snapshot.DriverName() != driver.MySQL {
 		query = strings.ReplaceAll(query, " USE INDEX (PRIMARY)", "")

@@ -247,7 +247,7 @@ func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, commitPeriodically func(
 
 	do(&tx, func() { // commitPeriodically
 		callsSinceLastTx++
-		if callsSinceLastTx == bulk {
+		if callsSinceLastTx == 10000 {
 			if err := tx.Commit(); err != nil {
 				logger.Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
 			}
