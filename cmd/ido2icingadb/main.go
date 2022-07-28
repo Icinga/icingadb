@@ -86,7 +86,7 @@ func main() {
 
 	// computeProgress figures out which data has already been migrated
 	// not to start from the beginning every time in the following migrate().
-	computeProgress(idb)
+	computeProgress(idb, envId)
 
 	// On rationale read buildEventTimeCache() and buildPreviousHardStateCache() docs.
 	log.Info("Filling cache")
@@ -207,15 +207,18 @@ var idoMigrationProgressSchema string
 
 // computeProgress initializes types[*].lastId, types[*].total and types[*].done.
 // (On non-recoverable errors the whole program exits.)
-func computeProgress(idb *icingadb.DB) {
+func computeProgress(idb *icingadb.DB, envId []byte) {
 	if _, err := idb.Exec(idoMigrationProgressSchema); err != nil {
 		log.Fatalf("%+v", errors.Wrap(err, "can't create table ido_migration_progress"))
 	}
 
+	envIdHex := hex.EncodeToString(envId)
 	types.forEach(func(ht *historyType) {
-		var query = idb.Rebind("SELECT last_ido_id FROM ido_migration_progress WHERE history_type=?")
+		var query = idb.Rebind(
+			"SELECT last_ido_id FROM ido_migration_progress WHERE environment_id=? AND history_type=?",
+		)
 
-		switch err := idb.Get(&ht.lastId, query, ht.name); err {
+		switch err := idb.Get(&ht.lastId, query, envIdHex, ht.name); err {
 		case nil, sql.ErrNoRows:
 		default:
 			log.With("backend", "Icinga DB", "query", query, "args", []interface{}{ht.name}).
@@ -341,6 +344,7 @@ func migrateOneType[IdoRow any](
 	}
 
 	upsertProgress, _ := idb.BuildUpsertStmt(&IdoMigrationProgress{})
+	envIdHex := hex.EncodeToString(envId)
 
 	ht.bar.SetCurrent(ht.done)
 
@@ -401,7 +405,7 @@ func migrateOneType[IdoRow any](
 				args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
 
 				_, err := tx.NamedExec(upsertProgress, &IdoMigrationProgress{
-					IdoMigrationProgressUpserter{lastIdoId}, ht.name,
+					IdoMigrationProgressUpserter{lastIdoId}, envIdHex, ht.name,
 				})
 				if err != nil {
 					log.With("backend", "Icinga DB", "dml", upsertProgress, "args", args).

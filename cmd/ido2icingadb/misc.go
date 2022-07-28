@@ -77,6 +77,7 @@ func (impu *IdoMigrationProgressUpserter) Upsert() interface{} {
 
 type IdoMigrationProgress struct {
 	IdoMigrationProgressUpserter `json:",inline"`
+	EnvironmentId                string `json:"environment_id"`
 	HistoryType                  string `json:"history_type"`
 }
 
