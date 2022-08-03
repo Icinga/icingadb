@@ -1,4 +1,4 @@
-# IDO2IcingaDB
+# Icinga DB Migration
 
 ![Icinga Logo]
 
@@ -32,7 +32,7 @@ you will find a copy of this license in the [LICENSE] file.
 
 1. Add the official release repository as described
    in the [installation chapter] of the Icinga DB documentation.
-2. Install the package `ido2icingadb`.
+2. Install the package `icingadb-migration`.
 
 ## Usage
 
@@ -79,17 +79,17 @@ icingadb:
 
 ### Cache directory
 
-Choose a (not necessarily yet existing) directory for IDO2IcingaDB's
+Choose a (not necessarily yet existing) directory for Icinga DB Migration's
 internal cache. If either there isn't much to migrate or the migration
 process won't be interrupted by a reboot (of the machine
-IDO2IcingaDB/database runs on), `mktemp -d` is enough.
+Icinga DB migration/database runs on), `mktemp -d` is enough.
 
 ### Actual migration
 
 Run:
 
 ```shell
-ido2icingadb -c ido2icingadb.yml -t ~/ido2icingadb.tmp
+icingadb-migrate -c icingadb-migration.yml -t ~/icingadb-migration.tmp
 ```
 
 In case of an interrupt re-run.
