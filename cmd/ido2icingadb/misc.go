@@ -15,7 +15,6 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -201,8 +200,7 @@ type historyType struct {
 	// migrationQuery SELECTs source data for actual migration.
 	migrationQuery string
 	// migrate does the actual migration.
-	migrate func(c *Config, idb *icingadb.DB, envId []byte,
-		endpointId [sha1.Size]byte, idbTx *sync.Mutex, ht *historyType)
+	migrate func(c *Config, idb *icingadb.DB, envId []byte, endpointId [sha1.Size]byte, ht *historyType)
 
 	// cacheFile locates <name>.sqlite3.
 	cacheFile string
@@ -259,8 +257,8 @@ var types = historyTypes{
 		idoTable:       "icinga_commenthistory",
 		idoIdColumn:    "commenthistory_id",
 		migrationQuery: commentMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
-			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertCommentRows)
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, ht, convertCommentRows)
 		},
 	},
 	{
@@ -268,8 +266,8 @@ var types = historyTypes{
 		idoTable:       "icinga_downtimehistory",
 		idoIdColumn:    "downtimehistory_id",
 		migrationQuery: downtimeMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
-			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertDowntimeRows)
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, ht, convertDowntimeRows)
 		},
 	},
 	{
@@ -284,8 +282,8 @@ var types = historyTypes{
 			})
 		},
 		migrationQuery: flappingMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
-			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertFlappingRows)
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, ht, convertFlappingRows)
 		},
 	},
 	{
@@ -300,8 +298,8 @@ var types = historyTypes{
 		},
 		cacheLimitQuery: "SELECT MAX(history_id) FROM previous_hard_state",
 		migrationQuery:  notificationMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
-			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertNotificationRows)
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, ht, convertNotificationRows)
 		},
 	},
 	{
@@ -314,8 +312,8 @@ var types = historyTypes{
 		},
 		cacheLimitQuery: "SELECT MAX(history_id) FROM previous_hard_state",
 		migrationQuery:  stateMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, idbTx *sync.Mutex, ht *historyType) {
-			migrateOneType(c, idb, envId, endpId, idbTx, ht, convertStateRows)
+		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, ht *historyType) {
+			migrateOneType(c, idb, envId, endpId, ht, convertStateRows)
 		},
 	},
 }

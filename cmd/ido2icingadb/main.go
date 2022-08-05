@@ -11,7 +11,6 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/config"
-	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
@@ -25,7 +24,6 @@ import (
 	"os"
 	"path"
 	"regexp"
-	"sync"
 	"time"
 )
 
@@ -279,7 +277,6 @@ func fillCache() {
 // migrate does the actual migration.
 func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 	endpointId := sha1.Sum([]byte(c.Icinga2.Endpoint))
-	idbTx := &sync.Mutex{}
 
 	progress := mpb.New()
 	for _, ht := range types {
@@ -287,7 +284,7 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 	}
 
 	types.forEach(func(ht *historyType) {
-		ht.migrate(c, idb, envId, endpointId, idbTx, ht)
+		ht.migrate(c, idb, envId, endpointId, ht)
 	})
 
 	progress.Wait()
@@ -295,7 +292,7 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 
 // migrate does the actual migration for one history type.
 func migrateOneType[IdoRow any](
-	c *Config, idb *icingadb.DB, envId []byte, endpointId [sha1.Size]byte, idbTx *sync.Mutex, ht *historyType,
+	c *Config, idb *icingadb.DB, envId []byte, endpointId [sha1.Size]byte, ht *historyType,
 	convertRows func(env string, envId, endpointId icingadbTypes.Binary,
 		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
 		idoRows []IdoRow) (icingaDbInserts, icingaDbUpserts [][]any, checkpoint any),
@@ -358,13 +355,6 @@ func migrateOneType[IdoRow any](
 			)
 
 			// ... and insert them:
-
-			if idb.DriverName() == driver.MySQL {
-				// Avoid MySQL error 1205 (Lock wait timeout exceeded; try restarting transaction)
-				// due to concurrent transactions upsert the same table (history).
-				idbTx.Lock()
-				defer idbTx.Unlock()
-			}
 
 			tx, err := idb.Beginx()
 			if err != nil {
