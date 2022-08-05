@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"math"
 	"strings"
+	"time"
 )
 
 //go:embed embed/event_time_cache_schema.sql
@@ -238,16 +239,17 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 // (On non-recoverable errors the whole program exits.)
 func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, commitPeriodically func())) {
 	logger := log.With("backend", "cache")
-	var callsSinceLastTx int
 
 	tx, err := cache.Beginx()
 	if err != nil {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
 	}
 
+	const commitInterval = 5 * time.Minute
+	nextCommit := time.Now().Add(commitInterval)
+
 	do(&tx, func() { // commitPeriodically
-		callsSinceLastTx++
-		if callsSinceLastTx == 10000 {
+		if now := time.Now(); now.After(nextCommit) {
 			if err := tx.Commit(); err != nil {
 				logger.Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
 			}
@@ -259,7 +261,7 @@ func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, commitPeriodically func(
 				logger.Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
 			}
 
-			callsSinceLastTx = 0
+			nextCommit = nextCommit.Add(commitInterval)
 		}
 	})
 
