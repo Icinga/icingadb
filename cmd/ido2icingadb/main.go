@@ -356,11 +356,6 @@ func migrateOneType[IdoRow any](
 
 			// ... and insert them:
 
-			tx, err := idb.Beginx()
-			if err != nil {
-				log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't begin transaction"))
-			}
-
 			for _, op := range []struct {
 				data        [][]any
 				stmtBuilder func(any) (string, int)
@@ -383,7 +378,7 @@ func migrateOneType[IdoRow any](
 						context.Background(), ch, idb.BatchSizeByPlaceholders(placeholders), com.NeverSplit[any],
 					)
 					for rows := range bulk {
-						if _, err := tx.NamedExec(query, rows); err != nil {
+						if _, err := idb.NamedExec(query, rows); err != nil {
 							log.With("backend", "Icinga DB", "dml", query, "args", rows).
 								Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 						}
@@ -394,17 +389,13 @@ func migrateOneType[IdoRow any](
 			if lastIdoId != nil {
 				args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
 
-				_, err := tx.NamedExec(upsertProgress, &IdoMigrationProgress{
+				_, err := idb.NamedExec(upsertProgress, &IdoMigrationProgress{
 					IdoMigrationProgressUpserter{lastIdoId}, envIdHex, ht.name,
 				})
 				if err != nil {
 					log.With("backend", "Icinga DB", "dml", upsertProgress, "args", args).
 						Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 				}
-			}
-
-			if err := tx.Commit(); err != nil {
-				log.With("backend", "Icinga DB").Fatalf("%+v", errors.Wrap(err, "can't commit transaction"))
 			}
 
 			ht.bar.IncrBy(len(idoRows))

@@ -151,7 +151,7 @@ func sliceIdoHistory[Row any](
 	}
 
 	args["checkpoint"] = checkpoint
-	args["bulk"] = 100
+	args["bulk"] = 10000
 
 	if snapshot.DriverName() != driver.MySQL {
 		query = strings.ReplaceAll(query, " USE INDEX (PRIMARY)", "")
