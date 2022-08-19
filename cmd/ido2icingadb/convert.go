@@ -371,21 +371,6 @@ func convertDowntimeRows(
 	return
 }
 
-// FlappingEnd updates an already migrated start event with the end event info.
-type FlappingEnd struct {
-	Id                    icingadbTypes.Binary    `json:"id"`
-	EndTime               icingadbTypes.UnixMilli `json:"end_time"`
-	PercentStateChangeEnd icingadbTypes.Float     `json:"percent_state_change_end"`
-}
-
-// Assert interface compliance.
-var _ contracts.TableNamer = (*FlappingEnd)(nil)
-
-// TableName implements the contracts.TableNamer interface.
-func (*FlappingEnd) TableName() string {
-	return "flapping_history"
-}
-
 type flappingRow = struct {
 	FlappinghistoryId  uint64
 	EventTime          int64
