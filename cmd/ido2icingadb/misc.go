@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha1"
+	"fmt"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
@@ -18,8 +19,9 @@ import (
 	"time"
 )
 
-// eta indicates the ETA for possibly slowly incrementing progresses possibly starting from >0%.
-type eta struct {
+// slowlyIncrementingProgressDecorator is the base decorator
+// for possibly slowly incrementing progresses possibly starting from >0%.
+type slowlyIncrementingProgressDecorator struct {
 	decor.WC
 
 	// startProgress is the first progress >0 seen by Decor.
@@ -32,38 +34,73 @@ type eta struct {
 	lastTime time.Time
 }
 
+// update is to be called by Decor and returns whether sipd is warmed up.
+func (sipd *slowlyIncrementingProgressDecorator) update(s decor.Statistics) bool {
+	if s.Completed || s.Current < 1 {
+		return false
+	}
+
+	if sipd.startProgress < 1 {
+		sipd.startProgress = s.Current
+		sipd.startTime = time.Now()
+		sipd.lastProgress = sipd.startProgress
+		sipd.lastTime = sipd.startTime
+
+		return false
+	}
+
+	if s.Current == sipd.startProgress {
+		return false
+	}
+
+	if s.Current > sipd.lastProgress {
+		sipd.lastProgress = s.Current
+		sipd.lastTime = time.Now()
+	}
+
+	return true
+}
+
+// eta indicates the ETA for possibly slowly incrementing progresses possibly starting from >0%.
+type eta struct {
+	slowlyIncrementingProgressDecorator
+}
+
 // Decor implements the decor.Decorator interface.
 func (e *eta) Decor(s decor.Statistics) string {
-	if s.Completed || s.Current < 1 {
+	if e.update(s) {
+		timePerItem := float64(e.lastTime.Sub(e.startTime)) / float64(e.lastProgress-e.startProgress)
+		lastETA := time.Duration(float64(s.Total-s.Current) * timePerItem)
+
+		return e.FormatMsg(((lastETA - time.Since(e.lastTime)) / time.Second * time.Second).String())
+	} else {
 		return ""
 	}
+}
 
-	if e.startProgress < 1 {
-		e.startProgress = s.Current
-		e.startTime = time.Now()
-		e.lastProgress = e.startProgress
-		e.lastTime = e.startTime
+// eta indicates ops/s for possibly slowly incrementing progresses possibly starting from >0%.
+type opsPerSec struct {
+	slowlyIncrementingProgressDecorator
+}
 
+// Decor implements the decor.Decorator interface.
+func (ops *opsPerSec) Decor(s decor.Statistics) string {
+	if ops.update(s) {
+		return ops.FormatMsg(fmt.Sprintf(
+			"%.0f/s",
+			float64(ops.lastProgress-ops.startProgress)/
+				(float64(ops.lastTime.Sub(ops.startTime))/float64(time.Second)),
+		))
+	} else {
 		return ""
 	}
-
-	if s.Current == e.startProgress {
-		return ""
-	}
-
-	if s.Current > e.lastProgress {
-		e.lastProgress = s.Current
-		e.lastTime = time.Now()
-	}
-
-	timePerItem := float64(e.lastTime.Sub(e.startTime)) / float64(e.lastProgress-e.startProgress)
-	lastETA := time.Duration(float64(s.Total-s.Current) * timePerItem)
-
-	return e.FormatMsg(((lastETA - time.Since(e.lastTime)) / time.Second * time.Second).String())
 }
 
 // Assert interface compliance.
-var _ decor.Decorator = (*eta)(nil)
+var (
+	_ decor.Decorator = (*eta)(nil)
+	_ decor.Decorator = (*opsPerSec)(nil)
+)
 
 type IdoMigrationProgressUpserter struct {
 	LastIdoId any `json:"last_ido_id"`
@@ -220,9 +257,14 @@ type historyType struct {
 
 // setupBar (re-)initializes ht.bar.
 func (ht *historyType) setupBar(progress *mpb.Progress) {
-	e := &eta{WC: decor.WC{W: 4}}
+	e := &eta{}
+	ops := &opsPerSec{}
+
+	e.W = 4
+	ops.W = 4
 
 	e.Init()
+	ops.Init()
 
 	ht.bar = progress.AddBar(
 		ht.total,
@@ -231,7 +273,7 @@ func (ht *historyType) setupBar(progress *mpb.Progress) {
 			decor.Name(ht.name, decor.WC{W: len(ht.name) + 1, C: decor.DidentRight}),
 			decor.Percentage(decor.WC{W: 5}),
 		),
-		mpb.AppendDecorators(e),
+		mpb.AppendDecorators(e, decor.Name(" "), ops),
 	)
 }
 
