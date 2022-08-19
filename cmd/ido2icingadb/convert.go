@@ -50,8 +50,8 @@ type commentRow = struct {
 func convertCommentRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []commentRow,
-) (icingaDbInserts, _ [][]any, checkpoint any) {
-	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []any
+) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
+	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []contracts.Entity
 
 	for _, row := range idoRows {
 		typ := objectTypes[row.ObjecttypeId]
@@ -213,7 +213,7 @@ func convertCommentRows(
 		checkpoint = row.CommenthistoryId
 	}
 
-	icingaDbInserts = [][]any{commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck}
+	icingaDbInserts = [][]contracts.Entity{commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck}
 	return
 }
 
@@ -242,8 +242,8 @@ type downtimeRow = struct {
 func convertDowntimeRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []downtimeRow,
-) (icingaDbInserts, _ [][]any, checkpoint any) {
-	var downtimeHistory, allHistory, sla []interface{}
+) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
+	var downtimeHistory, allHistory, sla []contracts.Entity
 
 	for _, row := range idoRows {
 		id := calcObjectId(env, row.Name)
@@ -367,7 +367,7 @@ func convertDowntimeRows(
 		checkpoint = row.DowntimehistoryId
 	}
 
-	icingaDbInserts = [][]interface{}{downtimeHistory, allHistory, sla}
+	icingaDbInserts = [][]contracts.Entity{downtimeHistory, allHistory, sla}
 	return
 }
 
@@ -402,7 +402,7 @@ type flappingRow = struct {
 func convertFlappingRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []flappingRow,
-) (icingaDbInserts, icingaDbUpserts [][]any, checkpoint any) {
+) (icingaDbInserts, icingaDbUpserts [][]contracts.Entity, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}
@@ -423,7 +423,7 @@ func convertFlappingRows(
 		cachedById[c.HistoryId] = convertTime(c.EventTime, c.EventTimeUsec)
 	}
 
-	var flappingHistory, flappingHistoryUpserts, allHistory []any
+	var flappingHistory, flappingHistoryUpserts, allHistory []contracts.Entity
 	for _, row := range idoRows {
 		ts := convertTime(row.EventTime, row.EventTimeUsec)
 
@@ -535,8 +535,8 @@ func convertFlappingRows(
 		checkpoint = row.FlappinghistoryId
 	}
 
-	icingaDbInserts = [][]interface{}{flappingHistory, allHistory}
-	icingaDbUpserts = [][]interface{}{flappingHistoryUpserts}
+	icingaDbInserts = [][]contracts.Entity{flappingHistory, allHistory}
+	icingaDbUpserts = [][]contracts.Entity{flappingHistoryUpserts}
 	return
 }
 
@@ -557,7 +557,7 @@ type notificationRow = struct {
 func convertNotificationRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []notificationRow,
-) (icingaDbInserts, _ [][]any, checkpoint any) {
+) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}
@@ -604,7 +604,7 @@ func convertNotificationRows(
 		perId[contact.Name1] = struct{}{}
 	}
 
-	var notificationHistory, userNotificationHistory, allHistory []interface{}
+	var notificationHistory, userNotificationHistory, allHistory []contracts.Entity
 	for _, row := range idoRows {
 		previousHardState, ok := cachedById[row.NotificationId]
 		if !ok {
@@ -696,7 +696,7 @@ func convertNotificationRows(
 		checkpoint = row.NotificationId
 	}
 
-	icingaDbInserts = [][]interface{}{notificationHistory, userNotificationHistory, allHistory}
+	icingaDbInserts = [][]contracts.Entity{notificationHistory, userNotificationHistory, allHistory}
 	return
 }
 
@@ -752,7 +752,7 @@ type stateRow = struct {
 func convertStateRows(
 	env string, envId, endpointId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []stateRow,
-) (icingaDbInserts, _ [][]any, checkpoint any) {
+) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}
@@ -771,7 +771,7 @@ func convertStateRows(
 		cachedById[c.HistoryId] = c.PreviousHardState
 	}
 
-	var stateHistory, allHistory, sla []interface{}
+	var stateHistory, allHistory, sla []contracts.Entity
 	for _, row := range idoRows {
 		previousHardState, ok := cachedById[row.StatehistoryId]
 		if !ok {
@@ -853,6 +853,6 @@ func convertStateRows(
 		checkpoint = row.StatehistoryId
 	}
 
-	icingaDbInserts = [][]interface{}{stateHistory, allHistory, sla}
+	icingaDbInserts = [][]contracts.Entity{stateHistory, allHistory, sla}
 	return
 }

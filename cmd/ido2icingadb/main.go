@@ -9,17 +9,19 @@ import (
 	"fmt"
 	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
-	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/config"
+	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v6"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"os"
 	"path"
@@ -175,7 +177,7 @@ func connectAll(c *Config) (ido, idb *icingadb.DB) {
 
 // connect connects to which DB as cfg specifies. (On non-recoverable errors the whole program exits.)
 func connect(which string, cfg *config.Database) *icingadb.DB {
-	db, err := cfg.Open(logging.NewLogger(log, 20*time.Second))
+	db, err := cfg.Open(logging.NewLogger(zap.NewNop().Sugar(), 20*time.Second))
 	if err != nil {
 		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
 	}
@@ -295,7 +297,7 @@ func migrateOneType[IdoRow any](
 	c *Config, idb *icingadb.DB, envId []byte, endpointId [sha1.Size]byte, ht *historyType,
 	convertRows func(env string, envId, endpointId icingadbTypes.Binary,
 		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
-		idoRows []IdoRow) (icingaDbInserts, icingaDbUpserts [][]any, checkpoint any),
+		idoRows []IdoRow) (icingaDbInserts, icingaDbUpserts [][]contracts.Entity, checkpoint any),
 ) {
 	var lastQuery string
 	var lastStmt *sqlx.Stmt
@@ -357,31 +359,25 @@ func migrateOneType[IdoRow any](
 			// ... and insert them:
 
 			for _, op := range []struct {
-				data        [][]any
-				stmtBuilder func(any) (string, int)
-			}{{inserts, idb.BuildInsertIgnoreStmt}, {upserts, idb.BuildUpsertStmt}} {
+				kind     string
+				data     [][]contracts.Entity
+				streamer func(context.Context, <-chan contracts.Entity, ...icingadb.OnSuccess[contracts.Entity]) error
+			}{{"INSERT IGNORE", inserts, idb.CreateIgnoreStreamed}, {"UPSERT", upserts, idb.UpsertStreamed}} {
 				for _, table := range op.data {
 					if len(table) < 1 {
 						continue
 					}
 
-					query, placeholders := op.stmtBuilder(table[0])
-
-					ch := make(chan any, len(table))
+					ch := make(chan contracts.Entity, len(table))
 					for _, row := range table {
 						ch <- row
 					}
 
 					close(ch)
 
-					bulk := com.Bulk(
-						context.Background(), ch, idb.BatchSizeByPlaceholders(placeholders), com.NeverSplit[any],
-					)
-					for rows := range bulk {
-						if _, err := idb.NamedExec(query, rows); err != nil {
-							log.With("backend", "Icinga DB", "dml", query, "args", rows).
-								Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
-						}
+					if err := op.streamer(context.Background(), ch); err != nil {
+						log.With("backend", "Icinga DB", "op", op.kind, "table", utils.TableName(table[0])).
+							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 					}
 				}
 			}
