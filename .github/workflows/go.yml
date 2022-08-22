@@ -78,3 +78,31 @@ jobs:
             gitdiff="$(git diff -U0)"
             echo "$gitdiff"
             test -z "$gitdiff"
+
+  vendor-diff:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/setup-go@v3
+      with:
+        go-version: ^1.18
+
+    - name: Checkout base commit
+      uses: actions/checkout@v3
+      with:
+        path: a
+        ref: ${{ github.base_ref }}
+    - name: Download dependencies of base commit
+      run: go mod vendor
+      working-directory: a
+
+    - name: Checkout PR
+      uses: actions/checkout@v3
+      with:
+        path: b
+    - name: Download dependencies of PR
+      run: go mod vendor
+      working-directory: b
+
+    - name: Diff of dependencies
+      run: diff -ur --color=always a/vendor b/vendor || true
