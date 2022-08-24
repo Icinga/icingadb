@@ -54,6 +54,8 @@ func convertCommentRows(
 	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []contracts.Entity
 
 	for _, row := range idoRows {
+		checkpoint = row.CommenthistoryId
+
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
@@ -209,8 +211,6 @@ func convertCommentRows(
 				allHistoryAck = append(allHistoryAck, h2)
 			}
 		}
-
-		checkpoint = row.CommenthistoryId
 	}
 
 	icingaDbInserts = [][]contracts.Entity{commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck}
@@ -246,6 +246,8 @@ func convertDowntimeRows(
 	var downtimeHistory, allHistory, sla []contracts.Entity
 
 	for _, row := range idoRows {
+		checkpoint = row.DowntimehistoryId
+
 		id := calcObjectId(env, row.Name)
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
@@ -363,8 +365,6 @@ func convertDowntimeRows(
 
 		s.DowntimeEnd.History = s
 		sla = append(sla, s)
-
-		checkpoint = row.DowntimehistoryId
 	}
 
 	icingaDbInserts = [][]contracts.Entity{downtimeHistory, allHistory, sla}
@@ -410,6 +410,8 @@ func convertFlappingRows(
 
 	var flappingHistory, flappingHistoryUpserts, allHistory []contracts.Entity
 	for _, row := range idoRows {
+		checkpoint = row.FlappinghistoryId
+
 		ts := convertTime(row.EventTime, row.EventTimeUsec)
 
 		// Needed for ID (see below).
@@ -516,8 +518,6 @@ func convertFlappingRows(
 			h.EventTime.History = h
 			allHistory = append(allHistory, h)
 		}
-
-		checkpoint = row.FlappinghistoryId
 	}
 
 	icingaDbInserts = [][]contracts.Entity{flappingHistory, allHistory}
@@ -591,6 +591,8 @@ func convertNotificationRows(
 
 	var notificationHistory, userNotificationHistory, allHistory []contracts.Entity
 	for _, row := range idoRows {
+		checkpoint = row.NotificationId
+
 		previousHardState, ok := cachedById[row.NotificationId]
 		if !ok {
 			continue
@@ -677,8 +679,6 @@ func convertNotificationRows(
 				UserId:                userId,
 			})
 		}
-
-		checkpoint = row.NotificationId
 	}
 
 	icingaDbInserts = [][]contracts.Entity{notificationHistory, userNotificationHistory, allHistory}
@@ -758,6 +758,8 @@ func convertStateRows(
 
 	var stateHistory, allHistory, sla []contracts.Entity
 	for _, row := range idoRows {
+		checkpoint = row.StatehistoryId
+
 		previousHardState, ok := cachedById[row.StatehistoryId]
 		if !ok {
 			continue
@@ -834,8 +836,6 @@ func convertStateRows(
 				PreviousHardState: previousHardState,
 			})
 		}
-
-		checkpoint = row.StatehistoryId
 	}
 
 	icingaDbInserts = [][]contracts.Entity{stateHistory, allHistory, sla}
