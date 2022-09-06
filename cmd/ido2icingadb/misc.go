@@ -173,30 +173,32 @@ func calcServiceId(env, name1, name2 string) []byte {
 	return hashAny([2]string{env, name1 + "!" + name2})
 }
 
-// sliceIdoHistory performs query with args+map[string]interface{}{"checkpoint": checkpoint, "bulk": bulk} on snapshot
+// sliceIdoHistory performs query with args+fromid,toid,checkpoint,bulk on ht.snapshot
 // and passes the results to onRows until either an empty result set or onRows() returns nil.
 // Rationale: split the likely large result set of a query by adding a WHERE condition and a LIMIT,
 // both with :named placeholders (:checkpoint, :bulk).
 // checkpoint is the initial value for the WHERE condition, onRows() returns follow-up ones.
 // (On non-recoverable errors the whole program exits.)
 func sliceIdoHistory[Row any](
-	snapshot *sqlx.Tx, query string, args map[string]interface{},
+	ht *historyType, query string, args map[string]any,
 	checkpoint interface{}, onRows func([]Row) (checkpoint interface{}),
 ) {
 	if args == nil {
 		args = map[string]interface{}{}
 	}
 
+	args["fromid"] = ht.fromId
+	args["toid"] = ht.toId
 	args["checkpoint"] = checkpoint
 	args["bulk"] = 20000
 
-	if snapshot.DriverName() != driver.MySQL {
+	if ht.snapshot.DriverName() != driver.MySQL {
 		query = strings.ReplaceAll(query, " USE INDEX (PRIMARY)", "")
 	}
 
 	for {
 		// TODO: use Tx#SelectNamed() one nice day (https://github.com/jmoiron/sqlx/issues/779)
-		stmt, err := snapshot.PrepareNamed(query)
+		stmt, err := ht.snapshot.PrepareNamed(query)
 		if err != nil {
 			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
 		}
@@ -228,6 +230,10 @@ type historyType struct {
 	idoTable string
 	// idoIdColumn specifies idoTable's primary key.
 	idoIdColumn string
+	// idoStartColumns specifies idoTable's event start time locations. (First non-NULL is used.)
+	idoStartColumns []string
+	// idoEndColumns specifies idoTable's event end time locations. (First non-NULL is used.)
+	idoEndColumns []string
 	// cacheSchema specifies <name>.sqlite3's structure.
 	cacheSchema string
 	// cacheFiller fills cache from snapshot.
@@ -245,6 +251,10 @@ type historyType struct {
 	cache *sqlx.DB
 	// snapshot represents the data source.
 	snapshot *sqlx.Tx
+	// fromId is the first IDO row ID to migrate.
+	fromId uint64
+	// toId is the last IDO row ID to migrate.
+	toId uint64
 	// total summarizes the source data.
 	total int64
 	// done summarizes the migrated data.
@@ -295,28 +305,36 @@ func (hts historyTypes) forEach(f func(*historyType)) {
 
 var types = historyTypes{
 	{
-		name:           "ack & comment",
-		idoTable:       "icinga_commenthistory",
-		idoIdColumn:    "commenthistory_id",
+		name:            "ack & comment",
+		idoTable:        "icinga_commenthistory",
+		idoIdColumn:     "commenthistory_id",
+		idoStartColumns: []string{"entry_time"},
+		// Manual deletion time wins vs. time of expiration which never happens due to manual deletion.
+		idoEndColumns:  []string{"deletion_time", "expiration_time"},
 		migrationQuery: commentMigrationQuery,
 		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, ht *historyType) {
 			migrateOneType(c, idb, envId, endpId, ht, convertCommentRows)
 		},
 	},
 	{
-		name:           "downtime",
-		idoTable:       "icinga_downtimehistory",
-		idoIdColumn:    "downtimehistory_id",
-		migrationQuery: downtimeMigrationQuery,
+		name:        "downtime",
+		idoTable:    "icinga_downtimehistory",
+		idoIdColumn: "downtimehistory_id",
+		// Fall back to scheduled time if actual time is missing.
+		idoStartColumns: []string{"actual_start_time", "scheduled_start_time"},
+		idoEndColumns:   []string{"actual_end_time", "scheduled_end_time"},
+		migrationQuery:  downtimeMigrationQuery,
 		migrate: func(c *Config, idb *icingadb.DB, envId []byte, endpId [20]byte, ht *historyType) {
 			migrateOneType(c, idb, envId, endpId, ht, convertDowntimeRows)
 		},
 	},
 	{
-		name:        "flapping",
-		idoTable:    "icinga_flappinghistory",
-		idoIdColumn: "flappinghistory_id",
-		cacheSchema: eventTimeCacheSchema,
+		name:            "flapping",
+		idoTable:        "icinga_flappinghistory",
+		idoIdColumn:     "flappinghistory_id",
+		idoStartColumns: []string{"event_time"},
+		idoEndColumns:   []string{"event_time"},
+		cacheSchema:     eventTimeCacheSchema,
 		cacheFiller: func(ht *historyType) {
 			buildEventTimeCache(ht, []string{
 				"xh.flappinghistory_id id", "UNIX_TIMESTAMP(xh.event_time) event_time",
@@ -329,10 +347,12 @@ var types = historyTypes{
 		},
 	},
 	{
-		name:        "notification",
-		idoTable:    "icinga_notifications",
-		idoIdColumn: "notification_id",
-		cacheSchema: previousHardStateCacheSchema,
+		name:            "notification",
+		idoTable:        "icinga_notifications",
+		idoIdColumn:     "notification_id",
+		idoStartColumns: []string{"start_time"},
+		idoEndColumns:   []string{"end_time"},
+		cacheSchema:     previousHardStateCacheSchema,
 		cacheFiller: func(ht *historyType) {
 			buildPreviousHardStateCache(ht, []string{
 				"xh.notification_id id", "xh.object_id", "xh.state last_hard_state",
@@ -345,10 +365,12 @@ var types = historyTypes{
 		},
 	},
 	{
-		name:        "state",
-		idoTable:    "icinga_statehistory",
-		idoIdColumn: "statehistory_id",
-		cacheSchema: previousHardStateCacheSchema,
+		name:            "state",
+		idoTable:        "icinga_statehistory",
+		idoIdColumn:     "statehistory_id",
+		idoStartColumns: []string{"state_time"},
+		idoEndColumns:   []string{"state_time"},
+		cacheSchema:     previousHardStateCacheSchema,
 		cacheFiller: func(ht *historyType) {
 			buildPreviousHardStateCache(ht, []string{"xh.statehistory_id id", "xh.object_id", "xh.last_hard_state"})
 		},

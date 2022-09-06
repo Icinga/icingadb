@@ -8,6 +8,7 @@ SELECT dh.downtimehistory_id, UNIX_TIMESTAMP(dh.entry_time) entry_time, dh.autho
 FROM icinga_downtimehistory dh USE INDEX (PRIMARY)
 INNER JOIN icinga_objects o ON o.object_id=dh.object_id
 LEFT JOIN icinga_scheduleddowntime sd ON sd.scheduleddowntime_id=dh.triggered_by_id
-WHERE dh.downtimehistory_id > :checkpoint -- where we were interrupted
+WHERE dh.downtimehistory_id BETWEEN :fromid AND :toid
+AND dh.downtimehistory_id > :checkpoint -- where we were interrupted
 ORDER BY dh.downtimehistory_id -- this way we know what has already been migrated from just the last row's ID
 LIMIT :bulk

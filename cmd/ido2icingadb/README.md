@@ -47,7 +47,7 @@ you will find a copy of this license in the [LICENSE] file.
     for the period both IDO and Icinga DB are active.
     Disable the IDO feature -- the sooner, the better!
     Or read on while not disabling it yet.
-    There is a way to avoid duplicate events.
+    There are ways to avoid duplicate events.
 
 ### Configuration file
 
@@ -67,6 +67,9 @@ ido:
    database: icinga
    user: icinga
    password: CHANGEME
+   # Input time range
+   #from: 0
+   #to: 2147483647
 # Icinga DB database
 icingadb:
    type: mysql
@@ -76,6 +79,21 @@ icingadb:
    user: icingadb
    password: CHANGEME
 ```
+
+#### Input time range
+
+By default, everything is migrated. If you wish, you can restrict the input
+data's start and/or end by giving `from` and/or `to` under `ido:` as Unix
+timestamps (in seconds).
+
+Examples:
+
+* Now: Run in a shell: `date +%s`
+* One year ago: Run in a shell: `date -d -1year +%s`
+* Icinga DB usage start time: Query the Icinga DB database:
+  `SELECT MIN(event_time)/1000 FROM history;`
+
+The latter is useful for the range end to avoid duplicate events.
 
 ### Cache directory
 
@@ -101,10 +119,12 @@ In case of an interrupt re-run.
 
 ### Avoid duplicate events (optional)
 
-The easiest option is to both enable Icinga DB
+The easiest option has already been mentioned in the _Input time range_ section.
+
+Another option is to both enable Icinga DB
 and disable IDO within one Icinga 2 reload.
 
-But if this doesn't work on first try, you'll lose history.
+But if the latter doesn't work on first try, you'll lose history.
 Not to lose any data consider everything done above just a test.
 Reset Icinga DB and re-migrate as follows:
 

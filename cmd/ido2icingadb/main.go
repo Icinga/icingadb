@@ -23,9 +23,11 @@ import (
 	"github.com/vbauerster/mpb/v6"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+	"math"
 	"os"
 	"path"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -39,7 +41,11 @@ type Flags struct {
 
 // Config defines the YAML config structure.
 type Config struct {
-	IDO      config.Database `yaml:"ido"`
+	IDO struct {
+		config.Database `yaml:"-,inline"`
+		From            int32 `yaml:"from"`
+		To              int32 `yaml:"to" default:"2147483647"`
+	} `yaml:"ido"`
 	IcingaDB config.Database `yaml:"icingadb"`
 	// Icinga2 specifies information the IDO doesn't provide.
 	Icinga2 struct {
@@ -83,6 +89,9 @@ func main() {
 	mkCache(f, idb.Mapper)
 
 	log.Info("Computing progress")
+
+	// Convert Config#IDO.From and .To to IDs to restrict data by PK.
+	computeIdRange(c)
 
 	// computeProgress figures out which data has already been migrated
 	// not to start from the beginning every time in the following migrate().
@@ -162,7 +171,7 @@ func connectAll(c *Config) (ido, idb *icingadb.DB) {
 	eg, _ := errgroup.WithContext(context.Background())
 
 	eg.Go(func() error {
-		ido = connect("IDO", &c.IDO)
+		ido = connect("IDO", &c.IDO.Database)
 		return nil
 	})
 
@@ -202,6 +211,45 @@ func startIdoTx(ido *icingadb.DB) {
 	})
 }
 
+// computeIdRange initializes types[*].fromId and types[*].toId.
+// (On non-recoverable errors the whole program exits.)
+func computeIdRange(c *Config) {
+	types.forEach(func(ht *historyType) {
+		getBorderId := func(id *uint64, timeColumns []string, compOperator string, borderTime int32, sortOrder string) {
+			deZeroFied := make([]string, 0, len(timeColumns))
+			for _, column := range timeColumns {
+				deZeroFied = append(deZeroFied, fmt.Sprintf(
+					"CASE WHEN %[1]s < '1970-01-03 00:00:00' THEN NULL ELSE %[1]s END", column,
+				))
+			}
+
+			var timeExpr string
+			if len(deZeroFied) > 1 {
+				timeExpr = "COALESCE(" + strings.Join(deZeroFied, ",") + ")"
+			} else {
+				timeExpr = deZeroFied[0]
+			}
+
+			query := ht.snapshot.Rebind(
+				"SELECT " + ht.idoIdColumn + " FROM " + ht.idoTable + " WHERE " + timeExpr + " " + compOperator +
+					" FROM_UNIXTIME(?) ORDER BY " + ht.idoIdColumn + " " + sortOrder + " LIMIT 1",
+			)
+
+			switch err := ht.snapshot.Get(id, query, borderTime); err {
+			case nil, sql.ErrNoRows:
+			default:
+				log.With("backend", "IDO", "query", query, "args", []any{borderTime}).
+					Fatalf("%+v", errors.Wrap(err, "can't perform query"))
+			}
+		}
+
+		ht.fromId = math.MaxInt64
+
+		getBorderId(&ht.fromId, ht.idoEndColumns, ">=", c.IDO.From, "ASC")
+		getBorderId(&ht.toId, ht.idoStartColumns, "<=", c.IDO.To, "DESC")
+	})
+}
+
 //go:embed embed/ido_migration_progress_schema.sql
 var idoMigrationProgressSchema string
 
@@ -238,9 +286,10 @@ func computeProgress(idb *icingadb.DB, envId []byte) {
 				// For actual migration icinga_objects will be joined anyway,
 				// so it makes no sense to take vanished objects into account.
 				"SELECT CASE WHEN xh."+ht.idoIdColumn+"<=? THEN 1 ELSE 0 END migrated, COUNT(*) cnt FROM "+
-					ht.idoTable+" xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id GROUP BY migrated",
+					ht.idoTable+" xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+
+					ht.idoIdColumn+" BETWEEN ? AND ? GROUP BY migrated",
 			),
-			ht.lastId,
+			ht.lastId, ht.fromId, ht.toId,
 		)
 		if err != nil {
 			log.Fatalf("%+v", errors.Wrap(err, "can't count query"))
@@ -337,9 +386,9 @@ func migrateOneType[IdoRow any](
 	// For the case that the cache was older that the IDO,
 	// but ht.cacheFiller couldn't update it, limit (WHERE) our source data set.
 	if ht.cacheLimitQuery != "" {
-		var limit uint64
+		var limit sql.NullInt64
 		cacheGet(ht.cache, &limit, ht.cacheLimitQuery)
-		args = map[string]interface{}{"cache_limit": limit}
+		args = map[string]interface{}{"cache_limit": limit.Int64}
 	}
 
 	upsertProgress, _ := idb.BuildUpsertStmt(&IdoMigrationProgress{})
@@ -349,7 +398,7 @@ func migrateOneType[IdoRow any](
 
 	// Stream IDO rows, ...
 	sliceIdoHistory(
-		ht.snapshot, ht.migrationQuery, args, ht.lastId,
+		ht, ht.migrationQuery, args, ht.lastId,
 		func(idoRows []IdoRow) (checkpoint interface{}) {
 			// ... convert them, ...
 			inserts, upserts, lastIdoId := convertRows(

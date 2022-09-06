@@ -3,6 +3,7 @@ SELECT sh.statehistory_id, UNIX_TIMESTAMP(sh.state_time) state_time, sh.state_ti
   sh.output, sh.long_output, sh.check_source, o.objecttype_id, o.name1, COALESCE(o.name2, '') name2
 FROM icinga_statehistory sh USE INDEX (PRIMARY)
 INNER JOIN icinga_objects o ON o.object_id=sh.object_id
-WHERE sh.statehistory_id <= :cache_limit AND sh.statehistory_id > :checkpoint -- where we were interrupted
+WHERE sh.statehistory_id BETWEEN :fromid AND :toid
+AND sh.statehistory_id <= :cache_limit AND sh.statehistory_id > :checkpoint -- where we were interrupted
 ORDER BY sh.statehistory_id -- this way we know what has already been migrated from just the last row's ID
 LIMIT :bulk
