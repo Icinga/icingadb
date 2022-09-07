@@ -26,6 +26,7 @@ import (
 	"math"
 	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -86,7 +87,7 @@ func main() {
 	startIdoTx(ido)
 
 	// Prepare the directory structure the following fillCache() will need later.
-	mkCache(f, idb.Mapper)
+	mkCache(f, c, idb.Mapper)
 
 	log.Info("Computing progress")
 
@@ -95,7 +96,7 @@ func main() {
 
 	// computeProgress figures out which data has already been migrated
 	// not to start from the beginning every time in the following migrate().
-	computeProgress(idb, envId)
+	computeProgress(c, idb, envId)
 
 	// On rationale read buildEventTimeCache() and buildPreviousHardStateCache() docs.
 	log.Info("Filling cache")
@@ -105,7 +106,7 @@ func main() {
 	migrate(c, idb, envId)
 
 	log.Info("Cleaning up cache")
-	cleanupCache()
+	cleanupCache(f)
 }
 
 // parseConfig validates the f.Config file and returns the config and -1 or - on failure - nil and an exit code.
@@ -135,7 +136,7 @@ var nonWords = regexp.MustCompile(`\W+`)
 
 // mkCache ensures <f.Cache>/<history type>.sqlite3 files are present and contain their schema
 // and initializes types[*].cache. (On non-recoverable errors the whole program exits.)
-func mkCache(f *Flags, mapper *reflectx.Mapper) {
+func mkCache(f *Flags, c *Config, mapper *reflectx.Mapper) {
 	log.Info("Preparing cache")
 
 	if err := os.MkdirAll(f.Cache, 0700); err != nil {
@@ -147,7 +148,10 @@ func mkCache(f *Flags, mapper *reflectx.Mapper) {
 			return
 		}
 
-		file := path.Join(f.Cache, nonWords.ReplaceAllLiteralString(ht.name, "_")+".sqlite3")
+		file := path.Join(f.Cache, fmt.Sprintf(
+			"%s_%d-%d.sqlite3", nonWords.ReplaceAllLiteralString(ht.name, "_"), c.IDO.From, c.IDO.To,
+		))
+
 		var err error
 
 		ht.cache, err = sqlx.Open("sqlite3", "file:"+file)
@@ -255,7 +259,7 @@ var idoMigrationProgressSchema string
 
 // computeProgress initializes types[*].lastId, types[*].total and types[*].done.
 // (On non-recoverable errors the whole program exits.)
-func computeProgress(idb *icingadb.DB, envId []byte) {
+func computeProgress(c *Config, idb *icingadb.DB, envId []byte) {
 	if _, err := idb.Exec(idoMigrationProgressSchema); err != nil {
 		log.Fatalf("%+v", errors.Wrap(err, "can't create table ido_migration_progress"))
 	}
@@ -263,13 +267,16 @@ func computeProgress(idb *icingadb.DB, envId []byte) {
 	envIdHex := hex.EncodeToString(envId)
 	types.forEach(func(ht *historyType) {
 		var query = idb.Rebind(
-			"SELECT last_ido_id FROM ido_migration_progress WHERE environment_id=? AND history_type=?",
+			"SELECT last_ido_id FROM ido_migration_progress" +
+				" WHERE environment_id=? AND history_type=? AND from_ts=? AND to_ts=?",
 		)
 
-		switch err := idb.Get(&ht.lastId, query, envIdHex, ht.name); err {
+		args := [...]any{envIdHex, ht.name, c.IDO.From, c.IDO.To}
+
+		switch err := idb.Get(&ht.lastId, query, args[:]...); err {
 		case nil, sql.ErrNoRows:
 		default:
-			log.With("backend", "Icinga DB", "query", query, "args", []interface{}{ht.name}).
+			log.With("backend", "Icinga DB", "query", query, "args", args[:]).
 				Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 		}
 	})
@@ -435,7 +442,7 @@ func migrateOneType[IdoRow any](
 				args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
 
 				_, err := idb.NamedExec(upsertProgress, &IdoMigrationProgress{
-					IdoMigrationProgressUpserter{lastIdoId}, envIdHex, ht.name,
+					IdoMigrationProgressUpserter{lastIdoId}, envIdHex, ht.name, c.IDO.From, c.IDO.To,
 				})
 				if err != nil {
 					log.With("backend", "Icinga DB", "dml", upsertProgress, "args", args).
@@ -452,16 +459,22 @@ func migrateOneType[IdoRow any](
 }
 
 // cleanupCache removes <f.Cache>/<history type>.sqlite3 files.
-func cleanupCache() {
+func cleanupCache(f *Flags) {
 	types.forEach(func(ht *historyType) {
 		if ht.cacheFile != "" {
 			if err := ht.cache.Close(); err != nil {
 				log.With("file", ht.cacheFile).Warnf("%+v", errors.Wrap(err, "can't close SQLite database"))
 			}
-
-			if err := os.Remove(ht.cacheFile); err != nil {
-				log.With("file", ht.cacheFile).Warnf("%+v", errors.Wrap(err, "can't remove SQLite database"))
-			}
 		}
 	})
+
+	if matches, err := filepath.Glob(path.Join(f.Cache, "*.sqlite3")); err == nil {
+		for _, match := range matches {
+			if err := os.Remove(match); err != nil {
+				log.With("file", match).Warnf("%+v", errors.Wrap(err, "can't remove SQLite database"))
+			}
+		}
+	} else {
+		log.With("dir", f.Cache).Warnf("%+v", errors.Wrap(err, "can't list SQLite databases"))
+	}
 }

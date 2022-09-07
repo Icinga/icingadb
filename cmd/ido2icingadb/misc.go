@@ -115,6 +115,8 @@ type IdoMigrationProgress struct {
 	IdoMigrationProgressUpserter `json:",inline"`
 	EnvironmentId                string `json:"environment_id"`
 	HistoryType                  string `json:"history_type"`
+	FromTs                       int32  `json:"from_ts"`
+	ToTs                         int32  `json:"to_ts"`
 }
 
 // Assert interface compliance.
