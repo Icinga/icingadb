@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal/command"
-	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
@@ -135,7 +134,6 @@ func run() int {
 		ha.Close(ctx)
 		cancelCtx()
 	}()
-	s := icingadb.NewSync(db, rc, logs.GetChildLogger("config-sync"))
 	hs := history.NewSync(db, rc, logs.GetChildLogger("history-sync"))
 	rt := icingadb.NewRuntimeUpdates(db, rc, logs.GetChildLogger("runtime-updates"))
 	ods := overdue.NewSync(db, rc, logs.GetChildLogger("overdue-sync"))
@@ -213,40 +211,7 @@ func run() int {
 						atomic.StoreInt64(&telemetry.OngoingSyncStartMilli, syncStart.UnixMilli())
 
 						logger.Info("Starting config sync")
-						for _, factory := range v1.ConfigFactories {
-							factory := factory
-
-							configInitSync.Add(1)
-							g.Go(func() error {
-								defer configInitSync.Done()
-
-								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump)
-							})
-						}
 						logger.Info("Starting initial state sync")
-						for _, factory := range v1.StateFactories {
-							factory := factory
-
-							stateInitSync.Add(1)
-							g.Go(func() error {
-								defer stateInitSync.Done()
-
-								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump)
-							})
-						}
-
-						configInitSync.Add(1)
-						g.Go(func() error {
-							defer configInitSync.Done()
-
-							select {
-							case <-dump.Done("icinga:customvar"):
-							case <-synctx.Done():
-								return synctx.Err()
-							}
-
-							return s.SyncCustomvars(synctx)
-						})
 
 						g.Go(func() error {
 							configInitSync.Wait()
