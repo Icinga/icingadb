@@ -2,6 +2,7 @@ package common
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/utils"
 )
 
@@ -44,6 +45,18 @@ func (s SyncSubject) Entity() contracts.Entity {
 
 // Factory returns the entity factory function that calls Init() on the created contracts.Entity if applicable.
 func (s SyncSubject) Factory() contracts.EntityFactoryFunc {
+	return s.factory
+}
+
+// FactoryForDelta behaves like Factory() unless s is WithChecksum().
+// In the latter case it returns a factory for EntityWithChecksum instead.
+// Rationale: Sync#ApplyDelta() uses its input entities which are WithChecksum() only for the delta itself
+// and not for insertion into the database, so EntityWithChecksum is enough. And it consumes less memory.
+func (s SyncSubject) FactoryForDelta() contracts.EntityFactoryFunc {
+	if s.withChecksum {
+		return v1.NewEntityWithChecksum
+	}
+
 	return s.factory
 }
 

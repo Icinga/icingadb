@@ -222,7 +222,7 @@ func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-ch
 	// Let errors from HYield cancel the group.
 	com.ErrgroupReceive(g, errs)
 
-	desired, errs := CreateEntities(ctx, subject.Factory(), pairs, runtime.NumCPU())
+	desired, errs := CreateEntities(ctx, subject.FactoryForDelta(), pairs, runtime.NumCPU())
 	// Let errors from CreateEntities cancel the group.
 	com.ErrgroupReceive(g, errs)
 

@@ -84,7 +84,9 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 	}
 
 	actual, dbErrs := s.db.YieldAll(
-		ctx, subject.Factory(), s.db.BuildSelectStmt(NewScopedEntity(subject.Entity(), e.Meta()), subject.Entity().Fingerprint()), e.Meta())
+		ctx, subject.FactoryForDelta(),
+		s.db.BuildSelectStmt(NewScopedEntity(subject.Entity(), e.Meta()), subject.Entity().Fingerprint()), e.Meta(),
+	)
 	// Let errors from DB cancel our group.
 	com.ErrgroupReceive(g, dbErrs)
 
@@ -184,7 +186,9 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	com.ErrgroupReceive(g, errs)
 
 	actualCvs, errs := s.db.YieldAll(
-		ctx, cv.Factory(), s.db.BuildSelectStmt(NewScopedEntity(cv.Entity(), e.Meta()), cv.Entity().Fingerprint()), e.Meta())
+		ctx, cv.FactoryForDelta(),
+		s.db.BuildSelectStmt(NewScopedEntity(cv.Entity(), e.Meta()), cv.Entity().Fingerprint()), e.Meta(),
+	)
 	com.ErrgroupReceive(g, errs)
 
 	g.Go(func() error {
@@ -194,7 +198,9 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	flatCv := common.NewSyncSubject(v1.NewCustomvarFlat)
 
 	actualFlatCvs, errs := s.db.YieldAll(
-		ctx, flatCv.Factory(), s.db.BuildSelectStmt(NewScopedEntity(flatCv.Entity(), e.Meta()), flatCv.Entity().Fingerprint()), e.Meta())
+		ctx, flatCv.FactoryForDelta(),
+		s.db.BuildSelectStmt(NewScopedEntity(flatCv.Entity(), e.Meta()), flatCv.Entity().Fingerprint()), e.Meta(),
+	)
 	com.ErrgroupReceive(g, errs)
 
 	g.Go(func() error {
