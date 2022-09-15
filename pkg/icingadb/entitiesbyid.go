@@ -35,7 +35,9 @@ func (ebi EntitiesById) Entities(ctx context.Context) <-chan contracts.Entity {
 	go func() {
 		defer close(entities)
 
-		for _, v := range ebi {
+		for k, v := range ebi {
+			delete(ebi, k)
+
 			select {
 			case <-ctx.Done():
 				return

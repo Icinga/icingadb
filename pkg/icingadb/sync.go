@@ -126,6 +126,8 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 			entities = delta.Create.Entities(ctx)
 		}
 
+		delta.Create = nil
+
 		g.Go(func() error {
 			return s.db.CreateStreamed(ctx, entities, OnSuccessIncrement[contracts.Entity](stat))
 		})
@@ -148,6 +150,8 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		// Let errors from SetChecksums cancel our group.
 		com.ErrgroupReceive(g, errs)
 
+		delta.Update = nil
+
 		g.Go(func() error {
 			// Using upsert here on purpose as this is the fastest way to do bulk updates.
 			// However, there is a risk that errors in the sync implementation could silently insert new rows.
@@ -159,7 +163,10 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	if len(delta.Delete) > 0 {
 		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		g.Go(func() error {
-			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), OnSuccessIncrement[any](stat))
+			ids := delta.Delete.IDs()
+			delta.Delete = nil
+
+			return s.db.Delete(ctx, delta.Subject.Entity(), ids, OnSuccessIncrement[any](stat))
 		})
 	}
 

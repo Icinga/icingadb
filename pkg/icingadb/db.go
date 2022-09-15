@@ -592,6 +592,8 @@ func (db *DB) Delete(
 	}
 	close(idsCh)
 
+	ids = nil
+
 	return db.DeleteStreamed(ctx, entityType, idsCh, onSuccess...)
 }
 

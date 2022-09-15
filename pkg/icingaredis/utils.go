@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"sync"
 )
 
 // Streams represents a Redis stream key to ID mapping.
@@ -86,11 +87,19 @@ func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksu
 		defer close(entitiesWithChecksum)
 
 		g, ctx := errgroup.WithContext(ctx)
+		var checksumsMutex sync.Mutex
 
 		for i := 0; i < concurrent; i++ {
 			g.Go(func() error {
 				for entity := range entities {
-					if checksumer, ok := checksums[entity.ID().String()]; ok {
+					key := entity.ID().String()
+
+					checksumsMutex.Lock()
+					checksumer, ok := checksums[key]
+					delete(checksums, key)
+					checksumsMutex.Unlock()
+
+					if ok {
 						entity.(contracts.Checksumer).SetChecksum(checksumer.(contracts.Checksumer).Checksum())
 					} else {
 						return errors.Errorf("no checksum for %#v", entity)

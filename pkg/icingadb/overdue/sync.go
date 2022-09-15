@@ -109,6 +109,8 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 			pipe.SAdd(ctx, key, ids...)
 		}
 
+		rows = nil
+
 		return nil
 	})
 
