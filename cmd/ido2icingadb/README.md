@@ -47,7 +47,7 @@ you will find a copy of this license in the [LICENSE] file.
     for the period both IDO and Icinga DB are active.
     Disable the IDO feature -- the sooner, the better!
     Or read on while not disabling it yet.
-    There are ways to avoid duplicate events.
+    There is a way to avoid duplicate events.
 
 ### Configuration file
 
@@ -116,31 +116,6 @@ In case of an interrupt re-run.
 
     If there is much to migrate, use e.g. tmux to
     protect yourself against SSH connection losses.
-
-### Avoid duplicate events (optional)
-
-The easiest option has already been mentioned in the _Input time range_ section.
-
-Another option is to both enable Icinga DB
-and disable IDO within one Icinga 2 reload.
-
-But if the latter doesn't work on first try, you'll lose history.
-Not to lose any data consider everything done above just a test.
-Reset Icinga DB and re-migrate as follows:
-
-!!! warning
-
-    The following assumes you didn't disable the IDO, yet!
-
-1. Disable the Icinga DB feature: `icinga2 feature disable icingadb`
-2. Reload Icinga 2: `systemctl reload icinga2`
-3. Stop Icinga DB: `systemctl stop icingadb`
-4. Reset Redis: `icingadb-redis-cli flushdb`
-5. Re-create Icinga DB's database
-   (drop database, create database, import schema, grant permissions)
-6. Start Icinga DB: `systemctl start icingadb`
-7. Both re-enable Icinga DB and disable IDO within one Icinga 2 reload
-8. Migrate history again, with a clean cache directory (just to be sure)
 
 ## Support
 
