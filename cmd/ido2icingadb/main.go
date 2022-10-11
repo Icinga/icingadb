@@ -82,6 +82,10 @@ func main() {
 
 	ido, idb := connectAll(c)
 
+	if err := idb.CheckSchema(context.Background()); err != nil {
+		log.Fatalf("%+v", err)
+	}
+
 	// Start repeatable-read-isolated transactions (consistent SELECTs)
 	// not to have to care for IDO data changes during migration.
 	startIdoTx(ido)
