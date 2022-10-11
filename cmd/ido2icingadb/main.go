@@ -275,12 +275,10 @@ func computeProgress(c *Config, idb *icingadb.DB, envId []byte) {
 				" WHERE environment_id=? AND history_type=? AND from_ts=? AND to_ts=?",
 		)
 
-		args := [...]any{envIdHex, ht.name, c.IDO.From, c.IDO.To}
+		args := []any{envIdHex, ht.name, c.IDO.From, c.IDO.To}
 
-		switch err := idb.Get(&ht.lastId, query, args[:]...); err {
-		case nil, sql.ErrNoRows:
-		default:
-			log.With("backend", "Icinga DB", "query", query, "args", args[:]).
+		if err := idb.Get(&ht.lastId, query, args...); err != nil && err != sql.ErrNoRows {
+			log.With("backend", "Icinga DB", "query", query, "args", args).
 				Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 		}
 	})
