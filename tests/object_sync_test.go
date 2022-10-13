@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 	"io"
 	"reflect"
 	"sort"
@@ -328,7 +329,7 @@ func TestObjectSync(t *testing.T) {
 					t.Parallel()
 
 					client.CreateObject(t, "services", *service.HostName+"!"+service.Name, map[string]interface{}{
-						"attrs": makeIcinga2ApiAttributes(service),
+						"attrs": makeIcinga2ApiAttributes(service, false),
 					})
 
 					eventually.Assert(t, func(t require.TestingT) {
@@ -387,7 +388,7 @@ func TestObjectSync(t *testing.T) {
 						}, 20*time.Second, 1*time.Second, "service with name=%q should exist in database", service.Name)
 
 						client.UpdateObject(t, "services", *service.HostName+"!"+service.Name, map[string]interface{}{
-							"attrs": makeIcinga2ApiAttributes(service),
+							"attrs": makeIcinga2ApiAttributes(service, true),
 						})
 
 						eventually.Assert(t, func(t require.TestingT) {
@@ -426,7 +427,7 @@ func TestObjectSync(t *testing.T) {
 					t.Parallel()
 
 					client.CreateObject(t, "users", user.Name, map[string]interface{}{
-						"attrs": makeIcinga2ApiAttributes(user),
+						"attrs": makeIcinga2ApiAttributes(user, false),
 					})
 
 					eventually.Assert(t, func(t require.TestingT) {
@@ -465,7 +466,7 @@ func TestObjectSync(t *testing.T) {
 
 					t.Run(user.VariantInfoString(), func(t *testing.T) {
 						client.UpdateObject(t, "users", userName, map[string]interface{}{
-							"attrs": makeIcinga2ApiAttributes(user),
+							"attrs": makeIcinga2ApiAttributes(user, true),
 						})
 
 						eventually.Assert(t, func(t require.TestingT) {
@@ -488,7 +489,7 @@ func TestObjectSync(t *testing.T) {
 					t.Parallel()
 
 					client.CreateObject(t, "notifications", notification.fullName(), map[string]interface{}{
-						"attrs": makeIcinga2ApiAttributes(notification),
+						"attrs": makeIcinga2ApiAttributes(notification, false),
 					})
 
 					eventually.Assert(t, func(t require.TestingT) {
@@ -520,7 +521,7 @@ func TestObjectSync(t *testing.T) {
 				}
 
 				client.CreateObject(t, "notifications", baseNotification.fullName(), map[string]interface{}{
-					"attrs": makeIcinga2ApiAttributes(baseNotification),
+					"attrs": makeIcinga2ApiAttributes(baseNotification, false),
 				})
 
 				require.Eventuallyf(t, func() bool {
@@ -597,7 +598,7 @@ func TestObjectSync(t *testing.T) {
 
 					t.Run(notification.VariantInfoString(), func(t *testing.T) {
 						client.UpdateObject(t, "notifications", notification.fullName(), map[string]interface{}{
-							"attrs": makeIcinga2ApiAttributes(notification),
+							"attrs": makeIcinga2ApiAttributes(notification, true),
 						})
 
 						eventually.Assert(t, func(t require.TestingT) {
@@ -743,7 +744,7 @@ func makeTestSyncHosts(t *testing.T) []Host {
 type Service struct {
 	Name                  string             `                                  icingadb:"name"`
 	DisplayName           string             `icinga2:"display_name"            icingadb:"display_name"`
-	HostName              *string            `icinga2:"host_name"               icingadb:"host.name"`
+	HostName              *string            `icinga2:"host_name,nomodify"      icingadb:"host.name"`
 	CheckCommandName      string             `icinga2:"check_command"           icingadb:"checkcommand_name"`
 	MaxCheckAttempts      float64            `icinga2:"max_check_attempts"      icingadb:"max_check_attempts"`
 	CheckPeriodName       string             `icinga2:"check_period"            icingadb:"check_timeperiod_name"`
@@ -889,8 +890,8 @@ func makeTestUsers(t *testing.T) []User {
 
 type Notification struct {
 	Name        string            `                                  icingadb:"name"`
-	HostName    *string           `icinga2:"host_name"               icingadb:"host.name"`
-	ServiceName *string           `icinga2:"service_name"            icingadb:"service.name"`
+	HostName    *string           `icinga2:"host_name,nomodify"      icingadb:"host.name"`
+	ServiceName *string           `icinga2:"service_name,nomodify"   icingadb:"service.name"`
 	Command     string            `icinga2:"command"                 icingadb:"notificationcommand.name"`
 	Times       map[string]string `icinga2:"times"`
 	Interval    int               `icinga2:"interval"                icingadb:"notification_interval"`
@@ -1061,7 +1062,9 @@ func writeIcinga2ConfigObject(w io.Writer, obj interface{}) error {
 	}
 
 	for fieldIndex := 0; fieldIndex < typ.NumField(); fieldIndex++ {
-		if attr := typ.Field(fieldIndex).Tag.Get("icinga2"); attr != "" {
+		tag := typ.Field(fieldIndex).Tag.Get("icinga2")
+		attr := strings.Split(tag, ",")[0]
+		if attr != "" {
 			if v := o.Field(fieldIndex).Interface(); v != nil {
 				_, err := fmt.Fprintf(w, "\t%s = %s\n", attr, value.ToIcinga2Config(v))
 				if err != nil {
@@ -1076,17 +1079,23 @@ func writeIcinga2ConfigObject(w io.Writer, obj interface{}) error {
 }
 
 // makeIcinga2ApiAttributes generates a map that can be JSON marshaled and passed to the icinga2 API
-// based on the type of obj and its field having icinga2 struct tags.
-func makeIcinga2ApiAttributes(obj interface{}) map[string]interface{} {
+// based on the type of obj and its field having icinga2 struct tags. Fields that are marked as "nomodify"
+// (for example `icinga2:"host_name,nomodify"`) are omitted if the modify parameter is set to true.
+func makeIcinga2ApiAttributes(obj interface{}, modify bool) map[string]interface{} {
 	attrs := make(map[string]interface{})
 
 	o := reflect.ValueOf(obj)
 	typ := o.Type()
 	for fieldIndex := 0; fieldIndex < typ.NumField(); fieldIndex++ {
-		if attr := typ.Field(fieldIndex).Tag.Get("icinga2"); attr != "" {
-			if val := o.Field(fieldIndex).Interface(); val != nil {
-				attrs[attr] = value.ToIcinga2Api(val)
-			}
+		tag := typ.Field(fieldIndex).Tag.Get("icinga2")
+		parts := strings.Split(tag, ",")
+		attr := parts[0]
+		flags := parts[1:]
+		if attr == "" || (modify && slices.Contains(flags, "nomodify")) {
+			continue
+		}
+		if val := o.Field(fieldIndex).Interface(); val != nil {
+			attrs[attr] = value.ToIcinga2Api(val)
 		}
 	}
 
