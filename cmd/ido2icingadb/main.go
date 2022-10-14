@@ -284,6 +284,24 @@ func computeProgress(c *Config, idb *icingadb.DB, envId []byte) {
 	})
 
 	types.forEach(func(ht *historyType) {
+		if ht.cacheFiller != nil {
+			err := ht.snapshot.Get(
+				&ht.cacheTotal,
+				ht.snapshot.Rebind(
+					// For actual migration icinga_objects will be joined anyway,
+					// so it makes no sense to take vanished objects into account.
+					"SELECT COUNT(*) FROM "+ht.idoTable+
+						" xh INNER JOIN icinga_objects o ON o.object_id=xh.object_id WHERE xh."+ht.idoIdColumn+" <= ?",
+				),
+				ht.toId,
+			)
+			if err != nil {
+				log.Fatalf("%+v", errors.Wrap(err, "can't count query"))
+			}
+		}
+	})
+
+	types.forEach(func(ht *historyType) {
 		var rows []struct {
 			Migrated uint8
 			Cnt      int64
@@ -321,7 +339,7 @@ func fillCache() {
 	progress := mpb.New()
 	for _, ht := range types {
 		if ht.cacheFiller != nil {
-			ht.setupBar(progress)
+			ht.setupBar(progress, ht.cacheTotal)
 		}
 	}
 
@@ -340,7 +358,7 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 
 	progress := mpb.New()
 	for _, ht := range types {
-		ht.setupBar(progress)
+		ht.setupBar(progress, ht.total)
 	}
 
 	types.forEach(func(ht *historyType) {

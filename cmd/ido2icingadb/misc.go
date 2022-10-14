@@ -259,6 +259,8 @@ type historyType struct {
 	toId uint64
 	// total summarizes the source data.
 	total int64
+	// cacheTotal summarizes the cache source data.
+	cacheTotal int64
 	// done summarizes the migrated data.
 	done int64
 	// bar represents the current progress bar.
@@ -268,7 +270,7 @@ type historyType struct {
 }
 
 // setupBar (re-)initializes ht.bar.
-func (ht *historyType) setupBar(progress *mpb.Progress) {
+func (ht *historyType) setupBar(progress *mpb.Progress, total int64) {
 	e := &eta{}
 	ops := &opsPerSec{}
 
@@ -279,7 +281,7 @@ func (ht *historyType) setupBar(progress *mpb.Progress) {
 	ops.Init()
 
 	ht.bar = progress.AddBar(
-		ht.total,
+		total,
 		mpb.BarFillerClearOnComplete(),
 		mpb.PrependDecorators(
 			decor.Name(ht.name, decor.WC{W: len(ht.name) + 1, C: decor.DidentRight}),
