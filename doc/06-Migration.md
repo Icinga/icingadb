@@ -1,20 +1,7 @@
-# Icinga DB Migration
+# Migration from IDO
 
-![Icinga Logo]
-
-#### Table of Contents
-
-- [About](#about)
-- [License](#license)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Support](#support)
-- [Contributing](#contributing)
-
-## About
-
-This commandline tool migrates history data from [IDO] to [Icinga DB].
-Or, more precisely: from the IDO SQL database to the Icinga DB one.
+The Icinga DB Migration commandline tool migrates history data from [IDO] to
+Icinga DB. Or, more precisely: from the IDO SQL database to the Icinga DB one.
 
 !!! info
 
@@ -22,21 +9,7 @@ Or, more precisely: from the IDO SQL database to the Icinga DB one.
     Only the past history data of existing IDO setups
     isn't known to Icinga DB without migration from IDO.
 
-## License
-
-This tool and its documentation are licensed under the terms
-of the GNU General Public License Version 2,
-you will find a copy of this license in the [LICENSE] file.
-
-## Installation
-
-1. Add the official release repository as described
-   in the [installation chapter] of the Icinga DB documentation.
-2. Install the package `icingadb-migration`.
-
-## Usage
-
-### Icinga DB
+## Icinga DB
 
 1. Make sure Icinga DB is up, running and writing to its database.
 2. Optionally disable Icinga 2's IDO feature.
@@ -49,7 +22,7 @@ you will find a copy of this license in the [LICENSE] file.
     Or read on while not disabling it yet.
     There is a way to avoid duplicate events.
 
-### Configuration file
+## Configuration file
 
 Create a YAML file like this somewhere:
 
@@ -80,7 +53,7 @@ icingadb:
    password: CHANGEME
 ```
 
-#### Input time range
+### Input time range
 
 By default, everything is migrated. If you wish, you can restrict the input
 data's start and/or end by giving `from` and/or `to` under `ido:` as Unix
@@ -95,14 +68,14 @@ Examples:
 
 The latter is useful for the range end to avoid duplicate events.
 
-### Cache directory
+## Cache directory
 
 Choose a (not necessarily yet existing) directory for Icinga DB Migration's
 internal cache. If either there isn't much to migrate or the migration
 process won't be interrupted by a reboot (of the machine
 Icinga DB migration/database runs on), `mktemp -d` is enough.
 
-### Actual migration
+## Actual migration
 
 Run:
 
@@ -117,23 +90,5 @@ In case of an interrupt re-run.
     If there is much to migrate, use e.g. tmux to
     protect yourself against SSH connection losses.
 
-## Support
 
-Check the [project website] for status updates. Join the [community channels]
-for questions or ask an Icinga partner for [professional support].
-
-## Contributing
-
-There are many ways to contribute to Icinga -- whether it be sending patches,
-testing, reporting bugs, or reviewing and updating the documentation. Every
-contribution is appreciated!
-
-
-[Icinga Logo]: https://icinga.com/wp-content/uploads/2014/06/icinga_logo.png
 [IDO]: https://icinga.com/docs/icinga-2/latest/doc/14-features/#ido-database-db-ido
-[Icinga DB]: https://icinga.com/docs/icinga-db/latest/doc/01-About/
-[LICENSE]: ./LICENSE
-[installation chapter]: https://icinga.com/docs/icingadb/latest/doc/02-Installation/
-[project website]: https://icinga.com
-[community channels]: https://icinga.com/community/
-[professional support]: https://icinga.com/support/
