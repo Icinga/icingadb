@@ -18,9 +18,7 @@ Icinga DB. Or, more precisely: from the IDO SQL database to the Icinga DB one.
 
     Migration will cause duplicate Icinga DB events
     for the period both IDO and Icinga DB are active.
-    Disable the IDO feature -- the sooner, the better!
-    Or read on while not disabling it yet.
-    There is a way to avoid duplicate events.
+    Read on, there is a way to avoid that.
 
 ## Configuration file
 
@@ -80,7 +78,7 @@ Icinga DB migration/database runs on), `mktemp -d` is enough.
 Run:
 
 ```shell
-icingadb-migrate -c icingadb-migration.yml -t ~/icingadb-migration.tmp
+icingadb-migrate -c icingadb-migration.yml -t ~/icingadb-migration.cache
 ```
 
 In case of an interrupt re-run.
