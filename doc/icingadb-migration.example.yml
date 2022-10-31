@@ -1,0 +1,25 @@
+icinga2:
+  # Content of /var/lib/icinga2/icingadb.env
+  env: "da39a3e..."
+
+# IDO database
+ido:
+  type: mysql # or "pgsql" for PostgreSQL
+  host: 192.0.2.1
+  #port: 3306
+  database: icinga
+  user: icinga
+  password: CHANGEME
+
+  # Input time range
+  #from: 0
+  #to: 2147483647
+
+# Icinga DB database
+icingadb:
+  type: mysql # or "pgsql" for PostgreSQL
+  host: 2001:db8::1
+  #port: 3306
+  database: icingadb
+  user: icingadb
+  password: CHANGEME
