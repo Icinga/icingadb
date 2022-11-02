@@ -6,7 +6,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
-	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
@@ -29,11 +28,9 @@ import (
 )
 
 const (
-	ExitSuccess                   = 0
-	ExitFailure                   = 1
-	expectedRedisSchemaVersion    = "5"
-	expectedMysqlSchemaVersion    = 3
-	expectedPostgresSchemaVersion = 1
+	ExitSuccess                = 0
+	ExitFailure                = 1
+	expectedRedisSchemaVersion = "5"
 )
 
 func main() {
@@ -74,7 +71,7 @@ func run() int {
 		}
 	}
 
-	if err := checkDbSchema(context.Background(), db); err != nil {
+	if err := db.CheckSchema(context.Background()); err != nil {
 		logger.Fatalf("%+v", err)
 	}
 
@@ -356,36 +353,6 @@ func run() int {
 
 		cancelHactx()
 	}
-}
-
-// checkDbSchema asserts the database schema of the expected version being present.
-func checkDbSchema(ctx context.Context, db *icingadb.DB) error {
-	var expectedDbSchemaVersion uint16
-	switch db.DriverName() {
-	case driver.MySQL:
-		expectedDbSchemaVersion = expectedMysqlSchemaVersion
-	case driver.PostgreSQL:
-		expectedDbSchemaVersion = expectedPostgresSchemaVersion
-	}
-
-	var version uint16
-
-	err := db.QueryRowxContext(ctx, "SELECT version FROM icingadb_schema ORDER BY id DESC LIMIT 1").Scan(&version)
-	if err != nil {
-		return errors.Wrap(err, "can't check database schema version")
-	}
-
-	if version != expectedDbSchemaVersion {
-		// Since these error messages are trivial and mostly caused by users, we don't need
-		// to print a stack trace here. However, since errors.Errorf() does this automatically,
-		// we need to use fmt instead.
-		return fmt.Errorf(
-			"unexpected database schema version: v%d (expected v%d), please make sure you have applied all database"+
-				" migrations after upgrading Icinga DB", version, expectedDbSchemaVersion,
-		)
-	}
-
-	return nil
 }
 
 // monitorRedisSchema monitors rc's icinga:schema version validity.

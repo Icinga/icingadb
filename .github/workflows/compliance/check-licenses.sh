@@ -5,7 +5,7 @@ set -eo pipefail
 find_license_file() {
   MOD_NAME="$1"
   LICENSE_DIR="vendor/$MOD_NAME"
-  LICENSE_FILES=({,../}LICENSE{,.txt,.md})
+  LICENSE_FILES=({,../}{,UN}LICENSE{,.txt,.md})
 
   for LICENSE_FILE in "${LICENSE_FILES[@]}"; do
     LICENSE_FILE="${LICENSE_DIR}/$LICENSE_FILE"
@@ -29,6 +29,8 @@ list_all_deps() {
 COMPATIBLE_LINE=$(($LINENO + 2))
 
 COMPATIBLE=(
+  # public domain
+  3cee2c43614ad4572d9d594c81b9348cf45ed5ac # vendor/github.com/vbauerster/mpb/v6/UNLICENSE
   # MIT
   66d504eb2f162b9cbf11b07506eeed90c6edabe1 # vendor/github.com/cespare/xxhash/v2/LICENSE.txt
   1513ff663e946fdcadb630bed670d253b8b22e1e # vendor/github.com/davecgh/go-spew/spew/../LICENSE

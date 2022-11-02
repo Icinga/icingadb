@@ -87,6 +87,41 @@ func NewDb(db *sqlx.DB, logger *logging.Logger, options *Options) *DB {
 	}
 }
 
+const (
+	expectedMysqlSchemaVersion    = 3
+	expectedPostgresSchemaVersion = 1
+)
+
+// CheckSchema asserts the database schema of the expected version being present.
+func (db *DB) CheckSchema(ctx context.Context) error {
+	var expectedDbSchemaVersion uint16
+	switch db.DriverName() {
+	case driver.MySQL:
+		expectedDbSchemaVersion = expectedMysqlSchemaVersion
+	case driver.PostgreSQL:
+		expectedDbSchemaVersion = expectedPostgresSchemaVersion
+	}
+
+	var version uint16
+
+	err := db.QueryRowxContext(ctx, "SELECT version FROM icingadb_schema ORDER BY id DESC LIMIT 1").Scan(&version)
+	if err != nil {
+		return errors.Wrap(err, "can't check database schema version")
+	}
+
+	if version != expectedDbSchemaVersion {
+		// Since these error messages are trivial and mostly caused by users, we don't need
+		// to print a stack trace here. However, since errors.Errorf() does this automatically,
+		// we need to use fmt instead.
+		return fmt.Errorf(
+			"unexpected database schema version: v%d (expected v%d), please make sure you have applied all database"+
+				" migrations after upgrading Icinga DB", version, expectedDbSchemaVersion,
+		)
+	}
+
+	return nil
+}
+
 // BuildColumns returns all columns of the given struct.
 func (db *DB) BuildColumns(subject interface{}) []string {
 	fields := db.Mapper.TypeMap(reflect.TypeOf(subject)).Names
@@ -131,7 +166,7 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 	switch db.DriverName() {
 	case driver.MySQL:
 		// MySQL treats UPDATE id = id as a no-op.
-		clause = "ON DUPLICATE KEY UPDATE id = id"
+		clause = fmt.Sprintf(`ON DUPLICATE KEY UPDATE "%s" = "%s"`, columns[0], columns[0])
 	case driver.PostgreSQL:
 		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO NOTHING", table)
 	}
@@ -526,6 +561,28 @@ func (db *DB) CreateStreamed(
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
 		forward, com.NeverSplit[contracts.Entity], onSuccess...,
+	)
+}
+
+// CreateIgnoreStreamed bulk creates the specified entities via NamedBulkExec.
+// The insert statement is created using BuildInsertIgnoreStmt with the first entity from the entities stream.
+// Bulk size is controlled via Options.MaxPlaceholdersPerStatement and
+// concurrency is controlled via Options.MaxConnectionsPerTable.
+// Entities for which the query ran successfully will be passed to onSuccess.
+func (db *DB) CreateIgnoreStreamed(
+	ctx context.Context, entities <-chan contracts.Entity, onSuccess ...OnSuccess[contracts.Entity],
+) error {
+	first, forward, err := com.CopyFirst(ctx, entities)
+	if first == nil {
+		return errors.Wrap(err, "can't copy first entity")
+	}
+
+	sem := db.GetSemaphoreForTable(utils.TableName(first))
+	stmt, placeholders := db.BuildInsertIgnoreStmt(first)
+
+	return db.NamedBulkExec(
+		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
+		forward, com.SplitOnDupId[contracts.Entity], onSuccess...,
 	)
 }
 
