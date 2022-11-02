@@ -22,3 +22,7 @@ type EntityWithChecksum struct {
 func (e EntityWithChecksum) Fingerprint() contracts.Fingerprinter {
 	return e
 }
+
+func NewEntityWithChecksum() contracts.Entity {
+	return &EntityWithChecksum{}
+}
