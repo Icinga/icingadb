@@ -28,8 +28,6 @@ Create a YAML file like this somewhere:
 icinga2:
    # Content of /var/lib/icinga2/icingadb.env
    env: "da39a3ee5e6b4b0d3255bfef95601890afBADHEX"
-   # Name of the main Icinga 2 endpoint writing to IDO
-   endpoint: master-1
 # IDO database
 ido:
    type: pgsql
