@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha1"
 	"database/sql"
 	_ "embed"
 	"encoding/hex"
@@ -52,8 +51,6 @@ type Config struct {
 	Icinga2 struct {
 		// Env specifies the environment ID, hex.
 		Env string `yaml:"env"`
-		// Endpoint specifies the name on the main endpoint writing to IDO.
-		Endpoint string `yaml:"endpoint"`
 	} `yaml:"icinga2"`
 }
 
@@ -354,15 +351,13 @@ func fillCache() {
 
 // migrate does the actual migration.
 func migrate(c *Config, idb *icingadb.DB, envId []byte) {
-	endpointId := sha1.Sum([]byte(c.Icinga2.Endpoint))
-
 	progress := mpb.New()
 	for _, ht := range types {
 		ht.setupBar(progress, ht.total)
 	}
 
 	types.forEach(func(ht *historyType) {
-		ht.migrate(c, idb, envId, endpointId, ht)
+		ht.migrate(c, idb, envId, ht)
 	})
 
 	progress.Wait()
@@ -370,8 +365,8 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 
 // migrate does the actual migration for one history type.
 func migrateOneType[IdoRow any](
-	c *Config, idb *icingadb.DB, envId []byte, endpointId [sha1.Size]byte, ht *historyType,
-	convertRows func(env string, envId, endpointId icingadbTypes.Binary,
+	c *Config, idb *icingadb.DB, envId []byte, ht *historyType,
+	convertRows func(env string, envId icingadbTypes.Binary,
 		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
 		idoRows []IdoRow) (icingaDbInserts, icingaDbUpserts [][]contracts.Entity, checkpoint any),
 ) {
@@ -428,9 +423,7 @@ func migrateOneType[IdoRow any](
 		ht, ht.migrationQuery, args, ht.lastId,
 		func(idoRows []IdoRow) (checkpoint interface{}) {
 			// ... convert them, ...
-			inserts, upserts, lastIdoId := convertRows(
-				c.Icinga2.Env, envId, endpointId[:], selectCache, ht.snapshot, idoRows,
-			)
+			inserts, upserts, lastIdoId := convertRows(c.Icinga2.Env, envId, selectCache, ht.snapshot, idoRows)
 
 			// ... and insert them:
 

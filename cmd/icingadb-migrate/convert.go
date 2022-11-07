@@ -48,7 +48,7 @@ type commentRow = struct {
 }
 
 func convertCommentRows(
-	env string, envId, endpointId icingadbTypes.Binary,
+	env string, envId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []commentRow,
 ) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
 	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []contracts.Entity
@@ -71,7 +71,6 @@ func convertCommentRows(
 				CommentHistoryEntity: history.CommentHistoryEntity{CommentId: id},
 				HistoryTableMeta: history.HistoryTableMeta{
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
@@ -93,7 +92,6 @@ func convertCommentRows(
 				HistoryMeta: history.HistoryMeta{
 					HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_add", row.Name})},
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
@@ -111,7 +109,6 @@ func convertCommentRows(
 					HistoryMeta: history.HistoryMeta{
 						HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_remove", row.Name})},
 						EnvironmentId: envId,
-						EndpointId:    endpointId,
 						ObjectType:    typ,
 						HostId:        hostId,
 						ServiceId:     serviceId,
@@ -143,7 +140,6 @@ func convertCommentRows(
 				},
 				HistoryTableMeta: history.HistoryTableMeta{
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
@@ -175,7 +171,6 @@ func convertCommentRows(
 						Id: hashAny([]any{env, "ack_set", name, setTs}),
 					},
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
@@ -196,7 +191,6 @@ func convertCommentRows(
 							Id: hashAny([]any{env, "ack_clear", name, setTs}),
 						},
 						EnvironmentId: envId,
-						EndpointId:    endpointId,
 						ObjectType:    typ,
 						HostId:        hostId,
 						ServiceId:     serviceId,
@@ -240,7 +234,7 @@ type downtimeRow = struct {
 }
 
 func convertDowntimeRows(
-	env string, envId, endpointId icingadbTypes.Binary,
+	env string, envId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []downtimeRow,
 ) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
 	var downtimeHistory, allHistory, sla []contracts.Entity
@@ -287,7 +281,6 @@ func convertDowntimeRows(
 			DowntimeHistoryEntity: history.DowntimeHistoryEntity{DowntimeId: id},
 			HistoryTableMeta: history.HistoryTableMeta{
 				EnvironmentId: envId,
-				EndpointId:    endpointId,
 				ObjectType:    typ,
 				HostId:        hostId,
 				ServiceId:     serviceId,
@@ -313,7 +306,6 @@ func convertDowntimeRows(
 			HistoryMeta: history.HistoryMeta{
 				HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "downtime_start", row.Name})},
 				EnvironmentId: envId,
-				EndpointId:    endpointId,
 				ObjectType:    typ,
 				HostId:        hostId,
 				ServiceId:     serviceId,
@@ -331,7 +323,6 @@ func convertDowntimeRows(
 				HistoryMeta: history.HistoryMeta{
 					HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "downtime_end", row.Name})},
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
@@ -352,7 +343,6 @@ func convertDowntimeRows(
 			DowntimeHistoryEntity: history.DowntimeHistoryEntity{DowntimeId: id},
 			HistoryTableMeta: history.HistoryTableMeta{
 				EnvironmentId: envId,
-				EndpointId:    endpointId,
 				ObjectType:    typ,
 				HostId:        hostId,
 				ServiceId:     serviceId,
@@ -385,7 +375,7 @@ type flappingRow = struct {
 }
 
 func convertFlappingRows(
-	env string, envId, endpointId icingadbTypes.Binary,
+	env string, envId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []flappingRow,
 ) (icingaDbInserts, icingaDbUpserts [][]contracts.Entity, checkpoint any) {
 	if len(idoRows) < 1 {
@@ -446,7 +436,6 @@ func convertFlappingRows(
 				},
 				HistoryTableMeta: history.HistoryTableMeta{
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
@@ -466,7 +455,6 @@ func convertFlappingRows(
 						Id: hashAny([]interface{}{env, "flapping_end", name, startTime}),
 					},
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
@@ -486,7 +474,6 @@ func convertFlappingRows(
 				},
 				HistoryTableMeta: history.HistoryTableMeta{
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
@@ -505,7 +492,6 @@ func convertFlappingRows(
 						Id: hashAny([]interface{}{env, "flapping_start", name, startTime}),
 					},
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
@@ -540,7 +526,7 @@ type notificationRow = struct {
 }
 
 func convertNotificationRows(
-	env string, envId, endpointId icingadbTypes.Binary,
+	env string, envId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []notificationRow,
 ) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
 	if len(idoRows) < 1 {
@@ -632,7 +618,6 @@ func convertNotificationRows(
 			},
 			HistoryTableMeta: history.HistoryTableMeta{
 				EnvironmentId: envId,
-				EndpointId:    endpointId,
 				ObjectType:    typ,
 				HostId:        hostId,
 				ServiceId:     serviceId,
@@ -655,7 +640,6 @@ func convertNotificationRows(
 			HistoryMeta: history.HistoryMeta{
 				HistoryEntity: history.HistoryEntity{Id: id},
 				EnvironmentId: envId,
-				EndpointId:    endpointId,
 				ObjectType:    typ,
 				HostId:        hostId,
 				ServiceId:     serviceId,
@@ -735,7 +719,7 @@ type stateRow = struct {
 }
 
 func convertStateRows(
-	env string, envId, endpointId icingadbTypes.Binary,
+	env string, envId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []stateRow,
 ) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
 	if len(idoRows) < 1 {
@@ -782,7 +766,6 @@ func convertStateRows(
 			},
 			HistoryTableMeta: history.HistoryTableMeta{
 				EnvironmentId: envId,
-				EndpointId:    endpointId,
 				ObjectType:    typ,
 				HostId:        hostId,
 				ServiceId:     serviceId,
@@ -804,7 +787,6 @@ func convertStateRows(
 			HistoryMeta: history.HistoryMeta{
 				HistoryEntity: history.HistoryEntity{Id: id},
 				EnvironmentId: envId,
-				EndpointId:    endpointId,
 				ObjectType:    typ,
 				HostId:        hostId,
 				ServiceId:     serviceId,
@@ -825,7 +807,6 @@ func convertStateRows(
 				},
 				HistoryTableMeta: history.HistoryTableMeta{
 					EnvironmentId: envId,
-					EndpointId:    endpointId,
 					ObjectType:    typ,
 					HostId:        hostId,
 					ServiceId:     serviceId,
