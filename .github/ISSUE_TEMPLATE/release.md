@@ -1,5 +1,5 @@
 ---
-name: [INTERNAL] Release
+name: '[INTERNAL] Release'
 about: Release a version
 title: 'Release Version v$version'
 labels: ''
