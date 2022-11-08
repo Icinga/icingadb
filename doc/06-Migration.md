@@ -1,90 +1,102 @@
 # Migration from IDO
 
-The Icinga DB Migration commandline tool migrates history data from [IDO] to
-Icinga DB. Or, more precisely: from the IDO SQL database to the Icinga DB one.
+Migrating from the IDO feature to Icinga DB starts by setting up Icinga DB. To
+do so, please follow the [installation instructions]. The Icinga DB feature can
+be enabled in parallel to the IDO, allowing you to perform the migration while
+the IDO is still running.
 
-!!! info
+After setting up Icinga DB, all Icinga objects and their current state should
+already show up in Icinga DB Web as this information is synced from Icinga 2.
+At this point, the old host and service history is missing in Icinga DB. If it
+is desired to keep it, this information has to be migrated explicitly from the
+old IDO database. To do so, follow the instructions below.
 
-    Everything else is already populated by Icinga DB itself.
-    Only the past history data of existing IDO setups
-    isn't known to Icinga DB without migration from IDO.
+## History
 
-## Icinga DB
+To migrate history data from the [IDO] database, the Icinga DB Migration
+commandline tool is provided. If you have installed Icinga DB from our
+packages, it is automatically installed as well.
 
-1. Make sure Icinga DB is up, running and writing to its database.
-2. Optionally disable Icinga 2's IDO feature.
+### Preparing the Configuration
 
-!!! warning
+Please take the [example configuration] as a starting point and copy it to the
+host you will perform the migration on.  The following sections will guide you
+through how to adjust it for your needs.
 
-    Migration will cause duplicate Icinga DB events
-    for the period both IDO and Icinga DB are active.
-    Read on, there is a way to avoid that.
+#### Environment ID
 
-## Configuration file
+Icinga DB allows writing multiple Icinga environments to the same database.
+Thus, you have to tell the migration tool for which environment you want to
+migrate the history. On each Icinga 2 node that has the Icinga DB feature
+enabled, the environment ID is written to the file
+`/var/lib/icinga2/icingadb.env`. Please use the contents of this file for the
+`env` option in the section `icinga2`.
 
-Create a YAML file like this somewhere:
+#### Database Connection
 
-```yaml
-icinga2:
-   # Content of /var/lib/icinga2/icingadb.env
-   env: "da39a3ee5e6b4b0d3255bfef95601890afBADHEX"
-# IDO database
-ido:
-   type: pgsql
-   host: 192.0.2.1
-   port: 5432
-   database: icinga
-   user: icinga
-   password: CHANGEME
-   # Input time range
-   #from: 0
-   #to: 2147483647
-# Icinga DB database
-icingadb:
-   type: mysql
-   host: 2001:db8::1
-   port: 3306
-   database: icingadb
-   user: icingadb
-   password: CHANGEME
+The migration tool needs to access both the IDO and the Icinga DB databases.
+Please specify the connection details in the corresponding `ido` and `icingadb`
+sections of the configuration.
+
+Both the IDO and Icinga DB support MySQL and PostgreSQL. You can migrate from
+and to both types, including from one type to the other.
+
+#### Input Time Range
+
+The migration tool allows you to restrict the time range of the history events
+to be migrated. This is controlled by the options `from` and `to` in the `ido`
+section of the configuration. Both options can be set to Unix timestamps.
+
+It is recommended to set the `to` option to a cutoff time at which the history
+in the Icinga DB database switches from migrated events to events written
+directly by Icinga DB. If you kept running the IDO in parallel to Icinga DB and
+do not do this, there will be duplicate events for the time both were running.
+
+You can query the time of the first history event written by Icinga DB by
+running this query in its database:
+
+```
+SELECT MIN(event_time)/1000 FROM history;
 ```
 
-### Input time range
+In case you had trouble setting up Icinga DB or this is not the first time you
+are setting up Icinga DB, please make sure to double-check this timestamp and
+adjust it accordingly if it is not what you expect.
 
-By default, everything is migrated. If you wish, you can restrict the input
-data's start and/or end by giving `from` and/or `to` under `ido:` as Unix
-timestamps (in seconds).
+!!! tip
 
-Examples:
+    You can convert between Unix timestamps and a human-readable format using the `date` command:
 
-* Now: Run in a shell: `date +%s`
-* One year ago: Run in a shell: `date -d -1year +%s`
-* Icinga DB usage start time: Query the Icinga DB database:
-  `SELECT MIN(event_time)/1000 FROM history;`
+    * Unix timestamp to readable date: `date -d @1667219820`
+    * Current date/time to Unix timestamp: `date +%s`
+    * Specific date/time to Unix timestamp: `date -d '2022-01-01 00:00:00' +%s`
+    * Relative date/time to Unix timestamp: `date -d '-1 year' +%s`
 
-The latter is useful for the range end to avoid duplicate events.
+Similarly, you can use `from` to limit how much old history gets migrated.
 
-## Cache directory
+### Cache Directory
 
 Choose a (not necessarily yet existing) directory for Icinga DB Migration's
 internal cache. If either there isn't much to migrate or the migration
 process won't be interrupted by a reboot (of the machine
 Icinga DB migration/database runs on), `mktemp -d` is enough.
 
-## Actual migration
+### Run the Migration
 
-Run:
+To start the actual migration, execute the following command:
 
 ```shell
 icingadb-migrate -c icingadb-migration.yml -t ~/icingadb-migration.cache
 ```
 
-In case of an interrupt re-run.
+In case this command was interrupted, you can run it again. It will continue
+where it left off and reuse the cache if it is still present.
 
 !!! tip
 
     If there is much to migrate, use e.g. tmux to
     protect yourself against SSH connection losses.
 
-
+[installation instructions]: 02-Installation.md
 [IDO]: https://icinga.com/docs/icinga-2/latest/doc/14-features/#ido-database-db-ido
+[example configuration]: icingadb-migration.example.yml
