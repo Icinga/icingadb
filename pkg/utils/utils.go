@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/exp/utf8string"
 	"math"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -205,4 +206,13 @@ func MaxInt(x, y int) int {
 	}
 
 	return y
+}
+
+// JoinHostPort is like its equivalent in net., but handles UNIX sockets as well.
+func JoinHostPort(host string, port int) string {
+	if strings.HasPrefix(host, "/") {
+		return host
+	}
+
+	return net.JoinHostPort(host, fmt.Sprint(port))
 }

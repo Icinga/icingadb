@@ -18,7 +18,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"net"
 	"os"
 	"os/signal"
 	"sync"
@@ -64,7 +63,7 @@ func run() int {
 	}
 	defer db.Close()
 	{
-		logger.Infof("Connecting to database at '%s'", net.JoinHostPort(cmd.Config.Database.Host, fmt.Sprint(cmd.Config.Database.Port)))
+		logger.Infof("Connecting to database at '%s'", utils.JoinHostPort(cmd.Config.Database.Host, cmd.Config.Database.Port))
 		err := db.Ping()
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
@@ -80,7 +79,7 @@ func run() int {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
 	}
 	{
-		logger.Infof("Connecting to Redis at '%s'", net.JoinHostPort(cmd.Config.Redis.Host, fmt.Sprint(cmd.Config.Redis.Port)))
+		logger.Infof("Connecting to Redis at '%s'", utils.JoinHostPort(cmd.Config.Redis.Host, cmd.Config.Redis.Port))
 		_, err := rc.Ping(context.Background()).Result()
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to Redis"))
