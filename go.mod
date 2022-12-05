@@ -5,7 +5,7 @@ go 1.18
 require (
 	github.com/creasty/defaults v1.6.0
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/go-sql-driver/mysql v1.6.0
+	github.com/go-sql-driver/mysql v1.7.0
 	github.com/goccy/go-yaml v1.9.6
 	github.com/google/uuid v1.3.0
 	github.com/jessevdk/go-flags v1.5.0
