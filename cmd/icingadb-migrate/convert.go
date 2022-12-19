@@ -508,10 +508,13 @@ func convertFlappingRows(
 		}
 	}
 
-	stages = []icingaDbOutputStage{{
-		inserts: [][]contracts.Entity{flappingHistory, allHistory},
-		upserts: [][]contracts.Entity{flappingHistoryUpserts},
-	}}
+	stages = []icingaDbOutputStage{
+		{
+			inserts: [][]contracts.Entity{flappingHistory},
+			upserts: [][]contracts.Entity{flappingHistoryUpserts},
+		},
+		{inserts: [][]contracts.Entity{allHistory}},
+	}
 	return
 }
 
