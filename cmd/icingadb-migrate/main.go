@@ -368,7 +368,7 @@ func migrateOneType[IdoRow any](
 	c *Config, idb *icingadb.DB, envId []byte, ht *historyType,
 	convertRows func(env string, envId icingadbTypes.Binary,
 		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
-		idoRows []IdoRow) (icingaDbInserts, icingaDbUpserts [][]contracts.Entity, checkpoint any),
+		idoRows []IdoRow) (stages []icingaDbOutputStage, checkpoint any),
 ) {
 	var lastQuery string
 	var lastStmt *sqlx.Stmt
@@ -423,30 +423,35 @@ func migrateOneType[IdoRow any](
 		ht, ht.migrationQuery, args, ht.lastId,
 		func(idoRows []IdoRow) (checkpoint interface{}) {
 			// ... convert them, ...
-			inserts, upserts, lastIdoId := convertRows(c.Icinga2.Env, envId, selectCache, ht.snapshot, idoRows)
+			stages, lastIdoId := convertRows(c.Icinga2.Env, envId, selectCache, ht.snapshot, idoRows)
 
 			// ... and insert them:
 
-			for _, op := range []struct {
-				kind     string
-				data     [][]contracts.Entity
-				streamer func(context.Context, <-chan contracts.Entity, ...icingadb.OnSuccess[contracts.Entity]) error
-			}{{"INSERT IGNORE", inserts, idb.CreateIgnoreStreamed}, {"UPSERT", upserts, idb.UpsertStreamed}} {
-				for _, table := range op.data {
-					if len(table) < 1 {
-						continue
-					}
+			for _, stage := range stages {
+				for _, op := range []struct {
+					kind     string
+					data     [][]contracts.Entity
+					streamer func(context.Context, <-chan contracts.Entity, ...icingadb.OnSuccess[contracts.Entity]) error
+				}{
+					{"INSERT IGNORE", stage.inserts, idb.CreateIgnoreStreamed},
+					{"UPSERT", stage.upserts, idb.UpsertStreamed},
+				} {
+					for _, table := range op.data {
+						if len(table) < 1 {
+							continue
+						}
 
-					ch := make(chan contracts.Entity, len(table))
-					for _, row := range table {
-						ch <- row
-					}
+						ch := make(chan contracts.Entity, len(table))
+						for _, row := range table {
+							ch <- row
+						}
 
-					close(ch)
+						close(ch)
 
-					if err := op.streamer(context.Background(), ch); err != nil {
-						log.With("backend", "Icinga DB", "op", op.kind, "table", utils.TableName(table[0])).
-							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+						if err := op.streamer(context.Background(), ch); err != nil {
+							log.With("backend", "Icinga DB", "op", op.kind, "table", utils.TableName(table[0])).
+								Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+						}
 					}
 				}
 			}
