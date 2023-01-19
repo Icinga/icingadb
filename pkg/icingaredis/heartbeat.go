@@ -179,9 +179,12 @@ func (h *Heartbeat) sendEvent(m *HeartbeatMessage) {
 	select {
 	case old := <-h.events:
 		if old != nil {
-			h.logger.Debugw("Previous heartbeat not read from channel",
-				zap.Time("previous", old.received),
-				zap.Time("current", m.received))
+			kv := []any{zap.Time("previous", old.received)}
+			if m != nil {
+				kv = append(kv, zap.Time("current", m.received))
+			}
+
+			h.logger.Debugw("Previous heartbeat not read from channel", kv...)
 		} else {
 			h.logger.Debug("Previous heartbeat loss event not read from channel")
 		}
