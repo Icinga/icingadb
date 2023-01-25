@@ -25,6 +25,7 @@ BEGIN
   DECLARE active_downtimes int unsigned;
   DECLARE problem_time bigint unsigned;
   DECLARE total_time bigint unsigned;
+  DECLARE rowCounts int unsigned;
   DECLARE done int;
   DECLARE cur CURSOR FOR
     (
@@ -69,6 +70,8 @@ BEGIN
         AND ((in_service_id IS NULL AND s.service_id IS NULL) OR s.service_id = in_service_id)
         AND s.event_time > in_start_time
         AND s.event_time < in_end_time
+        AND s.hard_state IS NOT NULL
+        AND s.previous_hard_state IS NOT NULL
     ) UNION ALL (
       -- end event to keep loop simple, values are not used
       SELECT
@@ -130,6 +133,7 @@ BEGIN
 
   SET done = 0;
   OPEN cur;
+  SELECT FOUND_ROWS() INTO rowCounts;
   read_loop: LOOP
     FETCH cur INTO row_event_time, row_event_type, row_event_prio, row_hard_state, row_previous_hard_state;
     IF done THEN
@@ -156,7 +160,12 @@ BEGIN
   END LOOP;
   CLOSE cur;
 
-  SET result = 100 * (total_time - problem_time) / total_time;
+  -- row count "1" because of the faked ending result used for the
+  -- cursor loop, whose result set is never used.
+  IF rowCounts > 1 THEN
+      SET result = 100 * (total_time - problem_time) / total_time;
+  END IF; -- else no data available to be reported
+
   RETURN result;
 END//
 DELIMITER ;

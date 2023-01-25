@@ -38,7 +38,9 @@ DECLARE
   active_downtimes uint := 0;
   problem_time biguint := 0;
   total_time biguint;
+  rowCounts uint := 0;
   row record;
+  result decimal(7, 4);
 BEGIN
   IF in_end_time <= in_start_time THEN
     RAISE 'end time must be greater than start time';
@@ -127,6 +129,8 @@ BEGIN
         AND ((in_service_id IS NULL AND s.service_id IS NULL) OR s.service_id = in_service_id)
         AND s.event_time > in_start_time
         AND s.event_time < in_end_time
+        AND s.hard_state IS NOT NULL
+        AND s.previous_hard_state IS NOT NULL
     ) UNION ALL (
       -- end event to keep loop simple, values are not used
       SELECT
@@ -147,6 +151,7 @@ BEGIN
       problem_time := problem_time + row.event_time - last_event_time;
     END IF;
 
+    rowCounts := rowCounts + 1;
     last_event_time := row.event_time;
     IF row.event_type = 'state_change' THEN
       last_hard_state := row.hard_state;
@@ -157,7 +162,13 @@ BEGIN
     END IF;
   END LOOP;
 
-  RETURN 100 * (total_time - problem_time) / total_time;
+  -- row count "1" because of the faked ending result used for the
+  -- cursor loop, whose result set is never used.
+  IF rowCounts > 1 THEN
+    result := 100 * (total_time - problem_time) / total_time;
+  END IF; -- else no data available to be reported
+
+  RETURN result;
 END;
 $$;
 
