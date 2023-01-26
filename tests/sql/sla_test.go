@@ -2,6 +2,7 @@ package sql_test
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
@@ -22,7 +23,7 @@ func TestSla(t *testing.T) {
 		Events   []SlaHistoryEvent
 		Start    uint64
 		End      uint64
-		Expected float64
+		Expected sql.NullFloat64
 	}
 
 	tests := []TestData{{
@@ -31,7 +32,7 @@ func TestSla(t *testing.T) {
 		Events:   nil,
 		Start:    1000,
 		End:      2000,
-		Expected: 100.0,
+		Expected: sql.NullFloat64{},
 	}, {
 		Name: "MultipleStateChanges",
 		// Some flapping, test that all changes are considered.
@@ -46,7 +47,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 60.0,
+		Expected: sql.NullFloat64{Float64: 60.0},
 	}, {
 		Name: "OverlappingDowntimesAndProblems",
 		// SLA should be 90%:
@@ -65,7 +66,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 90.0,
+		Expected: sql.NullFloat64{Float64: 90.0},
 	}, {
 		Name: "CriticalBeforeInterval",
 		// If there is no event within the SLA interval, the last state from before the interval should be used.
@@ -74,7 +75,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 0.0,
+		Expected: sql.NullFloat64{Float64: 0.0},
 	}, {
 		Name: "CriticalBeforeIntervalWithDowntime",
 		// State change and downtime start from before the SLA interval should be considered if still relevant.
@@ -84,7 +85,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 80.0,
+		Expected: sql.NullFloat64{Float64: 80.0},
 	}, {
 		Name: "CriticalBeforeIntervalWithOverlappingDowntimes",
 		// Test that overlapping downtimes are properly accounted for.
@@ -99,7 +100,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 80.0,
+		Expected: sql.NullFloat64{Float64: 80.0},
 	}, {
 		Name: "FallbackToPreviousState",
 		// If there is no state event from before the SLA interval, the previous hard state from the first event
@@ -109,7 +110,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 80.0,
+		Expected: sql.NullFloat64{Float64: 80.0},
 	}, {
 		Name: "FallbackToCurrentState",
 		// If there are no state history events, the current state of the checkable should be used.
@@ -118,7 +119,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 0.0,
+		Expected: sql.NullFloat64{Float64: 0.0},
 	}, {
 		Name: "PreferInitialStateFromBeforeOverLaterState",
 		// The previous_hard_state should only be used as a fallback when there is no event from before the
@@ -129,7 +130,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 80.0,
+		Expected: sql.NullFloat64{Float64: 80.0},
 	}, {
 		Name: "PreferInitialStateFromBeforeOverCurrentState",
 		// The current state should only be used as a fallback when there is no state history event.
@@ -140,7 +141,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 0.0,
+		Expected: sql.NullFloat64{Float64: 0.0},
 	}, {
 		Name: "PreferLaterStateOverCurrentState",
 		// The current state should only be used as a fallback when there is no state history event.
@@ -151,7 +152,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 80.0,
+		Expected: sql.NullFloat64{Float64: 80.0},
 	}, {
 		Name: "InitialUnknownReducesTotalTime",
 		Events: []SlaHistoryEvent{
@@ -161,7 +162,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 60,
+		Expected: sql.NullFloat64{Float64: 60},
 	}, {
 		Name: "IntermediateUnknownReducesTotalTime",
 		Events: []SlaHistoryEvent{
@@ -173,7 +174,7 @@ func TestSla(t *testing.T) {
 		},
 		Start:    1000,
 		End:      2000,
-		Expected: 60,
+		Expected: sql.NullFloat64{Float64: 60},
 	}}
 
 	for _, test := range tests {
@@ -226,14 +227,14 @@ func TestSla(t *testing.T) {
 	})
 }
 
-func execSqlSlaFunc(db *sqlx.DB, m *SlaHistoryMeta, start uint64, end uint64) (float64, error) {
-	var result float64
+func execSqlSlaFunc(db *sqlx.DB, m *SlaHistoryMeta, start uint64, end uint64) (sql.NullFloat64, error) {
+	var result sql.NullFloat64
 	err := db.Get(&result, db.Rebind("SELECT get_sla_ok_percent(?, ?, ?, ?)"),
 		m.HostId, m.ServiceId, start, end)
 	return result, err
 }
 
-func testSla(t *testing.T, db *sqlx.DB, events []SlaHistoryEvent, start uint64, end uint64, expected float64, msg string) {
+func testSla(t *testing.T, db *sqlx.DB, events []SlaHistoryEvent, start uint64, end uint64, expected sql.NullFloat64, msg string) {
 	t.Run("Host", func(t *testing.T) {
 		testSlaWithObjectType(t, db, events, false, start, end, expected, msg)
 	})
@@ -243,7 +244,7 @@ func testSla(t *testing.T, db *sqlx.DB, events []SlaHistoryEvent, start uint64, 
 }
 
 func testSlaWithObjectType(t *testing.T, db *sqlx.DB,
-	events []SlaHistoryEvent, service bool, start uint64, end uint64, expected float64, msg string,
+	events []SlaHistoryEvent, service bool, start uint64, end uint64, expected sql.NullFloat64, msg string,
 ) {
 	makeId := func() []byte {
 		id := make([]byte, 20)
@@ -271,7 +272,7 @@ func testSlaWithObjectType(t *testing.T, db *sqlx.DB,
 
 	r, err := execSqlSlaFunc(db, &meta, start, end)
 	require.NoError(t, err, "SLA query should not fail")
-	assert.Equal(t, expected, r, msg)
+	assert.Equal(t, expected.Float64, r.Float64, msg)
 }
 
 type SlaHistoryMeta struct {
