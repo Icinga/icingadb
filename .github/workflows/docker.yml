@@ -24,6 +24,6 @@ jobs:
 
     steps:
       - name: Docker image
-        uses: Icinga/docker-icingadb@master
+        uses: Icinga/docker-icingadb@Simplify
         with:
           dockerhub-token: '${{ secrets.DOCKER_HUB_PERSONAL_TOKEN }}'
