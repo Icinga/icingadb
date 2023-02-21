@@ -1,10 +1,7 @@
 name: Docker image
 
 on:
-  pull_request: {}
-  push:
-    branches:
-      - master
+  push: {}
   release:
     types:
       - published
@@ -15,7 +12,7 @@ jobs:
 
     steps:
       - name: Docker image
-        uses: Icinga/docker-icingadb@master
+        uses: Icinga/docker-icingadb@Simplify
         env:
           INPUT_TOKEN: '${{ github.token }}'
           DOCKER_HUB_PASSWORD: '${{ secrets.DOCKER_HUB_PERSONAL_TOKEN }}'
