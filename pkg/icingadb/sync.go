@@ -109,7 +109,12 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	// Create
 	if len(delta.Create) > 0 {
 		s.logger.Infof("Inserting %d items of type %s", len(delta.Create), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
-		var entities <-chan contracts.Entity
+		createStreamedFunc := func(entities <-chan contracts.Entity) func() error {
+			return func() error {
+				return s.db.CreateStreamed(ctx, entities, OnSuccessIncrement[contracts.Entity](stat))
+			}
+		}
+
 		if delta.Subject.WithChecksum() {
 			pairs, errs := s.redis.HMYield(
 				ctx,
@@ -121,16 +126,31 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 			entitiesWithoutChecksum, errs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, runtime.NumCPU())
 			// Let errors from CreateEntities cancel our group.
 			com.ErrgroupReceive(g, errs)
-			entities, errs = icingaredis.SetChecksums(ctx, entitiesWithoutChecksum, delta.Create, runtime.NumCPU())
+			entities, errs := icingaredis.SetChecksums(ctx, entitiesWithoutChecksum, delta.Create, runtime.NumCPU())
 			// Let errors from SetChecksums cancel our group.
 			com.ErrgroupReceive(g, errs)
-		} else {
-			entities = delta.Create.Entities(ctx)
-		}
 
-		g.Go(func() error {
-			return s.db.CreateStreamed(ctx, entities, OnSuccessIncrement[contracts.Entity](stat))
-		})
+			switch delta.Subject.Entity().(type) {
+			case *v1.Host, *v1.Service:
+				s.logger.Infof("Inserting %d %s sla lifecycle", len(delta.Create), delta.Subject.Name())
+
+				createdEntities := make(chan contracts.Entity, len(delta.Create))
+				g.Go(func() error {
+					defer close(createdEntities)
+
+					return s.db.CreateStreamed(
+						ctx, CreateSlaLifecyclesFromCheckables(ctx, g, s.db, entities, false),
+						OnSuccessApplyAndSendTo(createdEntities, GetCheckableFromSlaLifecycle),
+					)
+				})
+
+				g.Go(createStreamedFunc(createdEntities))
+			default:
+				g.Go(createStreamedFunc(entities))
+			}
+		} else {
+			g.Go(createStreamedFunc(delta.Create.Entities(ctx)))
+		}
 	}
 
 	// Update
@@ -160,9 +180,52 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	// Delete
 	if len(delta.Delete) > 0 {
 		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
-		g.Go(func() error {
-			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), OnSuccessIncrement[any](stat))
-		})
+		entity := delta.Subject.Entity()
+		switch entity.(type) {
+		case *v1.Host, *v1.Service:
+			updatedCheckables := make(chan contracts.Entity, len(delta.Delete))
+			g.Go(func() error {
+				defer close(updatedCheckables)
+				s.logger.Infof("Updating %d %s sla lifecycles", len(delta.Delete), delta.Subject.Name())
+
+				sl := v1.NewSlaLifecycle()
+				sem := s.db.GetSemaphoreForTable(utils.TableName(sl))
+				stmt := fmt.Sprintf(
+					`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`,
+					utils.TableName(sl),
+				)
+
+				return s.db.NamedBulkExec(
+					ctx, stmt, s.db.Options.MaxPlaceholdersPerStatement, sem,
+					CreateSlaLifecyclesFromCheckables(ctx, g, s.db, delta.Delete.Entities(ctx), true),
+					com.NeverSplit[contracts.Entity], OnSuccessSendTo(updatedCheckables),
+				)
+			})
+
+			s.logger.Infof("Inserting %d %s sla lifecycles of type delete", len(delta.Delete), delta.Subject.Name())
+
+			deleteIds := make(chan interface{}, len(delta.Delete))
+			g.Go(func() error {
+				defer close(deleteIds)
+
+				// extractEntityId is used as a callback for the on success mechanism to extract the checkables id.
+				extractEntityId := func(e contracts.Entity) interface{} {
+					return e.(*v1.SlaLifecycle).SourceEntity.ID()
+				}
+
+				return s.db.CreateIgnoreStreamed(
+					ctx, updatedCheckables, OnSuccessApplyAndSendTo[contracts.Entity, interface{}](deleteIds, extractEntityId),
+				)
+			})
+
+			g.Go(func() error {
+				return s.db.DeleteStreamed(ctx, delta.Subject.Entity(), deleteIds, OnSuccessIncrement[any](stat))
+			})
+		default:
+			g.Go(func() error {
+				return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), OnSuccessIncrement[any](stat))
+			})
+		}
 	}
 
 	return g.Wait()
