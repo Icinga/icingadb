@@ -6,7 +6,6 @@ import (
 )
 
 type Checkable struct {
-	EntityWithChecksum    `json:",inline"`
 	EnvironmentMeta       `json:",inline"`
 	NameCiMeta            `json:",inline"`
 	ActionUrlId           types.Binary `json:"action_url_id"`

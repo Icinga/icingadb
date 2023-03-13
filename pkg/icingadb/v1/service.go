@@ -6,8 +6,22 @@ import (
 )
 
 type Service struct {
-	Checkable `json:",inline"`
-	HostId    types.Binary `json:"host_id"`
+	ServiceFingerprint `json:",inline"`
+	Checkable          `json:",inline"`
+}
+
+type ServiceFingerprint struct {
+	EntityWithChecksum `json:",inline"`
+	HostId             types.Binary `json:"host_id"`
+}
+
+// Fingerprint implements the contracts.Fingerprinter interface.
+func (e ServiceFingerprint) Fingerprint() contracts.Fingerprinter {
+	return e
+}
+
+func NewEntityWithCustomFingerprint() contracts.Entity {
+	return &ServiceFingerprint{}
 }
 
 type ServiceCustomvar struct {

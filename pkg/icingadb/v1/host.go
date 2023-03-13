@@ -9,11 +9,12 @@ import (
 )
 
 type Host struct {
-	Checkable   `json:",inline"`
-	Address     string      `json:"address"`
-	Address6    string      `json:"address6"`
-	AddressBin  AddressBin  `json:"-"`
-	Address6Bin Address6Bin `json:"-"`
+	EntityWithChecksum `json:",inline"`
+	Checkable          `json:",inline"`
+	Address            string      `json:"address"`
+	Address6           string      `json:"address6"`
+	AddressBin         AddressBin  `json:"-"`
+	Address6Bin        Address6Bin `json:"-"`
 }
 
 // Init implements the contracts.Initer interface.
