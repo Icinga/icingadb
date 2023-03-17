@@ -12,7 +12,7 @@ type Service struct {
 
 type ServiceFingerprint struct {
 	EntityWithChecksum `json:",inline"`
-	HostId             types.Binary `json:"host_id"`
+	HostMeta           `json:",inline"`
 }
 
 // Fingerprint implements the contracts.Fingerprinter interface.
@@ -20,7 +20,7 @@ func (e ServiceFingerprint) Fingerprint() contracts.Fingerprinter {
 	return e
 }
 
-func NewEntityWithCustomFingerprint() contracts.Entity {
+func NewServiceFingerprint() contracts.Entity {
 	return &ServiceFingerprint{}
 }
 
@@ -77,5 +77,7 @@ func NewServicegroupMember() contracts.Entity {
 // Assert interface compliance.
 var (
 	_ contracts.Initer = (*Service)(nil)
+	_ BinaryHostIDer   = (*Service)(nil)
+	_ BinaryIDer       = (*Service)(nil)
 	_ contracts.Initer = (*Servicegroup)(nil)
 )
