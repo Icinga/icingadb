@@ -186,7 +186,14 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 		// MySQL treats UPDATE id = id as a no-op.
 		clause = fmt.Sprintf(`ON DUPLICATE KEY UPDATE "%s" = "%s"`, columns[0], columns[0])
 	case PostgreSQL:
-		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO NOTHING", table)
+		var constraint string
+		if constrainter, ok := into.(contracts.Constrainter); ok {
+			constraint = constrainter.Constraint()
+		} else {
+			constraint = "pk_" + table
+		}
+
+		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT %s DO NOTHING", constraint)
 	}
 
 	return fmt.Sprintf(
@@ -249,7 +256,14 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 		clause = "ON DUPLICATE KEY UPDATE"
 		setFormat = `"%[1]s" = VALUES("%[1]s")`
 	case PostgreSQL:
-		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO UPDATE SET", table)
+		var constraint string
+		if constrainter, ok := subject.(contracts.Constrainter); ok {
+			constraint = constrainter.Constraint()
+		} else {
+			constraint = "pk_" + table
+		}
+
+		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT %s DO UPDATE SET", constraint)
 		setFormat = `"%[1]s" = EXCLUDED."%[1]s"`
 	}
 

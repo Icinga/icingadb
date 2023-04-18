@@ -88,3 +88,9 @@ type TableNamer interface {
 type Scoper interface {
 	Scope() interface{}
 }
+
+// Constrainter implements the Constraint method,
+// which returns the PK or unique key constraint name of the table.
+type Constrainter interface {
+	Constraint() string // Constraint returns the PK/UNIQUE key constraint name
+}
