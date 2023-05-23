@@ -1235,7 +1235,7 @@ CREATE TABLE notification (
   name_checksum bytea20 NOT NULL,
   properties_checksum bytea20 NOT NULL,
 
-  name varchar(255) NOT NULL,
+  name varchar(767) NOT NULL,
   name_ci citext NOT NULL,
 
   host_id bytea20 NOT NULL,
@@ -1271,6 +1271,7 @@ CREATE INDEX idx_notification_service_id ON notification(service_id);
 COMMENT ON COLUMN notification.id IS 'sha1(environment.id + name)';
 COMMENT ON COLUMN notification.environment_id IS 'environment.id';
 COMMENT ON COLUMN notification.name_checksum IS 'sha1(name)';
+COMMENT ON COLUMN notification.name IS '255+1+255+1+255, i.e. "host.name!service.name!notification.name"';
 COMMENT ON COLUMN notification.host_id IS 'host.id';
 COMMENT ON COLUMN notification.service_id IS 'service.id';
 COMMENT ON COLUMN notification.notificationcommand_id IS 'command.id';
