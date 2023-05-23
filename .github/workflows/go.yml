@@ -33,7 +33,7 @@ jobs:
         with:
           go-version: 1.18.x
 
-      - uses: dominikh/staticcheck-action@29e9b80fb8de0521ba4ed3fdf68fed5bbe82a2d2 # v1.1.0
+      - uses: dominikh/staticcheck-action@ba605356b4b29a60e87ab9404b712f3461e566dc # v1.3.0
         with:
           install-go: false
 
