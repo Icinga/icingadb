@@ -29,13 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions/setup-go@v2
-        with:
-          go-version: 1.18.x
-
       - uses: dominikh/staticcheck-action@29e9b80fb8de0521ba4ed3fdf68fed5bbe82a2d2 # v1.1.0
-        with:
-          install-go: false
 
   vet:
     runs-on: ubuntu-latest
