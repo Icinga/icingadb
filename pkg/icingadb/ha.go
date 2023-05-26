@@ -319,7 +319,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 
 			return nil
 		},
-		IsRetryable,
+		retry.Retryable,
 		backoff.NewExponentialWithJitter(time.Millisecond*256, time.Second*3),
 		retry.Settings{
 			OnError: func(_ time.Duration, attempt uint64, err, lastErr error) {
