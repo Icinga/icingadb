@@ -66,6 +66,8 @@ github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0 h1:bkypFPDjIYGfCYD5mRBvpqxfYX1YCS1PXdKYWi8FsN0=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0/go.mod h1:P+Lt/0by1T8bfcF3z737NnSbmxQAppXMRziHUxPOC8k=
+github.com/icinga/icinga-go-library v0.3.0 h1:BeoomAiQC5RTRWCNqNkgbdTGxQ7ZFfkruR4HCSn5e0k=
+github.com/icinga/icinga-go-library v0.3.0/go.mod h1:YN7XJN3W0FodD+j4kirO89zk2tgvanXWt1RMV8UgOLo=
 github.com/icinga/icinga-testing v0.0.0-20240322142451-494ccd6d03e8 h1:PI+39IY1BjN24JC3B6Jy0rhwm3hqC4SnQFxbZjXOaHk=
 github.com/icinga/icinga-testing v0.0.0-20240322142451-494ccd6d03e8/go.mod h1:xjNiwePgnSVKJWPG/iFG7pNOibU/OWp01Zdl08o+EeI=
 github.com/jmoiron/sqlx v1.4.0 h1:1PLqN7S1UYp5t4SrVVnt4nUVNemrDAtxlulVe+Qgm3o=
@@ -171,8 +173,6 @@ golang.org/x/crypto v0.13.0/go.mod h1:y6Z2r+Rw4iayiXXAIxJIDAJ1zMW4yaTpebo8fPOliY
 golang.org/x/crypto v0.16.0/go.mod h1:gCAAfMLgwOJRpTjQ2zCCt2OcSfYMTeZVSRtQlPC7Nq4=
 golang.org/x/crypto v0.24.0 h1:mnl8DM0o513X8fdIkmyFE/5hTYxbwYOjDS/+rK6qpRI=
 golang.org/x/crypto v0.24.0/go.mod h1:Z1PMYSOR5nyMcyAVAIQSKCDwalqy85Aqn1x3Ws4L5DM=
-golang.org/x/exp v0.0.0-20221012112151-59b0eab1532e h1:/SJUJZl3kz7J5GzAx5lgaKvqKGd4OfzshwDMr6YJCC4=
-golang.org/x/exp v0.0.0-20221012112151-59b0eab1532e/go.mod h1:cyybsKvd6eL0RnXn6p/Grxp8F5bW7iYuBgsNCOHpMYE=
 golang.org/x/lint v0.0.0-20190930215403-16217165b5de/go.mod h1:6SW0HCj/g11FgYtHlgUYUwCkIfeOF89ocIRzGO/8vkc=
 golang.org/x/mod v0.2.0/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
 golang.org/x/mod v0.3.0/go.mod h1:s0Qsj1ACt9ePp/hMypM3fl4fZqREWJwdYDEqhRiZZUA=
