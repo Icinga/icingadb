@@ -9,6 +9,7 @@ import (
 	"github.com/icinga/icinga-testing/services"
 	"github.com/icinga/icinga-testing/utils"
 	"github.com/icinga/icinga-testing/utils/eventually"
+	"github.com/icinga/icingadb/pkg/types"
 	localutils "github.com/icinga/icingadb/tests/internal/utils"
 	"github.com/icinga/icingadb/tests/internal/value"
 	"github.com/jmoiron/sqlx"
@@ -110,8 +111,9 @@ func TestObjectSync(t *testing.T) {
 	t.Run("Host", func(t *testing.T) {
 		t.Parallel()
 
-		for _, host := range data.Hosts {
+		for hostId, host := range data.Hosts {
 			host := host
+			hostId := hostId
 			t.Run("Verify-"+host.VariantInfoString(), func(t *testing.T) {
 				t.Parallel()
 
@@ -136,14 +138,25 @@ func TestObjectSync(t *testing.T) {
 				}
 			})
 
+			t.Run("Verify-SlaLifeCycle-"+fmt.Sprint(hostId), func(t *testing.T) {
+				eventually.Assert(t, func(t require.TestingT) {
+					var count int
+					stmt := `SELECT COUNT(*) FROM "sla_lifecycle" INNER JOIN "host" ON "host"."id"="sla_lifecycle"."host_id" WHERE "service_id" IS NULL AND "host"."name"=?`
+					err := db.Get(&count, db.Rebind(stmt), host.Name)
+
+					require.NoError(t, err, "querying host sla lifecycle count should not fail")
+					require.True(t, count == 1, "there should be one sla lifecycle entry for host %q", host.Name)
+				}, 20*time.Second, 1*time.Second)
+			})
 		}
 	})
 
 	t.Run("Service", func(t *testing.T) {
 		t.Parallel()
 
-		for _, service := range data.Services {
+		for serviceId, service := range data.Services {
 			service := service
+			serviceId := serviceId
 			t.Run("Verify-"+service.VariantInfoString(), func(t *testing.T) {
 				t.Parallel()
 
@@ -166,6 +179,17 @@ func TestObjectSync(t *testing.T) {
 						}, 20*time.Second, 1*time.Second)
 					})
 				}
+			})
+
+			t.Run("Verify-SlaLifeCycle-"+fmt.Sprint(serviceId), func(t *testing.T) {
+				eventually.Assert(t, func(t require.TestingT) {
+					var count int
+					stmt := `SELECT COUNT(*) FROM "sla_lifecycle" INNER JOIN "service" ON "service"."id"="sla_lifecycle"."service_id" WHERE "service"."name" = ?`
+					err := db.Get(&count, db.Rebind(stmt), service.Name)
+
+					require.NoError(t, err, "querying service sla lifecycle should not fail")
+					require.True(t, count == 1, "there should be one sla lifecycle entry for service %q", service.Name)
+				}, 20*time.Second, 1*time.Second)
 			})
 		}
 	})
@@ -360,6 +384,22 @@ func TestObjectSync(t *testing.T) {
 						require.NoError(t, err, "querying service count should not fail")
 						return count == 0
 					}, 20*time.Second, 1*time.Second, "service with name=%q should be removed from database", service.Name)
+
+					eventually.Assert(t, func(t require.TestingT) {
+						var expectedResult []struct {
+							CreateTime types.UnixMilli `db:"create_time"`
+							DeleteTime types.UnixMilli `db:"delete_time"`
+						}
+						stmt := `SELECT "create_time", "delete_time" FROM "sla_lifecycle" 
+									INNER JOIN "service" ON "service"."id"="sla_lifecycle"."service_id"
+									WHERE "service"."name" = ?`
+						err := db.Select(&expectedResult, db.Rebind(stmt), service.Name)
+						require.NoError(t, err, "querying service sla lifecycle should not fail")
+
+						require.True(t, len(expectedResult) == 1)
+						require.False(t, expectedResult[0].CreateTime.Time().IsZero())
+						require.False(t, expectedResult[0].DeleteTime.Time().IsZero())
+					}, 20*time.Second, 1*time.Second)
 				})
 			}
 
