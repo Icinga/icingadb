@@ -40,6 +40,8 @@ func CreateSlaLifecyclesFromCheckables(
 
 		for {
 			select {
+			case <-ctx.Done():
+				return ctx.Err()
 			case checkable, ok := <-entities:
 				if !ok {
 					return nil
