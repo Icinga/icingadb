@@ -806,8 +806,8 @@ CREATE TABLE notification (
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
   properties_checksum binary(20) NOT NULL,
 
-  name varchar(255) NOT NULL,
-  name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  name varchar(767) NOT NULL COMMENT '255+1+255+1+255, i.e. "host.name!service.name!notification.name"',
+  name_ci varchar(767) COLLATE utf8mb4_unicode_ci NOT NULL,
 
   host_id binary(20) NOT NULL COMMENT 'host.id',
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
