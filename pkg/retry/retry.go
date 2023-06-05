@@ -114,9 +114,9 @@ func Retryable(err error) bool {
 		// which is not considered temporary or timed out by Go.
 		err = opError.Err
 	}
-	if errors.Is(err, syscall.ECONNREFUSED) {
+	if errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ENOENT) {
 		// syscall errors provide Temporary() and Timeout(),
-		// which do not include ECONNREFUSED, so we check this ourselves.
+		// which do not include ECONNREFUSED or ENOENT, so we check these ourselves.
 		return true
 	}
 	if errors.Is(err, syscall.ECONNRESET) {
