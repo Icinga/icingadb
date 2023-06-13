@@ -183,24 +183,8 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		entity := delta.Subject.Entity()
 		switch entity.(type) {
 		case *v1.Host, *v1.Service:
-			updatedCheckables := make(chan contracts.Entity, len(delta.Delete))
-			g.Go(func() error {
-				defer close(updatedCheckables)
-				s.logger.Infof("Updating %d %s sla lifecycles", len(delta.Delete), delta.Subject.Name())
-
-				sl := v1.NewSlaLifecycle()
-				sem := s.db.GetSemaphoreForTable(utils.TableName(sl))
-				stmt := fmt.Sprintf(
-					`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`,
-					utils.TableName(sl),
-				)
-
-				return s.db.NamedBulkExec(
-					ctx, stmt, s.db.Options.MaxPlaceholdersPerStatement, sem,
-					CreateSlaLifecyclesFromCheckables(ctx, g, s.db, delta.Delete.Entities(ctx), true),
-					com.NeverSplit[contracts.Entity], OnSuccessSendTo(updatedCheckables),
-				)
-			})
+			s.logger.Infof("Updating %d %s sla lifecycles", len(delta.Delete), delta.Subject.Name())
+			updatedSlaLifeCycles := UpdateSlaLifeCycles(ctx, s.db, delta.Delete.Entities(ctx), g, 0, len(delta.Delete))
 
 			s.logger.Infof("Inserting %d %s sla lifecycles of type delete", len(delta.Delete), delta.Subject.Name())
 
@@ -214,7 +198,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 				}
 
 				return s.db.CreateIgnoreStreamed(
-					ctx, updatedCheckables, OnSuccessApplyAndSendTo[contracts.Entity, interface{}](deleteIds, extractEntityId),
+					ctx, updatedSlaLifeCycles, OnSuccessApplyAndSendTo[contracts.Entity, interface{}](deleteIds, extractEntityId),
 				)
 			})
 

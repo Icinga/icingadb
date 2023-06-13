@@ -2,6 +2,8 @@ package icingadb
 
 import (
 	"context"
+	"fmt"
+	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
@@ -94,4 +96,31 @@ func CreateSlaLifecyclesFromCheckables(
 	})
 
 	return slaLifecycles
+}
+
+func UpdateSlaLifeCycles(
+	ctx context.Context, db *DB, entities <-chan contracts.Entity, g *errgroup.Group, bulkSize int, bufferLen int, onSuccess ...OnSuccess[contracts.Entity],
+) <-chan contracts.Entity {
+	updatedSlaLifeCycles := make(chan contracts.Entity, bufferLen)
+
+	g.Go(func() error {
+		defer close(updatedSlaLifeCycles)
+
+		sl := v1.NewSlaLifecycle()
+		sem := db.GetSemaphoreForTable(utils.TableName(sl))
+		stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, utils.TableName(sl))
+
+		if bulkSize <= 0 {
+			bulkSize = db.Options.MaxPlaceholdersPerStatement
+		}
+
+		onSuccess = append(onSuccess, OnSuccessSendTo(updatedSlaLifeCycles))
+
+		return db.NamedBulkExec(
+			ctx, stmt, bulkSize, sem, CreateSlaLifecyclesFromCheckables(ctx, g, db, entities, true),
+			com.NeverSplit[contracts.Entity], onSuccess...,
+		)
+	})
+
+	return updatedSlaLifeCycles
 }

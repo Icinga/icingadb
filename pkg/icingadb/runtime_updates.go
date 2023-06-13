@@ -205,29 +205,17 @@ func (r *RuntimeUpdates) Sync(
 			// Start the regular Icinga DB checkables upsert stream.
 			g.Go(upsertEntityFunc(entities))
 
-			updatedSlaLifeCycles := make(chan contracts.Entity, r.redis.Options.XReadCount)
+			deletedIds := make(chan interface{}, r.redis.Options.XReadCount)
 			g.Go(func() error {
-				defer close(updatedSlaLifeCycles)
+				defer close(deletedIds)
 
 				var counter com.Counter
 				defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
 					if count := counter.Reset(); count > 0 {
-						r.logger.Infof("Updating %d %s sla lifecycles", count, s.Name())
+						r.logger.Infof("Upserting %d %s sla lifecycles", count, s.Name())
 					}
 				}).Stop()
 
-				sl := v1.NewSlaLifecycle()
-				stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, utils.TableName(sl))
-				sem := r.db.GetSemaphoreForTable(utils.TableName(sl))
-
-				return r.db.NamedBulkExec(
-					ctx, stmt, upsertCount, sem, CreateSlaLifecyclesFromCheckables(ctx, g, r.db, deleteEntities, true),
-					com.NeverSplit[contracts.Entity], OnSuccessSendTo(updatedSlaLifeCycles), OnSuccessIncrement[contracts.Entity](&counter),
-				)
-			})
-
-			deletedIds := make(chan interface{}, r.redis.Options.XReadCount)
-			g.Go(func() error {
 				// extractEntityId is used as a callback for the on success mechanism to extract the checkables id.
 				extractEntityId := func(e contracts.Entity) interface{} {
 					return e.(*v1.SlaLifecycle).SourceEntity.ID()
@@ -236,6 +224,10 @@ func (r *RuntimeUpdates) Sync(
 				sl := v1.NewSlaLifecycle()
 				stmt, _ := r.db.BuildInsertIgnoreStmt(sl)
 				sem := r.db.GetSemaphoreForTable(utils.TableName(sl))
+
+				updatedSlaLifeCycles := UpdateSlaLifeCycles(
+					ctx, r.db, deleteEntities, g, upsertCount, r.redis.Options.XReadCount, OnSuccessIncrement[contracts.Entity](&counter),
+				)
 
 				return r.db.NamedBulkExec(
 					ctx, stmt, upsertCount, sem, updatedSlaLifeCycles, com.NeverSplit[contracts.Entity],
