@@ -203,32 +203,8 @@ func (r *RuntimeUpdates) Sync(
 			// Start the regular Icinga DB checkables upsert stream.
 			g.Go(upsertEntityFunc(entities))
 
-			deletedIds := make(chan any, r.redis.Options.XReadCount)
-			g.Go(func() error {
-				defer close(deletedIds)
-
-				var counter com.Counter
-				defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
-					if count := counter.Reset(); count > 0 {
-						r.logger.Infof("Updating %d %s sla lifecycles", count, s.Name())
-					}
-				}).Stop()
-
-				sl := v1.NewSlaLifecycle()
-				stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, database.TableName(sl))
-				sem := r.db.GetSemaphoreForTable(database.TableName(sl))
-
-				// extractEntityId is used as a callback for the on success mechanism to extract the checkables id.
-				extractEntityId := func(e database.Entity) any { return e.(*v1.SlaLifecycle).SourceEntity.ID() }
-
-				return r.db.NamedBulkExec(
-					ctx, stmt, upsertCount, sem, CreateSlaLifecyclesFromCheckables(ctx, g, deleteEntities, true),
-					com.NeverSplit[database.Entity], database.OnSuccessIncrement[database.Entity](&counter),
-					OnSuccessApplyAndSendTo[database.Entity, any](deletedIds, extractEntityId))
-			})
-
 			// Start the regular Icinga DB checkables delete stream.
-			g.Go(deleteEntityFunc(deletedIds))
+			g.Go(deleteEntityFunc(StreamIDsFromUpdatedSlaLifecycles(ctx, r.db, g, r.logger, deleteEntities, upsertCount)))
 		default:
 			// For non-checkables runtime updates of upsert event
 			g.Go(upsertEntityFunc(upsertEntities))
