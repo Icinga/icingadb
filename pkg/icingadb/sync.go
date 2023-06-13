@@ -184,27 +184,12 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		entity := delta.Subject.Entity()
 		switch entity.(type) {
 		case *v1.Host, *v1.Service:
-			deleteIds := make(chan any, len(delta.Delete))
-			g.Go(func() error {
-				defer close(deleteIds)
-
-				s.logger.Infof("Updating %d %s sla lifecycles", len(delta.Delete), delta.Subject.Name())
-
-				slTableName := database.TableName(v1.NewSlaLifecycle())
-				sem := s.db.GetSemaphoreForTable(slTableName)
-				stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, slTableName)
-
-				// extractEntityId is used as a callback for the on success mechanism to extract the checkables id.
-				extractEntityId := func(e database.Entity) any { return e.(*v1.SlaLifecycle).SourceEntity.ID() }
-
-				return s.db.NamedBulkExec(
-					ctx, stmt, s.db.Options.MaxPlaceholdersPerStatement, sem,
-					CreateSlaLifecyclesFromCheckables(ctx, g, delta.Delete.Entities(ctx), true),
-					com.NeverSplit[database.Entity], OnSuccessApplyAndSendTo[database.Entity, any](deleteIds, extractEntityId))
-			})
+			s.logger.Infof("Updating %d %s sla lifecycles", len(delta.Delete), delta.Subject.Name())
 
 			g.Go(func() error {
-				return s.db.DeleteStreamed(ctx, delta.Subject.Entity(), deleteIds, database.OnSuccessIncrement[any](stat))
+				return s.db.DeleteStreamed(
+					ctx, entity, StreamIDsFromUpdatedSlaLifecycles(ctx, s.db, g, s.logger, delta.Delete.Entities(ctx), 0),
+					database.OnSuccessIncrement[any](stat))
 			})
 		default:
 			g.Go(func() error {
