@@ -4,8 +4,10 @@ CREATE TABLE sla_lifecycle (
   host_id bytea20 NOT NULL,
   service_id bytea20 DEFAULT NULL,
 
-  create_time biguint DEFAULT 0,
-  delete_time biguint DEFAULT 0,
+  -- These columns are nullable, but as we're using the delete_time to build the composed primary key, we have to set
+  -- this to `0` instead, since it's not allowed to use a nullable column as part of the primary key.
+  create_time biguint NOT NULL DEFAULT 0,
+  delete_time biguint NOT NULL DEFAULT 0,
 
   CONSTRAINT pk_sla_lifecycle PRIMARY KEY (id, delete_time)
 );

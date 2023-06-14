@@ -193,7 +193,7 @@ func (r *RuntimeUpdates) Sync(
 				stmt, _ := r.db.BuildInsertIgnoreStmt(sl)
 
 				// Not to mess up the already existing FIFO mechanism, we have to perform only a single query
-				// (semaphore 1) at a time, even the sla queries could be bulk executed.
+				// (semaphore 1) at a time, even though, the sla queries could be executed concurrently.
 				// After successfully upserting a lifecycle entity, the original checkable entity is streamed to "entities".
 				slaEntities := CreateSlaLifecyclesFromCheckables(ctx, g, r.db, upsertEntities, false)
 				return r.db.NamedBulkExec(
@@ -225,7 +225,7 @@ func (r *RuntimeUpdates) Sync(
 				stmt, _ := r.db.BuildInsertIgnoreStmt(sl)
 				sem := r.db.GetSemaphoreForTable(utils.TableName(sl))
 
-				updatedSlaLifeCycles := UpdateSlaLifeCycles(
+				updatedSlaLifeCycles := UpdateSlaLifecycles(
 					ctx, r.db, deleteEntities, g, upsertCount, r.redis.Options.XReadCount, OnSuccessIncrement[contracts.Entity](&counter),
 				)
 

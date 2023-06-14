@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+var tableName = utils.TableName(v1.NewSlaLifecycle())
+
 // GetCheckableFromSlaLifecycle returns the original checkable from which the specified sla lifecycle were transformed.
 // When the passed entity is not of type *SlaLifecycle, it is returned as is.
 func GetCheckableFromSlaLifecycle(e contracts.Entity) contracts.Entity {
@@ -70,8 +72,7 @@ func CreateSlaLifecyclesFromCheckables(
 						// the `host_id` in the stream. So consider dropping this piece of code once Icinga 2 decides
 						// to include this data in the redis `delete` stream.
 						err := db.QueryRowxContext(
-							ctx, db.Rebind(db.BuildSelectStmt(checkable, v1.HostMeta{})+` WHERE "id" = ?`),
-							sl.ServiceId,
+							ctx, db.Rebind(`SELECT "host_id" FROM "service" WHERE "id" = ?`), sl.ServiceId,
 						).StructScan(sl)
 
 						if err != nil {
@@ -84,6 +85,7 @@ func CreateSlaLifecyclesFromCheckables(
 
 				if isDeleteEvent {
 					sl.DeleteTime = types.UnixMilli(now)
+					sl.CreateTime = types.UnixMilli(time.Unix(0, 0))
 				}
 
 				select {
@@ -98,7 +100,10 @@ func CreateSlaLifecyclesFromCheckables(
 	return slaLifecycles
 }
 
-func UpdateSlaLifeCycles(
+// UpdateSlaLifecycles updates the `delete_time` of the sla lifecycle for the given checkables.
+// When a given checkable doesn't already have a `create_time` entry in the database, the update query won't
+// update anything. Either way the sla lifecycle entries are streamed into the returned chan.
+func UpdateSlaLifecycles(
 	ctx context.Context, db *DB, entities <-chan contracts.Entity, g *errgroup.Group, bulkSize int, bufferLen int, onSuccess ...OnSuccess[contracts.Entity],
 ) <-chan contracts.Entity {
 	updatedSlaLifeCycles := make(chan contracts.Entity, bufferLen)
@@ -106,15 +111,14 @@ func UpdateSlaLifeCycles(
 	g.Go(func() error {
 		defer close(updatedSlaLifeCycles)
 
-		sl := v1.NewSlaLifecycle()
-		sem := db.GetSemaphoreForTable(utils.TableName(sl))
-		stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, utils.TableName(sl))
+		sem := db.GetSemaphoreForTable(tableName)
+		stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, tableName)
 
 		if bulkSize <= 0 {
 			bulkSize = db.Options.MaxPlaceholdersPerStatement
 		}
 
-		onSuccess = append(onSuccess, OnSuccessSendTo(updatedSlaLifeCycles))
+		onSuccess := append(onSuccess[:len(onSuccess):len(onSuccess)], OnSuccessSendTo(updatedSlaLifeCycles))
 
 		return db.NamedBulkExec(
 			ctx, stmt, bulkSize, sem, CreateSlaLifecyclesFromCheckables(ctx, g, db, entities, true),
