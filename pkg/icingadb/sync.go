@@ -183,7 +183,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		switch entity.(type) {
 		case *v1.Host, *v1.Service:
 			s.logger.Infof("Updating %d %s sla lifecycles", len(delta.Delete), delta.Subject.Name())
-			updatedSlaLifeCycles := UpdateSlaLifecycles(ctx, s.db, entity, delta.Delete.Entities(ctx), g, 0, len(delta.Delete))
+			updatedSlaLifeCycles := UpdateSlaLifecycles(ctx, s.db, entity, delta.Delete.Entities(ctx), g, len(delta.Delete))
 
 			s.logger.Infof("Inserting %d %s sla lifecycles of type delete", len(delta.Delete), delta.Subject.Name())
 

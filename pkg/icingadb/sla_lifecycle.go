@@ -104,7 +104,7 @@ func CreateSlaLifecyclesFromCheckables(
 // When a given checkable doesn't already have a `create_time` entry in the database, the update query won't
 // update anything. Either way the sla lifecycle entries are streamed into the returned chan.
 func UpdateSlaLifecycles(
-	ctx context.Context, db *DB, subject contracts.Entity, entities <-chan contracts.Entity, g *errgroup.Group, bulkSize int, bufferLen int, onSuccess ...OnSuccess[contracts.Entity],
+	ctx context.Context, db *DB, subject contracts.Entity, entities <-chan contracts.Entity, g *errgroup.Group, bufferLen int, onSuccess ...OnSuccess[contracts.Entity],
 ) <-chan contracts.Entity {
 	updatedSlaLifeCycles := make(chan contracts.Entity, bufferLen)
 
@@ -114,14 +114,10 @@ func UpdateSlaLifecycles(
 		sem := db.GetSemaphoreForTable(tableName)
 		stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, tableName)
 
-		if bulkSize <= 0 {
-			bulkSize = db.Options.MaxPlaceholdersPerStatement
-		}
-
 		onSuccess := append(onSuccess[:len(onSuccess):len(onSuccess)], OnSuccessSendTo(updatedSlaLifeCycles))
 
 		return db.NamedBulkExec(
-			ctx, stmt, bulkSize, sem, CreateSlaLifecyclesFromCheckables(ctx, subject, g, db, entities, true),
+			ctx, stmt, 1, sem, CreateSlaLifecyclesFromCheckables(ctx, subject, g, db, entities, true),
 			com.NeverSplit[contracts.Entity], onSuccess...,
 		)
 	})

@@ -226,7 +226,7 @@ func (r *RuntimeUpdates) Sync(
 				sem := r.db.GetSemaphoreForTable(utils.TableName(sl))
 
 				updatedSlaLifeCycles := UpdateSlaLifecycles(
-					ctx, r.db, s.Entity(), deleteEntities, g, upsertCount, r.redis.Options.XReadCount, OnSuccessIncrement[contracts.Entity](&counter),
+					ctx, r.db, s.Entity(), deleteEntities, g, upsertCount, OnSuccessIncrement[contracts.Entity](&counter),
 				)
 
 				return r.db.NamedBulkExec(
