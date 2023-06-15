@@ -186,7 +186,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		case *v1.Host, *v1.Service:
 			g.Go(func() error {
 				return s.db.DeleteStreamed(
-					ctx, entity, StreamIDsFromUpdatedSlaLifecycles(ctx, s.db, entity, g, s.logger, delta.Delete.Entities(ctx), 0),
+					ctx, entity, StreamIDsFromUpdatedSlaLifecycles(ctx, s.db, entity, g, s.logger, delta.Delete.Entities(ctx)),
 					database.OnSuccessIncrement[any](stat))
 			})
 		default:

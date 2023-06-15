@@ -101,7 +101,7 @@ func CreateSlaLifecyclesFromCheckables(
 // It's unlikely, but when a given Checkable doesn't already have a `create_time` entry in the database, the update
 // query won't update anything. Either way the entities IDs are streamed into the returned chan.
 func StreamIDsFromUpdatedSlaLifecycles(
-	ctx context.Context, db *database.DB, subject database.Entity, g *errgroup.Group, logger *logging.Logger, entities <-chan database.Entity, bulkSize int,
+	ctx context.Context, db *database.DB, subject database.Entity, g *errgroup.Group, logger *logging.Logger, entities <-chan database.Entity,
 ) <-chan any {
 	deleteEntityIDs := make(chan any, 1)
 
@@ -118,15 +118,11 @@ func StreamIDsFromUpdatedSlaLifecycles(
 		sem := db.GetSemaphoreForTable(tableName)
 		stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, tableName)
 
-		if bulkSize <= 0 {
-			bulkSize = db.Options.MaxPlaceholdersPerStatement
-		}
-
 		// extractEntityId is used as a callback for the on success mechanism to extract the checkables id.
 		extractEntityId := func(e database.Entity) any { return e.(*v1.SlaLifecycle).SourceEntity.ID() }
 
 		return db.NamedBulkExec(
-			ctx, stmt, bulkSize, sem, CreateSlaLifecyclesFromCheckables(ctx, subject, g, entities, true),
+			ctx, stmt, 1, sem, CreateSlaLifecyclesFromCheckables(ctx, subject, g, entities, true),
 			com.NeverSplit[database.Entity], OnSuccessApplyAndSendTo[database.Entity, any](deleteEntityIDs, extractEntityId))
 	})
 
