@@ -141,7 +141,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 					defer close(createdEntities)
 
 					return s.db.CreateIgnoreStreamed(
-						ctx, CreateSlaLifecyclesFromCheckables(ctx, g, entities, false),
+						ctx, CreateSlaLifecyclesFromCheckables(ctx, delta.Subject.Entity(), g, entities, false),
 						OnSuccessApplyAndSendTo(createdEntities, GetCheckableFromSlaLifecycle))
 				})
 
@@ -184,11 +184,9 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		entity := delta.Subject.Entity()
 		switch entity.(type) {
 		case *v1.Host, *v1.Service:
-			s.logger.Infof("Updating %d %s sla lifecycles", len(delta.Delete), delta.Subject.Name())
-
 			g.Go(func() error {
 				return s.db.DeleteStreamed(
-					ctx, entity, StreamIDsFromUpdatedSlaLifecycles(ctx, s.db, g, s.logger, delta.Delete.Entities(ctx), 0),
+					ctx, entity, StreamIDsFromUpdatedSlaLifecycles(ctx, s.db, entity, g, s.logger, delta.Delete.Entities(ctx), 0),
 					database.OnSuccessIncrement[any](stat))
 			})
 		default:
