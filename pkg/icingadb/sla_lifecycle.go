@@ -31,7 +31,7 @@ func GetCheckableFromSlaLifecycle(e database.Entity) database.Entity {
 // CreateSlaLifecyclesFromCheckables transforms the given checkables to sla lifecycle struct
 // and streams them into a returned channel.
 func CreateSlaLifecyclesFromCheckables(
-	ctx context.Context, g *errgroup.Group, entities <-chan database.Entity, isDeleteEvent bool,
+	ctx context.Context, subject database.Entity, g *errgroup.Group, entities <-chan database.Entity, isDeleteEvent bool,
 ) <-chan database.Entity {
 	slaLifecycles := make(chan database.Entity, 1)
 
@@ -61,7 +61,7 @@ func CreateSlaLifecyclesFromCheckables(
 					SourceEntity:    checkable,
 				}
 
-				switch checkable.(type) {
+				switch subject.(type) {
 				case *v1.Host:
 					sl.Id = checkable.ID().(types.Binary)
 					sl.HostId = sl.Id
@@ -101,7 +101,7 @@ func CreateSlaLifecyclesFromCheckables(
 // It's unlikely, but when a given Checkable doesn't already have a `create_time` entry in the database, the update
 // query won't update anything. Either way the entities IDs are streamed into the returned chan.
 func StreamIDsFromUpdatedSlaLifecycles(
-	ctx context.Context, db *database.DB, g *errgroup.Group, logger *logging.Logger, entities <-chan database.Entity, bulkSize int,
+	ctx context.Context, db *database.DB, subject database.Entity, g *errgroup.Group, logger *logging.Logger, entities <-chan database.Entity, bulkSize int,
 ) <-chan any {
 	deleteEntityIDs := make(chan any, 1)
 
@@ -111,7 +111,7 @@ func StreamIDsFromUpdatedSlaLifecycles(
 		var counter com.Counter
 		defer periodic.Start(ctx, logger.Interval(), func(_ periodic.Tick) {
 			if count := counter.Reset(); count > 0 {
-				logger.Infof("Updated %d sla lifecycles", count)
+				logger.Infof("Updated %d %s sla lifecycles", count, types.Name(subject))
 			}
 		}).Stop()
 
@@ -126,7 +126,7 @@ func StreamIDsFromUpdatedSlaLifecycles(
 		extractEntityId := func(e database.Entity) any { return e.(*v1.SlaLifecycle).SourceEntity.ID() }
 
 		return db.NamedBulkExec(
-			ctx, stmt, bulkSize, sem, CreateSlaLifecyclesFromCheckables(ctx, g, entities, true),
+			ctx, stmt, bulkSize, sem, CreateSlaLifecyclesFromCheckables(ctx, subject, g, entities, true),
 			com.NeverSplit[database.Entity], OnSuccessApplyAndSendTo[database.Entity, any](deleteEntityIDs, extractEntityId))
 	})
 

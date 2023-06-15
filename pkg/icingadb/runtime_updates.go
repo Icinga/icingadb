@@ -193,7 +193,7 @@ func (r *RuntimeUpdates) Sync(
 				// Not to mess up the already existing FIFO mechanism, we have to perform only a single query
 				// (semaphore 1) at a time, even though, the sla queries could be executed concurrently.
 				// After successfully upserting a lifecycle entity, the original checkable entity is streamed to "entities".
-				fromSlaEntities := CreateSlaLifecyclesFromCheckables(ctx, g, upsertEntities, false)
+				fromSlaEntities := CreateSlaLifecyclesFromCheckables(ctx, s.Entity(), g, upsertEntities, false)
 				return r.db.NamedBulkExec(
 					ctx, stmt, upsertCount, semaphore.NewWeighted(1), fromSlaEntities,
 					com.NeverSplit[database.Entity], database.OnSuccessIncrement[database.Entity](&counter),
@@ -204,7 +204,7 @@ func (r *RuntimeUpdates) Sync(
 			g.Go(upsertEntityFunc(entities))
 
 			// Start the regular Icinga DB checkables delete stream.
-			g.Go(deleteEntityFunc(StreamIDsFromUpdatedSlaLifecycles(ctx, r.db, g, r.logger, deleteEntities, upsertCount)))
+			g.Go(deleteEntityFunc(StreamIDsFromUpdatedSlaLifecycles(ctx, r.db, s.Entity(), g, r.logger, deleteEntities, upsertCount)))
 		default:
 			// For non-checkables runtime updates of upsert event
 			g.Go(upsertEntityFunc(upsertEntities))
