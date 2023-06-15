@@ -30,7 +30,7 @@ func GetCheckableFromSlaLifecycle(e contracts.Entity) contracts.Entity {
 // CreateSlaLifecyclesFromCheckables transforms the given checkables to sla lifecycle struct
 // and streams them into a returned channel.
 func CreateSlaLifecyclesFromCheckables(
-	ctx context.Context, g *errgroup.Group, db *DB, entities <-chan contracts.Entity, isDeleteEvent bool,
+	ctx context.Context, subject contracts.Entity, g *errgroup.Group, db *DB, entities <-chan contracts.Entity, isDeleteEvent bool,
 ) <-chan contracts.Entity {
 	slaLifecycles := make(chan contracts.Entity, 1)
 
@@ -60,7 +60,7 @@ func CreateSlaLifecyclesFromCheckables(
 					SourceEntity:    checkable,
 				}
 
-				switch checkable.(type) {
+				switch subject.(type) {
 				case *v1.Host:
 					sl.HostId = checkable.(v1.BinaryIDer).BinaryID()
 					sl.Id = utils.Checksum(objectpacker.MustPackSlice(sl.EnvironmentId, sl.HostId))
@@ -104,7 +104,7 @@ func CreateSlaLifecyclesFromCheckables(
 // When a given checkable doesn't already have a `create_time` entry in the database, the update query won't
 // update anything. Either way the sla lifecycle entries are streamed into the returned chan.
 func UpdateSlaLifecycles(
-	ctx context.Context, db *DB, entities <-chan contracts.Entity, g *errgroup.Group, bulkSize int, bufferLen int, onSuccess ...OnSuccess[contracts.Entity],
+	ctx context.Context, db *DB, subject contracts.Entity, entities <-chan contracts.Entity, g *errgroup.Group, bulkSize int, bufferLen int, onSuccess ...OnSuccess[contracts.Entity],
 ) <-chan contracts.Entity {
 	updatedSlaLifeCycles := make(chan contracts.Entity, bufferLen)
 
@@ -121,7 +121,7 @@ func UpdateSlaLifecycles(
 		onSuccess := append(onSuccess[:len(onSuccess):len(onSuccess)], OnSuccessSendTo(updatedSlaLifeCycles))
 
 		return db.NamedBulkExec(
-			ctx, stmt, bulkSize, sem, CreateSlaLifecyclesFromCheckables(ctx, g, db, entities, true),
+			ctx, stmt, bulkSize, sem, CreateSlaLifecyclesFromCheckables(ctx, subject, g, db, entities, true),
 			com.NeverSplit[contracts.Entity], onSuccess...,
 		)
 	})

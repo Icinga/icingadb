@@ -139,7 +139,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 					defer close(createdEntities)
 
 					return s.db.CreateStreamed(
-						ctx, CreateSlaLifecyclesFromCheckables(ctx, g, s.db, entities, false),
+						ctx, CreateSlaLifecyclesFromCheckables(ctx, delta.Subject.Entity(), g, s.db, entities, false),
 						OnSuccessApplyAndSendTo(createdEntities, GetCheckableFromSlaLifecycle),
 					)
 				})
@@ -179,12 +179,11 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Delete
 	if len(delta.Delete) > 0 {
-		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
 		entity := delta.Subject.Entity()
 		switch entity.(type) {
 		case *v1.Host, *v1.Service:
 			s.logger.Infof("Updating %d %s sla lifecycles", len(delta.Delete), delta.Subject.Name())
-			updatedSlaLifeCycles := UpdateSlaLifecycles(ctx, s.db, delta.Delete.Entities(ctx), g, 0, len(delta.Delete))
+			updatedSlaLifeCycles := UpdateSlaLifecycles(ctx, s.db, entity, delta.Delete.Entities(ctx), g, 0, len(delta.Delete))
 
 			s.logger.Infof("Inserting %d %s sla lifecycles of type delete", len(delta.Delete), delta.Subject.Name())
 
@@ -203,6 +202,8 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 			})
 
 			g.Go(func() error {
+				s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+
 				return s.db.DeleteStreamed(ctx, delta.Subject.Entity(), deleteIds, OnSuccessIncrement[any](stat))
 			})
 		default:

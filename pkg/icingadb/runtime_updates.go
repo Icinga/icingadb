@@ -195,7 +195,7 @@ func (r *RuntimeUpdates) Sync(
 				// Not to mess up the already existing FIFO mechanism, we have to perform only a single query
 				// (semaphore 1) at a time, even though, the sla queries could be executed concurrently.
 				// After successfully upserting a lifecycle entity, the original checkable entity is streamed to "entities".
-				slaEntities := CreateSlaLifecyclesFromCheckables(ctx, g, r.db, upsertEntities, false)
+				slaEntities := CreateSlaLifecyclesFromCheckables(ctx, s.Entity(), g, r.db, upsertEntities, false)
 				return r.db.NamedBulkExec(
 					ctx, stmt, upsertCount, semaphore.NewWeighted(1), slaEntities, com.NeverSplit[contracts.Entity],
 					OnSuccessApplyAndSendTo(entities, GetCheckableFromSlaLifecycle), OnSuccessIncrement[contracts.Entity](&counter),
@@ -226,7 +226,7 @@ func (r *RuntimeUpdates) Sync(
 				sem := r.db.GetSemaphoreForTable(utils.TableName(sl))
 
 				updatedSlaLifeCycles := UpdateSlaLifecycles(
-					ctx, r.db, deleteEntities, g, upsertCount, r.redis.Options.XReadCount, OnSuccessIncrement[contracts.Entity](&counter),
+					ctx, r.db, s.Entity(), deleteEntities, g, upsertCount, r.redis.Options.XReadCount, OnSuccessIncrement[contracts.Entity](&counter),
 				)
 
 				return r.db.NamedBulkExec(
