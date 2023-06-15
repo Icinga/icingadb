@@ -204,7 +204,7 @@ func (r *RuntimeUpdates) Sync(
 			g.Go(upsertEntityFunc(entities))
 
 			// Start the regular Icinga DB checkables delete stream.
-			g.Go(deleteEntityFunc(StreamIDsFromUpdatedSlaLifecycles(ctx, r.db, s.Entity(), g, r.logger, deleteEntities, upsertCount)))
+			g.Go(deleteEntityFunc(StreamIDsFromUpdatedSlaLifecycles(ctx, r.db, s.Entity(), g, r.logger, deleteEntities)))
 		default:
 			// For non-checkables runtime updates of upsert event
 			g.Go(upsertEntityFunc(upsertEntities))
