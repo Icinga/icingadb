@@ -983,7 +983,7 @@ CREATE TABLE customvar_flat (
   flatname_checksum binary(20) NOT NULL COMMENT 'sha1(flatname after conversion)',
 
   flatname varchar(512) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Path converted with `.` and `[ ]`',
-  flatvalue text NOT NULL,
+  flatvalue text DEFAULT NULL,
 
   PRIMARY KEY (id),
 

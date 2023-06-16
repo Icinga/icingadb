@@ -2,7 +2,6 @@ package v1
 
 import (
 	"context"
-	"fmt"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -25,7 +24,7 @@ type CustomvarFlat struct {
 	CustomvarMeta    `json:",inline"`
 	Flatname         string       `json:"flatname"`
 	FlatnameChecksum types.Binary `json:"flatname_checksum"`
-	Flatvalue        string       `json:"flatvalue"`
+	Flatvalue        types.String `json:"flatvalue"`
 }
 
 func NewCustomvar() contracts.Entity {
@@ -117,11 +116,9 @@ func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan contra
 					flattened := flatten.Flatten(value, customvar.Name)
 
 					for flatname, flatvalue := range flattened {
-						var fv string
-						if flatvalue == nil {
-							fv = "null"
-						} else {
-							fv = fmt.Sprintf("%v", flatvalue)
+						var fv interface{}
+						if flatvalue.Valid {
+							fv = flatvalue.String
 						}
 
 						select {
@@ -131,7 +128,7 @@ func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan contra
 									IdMeta: IdMeta{
 										// TODO(el): Schema comment is wrong.
 										// Without customvar.Id we would produce duplicate keys here.
-										Id: utils.Checksum(objectpacker.MustPackSlice(customvar.EnvironmentId, customvar.Id, flatname, flatvalue)),
+										Id: utils.Checksum(objectpacker.MustPackSlice(customvar.EnvironmentId, customvar.Id, flatname, fv)),
 									},
 								},
 								EnvironmentMeta: EnvironmentMeta{
@@ -141,7 +138,7 @@ func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan contra
 							},
 							Flatname:         flatname,
 							FlatnameChecksum: utils.Checksum(flatname),
-							Flatvalue:        fv,
+							Flatvalue:        flatvalue,
 						}:
 						case <-ctx.Done():
 							return ctx.Err()
