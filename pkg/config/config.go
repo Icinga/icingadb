@@ -54,7 +54,7 @@ func FromYAMLFile(name string) (*Config, error) {
 	defer f.Close()
 
 	c := &Config{}
-	d := yaml.NewDecoder(f)
+	d := yaml.NewDecoder(f, yaml.DisallowUnknownField())
 
 	if err := defaults.Set(c); err != nil {
 		return nil, errors.Wrap(err, "can't set config defaults")
