@@ -3,6 +3,7 @@ package icingadb_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	_ "embed"
 	"fmt"
 	"github.com/go-redis/redis/v8"
@@ -1194,9 +1195,9 @@ func newString(s string) *string {
 }
 
 type CustomVarTestData struct {
-	Value    interface{}       // Value to put into config or API
-	Vars     map[string]string // Expected values in customvar table
-	VarsFlat map[string]string // Expected values in customvar_flat table
+	Value    interface{}               // Value to put into config or API
+	Vars     map[string]string         // Expected values in customvar table
+	VarsFlat map[string]sql.NullString // Expected values in customvar_flat table
 }
 
 func (c *CustomVarTestData) Icinga2ConfigValue() string {
@@ -1246,20 +1247,22 @@ func (c *CustomVarTestData) verify(t require.TestingT, logger *zap.Logger, db *s
 	require.NoError(t, err, "querying customvars")
 	defer func() { _ = rows.Close() }()
 
-	expectedSrc := c.Vars
-	if flat {
-		expectedSrc = c.VarsFlat
-	}
-
 	// copy map to remove items while reading from the database
-	expected := make(map[string]string)
-	for k, v := range expectedSrc {
-		expected[k] = v
+	expected := make(map[string]sql.NullString)
+	if flat {
+		for k, v := range c.VarsFlat {
+			expected[k] = v
+		}
+	} else {
+		for k, v := range c.Vars {
+			expected[k] = toDBString(v)
+		}
 	}
 
 	for rows.Next() {
-		var cvName, cvValue string
-		err := rows.Scan(&cvName, &cvValue)
+		var cvName string
+		var cvValue sql.NullString
+		err = rows.Scan(&cvName, &cvValue)
 		require.NoError(t, err, "scanning query row")
 
 		logger.Debug("custom var from database",
@@ -1267,13 +1270,13 @@ func (c *CustomVarTestData) verify(t require.TestingT, logger *zap.Logger, db *s
 			zap.String("object-type", typeName),
 			zap.Any("object-name", name),
 			zap.String("custom-var-name", cvName),
-			zap.String("custom-var-value", cvValue))
+			zap.String("custom-var-value", cvValue.String))
 
 		if cvExpected, ok := expected[cvName]; ok {
 			assert.Equalf(t, cvExpected, cvValue, "custom var %q", cvName)
 			delete(expected, cvName)
 		} else if !ok {
-			assert.Failf(t, "unexpected custom var", "%q: %q", cvName, cvValue)
+			assert.Failf(t, "unexpected custom var", "%q: %q", cvName, cvValue.String)
 		}
 	}
 
@@ -1299,9 +1302,33 @@ func makeCustomVarTestData(t *testing.T) []*CustomVarTestData {
 			id + "-hello": `"` + id + ` world"`,
 			id + "-foo":   `"` + id + ` bar"`,
 		},
-		VarsFlat: map[string]string{
-			id + "-hello": id + " world",
-			id + "-foo":   id + " bar",
+		VarsFlat: map[string]sql.NullString{
+			id + "-hello": toDBString(id + " world"),
+			id + "-foo":   toDBString(id + " bar"),
+		},
+	})
+
+	// empty custom vars of type array and dictionaries
+	data = append(data, &CustomVarTestData{
+		Value: map[string]interface{}{
+			id + "-empty-list":        []interface{}{},
+			id + "-empty-nested-list": []interface{}{[]interface{}{}},
+			id + "-empty-dict":        map[string]interface{}{},
+			id + "-empty-nested-dict": map[string]interface{}{
+				"some-key": map[string]interface{}{},
+			},
+		},
+		Vars: map[string]string{
+			id + "-empty-list":        `[]`,
+			id + "-empty-nested-list": `[[]]`,
+			id + "-empty-dict":        `{}`,
+			id + "-empty-nested-dict": `{"some-key":{}}`,
+		},
+		VarsFlat: map[string]sql.NullString{
+			id + "-empty-list":                 {},
+			id + "-empty-nested-list[0]":       {},
+			id + "-empty-dict":                 {},
+			id + "-empty-nested-dict.some-key": {},
 		},
 	})
 
@@ -1342,29 +1369,29 @@ func makeCustomVarTestData(t *testing.T) []*CustomVarTestData {
 			id + "-nested-dict":  `{"array":["answer?",42],"dict":{"another-key":"another-value","yet-another-key":4711},"top-level-entry":"good morning"}`,
 			id + "-nested-array": `[[1,2,3],{"contains-a-map":"yes","really?":true},-42]`,
 		},
-		VarsFlat: map[string]string{
-			id + "-array[0]":                         `foo`,
-			id + "-array[1]":                         `23`,
-			id + "-array[2]":                         `bar`,
-			id + "-dict.some-key":                    `some-value`,
-			id + "-dict.other-key":                   `other-value`,
-			id + "-string":                           `hello icinga`,
-			id + "-int":                              `-1`,
-			id + "-float":                            `13.37`,
-			id + "-true":                             `true`,
-			id + "-false":                            `false`,
-			id + "-null":                             `null`,
-			id + "-nested-dict.dict.another-key":     `another-value`,
-			id + "-nested-dict.dict.yet-another-key": `4711`,
-			id + "-nested-dict.array[0]":             `answer?`,
-			id + "-nested-dict.array[1]":             `42`,
-			id + "-nested-dict.top-level-entry":      `good morning`,
-			id + "-nested-array[0][0]":               `1`,
-			id + "-nested-array[0][1]":               `2`,
-			id + "-nested-array[0][2]":               `3`,
-			id + "-nested-array[1].contains-a-map":   `yes`,
-			id + "-nested-array[1].really?":          `true`,
-			id + "-nested-array[2]":                  `-42`,
+		VarsFlat: map[string]sql.NullString{
+			id + "-array[0]":                         toDBString(`foo`),
+			id + "-array[1]":                         toDBString(`23`),
+			id + "-array[2]":                         toDBString(`bar`),
+			id + "-dict.some-key":                    toDBString(`some-value`),
+			id + "-dict.other-key":                   toDBString(`other-value`),
+			id + "-string":                           toDBString(`hello icinga`),
+			id + "-int":                              toDBString(`-1`),
+			id + "-float":                            toDBString(`13.37`),
+			id + "-true":                             toDBString(`true`),
+			id + "-false":                            toDBString(`false`),
+			id + "-null":                             toDBString(`null`),
+			id + "-nested-dict.dict.another-key":     toDBString(`another-value`),
+			id + "-nested-dict.dict.yet-another-key": toDBString(`4711`),
+			id + "-nested-dict.array[0]":             toDBString(`answer?`),
+			id + "-nested-dict.array[1]":             toDBString(`42`),
+			id + "-nested-dict.top-level-entry":      toDBString(`good morning`),
+			id + "-nested-array[0][0]":               toDBString(`1`),
+			id + "-nested-array[0][1]":               toDBString(`2`),
+			id + "-nested-array[0][2]":               toDBString(`3`),
+			id + "-nested-array[1].contains-a-map":   toDBString(`yes`),
+			id + "-nested-array[1].really?":          toDBString(`true`),
+			id + "-nested-array[2]":                  toDBString(`-42`),
 		},
 	})
 
@@ -1380,14 +1407,14 @@ func makeCustomVarTestData(t *testing.T) []*CustomVarTestData {
 			"b": `["bar",42,-13.37]`,
 			"c": `{"a":true,"b":false,"c":null}`,
 		},
-		VarsFlat: map[string]string{
-			"a":    "foo",
-			"b[0]": `bar`,
-			"b[1]": `42`,
-			"b[2]": `-13.37`,
-			"c.a":  `true`,
-			"c.b":  `false`,
-			"c.c":  `null`,
+		VarsFlat: map[string]sql.NullString{
+			"a":    toDBString("foo"),
+			"b[0]": toDBString(`bar`),
+			"b[1]": toDBString(`42`),
+			"b[2]": toDBString(`-13.37`),
+			"c.a":  toDBString(`true`),
+			"c.b":  toDBString(`false`),
+			"c.c":  toDBString(`null`),
 		},
 	}, &CustomVarTestData{
 		Value: map[string]interface{}{
@@ -1400,16 +1427,20 @@ func makeCustomVarTestData(t *testing.T) []*CustomVarTestData {
 			"b": `[true,false,null]`,
 			"c": `{"a":"foo","b":"bar","c":42}`,
 		},
-		VarsFlat: map[string]string{
-			"a":    `-13.37`,
-			"b[0]": `true`,
-			"b[1]": `false`,
-			"b[2]": `null`,
-			"c.a":  "foo",
-			"c.b":  `bar`,
-			"c.c":  `42`,
+		VarsFlat: map[string]sql.NullString{
+			"a":    toDBString(`-13.37`),
+			"b[0]": toDBString(`true`),
+			"b[1]": toDBString(`false`),
+			"b[2]": toDBString(`null`),
+			"c.a":  toDBString("foo"),
+			"c.b":  toDBString(`bar`),
+			"c.c":  toDBString(`42`),
 		},
 	})
 
 	return data
+}
+
+func toDBString(str string) sql.NullString {
+	return sql.NullString{String: str, Valid: true}
 }
