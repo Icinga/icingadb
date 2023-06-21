@@ -10,6 +10,11 @@ ido:
   database: icinga
   user: icinga
   password: CHANGEME
+  #tls: false
+  #cert: <Path to TLS client certificate>
+  #key: <Path to TLS private key>
+  #ca: <Path to TLS CA certificate>
+  #insecure: false
 
   # Input time range
   #from: 0
@@ -23,3 +28,8 @@ icingadb:
   database: icingadb
   user: icingadb
   password: CHANGEME
+  #tls: false
+  #cert: <Path to TLS client certificate>
+  #key: <Path to TLS private key>
+  #ca: <Path to TLS CA certificate>
+  #insecure: false
