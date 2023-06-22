@@ -9,6 +9,7 @@ import (
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/driver"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
@@ -247,14 +248,23 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 		func(ctx context.Context) error {
 			takeover = false
 			otherResponsible = false
+			isoLvl := sql.LevelSerializable
+			selectLock := ""
 
-			tx, errBegin := h.db.BeginTxx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+			if h.db.DriverName() == driver.MySQL {
+				// The RDBMS may actually be a Percona XtraDB Cluster which doesn't
+				// support serializable transactions, but only their following equivalent:
+				isoLvl = sql.LevelRepeatableRead
+				selectLock = " LOCK IN SHARE MODE"
+			}
+
+			tx, errBegin := h.db.BeginTxx(ctx, &sql.TxOptions{Isolation: isoLvl})
 			if errBegin != nil {
 				return errors.Wrap(errBegin, "can't start transaction")
 			}
 
-			query := h.db.Rebind("SELECT id, heartbeat FROM icingadb_instance " +
-				"WHERE environment_id = ? AND responsible = ? AND id <> ? AND heartbeat > ?")
+			query := h.db.Rebind("SELECT id, heartbeat FROM icingadb_instance "+
+				"WHERE environment_id = ? AND responsible = ? AND id <> ? AND heartbeat > ?") + selectLock
 
 			instance := &v1.IcingadbInstance{}
 
