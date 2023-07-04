@@ -24,7 +24,7 @@ func (t UnixMilli) Time() time.Time {
 // Marshals to milliseconds. Supports JSON null.
 func (t UnixMilli) MarshalJSON() ([]byte, error) {
 	if time.Time(t).IsZero() {
-		return nil, nil
+		return []byte("null"), nil
 	}
 
 	return []byte(strconv.FormatInt(time.Time(t).UnixMilli(), 10)), nil
