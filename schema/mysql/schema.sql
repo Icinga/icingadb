@@ -987,7 +987,8 @@ CREATE TABLE customvar_flat (
 
   PRIMARY KEY (id),
 
-  INDEX idx_customvar_flat_customvar_id (customvar_id)
+  INDEX idx_customvar_flat_customvar_id (customvar_id),
+  INDEX idx_customvar_flat_flatname_flatvalue (flatname, flatvalue(255)) COMMENT 'Lists filtered by custom variable'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE user (
