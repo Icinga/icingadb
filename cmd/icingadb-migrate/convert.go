@@ -32,7 +32,7 @@ var stateMigrationQuery string
 
 type commentRow = struct {
 	CommenthistoryId uint64
-	EntryTime        int64
+	EntryTime        sql.NullInt64
 	EntryTimeUsec    uint32
 	EntryType        uint8
 	AuthorName       string
@@ -56,6 +56,10 @@ func convertCommentRows(
 	for _, row := range idoRows {
 		checkpoint = row.CommenthistoryId
 
+		if !row.EntryTime.Valid {
+			continue
+		}
+
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
@@ -63,7 +67,7 @@ func convertCommentRows(
 		switch row.EntryType {
 		case 1: // user
 			id := calcObjectId(env, row.Name)
-			entryTime := convertTime(row.EntryTime, row.EntryTimeUsec)
+			entryTime := convertTime(row.EntryTime.Int64, row.EntryTimeUsec)
 			removeTime := convertTime(row.DeletionTime, row.DeletionTimeUsec)
 			expireTime := convertTime(row.ExpirationTime, 0)
 
@@ -129,7 +133,7 @@ func convertCommentRows(
 				name += "!" + row.Name2
 			}
 
-			setTime := convertTime(row.EntryTime, row.EntryTimeUsec)
+			setTime := convertTime(row.EntryTime.Int64, row.EntryTimeUsec)
 			setTs := float64(setTime.Time().UnixMilli())
 			clearTime := convertTime(row.DeletionTime, row.DeletionTimeUsec)
 			acknowledgementHistoryId := hashAny([]any{env, name, setTs})
@@ -218,7 +222,7 @@ type downtimeRow = struct {
 	CommentData         string
 	IsFixed             uint8
 	Duration            int64
-	ScheduledStartTime  int64
+	ScheduledStartTime  sql.NullInt64
 	ScheduledEndTime    int64
 	ActualStartTime     int64
 	ActualStartTimeUsec uint32
@@ -242,11 +246,15 @@ func convertDowntimeRows(
 	for _, row := range idoRows {
 		checkpoint = row.DowntimehistoryId
 
+		if !row.ScheduledStartTime.Valid {
+			continue
+		}
+
 		id := calcObjectId(env, row.Name)
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
-		scheduledStart := convertTime(row.ScheduledStartTime, 0)
+		scheduledStart := convertTime(row.ScheduledStartTime.Int64, 0)
 		scheduledEnd := convertTime(row.ScheduledEndTime, 0)
 		triggerTime := convertTime(row.TriggerTime, 0)
 		actualStart := convertTime(row.ActualStartTime, row.ActualStartTimeUsec)
@@ -363,7 +371,7 @@ func convertDowntimeRows(
 
 type flappingRow = struct {
 	FlappinghistoryId  uint64
-	EventTime          int64
+	EventTime          sql.NullInt64
 	EventTimeUsec      uint32
 	EventType          uint16
 	PercentStateChange sql.NullFloat64
@@ -402,7 +410,11 @@ func convertFlappingRows(
 	for _, row := range idoRows {
 		checkpoint = row.FlappinghistoryId
 
-		ts := convertTime(row.EventTime, row.EventTimeUsec)
+		if !row.EventTime.Valid {
+			continue
+		}
+
+		ts := convertTime(row.EventTime.Int64, row.EventTimeUsec)
 
 		// Needed for ID (see below).
 		var start icingadbTypes.UnixMilli
@@ -514,7 +526,7 @@ func convertFlappingRows(
 type notificationRow = struct {
 	NotificationId     uint64
 	NotificationReason uint8
-	EndTime            int64
+	EndTime            sql.NullInt64
 	EndTimeUsec        uint32
 	State              uint8
 	Output             string
@@ -579,6 +591,10 @@ func convertNotificationRows(
 	for _, row := range idoRows {
 		checkpoint = row.NotificationId
 
+		if !row.EndTime.Valid {
+			continue
+		}
+
 		previousHardState, ok := cachedById[row.NotificationId]
 		if !ok {
 			continue
@@ -597,7 +613,7 @@ func convertNotificationRows(
 			continue
 		}
 
-		ts := convertTime(row.EndTime, row.EndTimeUsec)
+		ts := convertTime(row.EndTime.Int64, row.EndTimeUsec)
 		tsMilli := float64(ts.Time().UnixMilli())
 		notificationHistoryId := hashAny([]interface{}{env, name, ntEnum, tsMilli})
 		id := hashAny([]interface{}{env, "notification", name, ntEnum, tsMilli})
@@ -702,7 +718,7 @@ func convertNotificationType(notificationReason, state uint8) icingadbTypes.Noti
 
 type stateRow = struct {
 	StatehistoryId      uint64
-	StateTime           int64
+	StateTime           sql.NullInt64
 	StateTimeUsec       uint32
 	State               uint8
 	StateType           uint8
@@ -744,13 +760,17 @@ func convertStateRows(
 	for _, row := range idoRows {
 		checkpoint = row.StatehistoryId
 
+		if !row.StateTime.Valid {
+			continue
+		}
+
 		previousHardState, ok := cachedById[row.StatehistoryId]
 		if !ok {
 			continue
 		}
 
 		name := strings.Join([]string{row.Name1, row.Name2}, "!")
-		ts := convertTime(row.StateTime, row.StateTimeUsec)
+		ts := convertTime(row.StateTime.Int64, row.StateTimeUsec)
 		tsMilli := float64(ts.Time().UnixMilli())
 		stateHistoryId := hashAny([]interface{}{env, name, tsMilli})
 		id := hashAny([]interface{}{env, "state_change", name, tsMilli})
