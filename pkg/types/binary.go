@@ -65,7 +65,7 @@ func (binary *Binary) UnmarshalText(text []byte) error {
 // Supports JSON null.
 func (binary Binary) MarshalJSON() ([]byte, error) {
 	if !binary.Valid() {
-		return nil, nil
+		return []byte("null"), nil
 	}
 
 	return internal.MarshalJSON(binary.String())
