@@ -1553,7 +1553,7 @@ CREATE TABLE customvar_flat (
   flatname_checksum bytea20 NOT NULL,
 
   flatname citext NOT NULL,
-  flatvalue text NOT NULL,
+  flatvalue text DEFAULT NULL,
 
   CONSTRAINT pk_customvar_flat PRIMARY KEY (id)
 );
