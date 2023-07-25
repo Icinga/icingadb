@@ -125,7 +125,7 @@ func parseConfig(f *Flags) (_ *Config, exit int) {
 		return nil, 2
 	}
 
-	if err := yaml.NewDecoder(cf).Decode(c); err != nil {
+	if err := yaml.NewDecoder(cf, yaml.DisallowUnknownField()).Decode(c); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "can't parse config file: %s\n", err.Error())
 		return nil, 2
 	}
