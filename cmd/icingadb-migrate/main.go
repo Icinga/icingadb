@@ -9,7 +9,6 @@ import (
 	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/pkg/config"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
@@ -428,30 +427,21 @@ func migrateOneType[IdoRow any](
 			// ... and insert them:
 
 			for _, stage := range stages {
-				for _, op := range []struct {
-					kind     string
-					data     [][]contracts.Entity
-					streamer func(context.Context, <-chan contracts.Entity, ...icingadb.OnSuccess[contracts.Entity]) error
-				}{
-					{"INSERT IGNORE", stage.inserts, idb.CreateIgnoreStreamed},
-					{"UPSERT", stage.upserts, idb.UpsertStreamed},
-				} {
-					for _, table := range op.data {
-						if len(table) < 1 {
-							continue
-						}
+				if len(stage.insert) > 0 {
+					ch := utils.ChanFromSlice(stage.insert)
 
-						ch := make(chan contracts.Entity, len(table))
-						for _, row := range table {
-							ch <- row
-						}
+					if err := idb.CreateIgnoreStreamed(context.Background(), ch); err != nil {
+						log.With("backend", "Icinga DB", "op", "INSERT IGNORE", "table", utils.TableName(stage.insert[0])).
+							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
+					}
+				}
 
-						close(ch)
+				if len(stage.upsert) > 0 {
+					ch := utils.ChanFromSlice(stage.upsert)
 
-						if err := op.streamer(context.Background(), ch); err != nil {
-							log.With("backend", "Icinga DB", "op", op.kind, "table", utils.TableName(table[0])).
-								Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
-						}
+					if err := idb.UpsertStreamed(context.Background(), ch); err != nil {
+						log.With("backend", "Icinga DB", "op", "UPSERT", "table", utils.TableName(stage.upsert[0])).
+							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 					}
 				}
 			}

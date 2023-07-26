@@ -238,7 +238,7 @@ func (hts historyTypes) forEach(f func(*historyType)) {
 }
 
 type icingaDbOutputStage struct {
-	inserts, upserts [][]contracts.Entity
+	insert, upsert []contracts.Entity
 }
 
 var types = historyTypes{

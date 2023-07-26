@@ -216,3 +216,16 @@ func JoinHostPort(host string, port int) string {
 
 	return net.JoinHostPort(host, fmt.Sprint(port))
 }
+
+// ChanFromSlice takes a slice of values and returns a channel from which these values can be received.
+// This channel is closed after the last value was sent.
+func ChanFromSlice[T any](values []T) <-chan T {
+	ch := make(chan T, len(values))
+	for _, value := range values {
+		ch <- value
+	}
+
+	close(ch)
+
+	return ch
+}

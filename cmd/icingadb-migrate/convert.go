@@ -207,9 +207,12 @@ func convertCommentRows(
 		}
 	}
 
-	stages = []icingaDbOutputStage{{inserts: [][]contracts.Entity{
-		commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck,
-	}}}
+	stages = []icingaDbOutputStage{
+		{insert: commentHistory},
+		{insert: acknowledgementHistory},
+		{insert: allHistoryComment},
+		{insert: allHistoryAck},
+	}
 	return
 }
 
@@ -359,7 +362,11 @@ func convertDowntimeRows(
 		sla = append(sla, s)
 	}
 
-	stages = []icingaDbOutputStage{{inserts: [][]contracts.Entity{downtimeHistory, allHistory, sla}}}
+	stages = []icingaDbOutputStage{
+		{insert: downtimeHistory},
+		{insert: allHistory},
+		{insert: sla},
+	}
 	return
 }
 
@@ -509,11 +516,9 @@ func convertFlappingRows(
 	}
 
 	stages = []icingaDbOutputStage{
-		{
-			inserts: [][]contracts.Entity{flappingHistory},
-			upserts: [][]contracts.Entity{flappingHistoryUpserts},
-		},
-		{inserts: [][]contracts.Entity{allHistory}},
+		{insert: flappingHistory},
+		{upsert: flappingHistoryUpserts},
+		{insert: allHistory},
 	}
 	return
 }
@@ -672,9 +677,11 @@ func convertNotificationRows(
 		}
 	}
 
-	stages = []icingaDbOutputStage{{inserts: [][]contracts.Entity{
-		notificationHistory, userNotificationHistory, allHistory,
-	}}}
+	stages = []icingaDbOutputStage{
+		{insert: notificationHistory},
+		{insert: userNotificationHistory},
+		{insert: allHistory},
+	}
 	return
 }
 
@@ -828,6 +835,10 @@ func convertStateRows(
 		}
 	}
 
-	stages = []icingaDbOutputStage{{inserts: [][]contracts.Entity{stateHistory, allHistory, sla}}}
+	stages = []icingaDbOutputStage{
+		{insert: stateHistory},
+		{insert: allHistory},
+		{insert: sla},
+	}
 	return
 }
