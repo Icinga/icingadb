@@ -2,9 +2,13 @@ package retry
 
 import (
 	"context"
+	"database/sql/driver"
+	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"net"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -128,6 +132,52 @@ func Retryable(err error) bool {
 	}
 	if errors.Is(err, syscall.ENETDOWN) || errors.Is(err, syscall.ENETUNREACH) {
 		return true
+	}
+
+	if errors.Is(err, driver.ErrBadConn) {
+		return true
+	}
+	if errors.Is(err, mysql.ErrInvalidConn) {
+		return true
+	}
+
+	var e *mysql.MySQLError
+	if errors.As(err, &e) {
+		switch e.Number {
+		case 1053, 1205, 1213, 2006:
+			// 1053: Server shutdown in progress
+			// 1205: Lock wait timeout
+			// 1213: Deadlock found when trying to get lock
+			// 2006: MySQL server has gone away
+			return true
+		default:
+			return false
+		}
+	}
+
+	var pe *pq.Error
+	if errors.As(err, &pe) {
+		switch pe.Code {
+		case "08000", // connection_exception
+			"08006", // connection_failure
+			"08001", // sqlclient_unable_to_establish_sqlconnection
+			"08004", // sqlserver_rejected_establishment_of_sqlconnection
+			"40001", // serialization_failure
+			"40P01", // deadlock_detected
+			"54000", // program_limit_exceeded
+			"55006", // object_in_use
+			"55P03", // lock_not_available
+			"57P01", // admin_shutdown
+			"57P02", // crash_shutdown
+			"57P03", // cannot_connect_now
+			"58000", // system_error
+			"58030", // io_error
+			"XX000": // internal_error
+			return true
+		default:
+			// Class 53 - Insufficient Resources
+			return strings.HasPrefix(string(pe.Code), "53")
+		}
 	}
 
 	return false
