@@ -274,7 +274,7 @@ func convertDowntimeRows(
 		}
 
 		if row.WasCancelled != 0 {
-			cancelTime = actualEnd
+			cancelTime = endTime
 		}
 
 		downtimeHistory = append(downtimeHistory, &history.DowntimeHistory{
