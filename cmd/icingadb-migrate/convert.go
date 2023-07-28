@@ -224,6 +224,7 @@ type downtimeRow = struct {
 	Duration            int64
 	ScheduledStartTime  sql.NullInt64
 	ScheduledEndTime    int64
+	WasStarted          uint8
 	ActualStartTime     int64
 	ActualStartTimeUsec uint32
 	ActualEndTime       int64
@@ -246,7 +247,7 @@ func convertDowntimeRows(
 	for _, row := range idoRows {
 		checkpoint = row.DowntimehistoryId
 
-		if !row.ScheduledStartTime.Valid {
+		if !row.ScheduledStartTime.Valid || row.WasStarted == 0 {
 			continue
 		}
 
