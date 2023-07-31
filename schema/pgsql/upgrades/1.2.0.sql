@@ -14,3 +14,11 @@ CREATE INDEX idx_servicegroup_name_ci ON servicegroup(name_ci);
 COMMENT ON INDEX idx_servicegroup_display_name IS 'Servicegroup list filtered/ordered by display_name';
 COMMENT ON INDEX idx_servicegroup_name_ci IS 'Servicegroup list filtered using quick search';
 COMMENT ON INDEX idx_servicegroup_name IS 'Host/service/service group list filtered by service group name; Servicegroup detail filter';
+
+ALTER TYPE history_type RENAME TO history_type_old;
+CREATE TYPE history_type AS ENUM ( 'state_change', 'ack_clear', 'downtime_end', 'flapping_end', 'comment_remove', 'comment_add', 'flapping_start', 'downtime_start', 'ack_set', 'notification' );
+ALTER TABLE history
+  ALTER COLUMN event_type DROP DEFAULT,
+  ALTER COLUMN event_type TYPE history_type USING event_type::text::history_type,
+  ALTER COLUMN event_type SET DEFAULT 'state_change'::history_type;
+DROP TYPE history_type_old;
