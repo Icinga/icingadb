@@ -20,7 +20,7 @@ func NewQuoter(db *sqlx.DB) *Quoter {
 
 	switch db.DriverName() {
 	case driver.MySQL:
-		qc = `"`
+		qc = "`"
 	case driver.PostgreSQL:
 		qc = `"`
 	default:
