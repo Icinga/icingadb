@@ -237,6 +237,10 @@ func (hts historyTypes) forEach(f func(*historyType)) {
 	_ = eg.Wait()
 }
 
+type icingaDbOutputStage struct {
+	insert, upsert []contracts.Entity
+}
+
 var types = historyTypes{
 	{
 		name:            "ack & comment",

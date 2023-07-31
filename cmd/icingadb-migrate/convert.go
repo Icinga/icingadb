@@ -50,7 +50,7 @@ type commentRow = struct {
 func convertCommentRows(
 	env string, envId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []commentRow,
-) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
+) (stages []icingaDbOutputStage, checkpoint any) {
 	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []contracts.Entity
 
 	for _, row := range idoRows {
@@ -211,7 +211,12 @@ func convertCommentRows(
 		}
 	}
 
-	icingaDbInserts = [][]contracts.Entity{commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck}
+	stages = []icingaDbOutputStage{
+		{insert: commentHistory},
+		{insert: acknowledgementHistory},
+		{insert: allHistoryComment},
+		{insert: allHistoryAck},
+	}
 	return
 }
 
@@ -241,7 +246,7 @@ type downtimeRow = struct {
 func convertDowntimeRows(
 	env string, envId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []downtimeRow,
-) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
+) (stages []icingaDbOutputStage, checkpoint any) {
 	var downtimeHistory, allHistory, sla []contracts.Entity
 
 	for _, row := range idoRows {
@@ -366,7 +371,11 @@ func convertDowntimeRows(
 		sla = append(sla, s)
 	}
 
-	icingaDbInserts = [][]contracts.Entity{downtimeHistory, allHistory, sla}
+	stages = []icingaDbOutputStage{
+		{insert: downtimeHistory},
+		{insert: allHistory},
+		{insert: sla},
+	}
 	return
 }
 
@@ -386,7 +395,7 @@ type flappingRow = struct {
 func convertFlappingRows(
 	env string, envId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []flappingRow,
-) (icingaDbInserts, icingaDbUpserts [][]contracts.Entity, checkpoint any) {
+) (stages []icingaDbOutputStage, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}
@@ -519,8 +528,11 @@ func convertFlappingRows(
 		}
 	}
 
-	icingaDbInserts = [][]contracts.Entity{flappingHistory, allHistory}
-	icingaDbUpserts = [][]contracts.Entity{flappingHistoryUpserts}
+	stages = []icingaDbOutputStage{
+		{insert: flappingHistory},
+		{upsert: flappingHistoryUpserts},
+		{insert: allHistory},
+	}
 	return
 }
 
@@ -541,7 +553,7 @@ type notificationRow = struct {
 func convertNotificationRows(
 	env string, envId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []notificationRow,
-) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
+) (stages []icingaDbOutputStage, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}
@@ -682,7 +694,11 @@ func convertNotificationRows(
 		}
 	}
 
-	icingaDbInserts = [][]contracts.Entity{notificationHistory, userNotificationHistory, allHistory}
+	stages = []icingaDbOutputStage{
+		{insert: notificationHistory},
+		{insert: userNotificationHistory},
+		{insert: allHistory},
+	}
 	return
 }
 
@@ -738,7 +754,7 @@ type stateRow = struct {
 func convertStateRows(
 	env string, envId icingadbTypes.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []stateRow,
-) (icingaDbInserts, _ [][]contracts.Entity, checkpoint any) {
+) (stages []icingaDbOutputStage, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
 	}
@@ -840,6 +856,10 @@ func convertStateRows(
 		}
 	}
 
-	icingaDbInserts = [][]contracts.Entity{stateHistory, allHistory, sla}
+	stages = []icingaDbOutputStage{
+		{insert: stateHistory},
+		{insert: allHistory},
+		{insert: sla},
+	}
 	return
 }
