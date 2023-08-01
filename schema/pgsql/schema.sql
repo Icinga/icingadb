@@ -1564,12 +1564,15 @@ ALTER TABLE customvar_flat ALTER COLUMN customvar_id SET STORAGE PLAIN;
 ALTER TABLE customvar_flat ALTER COLUMN flatname_checksum SET STORAGE PLAIN;
 
 CREATE INDEX idx_customvar_flat_customvar_id ON customvar_flat(customvar_id);
+CREATE INDEX idx_customvar_flat_flatname_flatvalue ON customvar_flat(flatname, flatvalue);
 
 COMMENT ON COLUMN customvar_flat.id IS 'sha1(environment.id + flatname + flatvalue)';
 COMMENT ON COLUMN customvar_flat.environment_id IS 'environment.id';
 COMMENT ON COLUMN customvar_flat.customvar_id IS 'sha1(customvar.id)';
 COMMENT ON COLUMN customvar_flat.flatname_checksum IS 'sha1(flatname after conversion)';
 COMMENT ON COLUMN customvar_flat.flatname IS 'Path converted with `.` and `[ ]`';
+
+COMMENT ON INDEX idx_customvar_flat_flatname_flatvalue IS 'Lists filtered by custom variable';
 
 CREATE TABLE "user" (
   id bytea20 NOT NULL,
