@@ -305,6 +305,8 @@ ALTER TABLE hostgroup ALTER COLUMN name_checksum SET STORAGE PLAIN;
 ALTER TABLE hostgroup ALTER COLUMN properties_checksum SET STORAGE PLAIN;
 ALTER TABLE hostgroup ALTER COLUMN zone_id SET STORAGE PLAIN;
 
+CREATE INDEX idx_hostgroup_display_name ON hostgroup(display_name);
+CREATE INDEX idx_hostgroup_name_ci ON hostgroup(name_ci);
 CREATE INDEX idx_hostgroup_name ON hostgroup(name);
 
 COMMENT ON COLUMN hostgroup.id IS 'sha1(environment.id + name)';
@@ -313,7 +315,9 @@ COMMENT ON COLUMN hostgroup.name_checksum IS 'sha1(name)';
 COMMENT ON COLUMN hostgroup.properties_checksum IS 'sha1(all properties)';
 COMMENT ON COLUMN hostgroup.zone_id IS 'zone.id';
 
-COMMENT ON INDEX idx_hostgroup_name IS 'Host/service/host group list filtered by host group name';
+COMMENT ON INDEX idx_hostgroup_display_name IS 'Hostgroup list filtered/ordered by display_name';
+COMMENT ON INDEX idx_hostgroup_name_ci IS 'Hostgroup list filtered using quick search';
+COMMENT ON INDEX idx_hostgroup_name IS 'Host/service/host group list filtered by host group name; Hostgroup detail filter';
 
 CREATE TABLE hostgroup_member (
   id bytea20 NOT NULL,
@@ -577,8 +581,12 @@ COMMENT ON COLUMN servicegroup.name_checksum IS 'sha1(name)';
 COMMENT ON COLUMN servicegroup.properties_checksum IS 'sha1(all properties)';
 COMMENT ON COLUMN servicegroup.zone_id IS 'zone.id';
 
+CREATE INDEX idx_servicegroup_display_name ON servicegroup(display_name);
+CREATE INDEX idx_servicegroup_name_ci ON servicegroup(name_ci);
 CREATE INDEX idx_servicegroup_name ON servicegroup(name);
-COMMENT ON INDEX idx_servicegroup_name IS 'Host/service/service group list filtered by service group name';
+COMMENT ON INDEX idx_servicegroup_display_name IS 'Servicegroup list filtered/ordered by display_name';
+COMMENT ON INDEX idx_servicegroup_name_ci IS 'Servicegroup list filtered using quick search';
+COMMENT ON INDEX idx_servicegroup_name IS 'Host/service/service group list filtered by service group name; Servicegroup detail filter';
 
 CREATE TABLE servicegroup_member (
   id bytea20 NOT NULL,
