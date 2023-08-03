@@ -20,33 +20,34 @@ redis:
   host: 2001:db8::1
 `
 
+	miniOutput := &Config{}
+	_ = defaults.Set(miniOutput)
+
+	miniOutput.Database.Host = "192.0.2.1"
+	miniOutput.Database.Database = "icingadb"
+	miniOutput.Database.User = "icingadb"
+	miniOutput.Database.Password = "icingadb"
+
+	miniOutput.Redis.Host = "2001:db8::1"
+	miniOutput.Logging.Output = logging.CONSOLE
+
 	subtests := []struct {
 		name   string
 		input  string
 		output *Config
+		warn   bool
 	}{
 		{
-			name:  "mini",
-			input: miniConf,
-			output: func() *Config {
-				c := &Config{}
-				_ = defaults.Set(c)
-
-				c.Database.Host = "192.0.2.1"
-				c.Database.Database = "icingadb"
-				c.Database.User = "icingadb"
-				c.Database.Password = "icingadb"
-
-				c.Redis.Host = "2001:db8::1"
-				c.Logging.Output = logging.CONSOLE
-
-				return c
-			}(),
+			name:   "mini",
+			input:  miniConf,
+			output: miniOutput,
+			warn:   false,
 		},
 		{
 			name:   "mini-with-unknown",
 			input:  miniConf + "\nunknown: 42",
-			output: nil,
+			output: miniOutput,
+			warn:   true,
 		},
 	}
 
@@ -58,12 +59,19 @@ redis:
 
 			require.NoError(t, os.WriteFile(tempFile.Name(), []byte(st.input), 0o600))
 
-			if actual, err := FromYAMLFile(tempFile.Name()); st.output == nil {
-				require.Error(t, err)
+			actual, err := FromYAMLFile(tempFile.Name())
+			require.NoError(t, err)
+
+			if st.warn {
+				require.Error(t, actual.DecodeWarning, "reading config should produce a warning")
+
+				// Reset the warning so that the following require.Equal() doesn't try to compare it.
+				actual.DecodeWarning = nil
 			} else {
-				require.NoError(t, err)
-				require.Equal(t, st.output, actual)
+				require.NoError(t, actual.DecodeWarning, "reading config should not produce a warning")
 			}
+
+			require.Equal(t, st.output, actual)
 		})
 	}
 }
