@@ -25,3 +25,6 @@ ALTER TABLE history
   ALTER COLUMN event_type TYPE history_type USING event_type::text::history_type,
   ALTER COLUMN event_type SET DEFAULT 'state_change'::history_type;
 DROP TYPE history_type_old;
+
+INSERT INTO icingadb_schema (version, timestamp)
+  VALUES (2, extract(epoch from now()) * 1000);

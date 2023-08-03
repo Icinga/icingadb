@@ -32,3 +32,6 @@ ALTER TABLE history
     DROP COLUMN event_type,
     CHANGE COLUMN event_type_new event_type enum('state_change', 'ack_clear', 'downtime_end', 'flapping_end', 'comment_remove', 'comment_add', 'flapping_start', 'downtime_start', 'ack_set', 'notification') NOT NULL;
 UNLOCK TABLES;
+
+INSERT INTO icingadb_schema (version, timestamp)
+  VALUES (4, CURRENT_TIMESTAMP() * 1000);
