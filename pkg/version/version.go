@@ -17,14 +17,14 @@ type VersionInfo struct {
 }
 
 // Version determines version and commit information based on multiple data sources:
-//  - Version information dynamically added by `git archive` in the remaining to parameters.
-//  - A hardcoded version number passed as first parameter.
-//  - Commit information added to the binary by `go build`.
+//   - Version information dynamically added by `git archive` in the remaining to parameters.
+//   - A hardcoded version number passed as first parameter.
+//   - Commit information added to the binary by `go build`.
 //
 // It's supposed to be called like this in combination with setting the `export-subst` attribute for the corresponding
 // file in .gitattributes:
 //
-//     var Version = version.Version("1.0.0-rc2", "$Format:%(describe)$", "$Format:%H$")
+//	var Version = version.Version("1.0.0-rc2", "$Format:%(describe)$", "$Format:%H$")
 //
 // When exported using `git archive`, the placeholders are replaced in the file and this version information is
 // preferred. Otherwise the hardcoded version is used and augmented with commit information from the build metadata.

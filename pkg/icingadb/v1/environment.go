@@ -22,10 +22,10 @@ func (e *Environment) Meta() *EnvironmentMeta {
 
 // EnvironmentFromContext returns the Environment value stored in ctx, if any:
 //
-// 	e, ok := EnvironmentFromContext(ctx)
-// 	if !ok {
-// 		// Error handling.
-// 	}
+//	e, ok := EnvironmentFromContext(ctx)
+//	if !ok {
+//		// Error handling.
+//	}
 func EnvironmentFromContext(ctx context.Context) (*Environment, bool) {
 	if e, ok := ctx.Value(environmentContextKey).(*Environment); ok {
 		return e, true
