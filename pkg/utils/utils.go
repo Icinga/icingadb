@@ -55,12 +55,12 @@ func Key(name string, sep byte) string {
 //
 // Timed should be installed by defer:
 //
-//  func TimedExample(logger *zap.SugaredLogger) {
-//  	defer utils.Timed(time.Now(), func(elapsed time.Duration) {
-//  		logger.Debugf("Executed job in %s", elapsed)
-//  	})
-//  	job()
-//  }
+//	func TimedExample(logger *zap.SugaredLogger) {
+//		defer utils.Timed(time.Now(), func(elapsed time.Duration) {
+//			logger.Debugf("Executed job in %s", elapsed)
+//		})
+//		job()
+//	}
 func Timed(start time.Time, callback func(elapsed time.Duration)) {
 	callback(time.Since(start))
 }
@@ -158,20 +158,20 @@ func Ellipsize(s string, limit int) string {
 //
 // Example usage:
 //
-//  # snake_case
-//  ConvertCamelCase(s, unicode.Lower, '_')
+//	# snake_case
+//	ConvertCamelCase(s, unicode.Lower, '_')
 //
-//  # SCREAMING_SNAKE_CASE
-//  ConvertCamelCase(s, unicode.Upper, '_')
+//	# SCREAMING_SNAKE_CASE
+//	ConvertCamelCase(s, unicode.Upper, '_')
 //
-//  # kebab-case
-//  ConvertCamelCase(s, unicode.Lower, '-')
+//	# kebab-case
+//	ConvertCamelCase(s, unicode.Lower, '-')
 //
-//  # SCREAMING-KEBAB-CASE
-//  ConvertCamelCase(s, unicode.Upper, '-')
+//	# SCREAMING-KEBAB-CASE
+//	ConvertCamelCase(s, unicode.Upper, '-')
 //
-//  # other.separator
-//  ConvertCamelCase(s, unicode.Lower, '.')
+//	# other.separator
+//	ConvertCamelCase(s, unicode.Lower, '.')
 func ConvertCamelCase(s string, _case int, sep byte) string {
 	r := []rune(s)
 	b := strings.Builder{}
