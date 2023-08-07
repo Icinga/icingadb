@@ -1269,7 +1269,15 @@ CREATE TABLE history (
   flapping_history_id binary(20) DEFAULT NULL COMMENT 'flapping_history.id',
   acknowledgement_history_id binary(20) DEFAULT NULL COMMENT 'acknowledgement_history.id',
 
-  event_type enum('notification','state_change','downtime_start', 'downtime_end','comment_add','comment_remove','flapping_start','flapping_end','ack_set','ack_clear') NOT NULL,
+  -- The enum values are ordered in a way that event_type provides a meaningful sort order for history entries with
+  -- the same event_time. state_change comes first as it can cause many of the other events like trigger downtimes,
+  -- remove acknowledgements and send notifications. Similarly, notification comes last as any other event can result
+  -- in a notification. End events sort before the corresponding start events as any ack/comment/downtime/flapping
+  -- period should last for more than a millisecond, therefore, the old period ends first and then the new one starts.
+  -- The remaining types are sorted by impact and cause: comments are informative, flapping is automatic and changes
+  -- mechanics, downtimes are semi-automatic, require user action (or configuration) and change mechanics, acks are pure
+  -- user actions and change mechanics.
+  event_type enum('state_change', 'ack_clear', 'downtime_end', 'flapping_end', 'comment_remove', 'comment_add', 'flapping_start', 'downtime_start', 'ack_set', 'notification') NOT NULL,
   event_time bigint unsigned NOT NULL,
 
   PRIMARY KEY (id),

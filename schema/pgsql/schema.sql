@@ -19,7 +19,16 @@ CREATE TYPE state_type AS ENUM ( 'hard', 'soft' );
 CREATE TYPE checkable_type AS ENUM ( 'host', 'service' );
 CREATE TYPE comment_type AS ENUM ( 'comment', 'ack' );
 CREATE TYPE notification_type AS ENUM ( 'downtime_start', 'downtime_end', 'downtime_removed', 'custom', 'acknowledgement', 'problem', 'recovery', 'flapping_start', 'flapping_end' );
-CREATE TYPE history_type AS ENUM ( 'notification', 'state_change', 'downtime_start', 'downtime_end', 'comment_add', 'comment_remove', 'flapping_start', 'flapping_end', 'ack_set', 'ack_clear' );
+
+-- The enum values are ordered in a way that event_type provides a meaningful sort order for history entries with
+-- the same event_time. state_change comes first as it can cause many of the other events like trigger downtimes,
+-- remove acknowledgements and send notifications. Similarly, notification comes last as any other event can result
+-- in a notification. End events sort before the corresponding start events as any ack/comment/downtime/flapping
+-- period should last for more than a millisecond, therefore, the old period ends first and then the new one starts.
+-- The remaining types are sorted by impact and cause: comments are informative, flapping is automatic and changes
+-- mechanics, downtimes are semi-automatic, require user action (or configuration) and change mechanics, acks are pure
+-- user actions and change mechanics.
+CREATE TYPE history_type AS ENUM ( 'state_change', 'ack_clear', 'downtime_end', 'flapping_end', 'comment_remove', 'comment_add', 'flapping_start', 'downtime_start', 'ack_set', 'notification' );
 
 CREATE OR REPLACE FUNCTION get_sla_ok_percent(
   in_host_id bytea20,
@@ -2040,7 +2049,7 @@ CREATE TABLE history (
   flapping_history_id bytea20 DEFAULT NULL,
   acknowledgement_history_id bytea20 DEFAULT NULL,
 
-  event_type history_type NOT NULL DEFAULT 'notification',
+  event_type history_type NOT NULL DEFAULT 'state_change',
   event_time biguint NOT NULL,
 
   CONSTRAINT pk_history PRIMARY KEY (id),
