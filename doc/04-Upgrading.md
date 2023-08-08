@@ -6,8 +6,8 @@ If you are upgrading across multiple versions, make sure to follow the steps for
 ## Upgrading to Icinga DB v1.1.1
 
 Please apply the `1.1.1.sql` upgrade script to your database.
-For package installations, you can find this file at `/usr/share/doc/icingadb/schema/mysql/upgrades/` or
-`/usr/share/doc/icingadb/schema/pgsql/upgrades/`, depending on your database type.
+For package installations, you can find this file at `/usr/share/icingadb/schema/mysql/upgrades/` or
+`/usr/share/icingadb/schema/pgsql/upgrades/`, depending on your database type.
 
 Note that this upgrade will change the `history` table, which can take some time depending on the size of the table and
 the performance of the database. While the upgrade is running, that table will be locked and can't be accessed. This
@@ -28,7 +28,7 @@ restart the daemon when upgrading the package.
 **Database Schema**
 
 * For MySQL databases, please apply the `1.0.0.sql` upgrade script.
-  For package installations, you can find this file at `/usr/share/doc/icingadb/schema/mysql/upgrades/`.
+  For package installations, you can find this file at `/usr/share/icingadb/schema/mysql/upgrades/`.
 
 ## Upgrading to Icinga DB RC2
 
