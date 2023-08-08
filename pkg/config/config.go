@@ -1,8 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
 	"github.com/jessevdk/go-flags"
@@ -17,6 +19,8 @@ type Config struct {
 	Redis     Redis     `yaml:"redis"`
 	Logging   Logging   `yaml:"logging"`
 	Retention Retention `yaml:"retention"`
+
+	DecodeWarning error `yaml:"-"`
 }
 
 // Validate checks constraints in the supplied configuration and returns an error if they are violated.
@@ -47,14 +51,13 @@ type Flags struct {
 
 // FromYAMLFile returns a new Config value created from the given YAML config file.
 func FromYAMLFile(name string) (*Config, error) {
-	f, err := os.Open(name)
+	f, err := os.ReadFile(name)
 	if err != nil {
-		return nil, errors.Wrap(err, "can't open YAML file "+name)
+		return nil, errors.Wrap(err, "can't read YAML file "+name)
 	}
-	defer f.Close()
 
 	c := &Config{}
-	d := yaml.NewDecoder(f, yaml.DisallowUnknownField())
+	d := yaml.NewDecoder(bytes.NewReader(f))
 
 	if err := defaults.Set(c); err != nil {
 		return nil, errors.Wrap(err, "can't set config defaults")
@@ -64,8 +67,16 @@ func FromYAMLFile(name string) (*Config, error) {
 		return nil, errors.Wrap(err, "can't parse YAML file "+name)
 	}
 
+	// Decode again with yaml.DisallowUnknownField() (like v1.2 will do) and issue a warning if it returns an error.
+	c.DecodeWarning = yaml.NewDecoder(bytes.NewReader(f), yaml.DisallowUnknownField()).Decode(&Config{})
+
 	if err := c.Validate(); err != nil {
-		return nil, errors.Wrap(err, "invalid configuration")
+		const msg = "invalid configuration"
+		if warn := c.DecodeWarning; warn != nil {
+			return nil, fmt.Errorf("%s: %w\n\nwarning: ignored unknown config option:\n\n%v", msg, err, warn)
+		} else {
+			return nil, errors.Wrap(err, msg)
+		}
 	}
 
 	return c, nil

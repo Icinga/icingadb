@@ -55,6 +55,10 @@ func run() int {
 	logger := logs.GetLogger()
 	defer logger.Sync()
 
+	if warn := cmd.Config.DecodeWarning; warn != nil {
+		logger.Warnf("ignoring unknown config option, this will become a fatal error in Icinga DB v1.2:\n\n%v", warn)
+	}
+
 	logger.Info("Starting Icinga DB")
 
 	db, err := cmd.Database(logs.GetChildLogger("database"))
