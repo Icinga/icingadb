@@ -10,3 +10,8 @@ updates:
   - Al2Klimov
   - julianbrost
   - lippserd
+
+- package-ecosystem: "github-actions"
+  directory: "/"
+  schedule:
+    interval: monthly
