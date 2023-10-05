@@ -3,7 +3,7 @@ package command
 import (
 	"fmt"
 	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/pkg/config"
+	"github.com/icinga/icingadb/internal/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/logging"

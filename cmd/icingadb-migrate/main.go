@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
-	"github.com/icinga/icingadb/pkg/config"
+	"github.com/icinga/icingadb/internal/config"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
