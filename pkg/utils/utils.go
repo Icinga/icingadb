@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/database"
+	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/utf8string"
@@ -15,7 +16,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode"
 )
 
 // FromUnixMilli creates and returns a time.Time value
@@ -41,14 +41,8 @@ func TableName(t interface{}) string {
 	if tn, ok := t.(database.TableNamer); ok {
 		return tn.TableName()
 	} else {
-		return Key(Name(t), '_')
+		return strcase.Snake(Name(t))
 	}
-}
-
-// Key returns the name with all Unicode letters mapped to lower case letters,
-// with an additional separator in front of each original upper case letter.
-func Key(name string, sep byte) string {
-	return ConvertCamelCase(name, unicode.LowerCase, sep)
 }
 
 // Timed calls the given callback with the time that has elapsed since the start.
@@ -151,42 +145,6 @@ func Ellipsize(s string, limit int) string {
 	default:
 		return utf8.Slice(0, limit-ellipsis.RuneCount()) + ellipsis.String()
 	}
-}
-
-// ConvertCamelCase converts a (lower) CamelCase string into various cases.
-// _case must be unicode.Lower or unicode.Upper.
-//
-// Example usage:
-//
-//	# snake_case
-//	ConvertCamelCase(s, unicode.Lower, '_')
-//
-//	# SCREAMING_SNAKE_CASE
-//	ConvertCamelCase(s, unicode.Upper, '_')
-//
-//	# kebab-case
-//	ConvertCamelCase(s, unicode.Lower, '-')
-//
-//	# SCREAMING-KEBAB-CASE
-//	ConvertCamelCase(s, unicode.Upper, '-')
-//
-//	# other.separator
-//	ConvertCamelCase(s, unicode.Lower, '.')
-func ConvertCamelCase(s string, _case int, sep byte) string {
-	r := []rune(s)
-	b := strings.Builder{}
-	b.Grow(len(r) + 2) // nominal 2 bytes of extra space for inserted delimiters
-
-	b.WriteRune(unicode.To(_case, r[0]))
-	for _, r := range r[1:] {
-		if sep != 0 && unicode.IsUpper(r) {
-			b.WriteByte(sep)
-		}
-
-		b.WriteRune(unicode.To(_case, r))
-	}
-
-	return b.String()
 }
 
 // AppName returns the name of the executable that started this program (process).

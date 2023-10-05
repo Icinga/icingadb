@@ -6,7 +6,7 @@ import (
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/pkg/errors"
@@ -136,9 +136,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 	db.SetMaxIdleConns(d.Options.MaxConnections / 3)
 	db.SetMaxOpenConns(d.Options.MaxConnections)
 
-	db.Mapper = reflectx.NewMapperFunc("db", func(s string) string {
-		return utils.Key(s, '_')
-	})
+	db.Mapper = reflectx.NewMapperFunc("db", strcase.Snake)
 
 	return icingadb.NewDb(db, logger, &d.Options), nil
 }

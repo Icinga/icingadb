@@ -1,12 +1,11 @@
 package logging
 
 import (
-	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/pkg/errors"
 	"github.com/ssgreg/journald"
 	"go.uber.org/zap/zapcore"
 	"strings"
-	"unicode"
 )
 
 // priorities maps zapcore.Level to journal.Priority.
@@ -79,7 +78,7 @@ func (c *journaldCore) addFields(enc zapcore.ObjectEncoder, fields []zapcore.Fie
 	for _, field := range fields {
 		field.Key = c.identifierU +
 			"_" +
-			utils.ConvertCamelCase(field.Key, unicode.UpperCase, '_')
+			strcase.ScreamingSnake(field.Key)
 		field.AddTo(enc)
 	}
 }

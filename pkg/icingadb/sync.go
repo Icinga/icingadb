@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -38,7 +39,7 @@ func NewSync(db *DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 // sync subject using the Sync function.
 func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, dump *DumpSignals) error {
 	typeName := utils.Name(subject.Entity())
-	key := "icinga:" + utils.Key(typeName, ':')
+	key := "icinga:" + strcase.Delimited(typeName, ':')
 
 	startTime := time.Now()
 	logTicker := time.NewTicker(s.logger.Interval())
@@ -108,12 +109,12 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Create
 	if len(delta.Create) > 0 {
-		s.logger.Infof("Inserting %d items of type %s", len(delta.Create), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+		s.logger.Infof("Inserting %d items of type %s", len(delta.Create), strcase.Delimited(utils.Name(delta.Subject.Entity()), ' '))
 		var entities <-chan database.Entity
 		if delta.Subject.WithChecksum() {
 			pairs, errs := s.redis.HMYield(
 				ctx,
-				fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
+				fmt.Sprintf("icinga:%s", strcase.Delimited(utils.Name(delta.Subject.Entity()), ':')),
 				delta.Create.Keys()...)
 			// Let errors from Redis cancel our group.
 			com.ErrgroupReceive(g, errs)
@@ -135,10 +136,10 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Update
 	if len(delta.Update) > 0 {
-		s.logger.Infof("Updating %d items of type %s", len(delta.Update), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+		s.logger.Infof("Updating %d items of type %s", len(delta.Update), strcase.Delimited(utils.Name(delta.Subject.Entity()), ' '))
 		pairs, errs := s.redis.HMYield(
 			ctx,
-			fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
+			fmt.Sprintf("icinga:%s", strcase.Delimited(utils.Name(delta.Subject.Entity()), ':')),
 			delta.Update.Keys()...)
 		// Let errors from Redis cancel our group.
 		com.ErrgroupReceive(g, errs)
@@ -159,7 +160,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Delete
 	if len(delta.Delete) > 0 {
-		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), strcase.Delimited(utils.Name(delta.Subject.Entity()), ' '))
 		g.Go(func() error {
 			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), OnSuccessIncrement[any](stat))
 		})

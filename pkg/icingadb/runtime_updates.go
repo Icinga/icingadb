@@ -12,6 +12,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
+	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -90,7 +91,7 @@ func (r *RuntimeUpdates) Sync(
 			deleteCount = r.db.Options.MaxPlaceholdersPerStatement
 		}
 
-		updateMessagesByKey[fmt.Sprintf("icinga:%s", utils.Key(s.Name(), ':'))] = updateMessages
+		updateMessagesByKey[fmt.Sprintf("icinga:%s", strcase.Delimited(s.Name(), ':'))] = updateMessages
 
 		r.logger.Debugf("Syncing runtime updates of %s", s.Name())
 
@@ -153,7 +154,7 @@ func (r *RuntimeUpdates) Sync(
 		r.logger.Debug("Syncing runtime updates of " + cv.Name())
 		r.logger.Debug("Syncing runtime updates of " + cvFlat.Name())
 
-		updateMessagesByKey["icinga:"+utils.Key(cv.Name(), ':')] = updateMessages
+		updateMessagesByKey["icinga:"+strcase.Delimited(cv.Name(), ':')] = updateMessages
 		g.Go(structifyStream(
 			ctx, updateMessages, upsertEntities, nil, deleteIds, nil,
 			structify.MakeMapStructifier(reflect.TypeOf(cv.Entity()).Elem(), "json"),

@@ -12,9 +12,9 @@ import (
 type Host struct {
 	Checkable   `json:",inline"`
 	Address     string      `json:"address"`
-	Address6    string      `json:"address6"`
+	Address6    string      `db:"address6" json:"address6"`
 	AddressBin  AddressBin  `json:"-"`
-	Address6Bin Address6Bin `json:"-"`
+	Address6Bin Address6Bin `db:"address6_bin" json:"-"`
 }
 
 // Init implements the contracts.Initer interface.
