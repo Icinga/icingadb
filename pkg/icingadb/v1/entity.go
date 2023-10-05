@@ -1,6 +1,8 @@
 package v1
 
-import "github.com/icinga/icingadb/pkg/contracts"
+import (
+	"github.com/icinga/icingadb/pkg/database"
+)
 
 // EntityWithoutChecksum represents entities without a checksum.
 type EntityWithoutChecksum struct {
@@ -8,7 +10,7 @@ type EntityWithoutChecksum struct {
 }
 
 // Fingerprint implements the contracts.Fingerprinter interface.
-func (e EntityWithoutChecksum) Fingerprint() contracts.Fingerprinter {
+func (e EntityWithoutChecksum) Fingerprint() database.Fingerprinter {
 	return e
 }
 
@@ -19,10 +21,10 @@ type EntityWithChecksum struct {
 }
 
 // Fingerprint implements the contracts.Fingerprinter interface.
-func (e EntityWithChecksum) Fingerprint() contracts.Fingerprinter {
+func (e EntityWithChecksum) Fingerprint() database.Fingerprinter {
 	return e
 }
 
-func NewEntityWithChecksum() contracts.Entity {
+func NewEntityWithChecksum() database.Entity {
 	return &EntityWithChecksum{}
 }

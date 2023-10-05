@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -41,23 +42,23 @@ type TimeperiodCustomvar struct {
 	TimeperiodId  types.Binary `json:"timeperiod_id"`
 }
 
-func NewTimeperiod() contracts.Entity {
+func NewTimeperiod() database.Entity {
 	return &Timeperiod{}
 }
 
-func NewTimeperiodRange() contracts.Entity {
+func NewTimeperiodRange() database.Entity {
 	return &TimeperiodRange{}
 }
 
-func NewTimeperiodOverrideInclude() contracts.Entity {
+func NewTimeperiodOverrideInclude() database.Entity {
 	return &TimeperiodOverrideInclude{}
 }
 
-func NewTimeperiodOverrideExclude() contracts.Entity {
+func NewTimeperiodOverrideExclude() database.Entity {
 	return &TimeperiodOverrideExclude{}
 }
 
-func NewTimeperiodCustomvar() contracts.Entity {
+func NewTimeperiodCustomvar() database.Entity {
 	return &TimeperiodCustomvar{}
 }
 

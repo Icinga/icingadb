@@ -2,24 +2,25 @@ package common
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/utils"
 )
 
 // SyncSubject defines information about entities to be synchronized.
 type SyncSubject struct {
-	entity       contracts.Entity
-	factory      contracts.EntityFactoryFunc
+	entity       database.Entity
+	factory      database.EntityFactoryFunc
 	withChecksum bool
 }
 
 // NewSyncSubject returns a new SyncSubject.
-func NewSyncSubject(factoryFunc contracts.EntityFactoryFunc) *SyncSubject {
+func NewSyncSubject(factoryFunc database.EntityFactoryFunc) *SyncSubject {
 	e := factoryFunc()
 
-	var factory contracts.EntityFactoryFunc
+	var factory database.EntityFactoryFunc
 	if _, ok := e.(contracts.Initer); ok {
-		factory = func() contracts.Entity {
+		factory = func() database.Entity {
 			e := factoryFunc()
 			e.(contracts.Initer).Init()
 
@@ -39,12 +40,12 @@ func NewSyncSubject(factoryFunc contracts.EntityFactoryFunc) *SyncSubject {
 }
 
 // Entity returns one value from the factory. Always returns the same entity.
-func (s SyncSubject) Entity() contracts.Entity {
+func (s SyncSubject) Entity() database.Entity {
 	return s.entity
 }
 
 // Factory returns the entity factory function that calls Init() on the created contracts.Entity if applicable.
-func (s SyncSubject) Factory() contracts.EntityFactoryFunc {
+func (s SyncSubject) Factory() database.EntityFactoryFunc {
 	return s.factory
 }
 
@@ -52,7 +53,7 @@ func (s SyncSubject) Factory() contracts.EntityFactoryFunc {
 // In the latter case it returns a factory for EntityWithChecksum instead.
 // Rationale: Sync#ApplyDelta() uses its input entities which are WithChecksum() only for the delta itself
 // and not for insertion into the database, so EntityWithChecksum is enough. And it consumes less memory.
-func (s SyncSubject) FactoryForDelta() contracts.EntityFactoryFunc {
+func (s SyncSubject) FactoryForDelta() database.EntityFactoryFunc {
 	if s.withChecksum {
 		return v1.NewEntityWithChecksum
 	}

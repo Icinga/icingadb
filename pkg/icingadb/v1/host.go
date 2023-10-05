@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql/driver"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 	"net"
 )
@@ -89,27 +90,27 @@ type HostgroupMember struct {
 	HostgroupId types.Binary `json:"hostgroup_id"`
 }
 
-func NewHost() contracts.Entity {
+func NewHost() database.Entity {
 	return &Host{}
 }
 
-func NewHostCustomvar() contracts.Entity {
+func NewHostCustomvar() database.Entity {
 	return &HostCustomvar{}
 }
 
-func NewHostState() contracts.Entity {
+func NewHostState() database.Entity {
 	return &HostState{}
 }
 
-func NewHostgroup() contracts.Entity {
+func NewHostgroup() database.Entity {
 	return &Hostgroup{}
 }
 
-func NewHostgroupCustomvar() contracts.Entity {
+func NewHostgroupCustomvar() database.Entity {
 	return &HostgroupCustomvar{}
 }
 
-func NewHostgroupMember() contracts.Entity {
+func NewHostgroupMember() database.Entity {
 	return &HostgroupMember{}
 }
 

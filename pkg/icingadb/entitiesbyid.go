@@ -2,11 +2,11 @@ package icingadb
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 )
 
 // EntitiesById is a map of key-contracts.Entity pairs.
-type EntitiesById map[string]contracts.Entity
+type EntitiesById map[string]database.Entity
 
 // Keys returns the keys.
 func (ebi EntitiesById) Keys() []string {
@@ -22,15 +22,15 @@ func (ebi EntitiesById) Keys() []string {
 func (ebi EntitiesById) IDs() []interface{} {
 	ids := make([]interface{}, 0, len(ebi))
 	for _, v := range ebi {
-		ids = append(ids, v.(contracts.IDer).ID())
+		ids = append(ids, v.(database.IDer).ID())
 	}
 
 	return ids
 }
 
 // Entities streams the entities on a returned channel.
-func (ebi EntitiesById) Entities(ctx context.Context) <-chan contracts.Entity {
-	entities := make(chan contracts.Entity)
+func (ebi EntitiesById) Entities(ctx context.Context) <-chan database.Entity {
+	entities := make(chan database.Entity)
 
 	go func() {
 		defer close(entities)

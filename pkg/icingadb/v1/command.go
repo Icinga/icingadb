@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -111,51 +112,51 @@ type NotificationcommandCustomvar struct {
 	NotificationcommandId types.Binary `json:"notificationcommand_id"`
 }
 
-func NewCheckcommand() contracts.Entity {
+func NewCheckcommand() database.Entity {
 	return &Checkcommand{}
 }
 
-func NewCheckcommandArgument() contracts.Entity {
+func NewCheckcommandArgument() database.Entity {
 	return &CheckcommandArgument{}
 }
 
-func NewCheckcommandEnvvar() contracts.Entity {
+func NewCheckcommandEnvvar() database.Entity {
 	return &CheckcommandEnvvar{}
 }
 
-func NewCheckcommandCustomvar() contracts.Entity {
+func NewCheckcommandCustomvar() database.Entity {
 	return &CheckcommandCustomvar{}
 }
 
-func NewEventcommand() contracts.Entity {
+func NewEventcommand() database.Entity {
 	return &Eventcommand{}
 }
 
-func NewEventcommandArgument() contracts.Entity {
+func NewEventcommandArgument() database.Entity {
 	return &EventcommandArgument{}
 }
 
-func NewEventcommandEnvvar() contracts.Entity {
+func NewEventcommandEnvvar() database.Entity {
 	return &EventcommandEnvvar{}
 }
 
-func NewEventcommandCustomvar() contracts.Entity {
+func NewEventcommandCustomvar() database.Entity {
 	return &EventcommandCustomvar{}
 }
 
-func NewNotificationcommand() contracts.Entity {
+func NewNotificationcommand() database.Entity {
 	return &Notificationcommand{}
 }
 
-func NewNotificationcommandArgument() contracts.Entity {
+func NewNotificationcommandArgument() database.Entity {
 	return &NotificationcommandArgument{}
 }
 
-func NewNotificationcommandEnvvar() contracts.Entity {
+func NewNotificationcommandEnvvar() database.Entity {
 	return &NotificationcommandEnvvar{}
 }
 
-func NewNotificationcommandCustomvar() contracts.Entity {
+func NewNotificationcommandCustomvar() database.Entity {
 	return &NotificationcommandCustomvar{}
 }
 

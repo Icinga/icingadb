@@ -3,7 +3,7 @@ package main
 import (
 	"database/sql"
 	_ "embed"
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
@@ -51,7 +51,7 @@ func convertCommentRows(
 	env string, envId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []commentRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
-	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []contracts.Entity
+	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []database.Entity
 
 	for _, row := range idoRows {
 		checkpoint = row.CommenthistoryId
@@ -247,7 +247,7 @@ func convertDowntimeRows(
 	env string, envId icingadbTypes.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []downtimeRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
-	var downtimeHistory, allHistory, sla []contracts.Entity
+	var downtimeHistory, allHistory, sla []database.Entity
 
 	for _, row := range idoRows {
 		checkpoint = row.DowntimehistoryId
@@ -416,7 +416,7 @@ func convertFlappingRows(
 		cachedById[c.HistoryId] = convertTime(c.EventTime, c.EventTimeUsec)
 	}
 
-	var flappingHistory, flappingHistoryUpserts, allHistory []contracts.Entity
+	var flappingHistory, flappingHistoryUpserts, allHistory []database.Entity
 	for _, row := range idoRows {
 		checkpoint = row.FlappinghistoryId
 
@@ -600,7 +600,7 @@ func convertNotificationRows(
 		perId[contact.Name1] = struct{}{}
 	}
 
-	var notificationHistory, userNotificationHistory, allHistory []contracts.Entity
+	var notificationHistory, userNotificationHistory, allHistory []database.Entity
 	for _, row := range idoRows {
 		checkpoint = row.NotificationId
 
@@ -773,7 +773,7 @@ func convertStateRows(
 		cachedById[c.HistoryId] = c.PreviousHardState
 	}
 
-	var stateHistory, allHistory, sla []contracts.Entity
+	var stateHistory, allHistory, sla []database.Entity
 	for _, row := range idoRows {
 		checkpoint = row.StatehistoryId
 

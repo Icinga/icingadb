@@ -6,6 +6,7 @@ import (
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -34,8 +35,8 @@ func (s Streams) Option() []string {
 // CreateEntities streams and creates entities from the
 // given Redis field value pairs using the specified factory function,
 // and streams them on a returned channel.
-func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, pairs <-chan HPair, concurrent int) (<-chan contracts.Entity, <-chan error) {
-	entities := make(chan contracts.Entity)
+func CreateEntities(ctx context.Context, factoryFunc database.EntityFactoryFunc, pairs <-chan HPair, concurrent int) (<-chan database.Entity, <-chan error) {
+	entities := make(chan database.Entity)
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -78,8 +79,8 @@ func CreateEntities(ctx context.Context, factoryFunc contracts.EntityFactoryFunc
 // SetChecksums concurrently streams from the given entities and
 // sets their checksums using the specified map and
 // streams the results on a returned channel.
-func SetChecksums(ctx context.Context, entities <-chan contracts.Entity, checksums map[string]contracts.Entity, concurrent int) (<-chan contracts.Entity, <-chan error) {
-	entitiesWithChecksum := make(chan contracts.Entity)
+func SetChecksums(ctx context.Context, entities <-chan database.Entity, checksums map[string]database.Entity, concurrent int) (<-chan database.Entity, <-chan error) {
+	entitiesWithChecksum := make(chan database.Entity)
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {

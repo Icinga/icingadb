@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -31,12 +32,12 @@ type IdMeta struct {
 }
 
 // ID implements part of the contracts.IDer interface.
-func (m IdMeta) ID() contracts.ID {
+func (m IdMeta) ID() database.ID {
 	return m.Id
 }
 
 // SetID implements part of the contracts.IDer interface.
-func (m *IdMeta) SetID(id contracts.ID) {
+func (m *IdMeta) SetID(id database.ID) {
 	m.Id = id.(types.Binary)
 }
 

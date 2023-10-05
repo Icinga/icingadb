@@ -7,7 +7,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
@@ -41,7 +40,7 @@ func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger)
 }
 
 // factory abstracts overdue.NewHostState and overdue.NewServiceState.
-type factory = func(id string, overdue bool) (contracts.Entity, error)
+type factory = func(id string, overdue bool) (database.Entity, error)
 
 // Sync synchronizes Redis overdue sets from s.redis to s.db.
 func (s Sync) Sync(ctx context.Context) error {
@@ -223,7 +222,7 @@ func (s Sync) updateOverdue(
 // updateDb sets objectType_state#is_overdue for ids to overdue.
 func (s Sync) updateDb(ctx context.Context, factory factory, ids []interface{}, overdue bool) error {
 	g, ctx := errgroup.WithContext(ctx)
-	ch := make(chan contracts.Entity, 1<<10)
+	ch := make(chan database.Entity, 1<<10)
 
 	g.Go(func() error {
 		defer close(ch)

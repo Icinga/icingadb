@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -48,23 +49,23 @@ type NotificationCustomvar struct {
 	NotificationId types.Binary `json:"notification_id"`
 }
 
-func NewNotification() contracts.Entity {
+func NewNotification() database.Entity {
 	return &Notification{}
 }
 
-func NewNotificationUser() contracts.Entity {
+func NewNotificationUser() database.Entity {
 	return &NotificationUser{}
 }
 
-func NewNotificationUsergroup() contracts.Entity {
+func NewNotificationUsergroup() database.Entity {
 	return &NotificationUsergroup{}
 }
 
-func NewNotificationRecipient() contracts.Entity {
+func NewNotificationRecipient() database.Entity {
 	return &NotificationRecipient{}
 }
 
-func NewNotificationCustomvar() contracts.Entity {
+func NewNotificationCustomvar() database.Entity {
 	return &NotificationCustomvar{}
 }
 

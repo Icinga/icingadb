@@ -1,7 +1,7 @@
 package icingadb
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/utils"
 )
 
@@ -9,7 +9,7 @@ import (
 // the WHERE conditions that entities of the
 // enclosed entity type must satisfy in order to be SELECTed.
 type ScopedEntity struct {
-	contracts.Entity
+	database.Entity
 	scope interface{}
 }
 
@@ -24,7 +24,7 @@ func (e ScopedEntity) TableName() string {
 }
 
 // NewScopedEntity returns a new ScopedEntity.
-func NewScopedEntity(entity contracts.Entity, scope interface{}) *ScopedEntity {
+func NewScopedEntity(entity database.Entity, scope interface{}) *ScopedEntity {
 	return &ScopedEntity{
 		Entity: entity,
 		scope:  scope,

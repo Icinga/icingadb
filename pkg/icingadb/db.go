@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/logging"
@@ -186,7 +185,7 @@ func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
 		utils.TableName(table),
 	)
 
-	if scoper, ok := table.(contracts.Scoper); ok {
+	if scoper, ok := table.(database.Scoper); ok {
 		where, _ := db.BuildWhere(scoper.Scope())
 		q += ` WHERE ` + where
 	}
@@ -216,7 +215,7 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 	table := utils.TableName(subject)
 	var updateColumns []string
 
-	if upserter, ok := subject.(contracts.Upserter); ok {
+	if upserter, ok := subject.(database.Upserter); ok {
 		updateColumns = db.BuildColumns(upserter.Upsert())
 	} else {
 		updateColumns = insertColumns
@@ -358,8 +357,8 @@ func (db *DB) BulkExec(
 // and can be executed concurrently to the extent allowed by the semaphore passed in sem.
 // Entities for which the query ran successfully will be passed to onSuccess.
 func (db *DB) NamedBulkExec(
-	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan contracts.Entity,
-	splitPolicyFactory com.BulkChunkSplitPolicyFactory[contracts.Entity], onSuccess ...OnSuccess[contracts.Entity],
+	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan database.Entity,
+	splitPolicyFactory com.BulkChunkSplitPolicyFactory[database.Entity], onSuccess ...OnSuccess[database.Entity],
 ) error {
 	var counter com.Counter
 	defer db.log(ctx, query, &counter).Stop()
@@ -379,7 +378,7 @@ func (db *DB) NamedBulkExec(
 					return errors.Wrap(err, "can't acquire semaphore")
 				}
 
-				g.Go(func(b []contracts.Entity) func() error {
+				g.Go(func(b []database.Entity) func() error {
 					return func() error {
 						defer sem.Release(1)
 
@@ -423,13 +422,13 @@ func (db *DB) NamedBulkExec(
 // The transactions are executed in a separate goroutine with a weighting of 1
 // and can be executed concurrently to the extent allowed by the semaphore passed in sem.
 func (db *DB) NamedBulkExecTx(
-	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan contracts.Entity,
+	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan database.Entity,
 ) error {
 	var counter com.Counter
 	defer db.log(ctx, query, &counter).Stop()
 
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.Bulk(ctx, arg, count, com.NeverSplit[contracts.Entity])
+	bulk := com.Bulk(ctx, arg, count, com.NeverSplit[database.Entity])
 
 	g.Go(func() error {
 		for {
@@ -443,7 +442,7 @@ func (db *DB) NamedBulkExecTx(
 					return errors.Wrap(err, "can't acquire semaphore")
 				}
 
-				g.Go(func(b []contracts.Entity) func() error {
+				g.Go(func(b []database.Entity) func() error {
 					return func() error {
 						defer sem.Release(1)
 
@@ -503,8 +502,8 @@ func (db *DB) BatchSizeByPlaceholders(n int) int {
 // YieldAll executes the query with the supplied scope,
 // scans each resulting row into an entity returned by the factory function,
 // and streams them into a returned channel.
-func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryFunc, query string, scope interface{}) (<-chan contracts.Entity, <-chan error) {
-	entities := make(chan contracts.Entity, 1)
+func (db *DB) YieldAll(ctx context.Context, factoryFunc database.EntityFactoryFunc, query string, scope interface{}) (<-chan database.Entity, <-chan error) {
+	entities := make(chan database.Entity, 1)
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -545,7 +544,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 // Entities for which the query ran successfully will be passed to onSuccess.
 func (db *DB) CreateStreamed(
-	ctx context.Context, entities <-chan contracts.Entity, onSuccess ...OnSuccess[contracts.Entity],
+	ctx context.Context, entities <-chan database.Entity, onSuccess ...OnSuccess[database.Entity],
 ) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
@@ -557,7 +556,7 @@ func (db *DB) CreateStreamed(
 
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
-		forward, com.NeverSplit[contracts.Entity], onSuccess...,
+		forward, com.NeverSplit[database.Entity], onSuccess...,
 	)
 }
 
@@ -567,7 +566,7 @@ func (db *DB) CreateStreamed(
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 // Entities for which the query ran successfully will be passed to onSuccess.
 func (db *DB) CreateIgnoreStreamed(
-	ctx context.Context, entities <-chan contracts.Entity, onSuccess ...OnSuccess[contracts.Entity],
+	ctx context.Context, entities <-chan database.Entity, onSuccess ...OnSuccess[database.Entity],
 ) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
@@ -579,7 +578,7 @@ func (db *DB) CreateIgnoreStreamed(
 
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
-		forward, com.SplitOnDupId[contracts.Entity], onSuccess...,
+		forward, com.SplitOnDupId[database.Entity], onSuccess...,
 	)
 }
 
@@ -589,7 +588,7 @@ func (db *DB) CreateIgnoreStreamed(
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 // Entities for which the query ran successfully will be passed to onSuccess.
 func (db *DB) UpsertStreamed(
-	ctx context.Context, entities <-chan contracts.Entity, onSuccess ...OnSuccess[contracts.Entity],
+	ctx context.Context, entities <-chan database.Entity, onSuccess ...OnSuccess[database.Entity],
 ) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
@@ -601,7 +600,7 @@ func (db *DB) UpsertStreamed(
 
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
-		forward, com.SplitOnDupId[contracts.Entity], onSuccess...,
+		forward, com.SplitOnDupId[database.Entity], onSuccess...,
 	)
 }
 
@@ -609,7 +608,7 @@ func (db *DB) UpsertStreamed(
 // The update statement is created using BuildUpdateStmt with the first entity from the entities stream.
 // Bulk size is controlled via Options.MaxRowsPerTransaction and
 // concurrency is controlled via Options.MaxConnectionsPerTable.
-func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Entity) error {
+func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan database.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if first == nil {
 		return errors.Wrap(err, "can't copy first entity")
@@ -626,7 +625,7 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan contracts.Enti
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 // IDs for which the query ran successfully will be passed to onSuccess.
 func (db *DB) DeleteStreamed(
-	ctx context.Context, entityType contracts.Entity, ids <-chan interface{}, onSuccess ...OnSuccess[any],
+	ctx context.Context, entityType database.Entity, ids <-chan interface{}, onSuccess ...OnSuccess[any],
 ) error {
 	sem := db.GetSemaphoreForTable(utils.TableName(entityType))
 	return db.BulkExec(
@@ -638,7 +637,7 @@ func (db *DB) DeleteStreamed(
 // bulk deletes them by passing the channel along with the entityType to DeleteStreamed.
 // IDs for which the query ran successfully will be passed to onSuccess.
 func (db *DB) Delete(
-	ctx context.Context, entityType contracts.Entity, ids []interface{}, onSuccess ...OnSuccess[any],
+	ctx context.Context, entityType database.Entity, ids []interface{}, onSuccess ...OnSuccess[any],
 ) error {
 	idsCh := make(chan interface{}, len(ids))
 	for _, id := range ids {

@@ -1,7 +1,7 @@
 package history
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/types"
 )
@@ -43,8 +43,8 @@ func (*HistoryNotification) TableName() string {
 
 // Assert interface compliance.
 var (
-	_ UpserterEntity       = (*NotificationHistory)(nil)
-	_ UpserterEntity       = (*UserNotificationHistory)(nil)
-	_ contracts.TableNamer = (*HistoryNotification)(nil)
-	_ UpserterEntity       = (*HistoryNotification)(nil)
+	_ UpserterEntity      = (*NotificationHistory)(nil)
+	_ UpserterEntity      = (*UserNotificationHistory)(nil)
+	_ database.TableNamer = (*HistoryNotification)(nil)
+	_ UpserterEntity      = (*HistoryNotification)(nil)
 )

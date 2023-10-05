@@ -5,7 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
@@ -197,11 +197,11 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 		}
 
 		bufSize := s.db.Options.MaxPlaceholdersPerStatement
-		insert := make(chan contracts.Entity, bufSize) // Events sent to the database for insertion.
-		inserted := make(chan contracts.Entity)        // Events returned by the database after successful insertion.
-		skipped := make(chan redis.XMessage)           // Events skipping insert/inserted (no entities generated).
-		state := make(map[contracts.Entity]*State)     // Shared state between all entities created by one event.
-		var stateMu sync.Mutex                         // Synchronizes concurrent access to state.
+		insert := make(chan database.Entity, bufSize) // Events sent to the database for insertion.
+		inserted := make(chan database.Entity)        // Events returned by the database after successful insertion.
+		skipped := make(chan redis.XMessage)          // Events skipping insert/inserted (no entities generated).
+		state := make(map[database.Entity]*State)     // Shared state between all entities created by one event.
+		var stateMu sync.Mutex                        // Synchronizes concurrent access to state.
 
 		g, ctx := errgroup.WithContext(ctx)
 
@@ -253,7 +253,7 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 		g.Go(func() error {
 			defer close(inserted)
 
-			return s.db.UpsertStreamed(ctx, insert, icingadb.OnSuccessSendTo[contracts.Entity](inserted))
+			return s.db.UpsertStreamed(ctx, insert, icingadb.OnSuccessSendTo[database.Entity](inserted))
 		})
 
 		g.Go(func() error {

@@ -3,6 +3,7 @@ package history
 import (
 	"database/sql/driver"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -11,17 +12,17 @@ type CommentHistoryEntity struct {
 }
 
 // Fingerprint implements part of the contracts.Entity interface.
-func (che CommentHistoryEntity) Fingerprint() contracts.Fingerprinter {
+func (che CommentHistoryEntity) Fingerprint() database.Fingerprinter {
 	return che
 }
 
 // ID implements part of the contracts.Entity interface.
-func (che CommentHistoryEntity) ID() contracts.ID {
+func (che CommentHistoryEntity) ID() database.ID {
 	return che.CommentId
 }
 
 // SetID implements part of the contracts.Entity interface.
-func (che *CommentHistoryEntity) SetID(id contracts.ID) {
+func (che *CommentHistoryEntity) SetID(id database.ID) {
 	che.CommentId = id.(types.Binary)
 }
 
@@ -109,12 +110,12 @@ func (et CommentEventTime) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
-	_ contracts.Entity     = (*CommentHistoryEntity)(nil)
-	_ contracts.Upserter   = (*CommentHistoryUpserter)(nil)
-	_ contracts.Initer     = (*CommentHistory)(nil)
-	_ UpserterEntity       = (*CommentHistory)(nil)
-	_ contracts.Initer     = (*HistoryComment)(nil)
-	_ contracts.TableNamer = (*HistoryComment)(nil)
-	_ UpserterEntity       = (*HistoryComment)(nil)
-	_ driver.Valuer        = CommentEventTime{}
+	_ database.Entity     = (*CommentHistoryEntity)(nil)
+	_ database.Upserter   = (*CommentHistoryUpserter)(nil)
+	_ contracts.Initer    = (*CommentHistory)(nil)
+	_ UpserterEntity      = (*CommentHistory)(nil)
+	_ contracts.Initer    = (*HistoryComment)(nil)
+	_ database.TableNamer = (*HistoryComment)(nil)
+	_ UpserterEntity      = (*HistoryComment)(nil)
+	_ driver.Valuer       = CommentEventTime{}
 )
