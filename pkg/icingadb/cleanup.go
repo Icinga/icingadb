@@ -3,8 +3,8 @@ package icingadb
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/types"
 	"time"
@@ -50,7 +50,7 @@ func (db *DB) CleanupOlderThan(
 			Time:          types.UnixMilli(olderThan),
 		})
 		if err != nil {
-			return 0, internal.CantPerformQuery(err, q)
+			return 0, database.CantPerformQuery(err, q)
 		}
 
 		n, err := rs.RowsAffected()

@@ -3,10 +3,10 @@ package icingadb
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
@@ -323,7 +323,7 @@ func (db *DB) BulkExec(
 							stmt = db.Rebind(stmt)
 							_, err = db.ExecContext(ctx, stmt, args...)
 							if err != nil {
-								return internal.CantPerformQuery(err, query)
+								return database.CantPerformQuery(err, query)
 							}
 
 							counter.Add(uint64(len(b)))
@@ -388,7 +388,7 @@ func (db *DB) NamedBulkExec(
 							func(ctx context.Context) error {
 								_, err := db.NamedExecContext(ctx, query, b)
 								if err != nil {
-									return internal.CantPerformQuery(err, query)
+									return database.CantPerformQuery(err, query)
 								}
 
 								counter.Add(uint64(len(b)))
@@ -514,7 +514,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc contracts.EntityFactoryF
 
 		rows, err := db.NamedQueryContext(ctx, query, scope)
 		if err != nil {
-			return internal.CantPerformQuery(err, query)
+			return database.CantPerformQuery(err, query)
 		}
 		defer rows.Close()
 

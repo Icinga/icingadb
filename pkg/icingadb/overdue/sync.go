@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/overdue"
@@ -89,7 +89,7 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 	query := fmt.Sprintf("SELECT id FROM %s_state WHERE is_overdue='y'", objectType)
 
 	if err := s.db.SelectContext(ctx, &rows, query); err != nil {
-		return internal.CantPerformQuery(err, query)
+		return database.CantPerformQuery(err, query)
 	}
 
 	_, err := s.redis.Pipelined(ctx, func(pipe redis.Pipeliner) error {

@@ -25,11 +25,6 @@ func CantParseUint64(err error, s string) error {
 	return errors.Wrapf(err, "can't parse %q into uint64", s)
 }
 
-// CantPerformQuery wraps the given error with the specified query that cannot be executed.
-func CantPerformQuery(err error, q string) error {
-	return errors.Wrapf(err, "can't perform %q", q)
-}
-
 // CantUnmarshalYAML wraps the given error with the designated value, which cannot be unmarshalled into.
 func CantUnmarshalYAML(err error, v interface{}) error {
 	return errors.Wrapf(err, "can't unmarshal YAML into %T", v)
