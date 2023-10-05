@@ -9,6 +9,7 @@ import (
 	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/internal/config"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
@@ -431,7 +432,7 @@ func migrateOneType[IdoRow any](
 					ch := utils.ChanFromSlice(stage.insert)
 
 					if err := idb.CreateIgnoreStreamed(context.Background(), ch); err != nil {
-						log.With("backend", "Icinga DB", "op", "INSERT IGNORE", "table", utils.TableName(stage.insert[0])).
+						log.With("backend", "Icinga DB", "op", "INSERT IGNORE", "table", database.TableName(stage.insert[0])).
 							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 					}
 				}
@@ -440,7 +441,7 @@ func migrateOneType[IdoRow any](
 					ch := utils.ChanFromSlice(stage.upsert)
 
 					if err := idb.UpsertStreamed(context.Background(), ch); err != nil {
-						log.With("backend", "Icinga DB", "op", "UPSERT", "table", utils.TableName(stage.upsert[0])).
+						log.With("backend", "Icinga DB", "op", "UPSERT", "table", database.TableName(stage.upsert[0])).
 							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 					}
 				}
