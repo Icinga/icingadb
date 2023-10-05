@@ -6,7 +6,7 @@ import (
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/flatten"
-	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
+	"github.com/icinga/icingadb/pkg/objectpacker"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"golang.org/x/sync/errgroup"
