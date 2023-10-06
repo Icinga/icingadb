@@ -70,7 +70,7 @@ func run() int {
 		}
 	}
 
-	if err := db.CheckSchema(context.Background()); err != nil {
+	if err := icingadb.CheckSchema(context.Background(), db); err != nil {
 		logger.Fatalf("%+v", err)
 	}
 
