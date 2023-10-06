@@ -2,7 +2,6 @@ package v1
 
 import (
 	"context"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/flatten"
@@ -109,7 +108,7 @@ func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan databa
 				for entity := range cvs {
 					var value interface{}
 					customvar := entity.(*Customvar)
-					if err := internal.UnmarshalJSON([]byte(customvar.Value), &value); err != nil {
+					if err := types.UnmarshalJSON([]byte(customvar.Value), &value); err != nil {
 						return err
 					}
 

@@ -3,7 +3,6 @@ package icingaredis
 import (
 	"context"
 	"github.com/go-redis/redis/v8"
-	"github.com/icinga/icingadb/internal"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/types"
@@ -208,7 +207,7 @@ func (m *HeartbeatMessage) Stats() *v1.StatsMessage {
 // EnvironmentID returns the Icinga DB environment ID stored in the heartbeat message.
 func (m *HeartbeatMessage) EnvironmentID() (types.Binary, error) {
 	var id types.Binary
-	err := internal.UnmarshalJSON([]byte(m.stats["icingadb_environment"].(string)), &id)
+	err := types.UnmarshalJSON([]byte(m.stats["icingadb_environment"].(string)), &id)
 	if err != nil {
 		return nil, err
 	}

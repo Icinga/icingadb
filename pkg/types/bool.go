@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
-	"github.com/icinga/icingadb/internal"
 	"github.com/pkg/errors"
 	"strconv"
 )
@@ -29,14 +28,14 @@ func (b Bool) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return internal.MarshalJSON(b.Bool)
+	return MarshalJSON(b.Bool)
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 func (b *Bool) UnmarshalText(text []byte) error {
 	parsed, err := strconv.ParseUint(string(text), 10, 64)
 	if err != nil {
-		return internal.CantParseUint64(err, string(text))
+		return CantParseUint64(err, string(text))
 	}
 
 	*b = Bool{parsed != 0, true}
@@ -49,7 +48,7 @@ func (b *Bool) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	if err := internal.UnmarshalJSON(data, &b.Bool); err != nil {
+	if err := UnmarshalJSON(data, &b.Bool); err != nil {
 		return err
 	}
 
