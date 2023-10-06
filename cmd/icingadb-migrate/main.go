@@ -171,7 +171,7 @@ func mkCache(f *Flags, c *Config, mapper *reflectx.Mapper) {
 }
 
 // connectAll connects to ido and idb (Icinga DB) as c specifies. (On non-recoverable errors the whole program exits.)
-func connectAll(c *Config) (ido, idb *icingadb.DB) {
+func connectAll(c *Config) (ido, idb *database.DB) {
 	log.Info("Connecting to databases")
 	eg, _ := errgroup.WithContext(context.Background())
 
@@ -190,7 +190,7 @@ func connectAll(c *Config) (ido, idb *icingadb.DB) {
 }
 
 // connect connects to which DB as cfg specifies. (On non-recoverable errors the whole program exits.)
-func connect(which string, cfg *config.Database) *icingadb.DB {
+func connect(which string, cfg *config.Database) *database.DB {
 	db, err := cfg.Open(logging.NewLogger(zap.NewNop().Sugar(), 20*time.Second))
 	if err != nil {
 		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
@@ -205,7 +205,7 @@ func connect(which string, cfg *config.Database) *icingadb.DB {
 
 // startIdoTx initializes types[*].snapshot with new repeatable-read-isolated ido transactions.
 // (On non-recoverable errors the whole program exits.)
-func startIdoTx(ido *icingadb.DB) {
+func startIdoTx(ido *database.DB) {
 	types.forEach(func(ht *historyType) {
 		tx, err := ido.BeginTxx(context.Background(), &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 		if err != nil {
@@ -260,7 +260,7 @@ var idoMigrationProgressSchema string
 
 // computeProgress initializes types[*].lastId, types[*].total and types[*].done.
 // (On non-recoverable errors the whole program exits.)
-func computeProgress(c *Config, idb *icingadb.DB, envId []byte) {
+func computeProgress(c *Config, idb *database.DB, envId []byte) {
 	if _, err := idb.Exec(idoMigrationProgressSchema); err != nil {
 		log.Fatalf("%+v", errors.Wrap(err, "can't create table ido_migration_progress"))
 	}
@@ -350,7 +350,7 @@ func fillCache() {
 }
 
 // migrate does the actual migration.
-func migrate(c *Config, idb *icingadb.DB, envId []byte) {
+func migrate(c *Config, idb *database.DB, envId []byte) {
 	progress := mpb.New()
 	for _, ht := range types {
 		ht.setupBar(progress, ht.total)
@@ -365,7 +365,7 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 
 // migrate does the actual migration for one history type.
 func migrateOneType[IdoRow any](
-	c *Config, idb *icingadb.DB, envId []byte, ht *historyType,
+	c *Config, idb *database.DB, envId []byte, ht *historyType,
 	convertRows func(env string, envId icingadbTypes.Binary,
 		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
 		idoRows []IdoRow) (stages []icingaDbOutputStage, checkpoint any),

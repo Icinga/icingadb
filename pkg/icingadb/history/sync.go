@@ -5,7 +5,6 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/icingadb"
 	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -23,13 +22,13 @@ import (
 
 // Sync specifies the source and destination of a history sync.
 type Sync struct {
-	db     *icingadb.DB
+	db     *database.DB
 	redis  *icingaredis.Client
 	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -252,7 +251,7 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 		g.Go(func() error {
 			defer close(inserted)
 
-			return s.db.UpsertStreamed(ctx, insert, icingadb.OnSuccessSendTo[database.Entity](inserted))
+			return s.db.UpsertStreamed(ctx, insert, database.OnSuccessSendTo[database.Entity](inserted))
 		})
 
 		g.Go(func() error {

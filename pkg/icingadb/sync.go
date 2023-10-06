@@ -21,13 +21,13 @@ import (
 
 // Sync implements a rendezvous point for Icinga DB and Redis to synchronize their entities.
 type Sync struct {
-	db     *DB
+	db     *database.DB
 	redis  *icingaredis.Client
 	logger *logging.Logger
 }
 
 // NewSync returns a new Sync.
-func NewSync(db *DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -130,7 +130,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		}
 
 		g.Go(func() error {
-			return s.db.CreateStreamed(ctx, entities, OnSuccessIncrement[database.Entity](stat))
+			return s.db.CreateStreamed(ctx, entities, database.OnSuccessIncrement[database.Entity](stat))
 		})
 	}
 
@@ -154,7 +154,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		g.Go(func() error {
 			// Using upsert here on purpose as this is the fastest way to do bulk updates.
 			// However, there is a risk that errors in the sync implementation could silently insert new rows.
-			return s.db.UpsertStreamed(ctx, entities, OnSuccessIncrement[database.Entity](stat))
+			return s.db.UpsertStreamed(ctx, entities, database.OnSuccessIncrement[database.Entity](stat))
 		})
 	}
 
@@ -162,7 +162,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	if len(delta.Delete) > 0 {
 		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), strcase.Delimited(types.Name(delta.Subject.Entity()), ' '))
 		g.Go(func() error {
-			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), OnSuccessIncrement[any](stat))
+			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), database.OnSuccessIncrement[any](stat))
 		})
 	}
 

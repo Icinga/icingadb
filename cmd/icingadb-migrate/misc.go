@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/driver"
-	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/objectpacker"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
 	"github.com/jmoiron/sqlx"
@@ -180,7 +179,7 @@ type historyType struct {
 	// migrationQuery SELECTs source data for actual migration.
 	migrationQuery string
 	// migrate does the actual migration.
-	migrate func(c *Config, idb *icingadb.DB, envId []byte, ht *historyType)
+	migrate func(c *Config, idb *database.DB, envId []byte, ht *historyType)
 
 	// cacheFile locates <name>.sqlite3.
 	cacheFile string
@@ -250,7 +249,7 @@ var types = historyTypes{
 		// Manual deletion time wins vs. time of expiration which never happens due to manual deletion.
 		idoEndColumns:  []string{"deletion_time", "expiration_time"},
 		migrationQuery: commentMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, ht *historyType) {
+		migrate: func(c *Config, idb *database.DB, envId []byte, ht *historyType) {
 			migrateOneType(c, idb, envId, ht, convertCommentRows)
 		},
 	},
@@ -262,7 +261,7 @@ var types = historyTypes{
 		idoStartColumns: []string{"actual_start_time", "scheduled_start_time"},
 		idoEndColumns:   []string{"actual_end_time", "scheduled_end_time"},
 		migrationQuery:  downtimeMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, ht *historyType) {
+		migrate: func(c *Config, idb *database.DB, envId []byte, ht *historyType) {
 			migrateOneType(c, idb, envId, ht, convertDowntimeRows)
 		},
 	},
@@ -280,7 +279,7 @@ var types = historyTypes{
 			})
 		},
 		migrationQuery: flappingMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, ht *historyType) {
+		migrate: func(c *Config, idb *database.DB, envId []byte, ht *historyType) {
 			migrateOneType(c, idb, envId, ht, convertFlappingRows)
 		},
 	},
@@ -298,7 +297,7 @@ var types = historyTypes{
 		},
 		cacheLimitQuery: "SELECT MAX(history_id) FROM previous_hard_state",
 		migrationQuery:  notificationMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, ht *historyType) {
+		migrate: func(c *Config, idb *database.DB, envId []byte, ht *historyType) {
 			migrateOneType(c, idb, envId, ht, convertNotificationRows)
 		},
 	},
@@ -314,7 +313,7 @@ var types = historyTypes{
 		},
 		cacheLimitQuery: "SELECT MAX(history_id) FROM previous_hard_state",
 		migrationQuery:  stateMigrationQuery,
-		migrate: func(c *Config, idb *icingadb.DB, envId []byte, ht *historyType) {
+		migrate: func(c *Config, idb *database.DB, envId []byte, ht *historyType) {
 			migrateOneType(c, idb, envId, ht, convertStateRows)
 		},
 	},

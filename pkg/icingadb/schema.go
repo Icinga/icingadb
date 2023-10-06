@@ -3,6 +3,7 @@ package icingadb
 import (
 	"context"
 	"fmt"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/pkg/errors"
 )
@@ -13,7 +14,7 @@ const (
 )
 
 // CheckSchema asserts the database schema of the expected version being present.
-func CheckSchema(ctx context.Context, db *DB) error {
+func CheckSchema(ctx context.Context, db *database.DB) error {
 	var expectedDbSchemaVersion uint16
 	switch db.DriverName() {
 	case driver.MySQL:

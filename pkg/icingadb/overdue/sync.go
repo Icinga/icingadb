@@ -8,7 +8,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/overdue"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -25,13 +24,13 @@ import (
 
 // Sync specifies the source and destination of an overdue sync.
 type Sync struct {
-	db     *icingadb.DB
+	db     *database.DB
 	redis  *icingaredis.Client
 	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,

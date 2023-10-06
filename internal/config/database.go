@@ -3,8 +3,8 @@ package config
 import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/driver"
-	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/strcase"
@@ -30,12 +30,12 @@ type Database struct {
 	User       string           `yaml:"user"`
 	Password   string           `yaml:"password"`
 	TlsOptions TLS              `yaml:",inline"`
-	Options    icingadb.Options `yaml:"options"`
+	Options    database.Options `yaml:"options"`
 }
 
 // Open prepares the DSN string and driver configuration,
 // calls sqlx.Open, but returns *icingadb.DB.
-func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
+func (d *Database) Open(logger *logging.Logger) (*database.DB, error) {
 	registerDriverOnce.Do(func() {
 		driver.Register(
 			logger,
@@ -147,7 +147,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 
 	db.Mapper = reflectx.NewMapperFunc("db", strcase.Snake)
 
-	return icingadb.NewDb(db, logger, &d.Options), nil
+	return database.NewDb(db, logger, &d.Options), nil
 }
 
 // Validate checks constraints in the supplied database configuration and returns an error if they are violated.

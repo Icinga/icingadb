@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/internal/config"
-	"github.com/icinga/icingadb/pkg/icingadb"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/logging"
 	goflags "github.com/jessevdk/go-flags"
@@ -48,7 +48,7 @@ func New() *Command {
 }
 
 // Database creates and returns a new icingadb.DB connection from config.Config.
-func (c Command) Database(l *logging.Logger) (*icingadb.DB, error) {
+func (c Command) Database(l *logging.Logger) (*database.DB, error) {
 	return c.Config.Database.Open(l)
 }
 

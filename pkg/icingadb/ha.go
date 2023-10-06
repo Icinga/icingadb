@@ -37,7 +37,7 @@ type HA struct {
 	ctx           context.Context
 	cancelCtx     context.CancelFunc
 	instanceId    types.Binary
-	db            *DB
+	db            *database.DB
 	environmentMu sync.Mutex
 	environment   *v1.Environment
 	heartbeat     *icingaredis.Heartbeat
@@ -52,7 +52,7 @@ type HA struct {
 }
 
 // NewHA returns a new HA and starts the controller loop.
-func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger *logging.Logger) *HA {
+func NewHA(ctx context.Context, db *database.DB, heartbeat *icingaredis.Heartbeat, logger *logging.Logger) *HA {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
 	instanceId := uuid.New()

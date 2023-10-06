@@ -1,11 +1,10 @@
-package icingadb
+package database
 
 import (
 	"context"
 	"fmt"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
@@ -100,7 +99,7 @@ func (db *DB) BuildColumns(subject interface{}) []string {
 func (db *DB) BuildDeleteStmt(from interface{}) string {
 	return fmt.Sprintf(
 		`DELETE FROM "%s" WHERE id IN (?)`,
-		database.TableName(from),
+		TableName(from),
 	)
 }
 
@@ -110,7 +109,7 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 
 	return fmt.Sprintf(
 		`INSERT INTO "%s" ("%s") VALUES (%s)`,
-		database.TableName(into),
+		TableName(into),
 		strings.Join(columns, `", "`),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 	), len(columns)
@@ -119,7 +118,7 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 // BuildInsertIgnoreStmt returns an INSERT statement for the specified struct for
 // which the database ignores rows that have already been inserted.
 func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
-	table := database.TableName(into)
+	table := TableName(into)
 	columns := db.BuildColumns(into)
 	var clause string
 
@@ -146,10 +145,10 @@ func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
 	q := fmt.Sprintf(
 		`SELECT "%s" FROM "%s"`,
 		strings.Join(db.BuildColumns(columns), `", "`),
-		database.TableName(table),
+		TableName(table),
 	)
 
-	if scoper, ok := table.(database.Scoper); ok {
+	if scoper, ok := table.(Scoper); ok {
 		where, _ := db.BuildWhere(scoper.Scope())
 		q += ` WHERE ` + where
 	}
@@ -168,7 +167,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 
 	return fmt.Sprintf(
 		`UPDATE "%s" SET %s WHERE id = :id`,
-		database.TableName(update),
+		TableName(update),
 		strings.Join(set, ", "),
 	), len(columns) + 1 // +1 because of WHERE id = :id
 }
@@ -176,10 +175,10 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 // BuildUpsertStmt returns an upsert statement for the given struct.
 func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {
 	insertColumns := db.BuildColumns(subject)
-	table := database.TableName(subject)
+	table := TableName(subject)
 	var updateColumns []string
 
-	if upserter, ok := subject.(database.Upserter); ok {
+	if upserter, ok := subject.(Upserter); ok {
 		updateColumns = db.BuildColumns(upserter.Upsert())
 	} else {
 		updateColumns = insertColumns
@@ -286,7 +285,7 @@ func (db *DB) BulkExec(
 							stmt = db.Rebind(stmt)
 							_, err = db.ExecContext(ctx, stmt, args...)
 							if err != nil {
-								return database.CantPerformQuery(err, query)
+								return CantPerformQuery(err, query)
 							}
 
 							counter.Add(uint64(len(b)))
@@ -321,8 +320,8 @@ func (db *DB) BulkExec(
 // and can be executed concurrently to the extent allowed by the semaphore passed in sem.
 // Entities for which the query ran successfully will be passed to onSuccess.
 func (db *DB) NamedBulkExec(
-	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan database.Entity,
-	splitPolicyFactory com.BulkChunkSplitPolicyFactory[database.Entity], onSuccess ...OnSuccess[database.Entity],
+	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan Entity,
+	splitPolicyFactory com.BulkChunkSplitPolicyFactory[Entity], onSuccess ...OnSuccess[Entity],
 ) error {
 	var counter com.Counter
 	defer db.log(ctx, query, &counter).Stop()
@@ -342,7 +341,7 @@ func (db *DB) NamedBulkExec(
 					return errors.Wrap(err, "can't acquire semaphore")
 				}
 
-				g.Go(func(b []database.Entity) func() error {
+				g.Go(func(b []Entity) func() error {
 					return func() error {
 						defer sem.Release(1)
 
@@ -351,7 +350,7 @@ func (db *DB) NamedBulkExec(
 							func(ctx context.Context) error {
 								_, err := db.NamedExecContext(ctx, query, b)
 								if err != nil {
-									return database.CantPerformQuery(err, query)
+									return CantPerformQuery(err, query)
 								}
 
 								counter.Add(uint64(len(b)))
@@ -386,13 +385,13 @@ func (db *DB) NamedBulkExec(
 // The transactions are executed in a separate goroutine with a weighting of 1
 // and can be executed concurrently to the extent allowed by the semaphore passed in sem.
 func (db *DB) NamedBulkExecTx(
-	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan database.Entity,
+	ctx context.Context, query string, count int, sem *semaphore.Weighted, arg <-chan Entity,
 ) error {
 	var counter com.Counter
 	defer db.log(ctx, query, &counter).Stop()
 
 	g, ctx := errgroup.WithContext(ctx)
-	bulk := com.Bulk(ctx, arg, count, com.NeverSplit[database.Entity])
+	bulk := com.Bulk(ctx, arg, count, com.NeverSplit[Entity])
 
 	g.Go(func() error {
 		for {
@@ -406,7 +405,7 @@ func (db *DB) NamedBulkExecTx(
 					return errors.Wrap(err, "can't acquire semaphore")
 				}
 
-				g.Go(func(b []database.Entity) func() error {
+				g.Go(func(b []Entity) func() error {
 					return func() error {
 						defer sem.Release(1)
 
@@ -466,8 +465,8 @@ func (db *DB) BatchSizeByPlaceholders(n int) int {
 // YieldAll executes the query with the supplied scope,
 // scans each resulting row into an entity returned by the factory function,
 // and streams them into a returned channel.
-func (db *DB) YieldAll(ctx context.Context, factoryFunc database.EntityFactoryFunc, query string, scope interface{}) (<-chan database.Entity, <-chan error) {
-	entities := make(chan database.Entity, 1)
+func (db *DB) YieldAll(ctx context.Context, factoryFunc EntityFactoryFunc, query string, scope interface{}) (<-chan Entity, <-chan error) {
+	entities := make(chan Entity, 1)
 	g, ctx := errgroup.WithContext(ctx)
 
 	g.Go(func() error {
@@ -477,7 +476,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc database.EntityFactoryFu
 
 		rows, err := db.NamedQueryContext(ctx, query, scope)
 		if err != nil {
-			return database.CantPerformQuery(err, query)
+			return CantPerformQuery(err, query)
 		}
 		defer rows.Close()
 
@@ -508,19 +507,19 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc database.EntityFactoryFu
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 // Entities for which the query ran successfully will be passed to onSuccess.
 func (db *DB) CreateStreamed(
-	ctx context.Context, entities <-chan database.Entity, onSuccess ...OnSuccess[database.Entity],
+	ctx context.Context, entities <-chan Entity, onSuccess ...OnSuccess[Entity],
 ) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if err != nil {
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
-	sem := db.GetSemaphoreForTable(database.TableName(first))
+	sem := db.GetSemaphoreForTable(TableName(first))
 	stmt, placeholders := db.BuildInsertStmt(first)
 
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
-		forward, com.NeverSplit[database.Entity], onSuccess...,
+		forward, com.NeverSplit[Entity], onSuccess...,
 	)
 }
 
@@ -530,19 +529,19 @@ func (db *DB) CreateStreamed(
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 // Entities for which the query ran successfully will be passed to onSuccess.
 func (db *DB) CreateIgnoreStreamed(
-	ctx context.Context, entities <-chan database.Entity, onSuccess ...OnSuccess[database.Entity],
+	ctx context.Context, entities <-chan Entity, onSuccess ...OnSuccess[Entity],
 ) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if err != nil {
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
-	sem := db.GetSemaphoreForTable(database.TableName(first))
+	sem := db.GetSemaphoreForTable(TableName(first))
 	stmt, placeholders := db.BuildInsertIgnoreStmt(first)
 
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
-		forward, database.SplitOnDupId[database.Entity], onSuccess...,
+		forward, SplitOnDupId[Entity], onSuccess...,
 	)
 }
 
@@ -552,19 +551,19 @@ func (db *DB) CreateIgnoreStreamed(
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 // Entities for which the query ran successfully will be passed to onSuccess.
 func (db *DB) UpsertStreamed(
-	ctx context.Context, entities <-chan database.Entity, onSuccess ...OnSuccess[database.Entity],
+	ctx context.Context, entities <-chan Entity, onSuccess ...OnSuccess[Entity],
 ) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if err != nil {
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
-	sem := db.GetSemaphoreForTable(database.TableName(first))
+	sem := db.GetSemaphoreForTable(TableName(first))
 	stmt, placeholders := db.BuildUpsertStmt(first)
 
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
-		forward, database.SplitOnDupId[database.Entity], onSuccess...,
+		forward, SplitOnDupId[Entity], onSuccess...,
 	)
 }
 
@@ -572,12 +571,12 @@ func (db *DB) UpsertStreamed(
 // The update statement is created using BuildUpdateStmt with the first entity from the entities stream.
 // Bulk size is controlled via Options.MaxRowsPerTransaction and
 // concurrency is controlled via Options.MaxConnectionsPerTable.
-func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan database.Entity) error {
+func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
 	if err != nil {
 		return errors.Wrap(err, "can't copy first entity")
 	}
-	sem := db.GetSemaphoreForTable(database.TableName(first))
+	sem := db.GetSemaphoreForTable(TableName(first))
 	stmt, _ := db.BuildUpdateStmt(first)
 
 	return db.NamedBulkExecTx(ctx, stmt, db.Options.MaxRowsPerTransaction, sem, forward)
@@ -589,9 +588,9 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan database.Entit
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 // IDs for which the query ran successfully will be passed to onSuccess.
 func (db *DB) DeleteStreamed(
-	ctx context.Context, entityType database.Entity, ids <-chan interface{}, onSuccess ...OnSuccess[any],
+	ctx context.Context, entityType Entity, ids <-chan interface{}, onSuccess ...OnSuccess[any],
 ) error {
-	sem := db.GetSemaphoreForTable(database.TableName(entityType))
+	sem := db.GetSemaphoreForTable(TableName(entityType))
 	return db.BulkExec(
 		ctx, db.BuildDeleteStmt(entityType), db.Options.MaxPlaceholdersPerStatement, sem, ids, onSuccess...,
 	)
@@ -601,7 +600,7 @@ func (db *DB) DeleteStreamed(
 // bulk deletes them by passing the channel along with the entityType to DeleteStreamed.
 // IDs for which the query ran successfully will be passed to onSuccess.
 func (db *DB) Delete(
-	ctx context.Context, entityType database.Entity, ids []interface{}, onSuccess ...OnSuccess[any],
+	ctx context.Context, entityType Entity, ids []interface{}, onSuccess ...OnSuccess[any],
 ) error {
 	idsCh := make(chan interface{}, len(ids))
 	for _, id := range ids {
