@@ -2,7 +2,8 @@ package com
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/database"
+	"github.com/icinga/icingadb/pkg/types"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -37,46 +38,40 @@ func ErrgroupReceive(g *errgroup.Group, err <-chan error) {
 }
 
 // CopyFirst asynchronously forwards all items from input to forward and synchronously returns the first item.
-func CopyFirst(
-	ctx context.Context, input <-chan database.Entity,
-) (first database.Entity, forward <-chan database.Entity, err error) {
-	var ok bool
+func CopyFirst[T any](ctx context.Context, input <-chan T) (T, <-chan T, error) {
 	select {
-	case <-ctx.Done():
-		return nil, nil, ctx.Err()
-	case first, ok = <-input:
-	}
+	case first, ok := <-input:
+		if !ok {
+			return types.Zero[T](), nil, errors.New("can't read from closed channel")
+		}
 
-	if !ok {
-		return
-	}
+		// Buffer of one because we receive an entity and send it back immediately.
+		forward := make(chan T, 1)
+		forward <- first
 
-	// Buffer of one because we receive an entity and send it back immediately.
-	fwd := make(chan database.Entity, 1)
-	fwd <- first
+		go func() {
+			defer close(forward)
 
-	forward = fwd
-
-	go func() {
-		defer close(fwd)
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case e, ok := <-input:
-				if !ok {
-					return
-				}
-
+			for {
 				select {
+				case e, ok := <-input:
+					if !ok {
+						return
+					}
+
+					select {
+					case forward <- e:
+					case <-ctx.Done():
+						return
+					}
 				case <-ctx.Done():
 					return
-				case fwd <- e:
 				}
 			}
-		}
-	}()
+		}()
 
-	return
+		return first, forward, nil
+	case <-ctx.Done():
+		return types.Zero[T](), nil, ctx.Err()
+	}
 }

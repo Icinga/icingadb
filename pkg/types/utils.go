@@ -50,3 +50,8 @@ func MarshalJSON(v interface{}) ([]byte, error) {
 func UnmarshalJSON(data []byte, v interface{}) error {
 	return errors.Wrapf(json.Unmarshal(data, v), "can't unmarshal JSON into %T", v)
 }
+
+// Zero returns the zero value for type T.
+func Zero[T any]() T {
+	return *new(T)
+}
