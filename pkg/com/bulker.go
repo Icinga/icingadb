@@ -2,7 +2,6 @@ package com
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/database"
 	"golang.org/x/sync/errgroup"
 	"sync"
 	"time"
@@ -19,25 +18,6 @@ type BulkChunkSplitPolicyFactory[T any] func() BulkChunkSplitPolicy[T]
 // NeverSplit returns a pseudo state machine which never demands splitting.
 func NeverSplit[T any]() BulkChunkSplitPolicy[T] {
 	return neverSplit[T]
-}
-
-// SplitOnDupId returns a state machine which tracks the inputs' IDs.
-// Once an already seen input arrives, it demands splitting.
-func SplitOnDupId[T database.IDer]() BulkChunkSplitPolicy[T] {
-	seenIds := map[string]struct{}{}
-
-	return func(ider T) bool {
-		id := ider.ID().String()
-
-		_, ok := seenIds[id]
-		if ok {
-			seenIds = map[string]struct{}{id: {}}
-		} else {
-			seenIds[id] = struct{}{}
-		}
-
-		return ok
-	}
 }
 
 func neverSplit[T any](T) bool {
@@ -182,6 +162,5 @@ func oneBulk[T any](ctx context.Context, ch <-chan T) <-chan []T {
 }
 
 var (
-	_ BulkChunkSplitPolicyFactory[struct{}]        = NeverSplit[struct{}]
-	_ BulkChunkSplitPolicyFactory[database.Entity] = SplitOnDupId[database.Entity]
+	_ BulkChunkSplitPolicyFactory[struct{}] = NeverSplit[struct{}]
 )

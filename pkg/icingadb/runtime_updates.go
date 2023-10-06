@@ -118,7 +118,7 @@ func (r *RuntimeUpdates) Sync(
 			}
 
 			return r.db.NamedBulkExec(
-				ctx, upsertStmt, upsertCount, sem, upsertEntities, com.SplitOnDupId[database.Entity], onSuccess...,
+				ctx, upsertStmt, upsertCount, sem, upsertEntities, database.SplitOnDupId[database.Entity], onSuccess...,
 			)
 		})
 
@@ -176,7 +176,7 @@ func (r *RuntimeUpdates) Sync(
 			sem := semaphore.NewWeighted(1)
 
 			return r.db.NamedBulkExec(
-				ctx, cvStmt, cvCount, sem, customvars, com.SplitOnDupId[database.Entity],
+				ctx, cvStmt, cvCount, sem, customvars, database.SplitOnDupId[database.Entity],
 				OnSuccessIncrement[database.Entity](&counter),
 				OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
 			)
@@ -197,7 +197,7 @@ func (r *RuntimeUpdates) Sync(
 
 			return r.db.NamedBulkExec(
 				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars,
-				com.SplitOnDupId[database.Entity], OnSuccessIncrement[database.Entity](&counter),
+				database.SplitOnDupId[database.Entity], OnSuccessIncrement[database.Entity](&counter),
 				OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
 			)
 		})

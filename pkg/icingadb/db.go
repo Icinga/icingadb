@@ -542,7 +542,7 @@ func (db *DB) CreateIgnoreStreamed(
 
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
-		forward, com.SplitOnDupId[database.Entity], onSuccess...,
+		forward, database.SplitOnDupId[database.Entity], onSuccess...,
 	)
 }
 
@@ -564,7 +564,7 @@ func (db *DB) UpsertStreamed(
 
 	return db.NamedBulkExec(
 		ctx, stmt, db.BatchSizeByPlaceholders(placeholders), sem,
-		forward, com.SplitOnDupId[database.Entity], onSuccess...,
+		forward, database.SplitOnDupId[database.Entity], onSuccess...,
 	)
 }
 
