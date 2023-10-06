@@ -3,6 +3,7 @@ package icingadb
 import (
 	"context"
 	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
@@ -119,7 +120,5 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 // checksumsMatch returns whether the checksums of two entities are the same.
 // Both entities must implement contracts.Checksumer.
 func checksumsMatch(a, b database.Entity) bool {
-	c1 := a.(contracts.Checksumer).Checksum()
-	c2 := b.(contracts.Checksumer).Checksum()
-	return c1.Equal(c2)
+	return cmp.Equal(a.(contracts.Checksumer).Checksum(), b.(contracts.Checksumer).Checksum())
 }
