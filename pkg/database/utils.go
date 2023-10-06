@@ -2,7 +2,7 @@ package database
 
 import (
 	"github.com/icinga/icingadb/pkg/strcase"
-	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/icinga/icingadb/pkg/types"
 	"github.com/pkg/errors"
 )
 
@@ -16,6 +16,6 @@ func TableName(t interface{}) string {
 	if tn, ok := t.(TableNamer); ok {
 		return tn.TableName()
 	} else {
-		return strcase.Snake(utils.Name(t))
+		return strcase.Snake(types.Name(t))
 	}
 }

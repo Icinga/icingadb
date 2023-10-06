@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/strcase"
+	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
@@ -212,7 +213,7 @@ func (c *Client) XReadUntilResult(ctx context.Context, a *redis.XReadArgs) ([]re
 
 // YieldAll yields all entities from Redis that belong to the specified SyncSubject.
 func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-chan database.Entity, <-chan error) {
-	key := strcase.Delimited(utils.Name(subject.Entity()), ':')
+	key := strcase.Delimited(types.Name(subject.Entity()), ':')
 	if subject.WithChecksum() {
 		key = "icinga:checksum:" + key
 	} else {
