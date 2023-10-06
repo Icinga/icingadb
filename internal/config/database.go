@@ -5,6 +5,7 @@ import (
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/jmoiron/sqlx"
@@ -36,7 +37,15 @@ type Database struct {
 // calls sqlx.Open, but returns *icingadb.DB.
 func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 	registerDriverOnce.Do(func() {
-		driver.Register(logger)
+		driver.Register(
+			logger,
+			driver.WithOnError(func(_ time.Duration, _ uint64, err, _ error) {
+				telemetry.UpdateCurrentDbConnErr(err)
+			}),
+			driver.WithOnSuccess(func(_ time.Duration, _ uint64, _ error) {
+				telemetry.UpdateCurrentDbConnErr(nil)
+			}),
+		)
 	})
 
 	var dsn string

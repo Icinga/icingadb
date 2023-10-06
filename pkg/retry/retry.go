@@ -19,14 +19,20 @@ type RetryableFunc func(context.Context) error
 // IsRetryable checks whether a new attempt can be started based on the error passed.
 type IsRetryable func(error) bool
 
+// OnErrorFunc is called if an error occurs.
+type OnErrorFunc func(elapsed time.Duration, attempt uint64, err, lastErr error)
+
+// OnSuccessFunc is called once the operation succeeds.
+type OnSuccessFunc func(elapsed time.Duration, attempt uint64, lastErr error)
+
 // Settings aggregates optional settings for WithBackoff.
 type Settings struct {
 	// Timeout lets WithBackoff give up once elapsed (if >0).
 	Timeout time.Duration
 	// OnError is called if an error occurs.
-	OnError func(elapsed time.Duration, attempt uint64, err, lastErr error)
+	OnError OnErrorFunc
 	// OnSuccess is called once the operation succeeds.
-	OnSuccess func(elapsed time.Duration, attempt uint64, lastErr error)
+	OnSuccess OnSuccessFunc
 }
 
 // WithBackoff retries the passed function if it fails and the error allows it to retry.
