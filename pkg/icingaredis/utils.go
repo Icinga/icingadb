@@ -72,7 +72,7 @@ func CreateEntities(ctx context.Context, factoryFunc database.EntityFactoryFunc,
 		return g.Wait()
 	})
 
-	return entities, com.WaitAsync(g)
+	return entities, com.WaitAsync(ctx, g)
 }
 
 // SetChecksums concurrently streams from the given entities and
@@ -110,7 +110,7 @@ func SetChecksums(ctx context.Context, entities <-chan database.Entity, checksum
 		return g.Wait()
 	})
 
-	return entitiesWithChecksum, com.WaitAsync(g)
+	return entitiesWithChecksum, com.WaitAsync(ctx, g)
 }
 
 // WrapCmdErr adds the command itself and

@@ -77,7 +77,7 @@ type HPair struct {
 func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan error) {
 	pairs := make(chan HPair, c.Options.HScanCount)
 
-	return pairs, com.WaitAsync(com.WaiterFunc(func() error {
+	return pairs, com.WaitAsync(ctx, com.WaiterFunc(func() error {
 		var counter com.Counter
 		defer c.log(ctx, key, &counter).Stop()
 		defer close(pairs)
@@ -128,7 +128,7 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-chan HPair, <-chan error) {
 	pairs := make(chan HPair)
 
-	return pairs, com.WaitAsync(com.WaiterFunc(func() error {
+	return pairs, com.WaitAsync(ctx, com.WaiterFunc(func() error {
 		var counter com.Counter
 		defer c.log(ctx, key, &counter).Stop()
 
@@ -228,7 +228,7 @@ func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-ch
 	// Let errors from CreateEntities cancel the group.
 	com.ErrgroupReceive(g, errs)
 
-	return desired, com.WaitAsync(g)
+	return desired, com.WaitAsync(ctx, g)
 }
 
 func (c *Client) log(ctx context.Context, key string, counter *com.Counter) periodic.Stopper {

@@ -499,7 +499,7 @@ func (db *DB) YieldAll(ctx context.Context, factoryFunc database.EntityFactoryFu
 		return nil
 	})
 
-	return entities, com.WaitAsync(g)
+	return entities, com.WaitAsync(ctx, g)
 }
 
 // CreateStreamed bulk creates the specified entities via NamedBulkExec.

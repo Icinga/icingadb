@@ -48,7 +48,7 @@ func ExpandCustomvars(
 	var forward chan database.Entity
 	customvars, forward = multiplexCvs(ctx, g, cvs)
 	flatCustomvars = flattenCustomvars(ctx, g, forward)
-	errs = com.WaitAsync(g)
+	errs = com.WaitAsync(ctx, g)
 
 	return
 }
