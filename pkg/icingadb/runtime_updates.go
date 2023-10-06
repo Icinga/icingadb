@@ -160,7 +160,7 @@ func (r *RuntimeUpdates) Sync(
 		))
 
 		customvars, flatCustomvars, errs := v1.ExpandCustomvars(ctx, upsertEntities)
-		com.ErrgroupReceive(g, errs)
+		com.ErrgroupReceive(ctx, g, errs)
 
 		cvStmt, cvPlaceholders := r.db.BuildUpsertStmt(cv.Entity())
 		cvCount := r.db.BatchSizeByPlaceholders(cvPlaceholders)

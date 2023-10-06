@@ -30,13 +30,18 @@ func WaitAsync(ctx context.Context, w Waiter) <-chan error {
 // ErrgroupReceive adds a goroutine to the specified group that
 // returns the first non-nil error (if any) from the specified channel.
 // If the channel is closed, it will return nil.
-func ErrgroupReceive(g *errgroup.Group, err <-chan error) {
+func ErrgroupReceive(ctx context.Context, g *errgroup.Group, err <-chan error) {
 	g.Go(func() error {
-		if e := <-err; e != nil {
-			return e
-		}
+		select {
+		case e, closed := <-err:
+			if closed {
+				return nil
+			}
 
-		return nil
+			return e
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	})
 }
 

@@ -77,7 +77,7 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 
 	desired, redisErrs := s.redis.YieldAll(ctx, subject)
 	// Let errors from Redis cancel our group.
-	com.ErrgroupReceive(g, redisErrs)
+	com.ErrgroupReceive(ctx, g, redisErrs)
 
 	e, ok := v1.EnvironmentFromContext(ctx)
 	if !ok {
@@ -89,7 +89,7 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 		s.db.BuildSelectStmt(NewScopedEntity(subject.Entity(), e.Meta()), subject.Entity().Fingerprint()), e.Meta(),
 	)
 	// Let errors from DB cancel our group.
-	com.ErrgroupReceive(g, dbErrs)
+	com.ErrgroupReceive(ctx, g, dbErrs)
 
 	g.Go(func() error {
 		return s.ApplyDelta(ctx, NewDelta(ctx, actual, desired, subject, s.logger))
@@ -117,14 +117,14 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 				fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
 				delta.Create.Keys()...)
 			// Let errors from Redis cancel our group.
-			com.ErrgroupReceive(g, errs)
+			com.ErrgroupReceive(ctx, g, errs)
 
 			entitiesWithoutChecksum, errs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, runtime.NumCPU())
 			// Let errors from CreateEntities cancel our group.
-			com.ErrgroupReceive(g, errs)
+			com.ErrgroupReceive(ctx, g, errs)
 			entities, errs = icingaredis.SetChecksums(ctx, entitiesWithoutChecksum, delta.Create, runtime.NumCPU())
 			// Let errors from SetChecksums cancel our group.
-			com.ErrgroupReceive(g, errs)
+			com.ErrgroupReceive(ctx, g, errs)
 		} else {
 			entities = delta.Create.Entities(ctx)
 		}
@@ -142,14 +142,14 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 			fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
 			delta.Update.Keys()...)
 		// Let errors from Redis cancel our group.
-		com.ErrgroupReceive(g, errs)
+		com.ErrgroupReceive(ctx, g, errs)
 
 		entitiesWithoutChecksum, errs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, runtime.NumCPU())
 		// Let errors from CreateEntities cancel our group.
-		com.ErrgroupReceive(g, errs)
+		com.ErrgroupReceive(ctx, g, errs)
 		entities, errs := icingaredis.SetChecksums(ctx, entitiesWithoutChecksum, delta.Update, runtime.NumCPU())
 		// Let errors from SetChecksums cancel our group.
-		com.ErrgroupReceive(g, errs)
+		com.ErrgroupReceive(ctx, g, errs)
 
 		g.Go(func() error {
 			// Using upsert here on purpose as this is the fastest way to do bulk updates.
@@ -181,16 +181,16 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	cv := common.NewSyncSubject(v1.NewCustomvar)
 
 	cvs, errs := s.redis.YieldAll(ctx, cv)
-	com.ErrgroupReceive(g, errs)
+	com.ErrgroupReceive(ctx, g, errs)
 
 	desiredCvs, desiredFlatCvs, errs := v1.ExpandCustomvars(ctx, cvs)
-	com.ErrgroupReceive(g, errs)
+	com.ErrgroupReceive(ctx, g, errs)
 
 	actualCvs, errs := s.db.YieldAll(
 		ctx, cv.FactoryForDelta(),
 		s.db.BuildSelectStmt(NewScopedEntity(cv.Entity(), e.Meta()), cv.Entity().Fingerprint()), e.Meta(),
 	)
-	com.ErrgroupReceive(g, errs)
+	com.ErrgroupReceive(ctx, g, errs)
 
 	g.Go(func() error {
 		return s.ApplyDelta(ctx, NewDelta(ctx, actualCvs, desiredCvs, cv, s.logger))
@@ -202,7 +202,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 		ctx, flatCv.FactoryForDelta(),
 		s.db.BuildSelectStmt(NewScopedEntity(flatCv.Entity(), e.Meta()), flatCv.Entity().Fingerprint()), e.Meta(),
 	)
-	com.ErrgroupReceive(g, errs)
+	com.ErrgroupReceive(ctx, g, errs)
 
 	g.Go(func() error {
 		return s.ApplyDelta(ctx, NewDelta(ctx, actualFlatCvs, desiredFlatCvs, flatCv, s.logger))
