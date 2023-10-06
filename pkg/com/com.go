@@ -2,7 +2,6 @@ package com
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
 	"golang.org/x/sync/errgroup"
 )
@@ -10,7 +9,7 @@ import (
 // WaitAsync calls Wait() on the passed Waiter in a new goroutine and
 // sends the first non-nil error (if any) to the returned channel.
 // The returned channel is always closed when the Waiter is done.
-func WaitAsync(w contracts.Waiter) <-chan error {
+func WaitAsync(w Waiter) <-chan error {
 	errs := make(chan error, 1)
 
 	go func() {
