@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
+	"github.com/icinga/icingadb/pkg/types"
 	"github.com/pkg/errors"
 )
 
@@ -12,21 +13,21 @@ type NotificationTypes uint16
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (nt *NotificationTypes) UnmarshalJSON(data []byte) error {
-	var types []string
-	if err := UnmarshalJSON(data, &types); err != nil {
+	var names []string
+	if err := types.UnmarshalJSON(data, &names); err != nil {
 		return err
 	}
 
-	var n NotificationTypes
-	for _, typ := range types {
-		if v, ok := notificationTypeNames[typ]; ok {
-			n |= v
+	var v NotificationTypes
+	for _, name := range names {
+		if i, ok := notificationTypeMap[name]; ok {
+			v |= i
 		} else {
 			return badNotificationTypes(nt)
 		}
 	}
 
-	*nt = n
+	*nt = v
 	return nil
 }
 
@@ -49,8 +50,8 @@ func badNotificationTypes(t interface{}) error {
 	return errors.Errorf("bad notification types: %#v", t)
 }
 
-// notificationTypeNames maps all valid NotificationTypes values to their SQL representation.
-var notificationTypeNames = map[string]NotificationTypes{
+// notificationTypeMap maps all valid NotificationTypes values to their SQL representation.
+var notificationTypeMap = map[string]NotificationTypes{
 	"DowntimeStart":   1,
 	"DowntimeEnd":     2,
 	"DowntimeRemoved": 4,
@@ -64,12 +65,12 @@ var notificationTypeNames = map[string]NotificationTypes{
 
 // allNotificationTypes is the largest valid NotificationTypes value.
 var allNotificationTypes = func() NotificationTypes {
-	var nt NotificationTypes
-	for _, v := range notificationTypeNames {
-		nt |= v
+	var all NotificationTypes
+	for _, i := range notificationTypeMap {
+		all |= i
 	}
 
-	return nt
+	return all
 }()
 
 // Assert interface compliance.

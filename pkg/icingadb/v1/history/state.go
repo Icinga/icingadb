@@ -2,24 +2,25 @@ package history
 
 import (
 	"github.com/icinga/icingadb/pkg/database"
+	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
 type StateHistory struct {
 	HistoryTableEntity `json:",inline"`
 	HistoryTableMeta   `json:",inline"`
-	EventTime          types.UnixMilli `json:"event_time"`
-	StateType          types.StateType `json:"state_type"`
-	SoftState          uint8           `json:"soft_state"`
-	HardState          uint8           `json:"hard_state"`
-	PreviousSoftState  uint8           `json:"previous_soft_state"`
-	PreviousHardState  uint8           `json:"previous_hard_state"`
-	CheckAttempt       uint8           `json:"check_attempt"`
-	Output             types.String    `json:"output"`
-	LongOutput         types.String    `json:"long_output"`
-	MaxCheckAttempts   uint32          `json:"max_check_attempts"`
-	CheckSource        types.String    `json:"check_source"`
-	SchedulingSource   types.String    `json:"scheduling_source"`
+	EventTime          types.UnixMilli         `json:"event_time"`
+	StateType          icingadbTypes.StateType `json:"state_type"`
+	SoftState          uint8                   `json:"soft_state"`
+	HardState          uint8                   `json:"hard_state"`
+	PreviousSoftState  uint8                   `json:"previous_soft_state"`
+	PreviousHardState  uint8                   `json:"previous_hard_state"`
+	CheckAttempt       uint8                   `json:"check_attempt"`
+	Output             types.String            `json:"output"`
+	LongOutput         types.String            `json:"long_output"`
+	MaxCheckAttempts   uint32                  `json:"max_check_attempts"`
+	CheckSource        types.String            `json:"check_source"`
+	SchedulingSource   types.String            `json:"scheduling_source"`
 }
 
 type HistoryState struct {
@@ -36,10 +37,10 @@ func (*HistoryState) TableName() string {
 type SlaHistoryState struct {
 	HistoryTableEntity `json:",inline"`
 	HistoryTableMeta   `json:",inline"`
-	EventTime          types.UnixMilli `json:"event_time"`
-	StateType          types.StateType `json:"state_type" db:"-"`
-	HardState          uint8           `json:"hard_state"`
-	PreviousHardState  uint8           `json:"previous_hard_state"`
+	EventTime          types.UnixMilli         `json:"event_time"`
+	StateType          icingadbTypes.StateType `json:"state_type" db:"-"`
+	HardState          uint8                   `json:"hard_state"`
+	PreviousHardState  uint8                   `json:"previous_hard_state"`
 }
 
 // Assert interface compliance.
