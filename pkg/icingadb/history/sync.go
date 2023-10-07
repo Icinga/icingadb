@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
 	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
@@ -174,7 +175,14 @@ type stageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMe
 // For each history event it receives, it parses that event into a new instance of that entity type and writes it to
 // the database. It writes exactly one entity to the database for each history event.
 func writeOneEntityStage(structPtr interface{}) stageFunc {
-	structifier := structify.MakeMapStructifier(reflect.TypeOf(structPtr).Elem(), "json")
+	structifier := structify.MakeMapStructifier(
+		reflect.TypeOf(structPtr).Elem(),
+		"json",
+		func(a any) {
+			if initer, ok := a.(contracts.Initer); ok {
+				initer.Init()
+			}
+		})
 
 	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
 		ptr, err := structifier(entry.Values)
@@ -310,7 +318,14 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 		UserIds       types.String `structify:"users_notified_ids"`
 	}
 
-	structifier := structify.MakeMapStructifier(reflect.TypeOf((*NotificationHistory)(nil)).Elem(), "structify")
+	structifier := structify.MakeMapStructifier(
+		reflect.TypeOf((*NotificationHistory)(nil)).Elem(),
+		"structify",
+		func(a any) {
+			if initer, ok := a.(contracts.Initer); ok {
+				initer.Init()
+			}
+		})
 
 	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
 		rawNotificationHistory, err := structifier(entry.Values)
