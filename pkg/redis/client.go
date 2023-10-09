@@ -1,20 +1,20 @@
-package icingaredis
+package redis
 
 import (
 	"context"
+	"crypto/tls"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/common"
-	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
-	"github.com/icinga/icingadb/pkg/strcase"
-	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
-	"runtime"
+	"net"
 	"time"
 )
 
@@ -34,6 +34,7 @@ type Options struct {
 	HMGetCount          int           `yaml:"hmget_count"           default:"4096"`
 	HScanCount          int           `yaml:"hscan_count"           default:"4096"`
 	MaxHMGetConnections int           `yaml:"max_hmget_connections" default:"8"`
+	MinPoolSize         int           `yaml:"min_pool_size"         default:"32"`
 	Timeout             time.Duration `yaml:"timeout"               default:"30s"`
 	XReadCount          int           `yaml:"xread_count"           default:"4096"`
 }
@@ -49,6 +50,9 @@ func (o *Options) Validate() error {
 	if o.HScanCount < 1 {
 		return errors.New("hscan_count must be at least 1")
 	}
+	if o.MinPoolSize < 1 {
+		return errors.New("min_pool_size must be at least 1")
+	}
 	if o.MaxHMGetConnections < 1 {
 		return errors.New("max_hmget_connections must be at least 1")
 	}
@@ -62,9 +66,50 @@ func (o *Options) Validate() error {
 	return nil
 }
 
-// NewClient returns a new icingaredis.Client wrapper for a pre-existing *redis.Client.
+// NewClient returns a new Client wrapper for a pre-existing redis.Client.
 func NewClient(client *redis.Client, logger *logging.Logger, options *Options) *Client {
 	return &Client{Client: client, logger: logger, Options: options}
+}
+
+// NewClientFromConfig returns a new Client from Config.
+func NewClientFromConfig(c *Config, logger *logging.Logger) (*Client, error) {
+	tlsConfig, err := c.TlsOptions.MakeConfig(c.Host)
+	if err != nil {
+		return nil, err
+	}
+
+	var dialer ctxDialerFunc
+	dl := &net.Dialer{Timeout: 15 * time.Second}
+
+	if tlsConfig == nil {
+		dialer = dl.DialContext
+	} else {
+		dialer = (&tls.Dialer{NetDialer: dl, Config: tlsConfig}).DialContext
+	}
+
+	options := &redis.Options{
+		Dialer:      dialWithLogging(dialer, logger),
+		Password:    c.Password,
+		DB:          0, // Use default DB,
+		ReadTimeout: c.Options.Timeout,
+		TLSConfig:   tlsConfig,
+	}
+
+	if utils.IsUnixAddr(c.Host) {
+		options.Network = "unix"
+		options.Addr = c.Host
+	} else {
+		options.Network = "tcp"
+		options.Addr = utils.JoinHostPort(c.Host, c.Port)
+	}
+
+	client := redis.NewClient(options)
+	options = client.Options()
+	options.PoolSize = utils.MaxInt(c.Options.MinPoolSize, options.PoolSize)
+	options.MaxRetries = options.PoolSize + 1 // https://github.com/go-redis/redis/issues/1737
+	client = redis.NewClient(options)
+
+	return NewClient(client, logger, &c.Options), nil
 }
 
 // HPair defines Redis hashes field-value pairs.
@@ -210,27 +255,6 @@ func (c *Client) XReadUntilResult(ctx context.Context, a *redis.XReadArgs) ([]re
 	}
 }
 
-// YieldAll yields all entities from Redis that belong to the specified SyncSubject.
-func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-chan database.Entity, <-chan error) {
-	key := strcase.Delimited(types.Name(subject.Entity()), ':')
-	if subject.WithChecksum() {
-		key = "icinga:checksum:" + key
-	} else {
-		key = "icinga:" + key
-	}
-
-	pairs, errs := c.HYield(ctx, key)
-	g, ctx := errgroup.WithContext(ctx)
-	// Let errors from HYield cancel the group.
-	com.ErrgroupReceive(ctx, g, errs)
-
-	desired, errs := CreateEntities(ctx, subject.FactoryForDelta(), pairs, runtime.NumCPU())
-	// Let errors from CreateEntities cancel the group.
-	com.ErrgroupReceive(ctx, g, errs)
-
-	return desired, com.WaitAsync(ctx, g)
-}
-
 func (c *Client) log(ctx context.Context, key string, counter *com.Counter) periodic.Stopper {
 	return periodic.Start(ctx, c.logger.Interval(), func(tick periodic.Tick) {
 		// We may never get to progress logging here,
@@ -242,4 +266,41 @@ func (c *Client) log(ctx context.Context, key string, counter *com.Counter) peri
 	}, periodic.OnStop(func(tick periodic.Tick) {
 		c.logger.Debugf("Finished fetching from %s with %d items in %s", key, counter.Total(), tick.Elapsed)
 	}))
+}
+
+type ctxDialerFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
+
+// dialWithLogging returns a Config Dialer with logging capabilities.
+func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc {
+	// dial behaves like net.Dialer#DialContext,
+	// but re-tries on common errors that are considered retryable.
+	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
+		err = retry.WithBackoff(
+			ctx,
+			func(ctx context.Context) (err error) {
+				conn, err = dialer(ctx, network, addr)
+				return
+			},
+			retry.Retryable,
+			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+			retry.Settings{
+				Timeout: 5 * time.Minute,
+				OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+					if lastErr == nil || err.Error() != lastErr.Error() {
+						logger.Warnw("Can't connect to Redis. Retrying", zap.Error(err))
+					}
+				},
+				OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
+					if attempt > 0 {
+						logger.Infow("Reconnected to Redis",
+							zap.Duration("after", elapsed), zap.Uint64("attempts", attempt+1))
+					}
+				},
+			},
+		)
+
+		err = errors.Wrap(err, "can't connect to Redis")
+
+		return
+	}
 }

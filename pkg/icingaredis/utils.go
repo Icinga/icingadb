@@ -2,39 +2,22 @@ package icingaredis
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
+	"github.com/icinga/icingadb/pkg/redis"
+	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
+	"runtime"
 )
-
-// Streams represents a Redis stream key to ID mapping.
-type Streams map[string]string
-
-// Option returns the Redis stream key to ID mapping
-// as a slice of stream keys followed by their IDs
-// that is compatible for the Redis STREAMS option.
-func (s Streams) Option() []string {
-	// len*2 because we're appending the IDs later.
-	streams := make([]string, 0, len(s)*2)
-	ids := make([]string, 0, len(s))
-
-	for key, id := range s {
-		streams = append(streams, key)
-		ids = append(ids, id)
-	}
-
-	return append(streams, ids...)
-}
 
 // CreateEntities streams and creates entities from the
 // given Redis field value pairs using the specified factory function,
 // and streams them on a returned channel.
-func CreateEntities(ctx context.Context, factoryFunc database.EntityFactoryFunc, pairs <-chan HPair, concurrent int) (<-chan database.Entity, <-chan error) {
+func CreateEntities(ctx context.Context, factoryFunc database.EntityFactoryFunc, pairs <-chan redis.HPair, concurrent int) (<-chan database.Entity, <-chan error) {
 	entities := make(chan database.Entity)
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -113,16 +96,23 @@ func SetChecksums(ctx context.Context, entities <-chan database.Entity, checksum
 	return entitiesWithChecksum, com.WaitAsync(ctx, g)
 }
 
-// WrapCmdErr adds the command itself and
-// the stack of the current goroutine to the command's error if any.
-func WrapCmdErr(cmd redis.Cmder) error {
-	err := cmd.Err()
-	if err != nil {
-		err = errors.Wrapf(err, "can't perform %q", utils.Ellipsize(
-			redis.NewCmd(context.Background(), cmd.Args()).String(), // Omits error in opposite to cmd.String()
-			100,
-		))
+// YieldAll yields all entities from Redis that belong to the specified SyncSubject.
+func YieldAll(ctx context.Context, c *redis.Client, subject *common.SyncSubject) (<-chan database.Entity, <-chan error) {
+	key := strcase.Delimited(types.Name(subject.Entity()), ':')
+	if subject.WithChecksum() {
+		key = "icinga:checksum:" + key
+	} else {
+		key = "icinga:" + key
 	}
 
-	return err
+	pairs, errs := c.HYield(ctx, key)
+	g, ctx := errgroup.WithContext(ctx)
+	// Let errors from HYield cancel the group.
+	com.ErrgroupReceive(ctx, g, errs)
+
+	desired, errs := CreateEntities(ctx, subject.FactoryForDelta(), pairs, runtime.NumCPU())
+	// Let errors from CreateEntities cancel the group.
+	com.ErrgroupReceive(ctx, g, errs)
+
+	return desired, com.WaitAsync(ctx, g)
 }

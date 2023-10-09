@@ -2,9 +2,9 @@ package icingadb
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
-	"github.com/icinga/icingadb/pkg/icingaredis"
+	goredis "github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"
@@ -13,7 +13,7 @@ import (
 // DumpSignals reads dump signals from a Redis stream via Listen.
 // Dump-done signals are passed on via Done channels, while InProgress must be checked for dump-wip signals.
 type DumpSignals struct {
-	redis        *icingaredis.Client
+	redis        *redis.Client
 	logger       *logging.Logger
 	mutex        sync.Mutex
 	doneCh       map[string]chan struct{}
@@ -22,7 +22,7 @@ type DumpSignals struct {
 }
 
 // NewDumpSignals returns new DumpSignals.
-func NewDumpSignals(redis *icingaredis.Client, logger *logging.Logger) *DumpSignals {
+func NewDumpSignals(redis *redis.Client, logger *logging.Logger) *DumpSignals {
 	return &DumpSignals{
 		redis:        redis,
 		logger:       logger,
@@ -61,7 +61,7 @@ func (s *DumpSignals) Listen(ctx context.Context) error {
 			return errors.Wrap(err, "can't listen for dump signals")
 		}
 
-		streams, err := s.redis.XReadUntilResult(ctx, &redis.XReadArgs{
+		streams, err := s.redis.XReadUntilResult(ctx, &goredis.XReadArgs{
 			Streams: []string{"icinga:dump", lastStreamId},
 		})
 		if err != nil {

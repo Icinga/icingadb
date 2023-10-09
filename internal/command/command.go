@@ -6,8 +6,8 @@ import (
 	icingadbconfig "github.com/icinga/icingadb/internal/config"
 	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icingadb/pkg/redis"
 	goflags "github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"os"
@@ -54,6 +54,6 @@ func (c Command) Database(l *logging.Logger) (*database.DB, error) {
 }
 
 // Redis creates and returns a new icingaredis.Client connection from config.Config.
-func (c Command) Redis(l *logging.Logger) (*icingaredis.Client, error) {
-	return c.Config.Redis.NewClient(l)
+func (c Command) Redis(l *logging.Logger) (*redis.Client, error) {
+	return redis.NewClientFromConfig(&c.Config.Redis, l)
 }

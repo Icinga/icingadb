@@ -2,9 +2,10 @@ package icingaredis
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
+	goredis "github.com/go-redis/redis/v8"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
 	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
@@ -26,7 +27,7 @@ type Heartbeat struct {
 	events         chan *HeartbeatMessage
 	lastReceivedMs int64
 	cancelCtx      context.CancelFunc
-	client         *Client
+	client         *redis.Client
 	done           chan struct{}
 	errMu          sync.Mutex
 	err            error
@@ -34,7 +35,7 @@ type Heartbeat struct {
 }
 
 // NewHeartbeat returns a new Heartbeat and starts the heartbeat controller loop.
-func NewHeartbeat(ctx context.Context, client *Client, logger *logging.Logger) *Heartbeat {
+func NewHeartbeat(ctx context.Context, client *redis.Client, logger *logging.Logger) *Heartbeat {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
 	heartbeat := &Heartbeat{
@@ -100,7 +101,7 @@ func (h *Heartbeat) controller(ctx context.Context) {
 		defer throttle.Stop()
 
 		for id := "$"; ; {
-			streams, err := h.client.XReadUntilResult(ctx, &redis.XReadArgs{
+			streams, err := h.client.XReadUntilResult(ctx, &goredis.XReadArgs{
 				Streams: []string{"icinga:stats", id},
 			})
 			if err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/pkg/errors"
@@ -22,12 +23,12 @@ import (
 // Sync implements a rendezvous point for Icinga DB and Redis to synchronize their entities.
 type Sync struct {
 	db     *database.DB
-	redis  *icingaredis.Client
+	redis  *redis.Client
 	logger *logging.Logger
 }
 
 // NewSync returns a new Sync.
-func NewSync(db *database.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -75,7 +76,7 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 	g, ctx := errgroup.WithContext(ctx)
 
-	desired, redisErrs := s.redis.YieldAll(ctx, subject)
+	desired, redisErrs := icingaredis.YieldAll(ctx, s.redis, subject)
 	// Let errors from Redis cancel our group.
 	com.ErrgroupReceive(ctx, g, redisErrs)
 
@@ -180,7 +181,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 
 	cv := common.NewSyncSubject(v1.NewCustomvar)
 
-	cvs, errs := s.redis.YieldAll(ctx, cv)
+	cvs, errs := icingaredis.YieldAll(ctx, s.redis, cv)
 	com.ErrgroupReceive(ctx, g, errs)
 
 	desiredCvs, desiredFlatCvs, errs := v1.ExpandCustomvars(ctx, cvs)

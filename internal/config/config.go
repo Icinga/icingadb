@@ -4,6 +4,7 @@ import (
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/pkg/errors"
 	"time"
 )
@@ -11,7 +12,7 @@ import (
 // Config defines Icinga DB config.
 type Config struct {
 	Database  database.Config `yaml:"database"`
-	Redis     Redis           `yaml:"redis"`
+	Redis     redis.Config    `yaml:"redis"`
 	Logging   logging.Config  `yaml:"logging"`
 	Retention RetentionConfig `yaml:"retention"`
 }

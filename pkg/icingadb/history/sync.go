@@ -2,16 +2,16 @@ package history
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
+	goredis "github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
 	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
-	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
+	redis "github.com/icinga/icingadb/pkg/redis"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
@@ -24,12 +24,12 @@ import (
 // Sync specifies the source and destination of a history sync.
 type Sync struct {
 	db     *database.DB
-	redis  *icingaredis.Client
+	redis  *redis.Client
 	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *database.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -47,7 +47,7 @@ func (s Sync) Sync(ctx context.Context) error {
 
 		s.logger.Debugf("Starting %s history sync", key)
 
-		// The pipeline consists of n+2 stages connected sequentially using n+1 channels of type chan redis.XMessage,
+		// The pipeline consists of n+2 stages connected sequentially using n+1 channels of type chan goredis.XMessage,
 		// where n = len(pipeline), i.e. the number of actual sync stages. So the resulting pipeline looks like this:
 		//
 		//     readFromRedis()    Reads from redis and sends the history entries to the next stage
@@ -67,14 +67,14 @@ func (s Sync) Sync(ctx context.Context) error {
 		// forward the entry after it has completed its own sync so that later stages can rely on previous stages being
 		// executed successfully.
 
-		ch := make([]chan redis.XMessage, len(pipeline)+1)
+		ch := make([]chan goredis.XMessage, len(pipeline)+1)
 		for i := range ch {
 			if i == 0 {
 				// Make the first channel buffered so that all items of one read iteration fit into the channel.
 				// This allows starting the next Redis XREAD right after the previous one has finished.
-				ch[i] = make(chan redis.XMessage, s.redis.Options.XReadCount)
+				ch[i] = make(chan goredis.XMessage, s.redis.Options.XReadCount)
 			} else {
-				ch[i] = make(chan redis.XMessage)
+				ch[i] = make(chan goredis.XMessage)
 			}
 		}
 
@@ -101,10 +101,10 @@ func (s Sync) Sync(ctx context.Context) error {
 
 // readFromRedis is the first stage of the history sync pipeline. It reads the history stream from Redis
 // and feeds the history entries into the next stage.
-func (s Sync) readFromRedis(ctx context.Context, key string, output chan<- redis.XMessage) error {
+func (s Sync) readFromRedis(ctx context.Context, key string, output chan<- goredis.XMessage) error {
 	defer close(output)
 
-	xra := &redis.XReadArgs{
+	xra := &goredis.XReadArgs{
 		Streams: []string{"icinga:history:stream:" + key, "0-0"},
 		Count:   int64(s.redis.Options.XReadCount),
 	}
@@ -131,7 +131,7 @@ func (s Sync) readFromRedis(ctx context.Context, key string, output chan<- redis
 
 // deleteFromRedis is the last stage of the history sync pipeline. It receives history entries from the second to last
 // pipeline stage and then deletes the stream entry from Redis as all pipeline stages successfully processed the entry.
-func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redis.XMessage) error {
+func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan goredis.XMessage) error {
 	var counter com.Counter
 	defer periodic.Start(ctx, s.logger.Interval(), func(_ periodic.Tick) {
 		if count := counter.Reset(); count > 0 {
@@ -139,7 +139,7 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 		}
 	}).Stop()
 
-	bulks := com.Bulk(ctx, input, s.redis.Options.HScanCount, com.NeverSplit[redis.XMessage])
+	bulks := com.Bulk(ctx, input, s.redis.Options.HScanCount, com.NeverSplit[goredis.XMessage])
 	stream := "icinga:history:stream:" + key
 	for {
 		select {
@@ -151,7 +151,7 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 
 			cmd := s.redis.XDel(ctx, stream, ids...)
 			if _, err := cmd.Result(); err != nil {
-				return icingaredis.WrapCmdErr(cmd)
+				return redis.WrapCmdErr(cmd)
 			}
 
 			counter.Add(uint64(len(ids)))
@@ -169,7 +169,7 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 // is supposed to forward each message from in to out, even if the event is not relevant for the current stage. On
 // error conditions, the message must not be forwarded to the next stage so that the event is not deleted from Redis
 // and can be processed at a later time.
-type stageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error
+type stageFunc func(ctx context.Context, s Sync, key string, in <-chan goredis.XMessage, out chan<- goredis.XMessage) error
 
 // writeOneEntityStage creates a stageFunc from a pointer to a struct implementing the v1.UpserterEntity interface.
 // For each history event it receives, it parses that event into a new instance of that entity type and writes it to
@@ -184,7 +184,7 @@ func writeOneEntityStage(structPtr interface{}) stageFunc {
 			}
 		})
 
-	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
+	return writeMultiEntityStage(func(entry goredis.XMessage) ([]v1.UpserterEntity, error) {
 		ptr, err := structifier(entry.Values)
 		if err != nil {
 			return nil, errors.Wrapf(err, "can't structify values %#v", entry.Values)
@@ -195,17 +195,17 @@ func writeOneEntityStage(structPtr interface{}) stageFunc {
 
 // writeMultiEntityStage creates a stageFunc from a function that takes a history event as an input and returns a
 // (potentially empty) slice of v1.UpserterEntity instances that it then inserts into the database.
-func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.UpserterEntity, error)) stageFunc {
-	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
+func writeMultiEntityStage(entryToEntities func(entry goredis.XMessage) ([]v1.UpserterEntity, error)) stageFunc {
+	return func(ctx context.Context, s Sync, key string, in <-chan goredis.XMessage, out chan<- goredis.XMessage) error {
 		type State struct {
-			Message redis.XMessage // Original event from Redis.
-			Pending int            // Number of pending entities. When reaching 0, the message is forwarded to out.
+			Message goredis.XMessage // Original event from Redis.
+			Pending int              // Number of pending entities. When reaching 0, the message is forwarded to out.
 		}
 
 		bufSize := s.db.Options.MaxPlaceholdersPerStatement
 		insert := make(chan database.Entity, bufSize) // Events sent to the database for insertion.
 		inserted := make(chan database.Entity)        // Events returned by the database after successful insertion.
-		skipped := make(chan redis.XMessage)          // Events skipping insert/inserted (no entities generated).
+		skipped := make(chan goredis.XMessage)        // Events skipping insert/inserted (no entities generated).
 		state := make(map[database.Entity]*State)     // Shared state between all entities created by one event.
 		var stateMu sync.Mutex                        // Synchronizes concurrent access to state.
 
@@ -310,7 +310,7 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 // userNotificationStage is a specialized stageFunc that populates the user_notification_history table. It is executed
 // on the notification history stream and uses the users_notified_ids attribute to create an entry in the
 // user_notification_history relation table for each user ID.
-func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
+func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan goredis.XMessage, out chan<- goredis.XMessage) error {
 	type NotificationHistory struct {
 		Id            types.Binary `structify:"id"`
 		EnvironmentId types.Binary `structify:"environment_id"`
@@ -327,7 +327,7 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 			}
 		})
 
-	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
+	return writeMultiEntityStage(func(entry goredis.XMessage) ([]v1.UpserterEntity, error) {
 		rawNotificationHistory, err := structifier(entry.Values)
 		if err != nil {
 			return nil, err
