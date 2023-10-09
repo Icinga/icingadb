@@ -31,6 +31,7 @@ redis:
 			input: miniConf,
 			output: func() *Config {
 				c := &Config{}
+				c.Init()
 				_ = defaults.Set(c)
 
 				c.Database.Host = "192.0.2.1"

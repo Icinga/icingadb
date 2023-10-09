@@ -17,6 +17,10 @@ type Config struct {
 	Retention RetentionConfig `yaml:"retention"`
 }
 
+func (c *Config) Init() {
+	c.Redis.Port = 6380
+}
+
 // Validate checks constraints in the supplied configuration and returns an error if they are violated.
 func (c *Config) Validate() error {
 	if err := c.Database.Validate(); err != nil {

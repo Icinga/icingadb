@@ -11,6 +11,10 @@ import (
 	"os"
 )
 
+type Initer interface {
+	Init()
+}
+
 type Validator interface {
 	Validate() error
 }
@@ -27,6 +31,10 @@ func FromYAMLFile[T any, P interface {
 	defer f.Close()
 
 	c := P(new(T))
+
+	if initer, ok := any(c).(Initer); ok {
+		initer.Init()
+	}
 
 	if err := defaults.Set(c); err != nil {
 		return nil, errors.Wrap(err, "can't set config defaults")
