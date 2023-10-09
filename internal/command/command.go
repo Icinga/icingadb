@@ -3,7 +3,8 @@ package command
 import (
 	"fmt"
 	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/internal/config"
+	icingadbconfig "github.com/icinga/icingadb/internal/config"
+	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/logging"
@@ -14,13 +15,13 @@ import (
 
 // Command provides factories for creating Redis and Database connections from Config.
 type Command struct {
-	Flags  *config.Flags
-	Config *config.Config
+	Flags  *icingadbconfig.Flags
+	Config *icingadbconfig.Config
 }
 
 // New creates and returns a new Command, parses CLI flags and YAML the config, and initializes the logger.
 func New() *Command {
-	flags, err := config.ParseFlags()
+	flags, err := config.ParseFlags[icingadbconfig.Flags]()
 	if err != nil {
 		var cliErr *goflags.Error
 		if errors.As(err, &cliErr) && cliErr.Type == goflags.ErrHelp {
@@ -35,7 +36,7 @@ func New() *Command {
 		os.Exit(0)
 	}
 
-	cfg, err := config.FromYAMLFile(flags.Config)
+	cfg, err := icingadbconfig.FromYAMLFile(flags.Config)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)

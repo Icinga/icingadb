@@ -5,7 +5,6 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"os"
 )
@@ -68,17 +67,4 @@ func FromYAMLFile(name string) (*Config, error) {
 	}
 
 	return c, nil
-}
-
-// ParseFlags parses CLI flags and
-// returns a Flags value created from them.
-func ParseFlags() (*Flags, error) {
-	f := &Flags{}
-	parser := flags.NewParser(f, flags.Default)
-
-	if _, err := parser.Parse(); err != nil {
-		return nil, errors.Wrap(err, "can't parse CLI flags")
-	}
-
-	return f, nil
 }

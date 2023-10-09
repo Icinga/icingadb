@@ -3,9 +3,23 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"io/ioutil"
 )
+
+// ParseFlags parses CLI flags and
+// returns a Flags value created from them.
+func ParseFlags[T any, P interface{ *T }]() (*T, error) {
+	f := P(new(T))
+	parser := flags.NewParser(f, flags.Default)
+
+	if _, err := parser.Parse(); err != nil {
+		return nil, errors.Wrap(err, "can't parse CLI flags")
+	}
+
+	return f, nil
+}
 
 // TLS provides TLS configuration options.
 type TLS struct {
