@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
-	"github.com/icinga/icingadb/internal/config"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
@@ -42,11 +41,11 @@ type Flags struct {
 // Config defines the YAML config structure.
 type Config struct {
 	IDO struct {
-		config.Database `yaml:"-,inline"`
+		database.Config `yaml:"-,inline"`
 		From            int32 `yaml:"from"`
 		To              int32 `yaml:"to" default:"2147483647"`
 	} `yaml:"ido"`
-	IcingaDB config.Database `yaml:"icingadb"`
+	IcingaDB database.Config `yaml:"icingadb"`
 	// Icinga2 specifies information the IDO doesn't provide.
 	Icinga2 struct {
 		// Env specifies the environment ID, hex.
@@ -176,7 +175,7 @@ func connectAll(c *Config) (ido, idb *database.DB) {
 	eg, _ := errgroup.WithContext(context.Background())
 
 	eg.Go(func() error {
-		ido = connect("IDO", &c.IDO.Database)
+		ido = connect("IDO", &c.IDO.Config)
 		return nil
 	})
 
@@ -190,8 +189,8 @@ func connectAll(c *Config) (ido, idb *database.DB) {
 }
 
 // connect connects to which DB as cfg specifies. (On non-recoverable errors the whole program exits.)
-func connect(which string, cfg *config.Database) *database.DB {
-	db, err := cfg.Open(logging.NewLogger(zap.NewNop().Sugar(), 20*time.Second))
+func connect(which string, cfg *database.Config) *database.DB {
+	db, err := database.NewDbFromConfig(cfg, logging.NewLogger(zap.NewNop().Sugar(), 20*time.Second))
 	if err != nil {
 		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
 	}

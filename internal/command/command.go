@@ -49,7 +49,7 @@ func New() *Command {
 
 // Database creates and returns a new icingadb.DB connection from config.Config.
 func (c Command) Database(l *logging.Logger) (*database.DB, error) {
-	return c.Config.Database.Open(l)
+	return database.NewDbFromConfig(&c.Config.Database, l)
 }
 
 // Redis creates and returns a new icingaredis.Client connection from config.Config.

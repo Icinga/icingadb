@@ -6,6 +6,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
+	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/icinga/icingadb/pkg/icingadb/overdue"
@@ -56,6 +57,16 @@ func run() int {
 	defer logger.Sync()
 
 	logger.Info("Starting Icinga DB")
+
+	driver.Register(
+		logger,
+		driver.WithOnError(func(_ time.Duration, _ uint64, err, _ error) {
+			telemetry.UpdateCurrentDbConnErr(err)
+		}),
+		driver.WithOnSuccess(func(_ time.Duration, _ uint64, _ error) {
+			telemetry.UpdateCurrentDbConnErr(nil)
+		}),
+	)
 
 	db, err := cmd.Database(logs.GetChildLogger("database"))
 	if err != nil {

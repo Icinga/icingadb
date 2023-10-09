@@ -3,17 +3,23 @@ package database
 import (
 	"context"
 	"fmt"
+	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/retry"
+	"github.com/icinga/icingadb/pkg/strcase"
+	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -71,7 +77,7 @@ func (o *Options) Validate() error {
 	return nil
 }
 
-// NewDb returns a new icingadb.DB wrapper for a pre-existing *sqlx.DB.
+// NewDb returns a new DB wrapper for a pre-existing sqlx.DB.
 func NewDb(db *sqlx.DB, logger *logging.Logger, options *Options) *DB {
 	return &DB{
 		DB:              db,
@@ -79,6 +85,110 @@ func NewDb(db *sqlx.DB, logger *logging.Logger, options *Options) *DB {
 		Options:         options,
 		tableSemaphores: make(map[string]*semaphore.Weighted),
 	}
+}
+
+// NewDbFromConfig returns a new DB from Config.
+func NewDbFromConfig(c *Config, logger *logging.Logger) (*DB, error) {
+	var dsn string
+	switch c.Type {
+	case "mysql":
+		config := mysql.NewConfig()
+
+		config.User = c.User
+		config.Passwd = c.Password
+
+		if utils.IsUnixAddr(c.Host) {
+			config.Net = "unix"
+			config.Addr = c.Host
+		} else {
+			config.Net = "tcp"
+			port := c.Port
+			if port == 0 {
+				port = 3306
+			}
+			config.Addr = utils.JoinHostPort(c.Host, port)
+		}
+
+		config.DBName = c.Database
+		config.Timeout = time.Minute
+		config.Params = map[string]string{"sql_mode": "ANSI_QUOTES"}
+
+		tlsConfig, err := c.TlsOptions.MakeConfig(c.Host)
+		if err != nil {
+			return nil, err
+		}
+
+		if tlsConfig != nil {
+			config.TLSConfig = "icingadb"
+			if err := mysql.RegisterTLSConfig(config.TLSConfig, tlsConfig); err != nil {
+				return nil, errors.Wrap(err, "can't register TLS config")
+			}
+		}
+
+		dsn = config.FormatDSN()
+	case "pgsql":
+		uri := &url.URL{
+			Scheme: "postgres",
+			User:   url.UserPassword(c.User, c.Password),
+			Path:   "/" + url.PathEscape(c.Database),
+		}
+
+		query := url.Values{
+			"connect_timeout":   {"60"},
+			"binary_parameters": {"yes"},
+
+			// Host and port can alternatively be specified in the query string. lib/pq can't parse the connection URI
+			// if a Unix domain socket path is specified in the host part of the URI, therefore always use the query
+			// string. See also https://github.com/lib/pq/issues/796
+			"host": {c.Host},
+		}
+		if c.Port != 0 {
+			query["port"] = []string{strconv.FormatInt(int64(c.Port), 10)}
+		}
+
+		if _, err := c.TlsOptions.MakeConfig(c.Host); err != nil {
+			return nil, err
+		}
+
+		if c.TlsOptions.Enable {
+			if c.TlsOptions.Insecure {
+				query["sslmode"] = []string{"require"}
+			} else {
+				query["sslmode"] = []string{"verify-full"}
+			}
+
+			if c.TlsOptions.Cert != "" {
+				query["sslcert"] = []string{c.TlsOptions.Cert}
+			}
+
+			if c.TlsOptions.Key != "" {
+				query["sslkey"] = []string{c.TlsOptions.Key}
+			}
+
+			if c.TlsOptions.Ca != "" {
+				query["sslrootcert"] = []string{c.TlsOptions.Ca}
+			}
+		} else {
+			query["sslmode"] = []string{"disable"}
+		}
+
+		uri.RawQuery = query.Encode()
+		dsn = uri.String()
+	default:
+		return nil, unknownDbType(c.Type)
+	}
+
+	db, err := sqlx.Open("icingadb-"+c.Type, dsn)
+	if err != nil {
+		return nil, errors.Wrap(err, "can't open database")
+	}
+
+	db.SetMaxIdleConns(c.Options.MaxConnections / 3)
+	db.SetMaxOpenConns(c.Options.MaxConnections)
+
+	db.Mapper = reflectx.NewMapperFunc("db", strcase.Snake)
+
+	return NewDb(db, logger, &c.Options), nil
 }
 
 // BuildColumns returns all columns of the given struct.
