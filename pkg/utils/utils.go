@@ -145,9 +145,13 @@ func MaxInt(x, y int) int {
 	return y
 }
 
+func IsUnixAddr(host string) bool {
+	return strings.HasPrefix(host, "/")
+}
+
 // JoinHostPort is like its equivalent in net., but handles UNIX sockets as well.
 func JoinHostPort(host string, port int) string {
-	if strings.HasPrefix(host, "/") {
+	if IsUnixAddr(host) {
 		return host
 	}
 
