@@ -9,6 +9,7 @@ import (
 type Config struct {
 	Host       string     `yaml:"host"`
 	Port       int        `yaml:"port"`
+	Database   int        `yaml:"database" default:"0"`
 	Password   string     `yaml:"password"`
 	TlsOptions config.TLS `yaml:",inline"`
 	Options    Options    `yaml:"options"`
