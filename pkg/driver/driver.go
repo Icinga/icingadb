@@ -32,7 +32,13 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	err := errors.Wrap(retry.WithBackoff(
 		ctx,
 		func(ctx context.Context) (err error) {
-			conn, err = c.Connector.Connect(ctx)
+			if conn, err = c.Connector.Connect(ctx); err == nil && c.driver.initConn != nil {
+				if err = c.driver.initConn(ctx, conn); err != nil {
+					_ = conn.Close()
+					conn = nil
+				}
+			}
+
 			return
 		},
 		shouldRetry,
@@ -67,7 +73,9 @@ func (c RetryConnector) Driver() driver.Driver {
 // Driver wraps a driver.Driver that also must implement driver.DriverContext with logging capabilities and provides our RetryConnector.
 type Driver struct {
 	ctxDriver
-	Logger *logging.Logger
+
+	Logger   *logging.Logger
+	initConn func(context.Context, driver.Conn) error
 }
 
 // OpenConnector implements the DriverContext interface.
@@ -85,7 +93,7 @@ func (d Driver) OpenConnector(name string) (driver.Connector, error) {
 
 // Register makes our database Driver available under the name "icingadb-*sql".
 func Register(logger *logging.Logger) {
-	sql.Register(MySQL, &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
+	sql.Register(MySQL, &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger, initConn: setGaleraOpts})
 	sql.Register(PostgreSQL, &Driver{ctxDriver: PgSQLDriver{}, Logger: logger})
 	_ = mysql.SetLogger(mysqlLogger(func(v ...interface{}) { logger.Debug(v...) }))
 	sqlx.BindDriver(PostgreSQL, sqlx.DOLLAR)
