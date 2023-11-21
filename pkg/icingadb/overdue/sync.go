@@ -4,18 +4,16 @@ import (
 	"context"
 	_ "embed"
 	"fmt"
-	"github.com/go-redis/redis/v8"
+	goredis "github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
-	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/icingadb"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/periodic"
+	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/overdue"
-	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"regexp"
@@ -26,13 +24,13 @@ import (
 
 // Sync specifies the source and destination of an overdue sync.
 type Sync struct {
-	db     *icingadb.DB
-	redis  *icingaredis.Client
+	db     *database.DB
+	redis  *redis.Client
 	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -41,7 +39,7 @@ func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger)
 }
 
 // factory abstracts overdue.NewHostState and overdue.NewServiceState.
-type factory = func(id string, overdue bool) (contracts.Entity, error)
+type factory = func(id string, overdue bool) (database.Entity, error)
 
 // Sync synchronizes Redis overdue sets from s.redis to s.db.
 func (s Sync) Sync(ctx context.Context) error {
@@ -89,10 +87,10 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 	query := fmt.Sprintf("SELECT id FROM %s_state WHERE is_overdue='y'", objectType)
 
 	if err := s.db.SelectContext(ctx, &rows, query); err != nil {
-		return internal.CantPerformQuery(err, query)
+		return database.CantPerformQuery(err, query)
 	}
 
-	_, err := s.redis.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+	_, err := s.redis.Pipelined(ctx, func(pipe goredis.Pipeliner) error {
 		key := "icingadb:overdue:" + objectType
 		pipe.Del(ctx, key)
 
@@ -136,7 +134,7 @@ func (s Sync) log(ctx context.Context, objectType string, counter *com.Counter) 
 //go:embed get_overdues.lua
 var getOverduesLua string
 
-var luaGetOverdues = redis.NewScript(strings.TrimSpace(
+var luaGetOverdues = goredis.NewScript(strings.TrimSpace(
 	regexp.MustCompile(`(?m)^--.*?$`).ReplaceAllString(getOverduesLua, ""),
 ))
 
@@ -209,7 +207,7 @@ func (s Sync) updateOverdue(
 	counter.Add(uint64(len(ids)))
 	telemetry.Stats.Overdue.Add(uint64(len(ids)))
 
-	var op func(ctx context.Context, key string, members ...interface{}) *redis.IntCmd
+	var op func(ctx context.Context, key string, members ...interface{}) *goredis.IntCmd
 	if overdue {
 		op = s.redis.SAdd
 	} else {
@@ -223,7 +221,7 @@ func (s Sync) updateOverdue(
 // updateDb sets objectType_state#is_overdue for ids to overdue.
 func (s Sync) updateDb(ctx context.Context, factory factory, ids []interface{}, overdue bool) error {
 	g, ctx := errgroup.WithContext(ctx)
-	ch := make(chan contracts.Entity, 1<<10)
+	ch := make(chan database.Entity, 1<<10)
 
 	g.Go(func() error {
 		defer close(ch)

@@ -2,7 +2,8 @@ package config
 
 import (
 	"github.com/creasty/defaults"
-	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icinga-go-library/config"
+	"github.com/icinga/icinga-go-library/logging"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
@@ -30,6 +31,7 @@ redis:
 			input: miniConf,
 			output: func() *Config {
 				c := &Config{}
+				c.Init()
 				_ = defaults.Set(c)
 
 				c.Database.Host = "192.0.2.1"
@@ -58,7 +60,7 @@ redis:
 
 			require.NoError(t, os.WriteFile(tempFile.Name(), []byte(st.input), 0o600))
 
-			if actual, err := FromYAMLFile(tempFile.Name()); st.output == nil {
+			if actual, err := config.FromYAMLFile[Config](tempFile.Name()); st.output == nil {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)

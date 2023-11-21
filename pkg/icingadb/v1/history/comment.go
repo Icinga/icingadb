@@ -2,8 +2,10 @@ package history
 
 import (
 	"database/sql/driver"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/types"
+	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 )
 
 type CommentHistoryEntity struct {
@@ -11,17 +13,17 @@ type CommentHistoryEntity struct {
 }
 
 // Fingerprint implements part of the contracts.Entity interface.
-func (che CommentHistoryEntity) Fingerprint() contracts.Fingerprinter {
+func (che CommentHistoryEntity) Fingerprint() database.Fingerprinter {
 	return che
 }
 
 // ID implements part of the contracts.Entity interface.
-func (che CommentHistoryEntity) ID() contracts.ID {
+func (che CommentHistoryEntity) ID() database.ID {
 	return che.CommentId
 }
 
 // SetID implements part of the contracts.Entity interface.
-func (che *CommentHistoryEntity) SetID(id contracts.ID) {
+func (che *CommentHistoryEntity) SetID(id database.ID) {
 	che.CommentId = id.(types.Binary)
 }
 
@@ -40,13 +42,13 @@ type CommentHistory struct {
 	CommentHistoryEntity   `json:",inline"`
 	HistoryTableMeta       `json:",inline"`
 	CommentHistoryUpserter `json:",inline"`
-	EntryTime              types.UnixMilli   `json:"entry_time"`
-	Author                 string            `json:"author"`
-	Comment                string            `json:"comment"`
-	EntryType              types.CommentType `json:"entry_type"`
-	IsPersistent           types.Bool        `json:"is_persistent"`
-	IsSticky               types.Bool        `json:"is_sticky"`
-	ExpireTime             types.UnixMilli   `json:"expire_time"`
+	EntryTime              types.UnixMilli           `json:"entry_time"`
+	Author                 string                    `json:"author"`
+	Comment                string                    `json:"comment"`
+	EntryType              icingadbTypes.CommentType `json:"entry_type"`
+	IsPersistent           types.Bool                `json:"is_persistent"`
+	IsSticky               types.Bool                `json:"is_sticky"`
+	ExpireTime             types.UnixMilli           `json:"expire_time"`
 }
 
 // Init implements the contracts.Initer interface.
@@ -109,12 +111,12 @@ func (et CommentEventTime) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
-	_ contracts.Entity     = (*CommentHistoryEntity)(nil)
-	_ contracts.Upserter   = (*CommentHistoryUpserter)(nil)
-	_ contracts.Initer     = (*CommentHistory)(nil)
-	_ UpserterEntity       = (*CommentHistory)(nil)
-	_ contracts.Initer     = (*HistoryComment)(nil)
-	_ contracts.TableNamer = (*HistoryComment)(nil)
-	_ UpserterEntity       = (*HistoryComment)(nil)
-	_ driver.Valuer        = CommentEventTime{}
+	_ database.Entity     = (*CommentHistoryEntity)(nil)
+	_ database.Upserter   = (*CommentHistoryUpserter)(nil)
+	_ contracts.Initer    = (*CommentHistory)(nil)
+	_ UpserterEntity      = (*CommentHistory)(nil)
+	_ contracts.Initer    = (*HistoryComment)(nil)
+	_ database.TableNamer = (*HistoryComment)(nil)
+	_ UpserterEntity      = (*HistoryComment)(nil)
+	_ driver.Valuer       = CommentEventTime{}
 )

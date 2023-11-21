@@ -1,8 +1,8 @@
 package v1
 
 import (
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/types"
 )
 
 type Checkable struct {

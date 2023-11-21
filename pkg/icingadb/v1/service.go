@@ -1,8 +1,9 @@
 package v1
 
 import (
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/types"
 )
 
 type Service struct {
@@ -36,27 +37,27 @@ type ServicegroupMember struct {
 	ServicegroupId types.Binary `json:"servicegroup_id"`
 }
 
-func NewService() contracts.Entity {
+func NewService() database.Entity {
 	return &Service{}
 }
 
-func NewServiceCustomvar() contracts.Entity {
+func NewServiceCustomvar() database.Entity {
 	return &ServiceCustomvar{}
 }
 
-func NewServiceState() contracts.Entity {
+func NewServiceState() database.Entity {
 	return &ServiceState{}
 }
 
-func NewServicegroup() contracts.Entity {
+func NewServicegroup() database.Entity {
 	return &Servicegroup{}
 }
 
-func NewServicegroupCustomvar() contracts.Entity {
+func NewServicegroupCustomvar() database.Entity {
 	return &ServicegroupCustomvar{}
 }
 
-func NewServicegroupMember() contracts.Entity {
+func NewServicegroupMember() database.Entity {
 	return &ServicegroupMember{}
 }
 

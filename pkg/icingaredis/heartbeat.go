@@ -2,12 +2,12 @@ package icingaredis
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
-	"github.com/icinga/icingadb/internal"
+	goredis "github.com/go-redis/redis/v8"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/types"
+	"github.com/icinga/icinga-go-library/utils"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -27,7 +27,7 @@ type Heartbeat struct {
 	events         chan *HeartbeatMessage
 	lastReceivedMs int64
 	cancelCtx      context.CancelFunc
-	client         *Client
+	client         *redis.Client
 	done           chan struct{}
 	errMu          sync.Mutex
 	err            error
@@ -35,7 +35,7 @@ type Heartbeat struct {
 }
 
 // NewHeartbeat returns a new Heartbeat and starts the heartbeat controller loop.
-func NewHeartbeat(ctx context.Context, client *Client, logger *logging.Logger) *Heartbeat {
+func NewHeartbeat(ctx context.Context, client *redis.Client, logger *logging.Logger) *Heartbeat {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
 	heartbeat := &Heartbeat{
@@ -101,7 +101,7 @@ func (h *Heartbeat) controller(ctx context.Context) {
 		defer throttle.Stop()
 
 		for id := "$"; ; {
-			streams, err := h.client.XReadUntilResult(ctx, &redis.XReadArgs{
+			streams, err := h.client.XReadUntilResult(ctx, &goredis.XReadArgs{
 				Streams: []string{"icinga:stats", id},
 			})
 			if err != nil {
@@ -208,7 +208,7 @@ func (m *HeartbeatMessage) Stats() *v1.StatsMessage {
 // EnvironmentID returns the Icinga DB environment ID stored in the heartbeat message.
 func (m *HeartbeatMessage) EnvironmentID() (types.Binary, error) {
 	var id types.Binary
-	err := internal.UnmarshalJSON([]byte(m.stats["icingadb_environment"].(string)), &id)
+	err := types.UnmarshalJSON([]byte(m.stats["icingadb_environment"].(string)), &id)
 	if err != nil {
 		return nil, err
 	}

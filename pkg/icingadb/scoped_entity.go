@@ -1,15 +1,14 @@
 package icingadb
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/icinga/icinga-go-library/database"
 )
 
 // ScopedEntity combines an entity and a scope that specifies
 // the WHERE conditions that entities of the
 // enclosed entity type must satisfy in order to be SELECTed.
 type ScopedEntity struct {
-	contracts.Entity
+	database.Entity
 	scope interface{}
 }
 
@@ -20,11 +19,11 @@ func (e ScopedEntity) Scope() interface{} {
 
 // TableName implements the contracts.TableNamer interface.
 func (e ScopedEntity) TableName() string {
-	return utils.TableName(e.Entity)
+	return database.TableName(e.Entity)
 }
 
 // NewScopedEntity returns a new ScopedEntity.
-func NewScopedEntity(entity contracts.Entity, scope interface{}) *ScopedEntity {
+func NewScopedEntity(entity database.Entity, scope interface{}) *ScopedEntity {
 	return &ScopedEntity{
 		Entity: entity,
 		scope:  scope,

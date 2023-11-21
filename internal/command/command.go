@@ -2,11 +2,12 @@ package command
 
 import (
 	"fmt"
+	"github.com/icinga/icinga-go-library/config"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/pkg/config"
-	"github.com/icinga/icingadb/pkg/icingadb"
-	"github.com/icinga/icingadb/pkg/icingaredis"
-	"github.com/icinga/icingadb/pkg/logging"
+	icingadbconfig "github.com/icinga/icingadb/internal/config"
 	goflags "github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"os"
@@ -14,13 +15,13 @@ import (
 
 // Command provides factories for creating Redis and Database connections from Config.
 type Command struct {
-	Flags  *config.Flags
-	Config *config.Config
+	Flags  *icingadbconfig.Flags
+	Config *icingadbconfig.Config
 }
 
 // New creates and returns a new Command, parses CLI flags and YAML the config, and initializes the logger.
 func New() *Command {
-	flags, err := config.ParseFlags()
+	flags, err := config.ParseFlags[icingadbconfig.Flags]()
 	if err != nil {
 		var cliErr *goflags.Error
 		if errors.As(err, &cliErr) && cliErr.Type == goflags.ErrHelp {
@@ -35,7 +36,7 @@ func New() *Command {
 		os.Exit(0)
 	}
 
-	cfg, err := config.FromYAMLFile(flags.Config)
+	cfg, err := config.FromYAMLFile[icingadbconfig.Config](flags.Config)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
@@ -48,11 +49,11 @@ func New() *Command {
 }
 
 // Database creates and returns a new icingadb.DB connection from config.Config.
-func (c Command) Database(l *logging.Logger) (*icingadb.DB, error) {
-	return c.Config.Database.Open(l)
+func (c Command) Database(l *logging.Logger) (*database.DB, error) {
+	return database.NewDbFromConfig(&c.Config.Database, l)
 }
 
 // Redis creates and returns a new icingaredis.Client connection from config.Config.
-func (c Command) Redis(l *logging.Logger) (*icingaredis.Client, error) {
-	return c.Config.Redis.NewClient(l)
+func (c Command) Redis(l *logging.Logger) (*redis.Client, error) {
+	return redis.NewClientFromConfig(&c.Config.Redis, l)
 }

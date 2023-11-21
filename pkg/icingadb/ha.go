@@ -6,17 +6,17 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"github.com/google/uuid"
-	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/pkg/backoff"
-	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/driver"
+	"github.com/icinga/icinga-go-library/backoff"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/driver"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/retry"
+	"github.com/icinga/icinga-go-library/types"
+	"github.com/icinga/icinga-go-library/utils"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/retry"
-	"github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"
@@ -37,7 +37,7 @@ type HA struct {
 	ctx           context.Context
 	cancelCtx     context.CancelFunc
 	instanceId    types.Binary
-	db            *DB
+	db            *database.DB
 	environmentMu sync.Mutex
 	environment   *v1.Environment
 	heartbeat     *icingaredis.Heartbeat
@@ -52,7 +52,7 @@ type HA struct {
 }
 
 // NewHA returns a new HA and starts the controller loop.
-func NewHA(ctx context.Context, db *DB, heartbeat *icingaredis.Heartbeat, logger *logging.Logger) *HA {
+func NewHA(ctx context.Context, db *database.DB, heartbeat *icingaredis.Heartbeat, logger *logging.Logger) *HA {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
 	instanceId := uuid.New()
@@ -284,7 +284,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 			case sql.ErrNoRows:
 				takeover = true
 			default:
-				return internal.CantPerformQuery(errQuery, query)
+				return database.CantPerformQuery(errQuery, query)
 			}
 
 			i := v1.IcingadbInstance{
@@ -311,7 +311,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 
 			stmt, _ := h.db.BuildUpsertStmt(i)
 			if _, err := tx.NamedExecContext(ctx, stmt, i); err != nil {
-				return internal.CantPerformQuery(err, stmt)
+				return database.CantPerformQuery(err, stmt)
 			}
 
 			if takeover {
@@ -319,7 +319,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 				_, err := tx.ExecContext(ctx, stmt, "n", envId, h.instanceId)
 
 				if err != nil {
-					return internal.CantPerformQuery(err, stmt)
+					return database.CantPerformQuery(err, stmt)
 				}
 			}
 
@@ -369,7 +369,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 func (h *HA) realizeLostHeartbeat() {
 	stmt := h.db.Rebind("UPDATE icingadb_instance SET responsible = ? WHERE id = ?")
 	if _, err := h.db.ExecContext(h.ctx, stmt, "n", h.instanceId); err != nil && !utils.IsContextCanceled(err) {
-		h.logger.Warnw("Can't update instance", zap.Error(internal.CantPerformQuery(err, stmt)))
+		h.logger.Warnw("Can't update instance", zap.Error(database.CantPerformQuery(err, stmt)))
 	}
 }
 
@@ -379,7 +379,7 @@ func (h *HA) insertEnvironment() error {
 	stmt, _ := h.db.BuildInsertIgnoreStmt(h.environment)
 
 	if _, err := h.db.NamedExecContext(h.ctx, stmt, h.environment); err != nil {
-		return internal.CantPerformQuery(err, stmt)
+		return database.CantPerformQuery(err, stmt)
 	}
 
 	return nil

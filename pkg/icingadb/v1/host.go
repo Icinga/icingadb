@@ -3,17 +3,18 @@ package v1
 import (
 	"bytes"
 	"database/sql/driver"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/types"
 	"net"
 )
 
 type Host struct {
 	Checkable   `json:",inline"`
 	Address     string      `json:"address"`
-	Address6    string      `json:"address6"`
+	Address6    string      `db:"address6" json:"address6"`
 	AddressBin  AddressBin  `json:"-"`
-	Address6Bin Address6Bin `json:"-"`
+	Address6Bin Address6Bin `db:"address6_bin" json:"-"`
 }
 
 // Init implements the contracts.Initer interface.
@@ -89,27 +90,27 @@ type HostgroupMember struct {
 	HostgroupId types.Binary `json:"hostgroup_id"`
 }
 
-func NewHost() contracts.Entity {
+func NewHost() database.Entity {
 	return &Host{}
 }
 
-func NewHostCustomvar() contracts.Entity {
+func NewHostCustomvar() database.Entity {
 	return &HostCustomvar{}
 }
 
-func NewHostState() contracts.Entity {
+func NewHostState() database.Entity {
 	return &HostState{}
 }
 
-func NewHostgroup() contracts.Entity {
+func NewHostgroup() database.Entity {
 	return &Hostgroup{}
 }
 
-func NewHostgroupCustomvar() contracts.Entity {
+func NewHostgroupCustomvar() database.Entity {
 	return &HostgroupCustomvar{}
 }
 
-func NewHostgroupMember() contracts.Entity {
+func NewHostgroupMember() database.Entity {
 	return &HostgroupMember{}
 }
 

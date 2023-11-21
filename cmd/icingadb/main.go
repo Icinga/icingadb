@@ -3,7 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/go-redis/redis/v8"
+	goredis "github.com/go-redis/redis/v8"
+	"github.com/icinga/icinga-go-library/driver"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/icingadb"
@@ -12,8 +16,6 @@ import (
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/okzk/sdnotify"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -57,6 +59,16 @@ func run() int {
 
 	logger.Info("Starting Icinga DB")
 
+	driver.Register(
+		logger,
+		driver.WithOnError(func(_ time.Duration, _ uint64, err, _ error) {
+			telemetry.UpdateCurrentDbConnErr(err)
+		}),
+		driver.WithOnSuccess(func(_ time.Duration, _ uint64, _ error) {
+			telemetry.UpdateCurrentDbConnErr(nil)
+		}),
+	)
+
 	db, err := cmd.Database(logs.GetChildLogger("database"))
 	if err != nil {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
@@ -70,7 +82,7 @@ func run() int {
 		}
 	}
 
-	if err := db.CheckSchema(context.Background()); err != nil {
+	if err := icingadb.CheckSchema(context.Background(), db); err != nil {
 		logger.Fatalf("%+v", err)
 	}
 
@@ -355,7 +367,7 @@ func run() int {
 }
 
 // monitorRedisSchema monitors rc's icinga:schema version validity.
-func monitorRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) {
+func monitorRedisSchema(logger *logging.Logger, rc *redis.Client, pos string) {
 	for {
 		var err error
 		pos, err = checkRedisSchema(logger, rc, pos)
@@ -367,7 +379,7 @@ func monitorRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos stri
 }
 
 // checkRedisSchema verifies rc's icinga:schema version.
-func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) (newPos string, err error) {
+func checkRedisSchema(logger *logging.Logger, rc *redis.Client, pos string) (newPos string, err error) {
 	if pos == "0-0" {
 		defer time.AfterFunc(3*time.Second, func() {
 			logger.Info("Waiting for Icinga 2 to write into Redis, please make sure you have started Icinga 2 and the Icinga DB feature is enabled")
@@ -376,7 +388,7 @@ func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string
 		logger.Debug("Checking Icinga 2 and Icinga DB compatibility")
 	}
 
-	streams, err := rc.XReadUntilResult(context.Background(), &redis.XReadArgs{
+	streams, err := rc.XReadUntilResult(context.Background(), &goredis.XReadArgs{
 		Streams: []string{"icinga:schema", pos},
 	})
 	if err != nil {

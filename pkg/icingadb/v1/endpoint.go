@@ -1,8 +1,9 @@
 package v1
 
 import (
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/types"
 )
 
 type Endpoint struct {
@@ -21,11 +22,11 @@ type Zone struct {
 	Depth              uint8        `json:"depth"`
 }
 
-func NewEndpoint() contracts.Entity {
+func NewEndpoint() database.Entity {
 	return &Endpoint{}
 }
 
-func NewZone() contracts.Entity {
+func NewZone() database.Entity {
 	return &Zone{}
 }
 
