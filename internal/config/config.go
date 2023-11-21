@@ -1,10 +1,10 @@
 package config
 
 import (
-	"github.com/icinga/icingadb/pkg/database"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/pkg/errors"
 	"time"
 )

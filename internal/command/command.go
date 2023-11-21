@@ -2,12 +2,12 @@ package command
 
 import (
 	"fmt"
+	"github.com/icinga/icinga-go-library/config"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icingadb/internal"
 	icingadbconfig "github.com/icinga/icingadb/internal/config"
-	"github.com/icinga/icingadb/pkg/config"
-	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/redis"
 	goflags "github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"os"

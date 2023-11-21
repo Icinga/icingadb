@@ -1,8 +1,8 @@
 package v1
 
 import (
-	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 )
 
 type Downtime struct {

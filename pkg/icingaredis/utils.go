@@ -2,13 +2,13 @@ package icingaredis
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/strcase"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/redis"
-	"github.com/icinga/icingadb/pkg/strcase"
-	"github.com/icinga/icingadb/pkg/types"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"runtime"

@@ -2,10 +2,10 @@ package history
 
 import (
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icinga-go-library/structify"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb/types"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
-	"github.com/icinga/icingadb/pkg/structify"
 	"reflect"
 )
 

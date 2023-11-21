@@ -3,8 +3,8 @@ package icingadb
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/driver"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/driver"
 	"github.com/pkg/errors"
 )
 

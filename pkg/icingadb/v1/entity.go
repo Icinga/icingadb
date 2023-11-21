@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/icinga/icingadb/pkg/database"
+	"github.com/icinga/icinga-go-library/database"
 )
 
 // EntityWithoutChecksum represents entities without a checksum.

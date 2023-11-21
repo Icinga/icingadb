@@ -2,12 +2,12 @@ package v1
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/flatten"
-	"github.com/icinga/icingadb/pkg/objectpacker"
-	"github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/flatten"
+	"github.com/icinga/icinga-go-library/objectpacker"
+	"github.com/icinga/icinga-go-library/types"
+	"github.com/icinga/icinga-go-library/utils"
 	"golang.org/x/sync/errgroup"
 	"runtime"
 )
