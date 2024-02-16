@@ -150,6 +150,8 @@ func Retryable(err error) bool {
 			// 1213: Deadlock found when trying to get lock
 			// 2006: MySQL server has gone away
 			return true
+		case 1047: // Unknown command
+			return strings.Contains(e.Message, "not yet prepared node for application use")
 		default:
 			return false
 		}
