@@ -32,6 +32,10 @@ type DB struct {
 	logger            *logging.Logger
 	tableSemaphores   map[string]*semaphore.Weighted
 	tableSemaphoresMu sync.Mutex
+
+	driverName     string
+	dataSourceName string
+	dbConfFunc     func(db *sqlx.DB)
 }
 
 // Options define user configurable database options.
@@ -74,14 +78,39 @@ func (o *Options) Validate() error {
 	return nil
 }
 
-// NewDb returns a new icingadb.DB wrapper for a pre-existing *sqlx.DB.
-func NewDb(db *sqlx.DB, logger *logging.Logger, options *Options) *DB {
+// NewDb returns a new icingadb.DB wrapper around a *sqlx.DB.
+func NewDb(
+	driverName, dataSourceName string,
+	dbConfFunc func(db *sqlx.DB),
+	options *Options,
+	logger *logging.Logger,
+) (*DB, error) {
+	db, err := sqlx.Open(driverName, dataSourceName)
+	if err != nil {
+		return nil, fmt.Errorf("can't open database: %w", err)
+	}
+
+	dbConfFunc(db)
+
 	return &DB{
 		DB:              db,
-		logger:          logger,
 		Options:         options,
+		logger:          logger,
 		tableSemaphores: make(map[string]*semaphore.Weighted),
-	}
+		driverName:      driverName,
+		dataSourceName:  dataSourceName,
+		dbConfFunc:      dbConfFunc,
+	}, nil
+}
+
+// Copy this icingadb.DB into a new, independent icingadb.DB instance.
+func (db *DB) Copy() (*DB, error) {
+	opts := *db.Options
+	return NewDb(
+		db.driverName, db.dataSourceName,
+		db.dbConfFunc,
+		&opts,
+		db.logger)
 }
 
 const (

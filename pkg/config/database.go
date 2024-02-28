@@ -128,19 +128,18 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 		return nil, unknownDbType(d.Type)
 	}
 
-	db, err := sqlx.Open("icingadb-"+d.Type, dsn)
-	if err != nil {
-		return nil, errors.Wrap(err, "can't open database")
-	}
+	return icingadb.NewDb(
+		"icingadb-"+d.Type, dsn,
+		func(db *sqlx.DB) {
+			db.SetMaxIdleConns(d.Options.MaxConnections / 3)
+			db.SetMaxOpenConns(d.Options.MaxConnections)
 
-	db.SetMaxIdleConns(d.Options.MaxConnections / 3)
-	db.SetMaxOpenConns(d.Options.MaxConnections)
-
-	db.Mapper = reflectx.NewMapperFunc("db", func(s string) string {
-		return utils.Key(s, '_')
-	})
-
-	return icingadb.NewDb(db, logger, &d.Options), nil
+			db.Mapper = reflectx.NewMapperFunc("db", func(s string) string {
+				return utils.Key(s, '_')
+			})
+		},
+		&d.Options,
+		logger)
 }
 
 // Validate checks constraints in the supplied database configuration and returns an error if they are violated.

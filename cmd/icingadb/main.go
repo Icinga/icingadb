@@ -132,7 +132,10 @@ func run() int {
 		cancelCtx()
 	}()
 	s := icingadb.NewSync(db, rc, logs.GetChildLogger("config-sync"))
-	hs := history.NewSync(db, rc, logs.GetChildLogger("history-sync"))
+	hs, err := history.NewSync(db, rc, logs.GetChildLogger("history-sync"))
+	if err != nil {
+		logger.Fatalf("%+v", errors.Wrap(err, "can't create history sync"))
+	}
 	rt := icingadb.NewRuntimeUpdates(db, rc, logs.GetChildLogger("runtime-updates"))
 	ods := overdue.NewSync(db, rc, logs.GetChildLogger("overdue-sync"))
 	ret := history.NewRetention(

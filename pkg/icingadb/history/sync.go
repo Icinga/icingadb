@@ -2,6 +2,7 @@ package history
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
@@ -30,16 +31,32 @@ type Sync struct {
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger) (*Sync, error) {
+	// The only database tables with foreign key constraints are found in the history context. By default - and for good
+	// reasons - a DB internally consists of a cluster of several database connections. However, if a multi-master
+	// database server setup is used, it can - and will - happen that this DB contains sessions to different servers and
+	// related queries will be submitted in the wrong order, at least in the eye of some database servers.
+	//
+	// To prevent this problem, an extra DB with only one connection is used for the history sync.
+	db, err := db.Copy()
+	if err != nil {
+		return nil, fmt.Errorf("can't copy DB: %w", err)
+	}
+
+	db.SetMaxIdleConns(1)
+	db.SetMaxOpenConns(1)
+
 	return &Sync{
 		db:     db,
 		redis:  redis,
 		logger: logger,
-	}
+	}, nil
 }
 
 // Sync synchronizes Redis history streams from s.redis to s.db and deletes the original data on success.
 func (s Sync) Sync(ctx context.Context) error {
+	defer func() { _ = s.db.Close() }()
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	for key, pipeline := range syncPipelines {
