@@ -96,7 +96,7 @@ func TestSetGaleraOpts(t *testing.T) {
 
 	for _, st := range subtests {
 		t.Run(st.name, func(t *testing.T) {
-			assert.ErrorIs(t, setGaleraOpts(context.Background(), &st.input), st.output)
+			assert.ErrorIs(t, setGaleraOpts(context.Background(), &st.input, 7), st.output)
 			assert.GreaterOrEqual(t, st.input.prepareCalls, uint8(1))
 
 			if ts, ok := st.input.preparedStmt.(*testStmt); ok {
