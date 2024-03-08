@@ -85,7 +85,7 @@ func (d Driver) OpenConnector(name string) (driver.Connector, error) {
 
 // Register makes our database Driver available under the name "icingadb-*sql".
 func Register(logger *logging.Logger) {
-	sql.Register(MySQL, &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
+	sql.Register(MySQL, &Driver{ctxDriver: MySQLDriver{}, Logger: logger})
 	sql.Register(PostgreSQL, &Driver{ctxDriver: PgSQLDriver{}, Logger: logger})
 	_ = mysql.SetLogger(mysqlLogger(func(v ...interface{}) { logger.Debug(v...) }))
 	sqlx.BindDriver(PostgreSQL, sqlx.DOLLAR)
