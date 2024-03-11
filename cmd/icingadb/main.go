@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/icingadb"
@@ -55,7 +56,7 @@ func run() int {
 	logger := logs.GetLogger()
 	defer logger.Sync()
 
-	logger.Info("Starting Icinga DB")
+	logger.Infof("Starting Icinga DB daemon (%s)", internal.Version.Version)
 
 	db, err := cmd.Database(logs.GetChildLogger("database"))
 	if err != nil {
