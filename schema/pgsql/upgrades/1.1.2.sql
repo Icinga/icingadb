@@ -137,3 +137,8 @@ BEGIN
   RETURN (100 * (total_time - problem_time)::decimal / total_time)::decimal(7, 4);
 END;
 $$;
+
+CREATE INDEX CONCURRENTLY idx_history_event_time_event_type ON history(event_time, event_type);
+COMMENT ON INDEX idx_history_event_time_event_type IS 'History filtered/ordered by event_time/event_type';
+
+DROP INDEX idx_history_event_time;
