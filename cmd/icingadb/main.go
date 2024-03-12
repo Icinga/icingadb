@@ -162,8 +162,8 @@ func run() int {
 		hactx, cancelHactx := context.WithCancel(ctx)
 		for hactx.Err() == nil {
 			select {
-			case <-ha.Takeover():
-				logger.Info("Taking over")
+			case takeoverReason := <-ha.Takeover():
+				logger.Infow("Taking over", zap.String("reason", takeoverReason))
 
 				go func() {
 					for hactx.Err() == nil {
@@ -324,8 +324,8 @@ func run() int {
 						}
 					}
 				}()
-			case <-ha.Handover():
-				logger.Warn("Handing over")
+			case handoverReason := <-ha.Handover():
+				logger.Warnw("Handing over", zap.String("reason", handoverReason))
 
 				cancelHactx()
 			case <-hactx.Done():

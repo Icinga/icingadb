@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-// timeout defines how long a heartbeat may be absent if a heartbeat has already been received.
+// Timeout defines how long a heartbeat may be absent if a heartbeat has already been received.
 // After this time, a heartbeat loss is propagated.
-var timeout = 60 * time.Second
+const Timeout = time.Minute
 
 // Heartbeat periodically reads heartbeats from a Redis stream and signals in Beat channels when they are received.
 // Also signals on if the heartbeat is Lost.
@@ -141,9 +141,9 @@ func (h *Heartbeat) controller(ctx context.Context) {
 
 				atomic.StoreInt64(&h.lastReceivedMs, m.received.UnixMilli())
 				h.sendEvent(m)
-			case <-time.After(timeout):
+			case <-time.After(Timeout):
 				if h.active {
-					h.logger.Warnw("Lost Icinga heartbeat", zap.Duration("timeout", timeout))
+					h.logger.Warnw("Lost Icinga heartbeat", zap.Duration("timeout", Timeout))
 					h.sendEvent(nil)
 					h.active = false
 				} else {
@@ -217,5 +217,5 @@ func (m *HeartbeatMessage) EnvironmentID() (types.Binary, error) {
 
 // ExpiryTime returns the timestamp when the heartbeat expires.
 func (m *HeartbeatMessage) ExpiryTime() time.Time {
-	return m.received.Add(timeout)
+	return m.received.Add(Timeout)
 }
