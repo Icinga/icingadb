@@ -5,6 +5,16 @@ import (
 	"github.com/icinga/icingadb/pkg/types"
 )
 
+// BinaryIDer is implemented by entity with id of type binary.
+type BinaryIDer interface {
+	BinaryID() types.Binary
+}
+
+// BinaryHostIDer is implemented by entity with host_id column.
+type BinaryHostIDer interface {
+	BinaryHostID() types.Binary
+}
+
 // ChecksumMeta is embedded by every type with a checksum.
 type ChecksumMeta struct {
 	PropertiesChecksum types.Binary `json:"checksum"`
@@ -38,6 +48,21 @@ func (m IdMeta) ID() contracts.ID {
 // SetID implements part of the contracts.IDer interface.
 func (m *IdMeta) SetID(id contracts.ID) {
 	m.Id = id.(types.Binary)
+}
+
+// BinaryID implements the contracts.BinaryIDer interface.
+func (m *IdMeta) BinaryID() types.Binary {
+	return m.Id
+}
+
+// HostMeta is embedded by every type with host_id column Icinga DB should synchronize.
+type HostMeta struct {
+	HostId types.Binary `json:"host_id"`
+}
+
+// BinaryHostID implements the contracts.BinaryHostIDer.
+func (m *HostMeta) BinaryHostID() types.Binary {
+	return m.HostId
 }
 
 // NameMeta is embedded by every type with a name.

@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icinga-testing/services"
 	"github.com/icinga/icinga-testing/utils"
 	"github.com/icinga/icinga-testing/utils/eventually"
+	"github.com/icinga/icingadb/pkg/types"
 	localutils "github.com/icinga/icingadb/tests/internal/utils"
 	"github.com/icinga/icingadb/tests/internal/value"
 	"github.com/jmoiron/sqlx"
@@ -29,6 +30,9 @@ import (
 //go:embed object_sync_test.conf
 var testSyncConfRaw string
 var testSyncConfTemplate = template.Must(template.New("testdata.conf").Parse(testSyncConfRaw))
+
+//go:embed config_sync_delta_slalifecycle.conf
+var slaLifecycleConfigSync []byte
 
 var usergroups = []string{
 	"testusergroup1",
@@ -91,9 +95,9 @@ func TestObjectSync(t *testing.T) {
 		require.NoError(t, err, "generate icinga2 notification config")
 	}
 	//logger.Sugar().Infof("config:\n\n%s\n\n", conf.String())
-	i.WriteConfig("etc/icinga2/conf.d/testdata.conf", conf.Bytes())
+	i.WriteConfig("etc/icinga2/conf.d/testdata.conf", slaLifecycleConfigSync)
 	i.EnableIcingaDb(r)
-	i.Reload()
+	require.NoError(t, i.Reload(), "Icinga 2 reload")
 
 	// Wait for Icinga 2 to signal a successful dump before starting
 	// Icinga DB to ensure that we actually test the initial sync.
@@ -104,15 +108,60 @@ func TestObjectSync(t *testing.T) {
 	logger.Debug("starting icingadb")
 	it.IcingaDbInstanceT(t, r, rdb)
 
+	// Wait some time to give Icinga DB a chance to finish syncing the 5 dummy hosts and services.
+	time.Sleep(2 * time.Second)
+
 	db, err := sqlx.Open(rdb.Driver(), rdb.DSN())
 	require.NoError(t, err, "connecting to SQL database shouldn't fail")
 	t.Cleanup(func() { _ = db.Close() })
+
+	dummyHostIdsMap := map[string]SlaLifecycle{}
+	dummyServiceIdsMap := map[string]SlaLifecycle{}
+	scanDummyObjFunc := func(typ string) {
+		var query string
+		if typ == "service" {
+			query = `SELECT service.name AS service_name, host.name as host_name, service.id AS service_id, host_id FROM service INNER JOIN host ON host.id=host_id`
+		} else {
+			query = `SELECT "name" AS host_name, id AS host_id FROM host`
+		}
+
+		rows, err := db.Queryx(query)
+		assert.NoError(t, err, "select all dummy %s ids", typ)
+		defer rows.Close()
+
+		for rows.Next() {
+			obj := &struct {
+				HostName     string `db:"host_name"`
+				ServiceName  string `db:"service_name"`
+				SlaLifecycle `db:",inline"`
+			}{
+				SlaLifecycle: SlaLifecycle{CreateTime: types.UnixMilli(time.Now())},
+			}
+
+			require.NoError(t, rows.StructScan(obj), "scan dummy %s", typ)
+
+			if typ == "host" {
+				dummyHostIdsMap[obj.HostName] = obj.SlaLifecycle
+			} else {
+				dummyServiceIdsMap[obj.HostName+"!"+obj.ServiceName] = obj.SlaLifecycle
+			}
+		}
+	}
+
+	// Fetch the dummy host and service ids from the database before reloading Icinga 2 with the new config.
+	go scanDummyObjFunc("host")
+	go scanDummyObjFunc("service")
+
+	// Write the regular conf bytes excluding the dummy bytes we wrote earlier and reload the Icinga 2 instance.
+	i.WriteConfig("etc/icinga2/conf.d/testdata.conf", conf.Bytes())
+	require.NoError(t, i.Reload(), "Icinga 2 reload")
 
 	t.Run("Host", func(t *testing.T) {
 		t.Parallel()
 
 		for _, host := range data.Hosts {
 			host := host
+
 			t.Run("Verify-"+host.VariantInfoString(), func(t *testing.T) {
 				t.Parallel()
 
@@ -145,6 +194,7 @@ func TestObjectSync(t *testing.T) {
 
 		for _, service := range data.Services {
 			service := service
+
 			t.Run("Verify-"+service.VariantInfoString(), func(t *testing.T) {
 				t.Parallel()
 
@@ -169,6 +219,51 @@ func TestObjectSync(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("SlaLifeCycle", func(t *testing.T) {
+		t.Parallel()
+
+		deleteTime := types.UnixMilli(time.Now())
+		t.Run("Hosts", func(t *testing.T) {
+			t.Parallel()
+
+			for i := 0; i < 5; i++ {
+				host := &Host{Name: "sla-lifecycle-host-" + fmt.Sprint(i)}
+				hostId := i
+
+				t.Run("Verify-Host-"+fmt.Sprint(hostId), func(t *testing.T) {
+					t.Parallel()
+
+					slinfo := dummyHostIdsMap[host.Name]
+					slinfo.DeleteTime = deleteTime
+
+					eventually.Assert(t, func(t require.TestingT) {
+						verifySlaLifecycleRow(t, db, &slinfo, false)
+					}, 20*time.Second, 1*time.Second)
+				})
+			}
+		})
+
+		t.Run("Services", func(t *testing.T) {
+			t.Parallel()
+
+			for i := 0; i < 5; i++ {
+				service := &Service{Name: "sla-lifecycle-service", HostName: newString("sla-lifecycle-host-" + fmt.Sprint(i))}
+				serviceId := i
+
+				t.Run("Verify-Service-"+fmt.Sprint(serviceId), func(t *testing.T) {
+					t.Parallel()
+
+					slinfo := dummyServiceIdsMap[*service.HostName+"!"+service.Name]
+					slinfo.DeleteTime = deleteTime
+
+					eventually.Assert(t, func(t require.TestingT) {
+						verifySlaLifecycleRow(t, db, &slinfo, false)
+					}, 20*time.Second, 1*time.Second)
+				})
+			}
+		})
 	})
 
 	t.Run("HostGroup", func(t *testing.T) {
@@ -316,7 +411,7 @@ func TestObjectSync(t *testing.T) {
 
 		// Wait some time to give Icinga DB a chance to finish the initial sync.
 		// TODO(jb): properly wait for this? but I don't know of a good way to detect this at the moment
-		time.Sleep(20 * time.Second)
+		time.Sleep(25 * time.Second)
 
 		client := i.ApiClient()
 
@@ -413,6 +508,82 @@ func TestObjectSync(t *testing.T) {
 						}
 
 						client.DeleteObject(t, "services", *service.HostName+"!"+service.Name, false)
+					})
+				}
+			})
+		})
+
+		t.Run("SlaLifeCycle", func(t *testing.T) {
+			t.Parallel()
+
+			assertCheckableFunc := func(checkable interface{}, objType string, objName string, host string, service string) {
+				client.CreateObject(t, objType, objName, map[string]interface{}{
+					"attrs": makeIcinga2ApiAttributes(checkable, false),
+				})
+
+				slinfo := &SlaLifecycle{CreateTime: types.UnixMilli(time.Now())}
+				eventually.Assert(t, func(t require.TestingT) {
+					// We can't join on the host/service tables, as the sla lifecycle entries may reference checkables
+					// that have already been deleted. So fetch the host/service id from DB before performing the actual test.
+					require.NoError(t, fetchCheckableId(db, slinfo, host, service))
+
+					verifySlaLifecycleRow(t, db, slinfo, false)
+				}, 20*time.Second, 1*time.Second)
+
+				client.DeleteObject(t, objType, objName, false)
+
+				slinfo.DeleteTime = types.UnixMilli(time.Now())
+				eventually.Assert(t, func(t require.TestingT) {
+					verifySlaLifecycleRow(t, db, slinfo, false)
+				}, 20*time.Second, 1*time.Second)
+
+				client.CreateObject(t, objType, objName, map[string]interface{}{
+					"attrs": makeIcinga2ApiAttributes(checkable, false),
+				})
+
+				// We are recreating this checkable, so we only have to change the timestamps as the
+				// checkable id will remain the same.
+				slinfo.CreateTime = types.UnixMilli(time.Now())
+				slinfo.DeleteTime = types.UnixMilli(time.Time{})
+
+				eventually.Assert(t, func(t require.TestingT) {
+					verifySlaLifecycleRow(t, db, slinfo, true)
+				}, 20*time.Second, 1*time.Second)
+
+				client.DeleteObject(t, objType, objName, false)
+
+				slinfo.DeleteTime = types.UnixMilli(time.Now())
+				eventually.Assert(t, func(t require.TestingT) {
+					verifySlaLifecycleRow(t, db, slinfo, true)
+				}, 20*time.Second, 1*time.Second)
+			}
+
+			t.Run("Host", func(t *testing.T) {
+				t.Parallel()
+
+				for hostId, host := range makeTestSyncHosts(t) {
+					host := host
+					hostId := hostId
+
+					t.Run("Verify-Host-"+fmt.Sprint(hostId), func(t *testing.T) {
+						t.Parallel()
+
+						assertCheckableFunc(host, "hosts", host.Name, host.Name, "")
+					})
+				}
+			})
+
+			t.Run("Service", func(t *testing.T) {
+				t.Parallel()
+
+				for serviceId, service := range makeTestSyncServices(t) {
+					service := service
+					serviceId := serviceId
+
+					t.Run("Verify-Service-"+fmt.Sprint(serviceId), func(t *testing.T) {
+						t.Parallel()
+
+						assertCheckableFunc(service, "services", *service.HostName+"!"+service.Name, *service.HostName, service.Name)
 					})
 				}
 			})
@@ -1186,6 +1357,86 @@ func verifyIcingaDbRow(t require.TestingT, db *sqlx.DB, obj interface{}) {
 	}
 
 	require.False(t, rows.Next(), "SQL query should return only one row: %s", query)
+}
+
+// verifySlaLifecycleRow verifies the sla lifecycle entries matching the given host/service id. It checks the creation
+// and deletion time of the specified checkable. When the provided checkable was recreated, it also additionally requires
+// two sla lifecycle entries to exist that match the checkables id.
+func verifySlaLifecycleRow(t require.TestingT, db *sqlx.DB, slinfo *SlaLifecycle, isRecreated bool) {
+	query := `SELECT "create_time", "delete_time" FROM "sla_lifecycle" WHERE "host_id" = ?`
+	args := []interface{}{slinfo.HostID}
+	if !slinfo.ServiceID.Valid() {
+		query += ` AND "service_id" IS NULL`
+	} else {
+		query += ` AND "service_id" = ?`
+		args = append(args, slinfo.ServiceID)
+	}
+	query += ` ORDER BY "create_time" ASC`
+
+	var resultSet []SlaLifecycle
+	err := db.Select(&resultSet, db.Rebind(query), args...)
+	require.NoError(t, err, "querying sla lifecycle should not fail: Query: %q", query)
+
+	zerotimestamp := time.Unix(0, 0)
+	var result SlaLifecycle
+
+	if isRecreated {
+		require.Len(t, resultSet, 2, "there should be two sla lifecycle entry")
+
+		result = resultSet[1]
+		recreated := resultSet[0]
+		assert.NotEqual(t, zerotimestamp, recreated.CreateTime.Time())
+		assert.NotEqual(t, zerotimestamp, recreated.DeleteTime.Time())
+
+		assert.Less(t, recreated.CreateTime.Time(), slinfo.CreateTime.Time())
+		assert.Less(t, recreated.DeleteTime.Time(), slinfo.CreateTime.Time())
+
+		if !slinfo.DeleteTime.Time().IsZero() {
+			assert.Less(t, recreated.CreateTime.Time(), slinfo.DeleteTime.Time())
+			assert.Less(t, recreated.DeleteTime.Time(), slinfo.DeleteTime.Time())
+		}
+	} else {
+		require.Len(t, resultSet, 1, "there should be one sla lifecycle entry")
+
+		result = resultSet[0]
+	}
+
+	assert.NotEqual(t, zerotimestamp, result.CreateTime.Time())
+	assert.WithinDuration(t, slinfo.CreateTime.Time(), result.CreateTime.Time(), time.Minute)
+
+	if slinfo.DeleteTime.Time().IsZero() {
+		assert.Equal(t, zerotimestamp, result.DeleteTime.Time())
+	} else {
+		assert.NotEqual(t, zerotimestamp, result.DeleteTime.Time())
+		assert.Less(t, result.CreateTime.Time(), result.DeleteTime.Time())
+		assert.WithinDuration(t, slinfo.DeleteTime.Time(), result.DeleteTime.Time(), time.Minute)
+	}
+}
+
+// fetchCheckableId retrieves host/service id from the database matching the given host/service
+// name and scans to the provided slinfo. Returns an error on any database failure.
+func fetchCheckableId(db *sqlx.DB, slinfo *SlaLifecycle, host string, service string) error {
+	query := `SELECT "sla_lifecycle"."host_id", "sla_lifecycle"."service_id"
+				FROM "sla_lifecycle" INNER JOIN "host" ON "host"."id"="sla_lifecycle"."host_id"`
+
+	where := ` WHERE "host"."name" = ?`
+	args := []interface{}{host}
+	if service == "" {
+		where += ` AND "service_id" IS NULL`
+	} else {
+		query += ` INNER JOIN "service" ON "service"."id"="sla_lifecycle"."service_id"`
+		where += ` AND "service"."name" = ?`
+		args = append(args, service)
+	}
+
+	return db.QueryRowx(db.Rebind(query+where), args...).StructScan(slinfo)
+}
+
+type SlaLifecycle struct {
+	CreateTime types.UnixMilli `db:"create_time"`
+	DeleteTime types.UnixMilli `db:"delete_time"`
+	HostID     types.Binary    `db:"host_id"`
+	ServiceID  types.Binary    `db:"service_id"`
 }
 
 // newString allocates a new *string and initializes it. This helper function exists as

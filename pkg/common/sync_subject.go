@@ -53,6 +53,13 @@ func (s SyncSubject) Factory() contracts.EntityFactoryFunc {
 // Rationale: Sync#ApplyDelta() uses its input entities which are WithChecksum() only for the delta itself
 // and not for insertion into the database, so EntityWithChecksum is enough. And it consumes less memory.
 func (s SyncSubject) FactoryForDelta() contracts.EntityFactoryFunc {
+	// Service types provides their own fingerprint, in which the host ids are also automatically selected,
+	// so that we don't have to perform extra queries to determine their host_ids when upserting sla
+	// lifecycle entries.
+	if _, ok := s.Entity().(*v1.Service); ok {
+		return v1.NewServiceFingerprint
+	}
+
 	if s.withChecksum {
 		return v1.NewEntityWithChecksum
 	}
