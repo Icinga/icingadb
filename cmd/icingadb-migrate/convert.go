@@ -150,19 +150,9 @@ func convertCommentRows(
 				},
 				AckHistoryUpserter: history.AckHistoryUpserter{ClearTime: clearTime},
 				SetTime:            setTime,
-				Author: icingadbTypes.String{
-					NullString: sql.NullString{
-						String: row.AuthorName,
-						Valid:  true,
-					},
-				},
-				Comment: icingadbTypes.String{
-					NullString: sql.NullString{
-						String: row.CommentData,
-						Valid:  true,
-					},
-				},
-				ExpireTime: convertTime(row.ExpirationTime, 0),
+				Author:             icingadbTypes.MakeString(row.AuthorName),
+				Comment:            icingadbTypes.MakeString(row.CommentData),
+				ExpireTime:         convertTime(row.ExpirationTime, 0),
 				IsPersistent: icingadbTypes.Bool{
 					Bool:  row.IsPersistent != 0,
 					Valid: true,
@@ -656,13 +646,8 @@ func convertNotificationRows(
 			SendTime:          ts,
 			State:             row.State,
 			PreviousHardState: previousHardState,
-			Text: icingadbTypes.String{
-				NullString: sql.NullString{
-					String: text,
-					Valid:  true,
-				},
-			},
-			UsersNotified: row.ContactsNotified,
+			Text:              icingadbTypes.MakeString(text),
+			UsersNotified:     row.ContactsNotified,
 		})
 
 		allHistory = append(allHistory, &history.HistoryNotification{

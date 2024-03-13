@@ -186,12 +186,7 @@ func (h *HA) controller() {
 						EntityWithoutChecksum: v1.EntityWithoutChecksum{IdMeta: v1.IdMeta{
 							Id: envId,
 						}},
-						Name: types.String{
-							NullString: sql.NullString{
-								String: envId.String(),
-								Valid:  true,
-							},
-						},
+						Name: types.MakeString(envId.String()),
 					}
 					h.environmentMu.Unlock()
 				}

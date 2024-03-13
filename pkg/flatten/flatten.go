@@ -1,7 +1,6 @@
 package flatten
 
 import (
-	"database/sql"
 	"fmt"
 	"github.com/icinga/icingadb/pkg/types"
 	"strconv"
@@ -37,7 +36,7 @@ func Flatten(value interface{}, prefix string) map[string]types.String {
 			if value != nil {
 				val = fmt.Sprintf("%v", value)
 			}
-			flattened[key] = types.String{NullString: sql.NullString{String: val, Valid: true}}
+			flattened[key] = types.MakeString(val)
 		}
 	}
 
