@@ -15,6 +15,14 @@ type String struct {
 	sql.NullString
 }
 
+// MakeString constructs a new non-NULL String from s.
+func MakeString(s string) String {
+	return String{sql.NullString{
+		String: s,
+		Valid:  true,
+	}}
+}
+
 // MarshalJSON implements the json.Marshaler interface.
 // Supports JSON null.
 func (s String) MarshalJSON() ([]byte, error) {
