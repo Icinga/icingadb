@@ -133,6 +133,9 @@ func Retryable(err error) bool {
 	if errors.Is(err, syscall.ENETDOWN) || errors.Is(err, syscall.ENETUNREACH) {
 		return true
 	}
+	if errors.Is(err, syscall.EPIPE) {
+		return true
+	}
 
 	if errors.Is(err, driver.ErrBadConn) {
 		return true
