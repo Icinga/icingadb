@@ -6,7 +6,3 @@ updates:
     interval: weekly
     time: '10:00'
   open-pull-requests-limit: 10
-  reviewers:
-  - Al2Klimov
-  - julianbrost
-  - lippserd
