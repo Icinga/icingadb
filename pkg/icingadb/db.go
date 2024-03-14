@@ -13,6 +13,7 @@ import (
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"reflect"
@@ -346,7 +347,22 @@ func (db *DB) BulkExec(
 						},
 						retry.Retryable,
 						backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-						retry.Settings{},
+						retry.Settings{
+							Timeout: 5 * time.Minute,
+							OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+								if lastErr == nil || err.Error() != lastErr.Error() {
+									db.logger.Warnw("Can't execute query. Retrying", zap.Error(err))
+								}
+							},
+							OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
+								if attempt > 0 {
+									db.logger.Infow("Query retried successfully after error",
+										zap.Duration("after", elapsed),
+										zap.Uint64("attempts", attempt+1),
+										zap.NamedError("recovered_error", lastErr))
+								}
+							},
+						},
 					)
 				}
 			}(b))
@@ -411,7 +427,22 @@ func (db *DB) NamedBulkExec(
 							},
 							retry.Retryable,
 							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-							retry.Settings{},
+							retry.Settings{
+								Timeout: 5 * time.Minute,
+								OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+									if lastErr == nil || err.Error() != lastErr.Error() {
+										db.logger.Warnw("Can't execute query. Retrying", zap.Error(err))
+									}
+								},
+								OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
+									if attempt > 0 {
+										db.logger.Infow("Query retried successfully after error",
+											zap.Duration("after", elapsed),
+											zap.Uint64("attempts", attempt+1),
+											zap.NamedError("recovered_error", lastErr))
+									}
+								},
+							},
 						)
 					}
 				}(b))
@@ -484,7 +515,22 @@ func (db *DB) NamedBulkExecTx(
 							},
 							retry.Retryable,
 							backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-							retry.Settings{},
+							retry.Settings{
+								Timeout: 5 * time.Minute,
+								OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+									if lastErr == nil || err.Error() != lastErr.Error() {
+										db.logger.Warnw("Can't execute query. Retrying", zap.Error(err))
+									}
+								},
+								OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
+									if attempt > 0 {
+										db.logger.Infow("Query retried successfully after error",
+											zap.Duration("after", elapsed),
+											zap.Uint64("attempts", attempt+1),
+											zap.NamedError("recovered_error", lastErr))
+									}
+								},
+							},
 						)
 					}
 				}(b))
