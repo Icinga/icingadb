@@ -26,7 +26,7 @@ therefore a dedicated Icinga DB instance that connects to it.
 
 Connection configuration for the database to which Icinga DB synchronizes monitoring data.
 This is also the database used in
-[Icinga DB Web](https://icinga.com/docs/icinga-db/latest/icinga-db-web/doc/01-About/) to view and work with the data.
+[Icinga DB Web](https://icinga.com/docs/icinga-db-web) to view and work with the data.
 In high availability setups, all Icinga DB instances must write to the same database.
 
 | Option   | Description                                                                                            |
