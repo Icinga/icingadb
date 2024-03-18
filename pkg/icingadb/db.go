@@ -32,6 +32,7 @@ type DB struct {
 	logger            *logging.Logger
 	tableSemaphores   map[string]*semaphore.Weighted
 	tableSemaphoresMu sync.Mutex
+	quoter            *Quoter
 }
 
 // Options define user configurable database options.
@@ -81,6 +82,7 @@ func NewDb(db *sqlx.DB, logger *logging.Logger, options *Options) *DB {
 		logger:          logger,
 		Options:         options,
 		tableSemaphores: make(map[string]*semaphore.Weighted),
+		quoter:          NewQuoter(db),
 	}
 }
 
@@ -136,8 +138,8 @@ func (db *DB) BuildColumns(subject interface{}) []string {
 // BuildDeleteStmt returns a DELETE statement for the given struct.
 func (db *DB) BuildDeleteStmt(from interface{}) string {
 	return fmt.Sprintf(
-		`DELETE FROM "%s" WHERE id IN (?)`,
-		utils.TableName(from),
+		"DELETE FROM %s WHERE id IN (?)",
+		db.quoter.QuoteIdentifier(utils.TableName(from)),
 	)
 }
 
@@ -146,9 +148,9 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 	columns := db.BuildColumns(into)
 
 	return fmt.Sprintf(
-		`INSERT INTO "%s" ("%s") VALUES (%s)`,
-		utils.TableName(into),
-		strings.Join(columns, `", "`),
+		"INSERT INTO %s (%s) VALUES (%s)",
+		db.quoter.QuoteIdentifier(utils.TableName(into)),
+		db.quoter.QuoteColumnList(columns),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 	), len(columns)
 }
@@ -163,15 +165,15 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 	switch db.DriverName() {
 	case driver.MySQL:
 		// MySQL treats UPDATE id = id as a no-op.
-		clause = fmt.Sprintf(`ON DUPLICATE KEY UPDATE "%s" = "%s"`, columns[0], columns[0])
+		clause = fmt.Sprintf("ON DUPLICATE KEY UPDATE %[1]s = %[1]s", db.quoter.QuoteIdentifier(columns[0]))
 	case driver.PostgreSQL:
 		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO NOTHING", table)
 	}
 
 	return fmt.Sprintf(
-		`INSERT INTO "%s" ("%s") VALUES (%s) %s`,
-		table,
-		strings.Join(columns, `", "`),
+		"INSERT INTO %s (%s) VALUES (%s) %s",
+		db.quoter.QuoteIdentifier(table),
+		db.quoter.QuoteColumnList(columns),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 		clause,
 	), len(columns)
@@ -181,14 +183,14 @@ func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
 // and the column list from the specified columns struct.
 func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
 	q := fmt.Sprintf(
-		`SELECT "%s" FROM "%s"`,
-		strings.Join(db.BuildColumns(columns), `", "`),
-		utils.TableName(table),
+		"SELECT %s FROM %s",
+		db.quoter.QuoteColumnList(db.BuildColumns(columns)),
+		db.quoter.QuoteIdentifier(utils.TableName(table)),
 	)
 
 	if scoper, ok := table.(contracts.Scoper); ok {
 		where, _ := db.BuildWhere(scoper.Scope())
-		q += ` WHERE ` + where
+		q += " WHERE " + where
 	}
 
 	return q
@@ -197,16 +199,11 @@ func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
 // BuildUpdateStmt returns an UPDATE statement for the given struct.
 func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 	columns := db.BuildColumns(update)
-	set := make([]string, 0, len(columns))
-
-	for _, col := range columns {
-		set = append(set, fmt.Sprintf(`"%s" = :%s`, col, col))
-	}
 
 	return fmt.Sprintf(
-		`UPDATE "%s" SET %s WHERE id = :id`,
-		utils.TableName(update),
-		strings.Join(set, ", "),
+		"UPDATE %s SET %s WHERE id = :id",
+		db.quoter.QuoteIdentifier(utils.TableName(update)),
+		strings.Join(db.quoter.BuildAssignmentList(columns), ", "),
 	), len(columns) + 1 // +1 because of WHERE id = :id
 }
 
@@ -226,25 +223,23 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 	switch db.DriverName() {
 	case driver.MySQL:
 		clause = "ON DUPLICATE KEY UPDATE"
-		setFormat = `"%[1]s" = VALUES("%[1]s")`
+		setFormat = fmt.Sprintf("%[1]s = VALUES(%[1]s)", db.quoter.QuoteIdentifier("%[1]s"))
 	case driver.PostgreSQL:
 		clause = fmt.Sprintf("ON CONFLICT ON CONSTRAINT pk_%s DO UPDATE SET", table)
-		setFormat = `"%[1]s" = EXCLUDED."%[1]s"`
+		setFormat = fmt.Sprintf("%[1]s = EXCLUDED.%[1]s", db.quoter.QuoteIdentifier("%[1]s"))
 	}
-
 	set := make([]string, 0, len(updateColumns))
-
 	for _, col := range updateColumns {
 		set = append(set, fmt.Sprintf(setFormat, col))
 	}
 
 	return fmt.Sprintf(
-		`INSERT INTO "%s" ("%s") VALUES (%s) %s %s`,
-		table,
-		strings.Join(insertColumns, `", "`),
-		fmt.Sprintf(":%s", strings.Join(insertColumns, ",:")),
+		"INSERT INTO %s (%s) VALUES (%s) %s %s",
+		db.quoter.QuoteIdentifier(table),
+		db.quoter.QuoteColumnList(insertColumns),
+		fmt.Sprintf(":%s", strings.Join(insertColumns, ", :")),
 		clause,
-		strings.Join(set, ","),
+		strings.Join(set, ", "),
 	), len(insertColumns)
 }
 
@@ -252,12 +247,8 @@ func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders in
 // combined with the AND operator.
 func (db *DB) BuildWhere(subject interface{}) (string, int) {
 	columns := db.BuildColumns(subject)
-	where := make([]string, 0, len(columns))
-	for _, col := range columns {
-		where = append(where, fmt.Sprintf(`"%s" = :%s`, col, col))
-	}
 
-	return strings.Join(where, ` AND `), len(columns)
+	return strings.Join(db.quoter.BuildAssignmentList(columns), " AND "), len(columns)
 }
 
 // OnSuccess is a callback for successful (bulk) DML operations.

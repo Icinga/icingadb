@@ -61,7 +61,8 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 
 		config.DBName = d.Database
 		config.Timeout = time.Minute
-		config.Params = map[string]string{"sql_mode": "ANSI_QUOTES"}
+		// Set strict SQL mode, i.e. trigger an error if an incorrect value is inserted into a column.
+		config.Params = map[string]string{"sql_mode": "TRADITIONAL"}
 
 		tlsConfig, err := d.TlsOptions.MakeConfig(d.Host)
 		if err != nil {
