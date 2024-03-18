@@ -156,7 +156,7 @@ ALTER TABLE acknowledgement_history
     MODIFY is_persistent enum('n','y') DEFAULT NULL COMMENT 'NULL if ack_set event happened before Icinga DB history recording';
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (2, CURRENT_TIMESTAMP() * 1000);
+  VALUES (2, UNIX_TIMESTAMP() * 1000);
 
 ALTER TABLE host_state
     MODIFY output longtext DEFAULT NULL,

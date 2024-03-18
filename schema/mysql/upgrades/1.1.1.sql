@@ -34,4 +34,4 @@ ALTER TABLE history
 UNLOCK TABLES;
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (4, CURRENT_TIMESTAMP() * 1000);
+  VALUES (4, UNIX_TIMESTAMP() * 1000);
