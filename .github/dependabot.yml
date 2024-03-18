@@ -1,12 +1,14 @@
 version: 2
 updates:
+
 - package-ecosystem: gomod
   directory: "/"
   schedule:
-    interval: weekly
-    time: '10:00'
+    interval: daily
   open-pull-requests-limit: 10
-  reviewers:
-  - Al2Klimov
-  - julianbrost
-  - lippserd
+
+- package-ecosystem: gomod
+  directory: "/tests"
+  schedule:
+    interval: daily
+  open-pull-requests-limit: 10
