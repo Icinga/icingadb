@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/go-redis/redis/v8 v8.11.5
-	github.com/go-sql-driver/mysql v1.7.1
+	github.com/go-sql-driver/mysql v1.8.0
 	github.com/goccy/go-yaml v1.9.5
 	github.com/google/uuid v1.3.0
 	github.com/icinga/icinga-testing v0.0.0-20240314110325-143a0bd42c70
@@ -17,6 +17,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/Icinga/go-libs v0.0.0-20220420130327-ef58ad52edd8 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
