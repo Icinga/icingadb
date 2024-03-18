@@ -143,7 +143,7 @@ func testHistory(t *testing.T, numNodes int) {
 	}, 15*time.Second, 200*time.Millisecond)
 
 	db, err := sqlx.Connect(rdb.Driver(), rdb.DSN())
-	require.NoError(t, err, "connecting to mysql")
+	require.NoError(t, err, "connecting to database")
 	t.Cleanup(func() { _ = db.Close() })
 
 	client := nodes[0].IcingaClient
