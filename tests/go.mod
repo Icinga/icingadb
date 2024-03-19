@@ -8,7 +8,7 @@ require (
 	github.com/goccy/go-yaml v1.9.5
 	github.com/google/uuid v1.6.0
 	github.com/icinga/icinga-testing v0.0.0-20240314110325-143a0bd42c70
-	github.com/jmoiron/sqlx v1.3.4
+	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.9
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.26.0
