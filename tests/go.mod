@@ -10,7 +10,7 @@ require (
 	github.com/icinga/icinga-testing v0.0.0-20240314110325-143a0bd42c70
 	github.com/jmoiron/sqlx v1.3.4
 	github.com/lib/pq v1.10.9
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.26.0
 	golang.org/x/exp v0.0.0-20221012112151-59b0eab1532e
 	golang.org/x/sync v0.6.0
