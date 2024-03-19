@@ -21,16 +21,22 @@ const (
 
 var timeout = time.Minute * 5
 
+type InitConnFunc func(context.Context, driver.Conn) error
+
 // RetryConnector wraps driver.Connector with retry logic.
 type RetryConnector struct {
 	driver.Connector
 
 	logger *logging.Logger
+
+	// initConn can be used to execute post Connect() arbitrary actions.
+	// It will be called after successfully initiated a new connection using the connector's Connect method.
+	initConn InitConnFunc
 }
 
 // NewConnector creates a fully initialized RetryConnector from the given args.
-func NewConnector(c driver.Connector, logger *logging.Logger) *RetryConnector {
-	return &RetryConnector{Connector: c, logger: logger}
+func NewConnector(c driver.Connector, logger *logging.Logger, init InitConnFunc) *RetryConnector {
+	return &RetryConnector{Connector: c, logger: logger, initConn: init}
 }
 
 // Connect implements part of the driver.Connector interface.
@@ -40,6 +46,13 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		ctx,
 		func(ctx context.Context) (err error) {
 			conn, err = c.Connector.Connect(ctx)
+			if err == nil && c.initConn != nil {
+				if err = c.initConn(ctx, conn); err != nil {
+					// We're going to retry this, so just don't bother whether Close() fails!
+					_ = conn.Close()
+				}
+			}
+
 			return
 		},
 		shouldRetry,

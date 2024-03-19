@@ -82,7 +82,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			return nil, errors.Wrap(err, "can't open mysql database")
 		}
 
-		db = sqlx.NewDb(sql.OpenDB(icingadbDriver.NewConnector(c, logger)), icingadbDriver.MySQL)
+		db = sqlx.NewDb(sql.OpenDB(icingadbDriver.NewConnector(c, logger, nil)), icingadbDriver.MySQL)
 	case "pgsql":
 		uri := &url.URL{
 			Scheme: "postgres",
@@ -136,7 +136,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			return nil, errors.Wrap(err, "can't open pgsql database")
 		}
 
-		db = sqlx.NewDb(sql.OpenDB(icingadbDriver.NewConnector(connector, logger)), icingadbDriver.PostgreSQL)
+		db = sqlx.NewDb(sql.OpenDB(icingadbDriver.NewConnector(connector, logger, nil)), icingadbDriver.PostgreSQL)
 	default:
 		return nil, unknownDbType(d.Type)
 	}
