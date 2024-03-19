@@ -27,10 +27,7 @@ func BenchmarkHistory(b *testing.B) {
 }
 
 func benchmarkHistory(b *testing.B, numComments int64) {
-	m := it.MysqlDatabase()
-	defer m.Cleanup()
-	m.ImportIcingaDbSchema()
-
+	rdb := getDatabase(b)
 	r := it.RedisServer()
 	defer r.Cleanup()
 	n := it.Icinga2Node("master")
@@ -39,8 +36,8 @@ func benchmarkHistory(b *testing.B, numComments int64) {
 	err := n.Reload()
 	require.NoError(b, err, "icinga2 should reload without error")
 
-	db, err := sqlx.Connect("mysql", m.DSN())
-	require.NoError(b, err, "connecting to mysql")
+	db, err := sqlx.Connect(rdb.Driver(), rdb.DSN())
+	require.NoError(b, err, "connecting to database")
 	defer func() { _ = db.Close() }()
 
 	redisClient := r.Open()
@@ -97,7 +94,7 @@ func benchmarkHistory(b *testing.B, numComments int64) {
 	b.Logf("current stream length: %d", lastPending)
 
 	b.StartTimer()
-	idb := it.IcingaDbInstance(r, m)
+	idb := it.IcingaDbInstance(r, rdb)
 	defer idb.Cleanup()
 
 	ticker := time.NewTicker(5 * time.Millisecond)

@@ -18,15 +18,14 @@ import (
 )
 
 func TestSla(t *testing.T) {
-	m := it.MysqlDatabaseT(t)
-	m.ImportIcingaDbSchema()
+	rdb := getDatabase(t)
 
 	r := it.RedisServerT(t)
 	i := it.Icinga2NodeT(t, "master")
 	i.EnableIcingaDb(r)
 	err := i.Reload()
 	require.NoError(t, err, "icinga2 should reload without error")
-	it.IcingaDbInstanceT(t, r, m)
+	it.IcingaDbInstanceT(t, r, rdb)
 
 	client := i.ApiClient()
 
@@ -109,8 +108,8 @@ func TestSla(t *testing.T) {
 
 		assert.Equal(t, 3, len(stateChanges), "there should be three hard state changes")
 
-		db, err := sqlx.Connect("mysql", m.DSN())
-		require.NoError(t, err, "connecting to mysql")
+		db, err := sqlx.Connect(rdb.Driver(), rdb.DSN())
+		require.NoError(t, err, "connecting to database")
 		defer func() { _ = db.Close() }()
 
 		type Row struct {
@@ -248,8 +247,8 @@ func TestSla(t *testing.T) {
 				End   int64 `db:"downtime_end"`
 			}
 
-			db, err := sqlx.Connect("mysql", m.DSN())
-			require.NoError(t, err, "connecting to mysql")
+			db, err := sqlx.Connect(rdb.Driver(), rdb.DSN())
+			require.NoError(t, err, "connecting to database")
 			defer func() { _ = db.Close() }()
 
 			if !o.Fixed {
