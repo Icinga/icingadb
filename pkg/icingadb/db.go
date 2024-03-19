@@ -54,6 +54,10 @@ type Options struct {
 	// MaxRowsPerTransaction defines the maximum number of rows per transaction.
 	// The default is 2^13, which in our tests showed the best performance in terms of execution time and parallelism.
 	MaxRowsPerTransaction int `yaml:"max_rows_per_transaction" default:"8192"`
+
+	// WsrepSyncWait defines which kinds of SQL statements catch up all pending sync between nodes first, see:
+	// https://mariadb.com/kb/en/galera-cluster-system-variables/#wsrep_sync_wait
+	WsrepSyncWait int `yaml:"wsrep_sync_wait" default:"7"`
 }
 
 // Validate checks constraints in the supplied database options and returns an error if they are violated.
