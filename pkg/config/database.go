@@ -1,7 +1,9 @@
 package config
 
 import (
+	"context"
 	"database/sql"
+	"database/sql/driver"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	icingadbDriver "github.com/icinga/icingadb/pkg/driver"
@@ -82,7 +84,12 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			return nil, errors.Wrap(err, "can't open mysql database")
 		}
 
-		db = sqlx.NewDb(sql.OpenDB(icingadbDriver.NewConnector(c, logger, nil)), icingadbDriver.MySQL)
+		wsrepSyncWait := int64(d.Options.WsrepSyncWait)
+		setWsrepSyncWait := func(ctx context.Context, conn driver.Conn) error {
+			return setGaleraOpts(ctx, conn, wsrepSyncWait)
+		}
+
+		db = sqlx.NewDb(sql.OpenDB(icingadbDriver.NewConnector(c, logger, setWsrepSyncWait)), icingadbDriver.MySQL)
 	case "pgsql":
 		uri := &url.URL{
 			Scheme: "postgres",
@@ -180,4 +187,37 @@ func (d *Database) isUnixAddr() bool {
 
 func unknownDbType(t string) error {
 	return errors.Errorf(`unknown database type %q, must be one of: "mysql", "pgsql"`, t)
+}
+
+// setGaleraOpts sets the "wsrep_sync_wait" variable for each session ensures that causality checks are performed
+// before execution and that each statement is executed on a fully synchronized node. Doing so prevents foreign key
+// violation when inserting into dependent tables on different MariaDB/MySQL nodes. When using MySQL single nodes,
+// the "SET SESSION" command will fail with "Unknown system variable (1193)" and will therefore be silently dropped.
+//
+// https://mariadb.com/kb/en/galera-cluster-system-variables/#wsrep_sync_wait
+func setGaleraOpts(ctx context.Context, conn driver.Conn, wsrepSyncWait int64) error {
+	const galeraOpts = "SET SESSION wsrep_sync_wait=?"
+
+	stmt, err := conn.(driver.ConnPrepareContext).PrepareContext(ctx, galeraOpts)
+	if err != nil {
+		if errors.Is(err, &mysql.MySQLError{Number: 1193}) { // Unknown system variable
+			return nil
+		}
+
+		return errors.Wrap(err, "cannot prepare "+galeraOpts)
+	}
+	// This is just for an unexpected exit and any returned error can safely be ignored and in case
+	// of the normal function exit, the stmt is closed manually, and its error is handled gracefully.
+	defer func() { _ = stmt.Close() }()
+
+	_, err = stmt.(driver.StmtExecContext).ExecContext(ctx, []driver.NamedValue{{Value: wsrepSyncWait}})
+	if err != nil {
+		return errors.Wrap(err, "cannot execute "+galeraOpts)
+	}
+
+	if err = stmt.Close(); err != nil {
+		return errors.Wrap(err, "cannot close prepared statement "+galeraOpts)
+	}
+
+	return nil
 }
