@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	github.com/creasty/defaults v1.7.0
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.8.0
 	github.com/goccy/go-yaml v1.11.3
 	github.com/google/uuid v1.6.0
@@ -14,6 +13,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pkg/errors v0.9.1
+	github.com/redis/go-redis/v9 v9.5.1
 	github.com/ssgreg/journald v1.0.0
 	github.com/stretchr/testify v1.9.0
 	github.com/vbauerster/mpb/v6 v6.0.4
@@ -26,7 +26,7 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fatih/color v1.13.0 // indirect

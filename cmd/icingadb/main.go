@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
@@ -17,6 +16,7 @@ import (
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/okzk/sdnotify"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"os"

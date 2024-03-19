@@ -2,13 +2,13 @@ package icingaredis
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"sync"

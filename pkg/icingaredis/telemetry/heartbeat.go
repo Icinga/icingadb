@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 	"fmt"
-	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/icingaredis"
@@ -11,6 +10,7 @@ import (
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"regexp"
 	"runtime/metrics"

@@ -3,13 +3,13 @@ module github.com/icinga/icingadb/tests
 go 1.18
 
 require (
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.8.0
 	github.com/goccy/go-yaml v1.11.3
 	github.com/google/uuid v1.6.0
-	github.com/icinga/icinga-testing v0.0.0-20240314110325-143a0bd42c70
+	github.com/icinga/icinga-testing v0.0.0-20240322142451-494ccd6d03e8
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.9
+	github.com/redis/go-redis/v9 v9.5.1
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20221012112151-59b0eab1532e

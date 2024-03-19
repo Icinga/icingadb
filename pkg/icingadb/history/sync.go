@@ -2,7 +2,6 @@ package history
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -17,6 +16,7 @@ import (
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 	"reflect"
 	"sync"
