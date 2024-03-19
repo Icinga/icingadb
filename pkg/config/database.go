@@ -1,14 +1,16 @@
 package config
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
-	"github.com/icinga/icingadb/pkg/driver"
+	icingadbDriver "github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
+	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"net"
 	"net/url"
@@ -36,10 +38,10 @@ type Database struct {
 // calls sqlx.Open, but returns *icingadb.DB.
 func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 	registerDriverOnce.Do(func() {
-		driver.Register(logger)
+		icingadbDriver.Register(logger)
 	})
 
-	var dsn string
+	var db *sqlx.DB
 	switch d.Type {
 	case "mysql":
 		config := mysql.NewConfig()
@@ -75,7 +77,12 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			}
 		}
 
-		dsn = config.FormatDSN()
+		c, err := mysql.NewConnector(config)
+		if err != nil {
+			return nil, errors.Wrap(err, "can't open mysql database")
+		}
+
+		db = sqlx.NewDb(sql.OpenDB(icingadbDriver.NewConnector(c, logger)), icingadbDriver.MySQL)
 	case "pgsql":
 		uri := &url.URL{
 			Scheme: "postgres",
@@ -123,14 +130,15 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 		}
 
 		uri.RawQuery = query.Encode()
-		dsn = uri.String()
+
+		connector, err := pq.NewConnector(uri.String())
+		if err != nil {
+			return nil, errors.Wrap(err, "can't open pgsql database")
+		}
+
+		db = sqlx.NewDb(sql.OpenDB(icingadbDriver.NewConnector(connector, logger)), icingadbDriver.PostgreSQL)
 	default:
 		return nil, unknownDbType(d.Type)
-	}
-
-	db, err := sqlx.Open("icingadb-"+d.Type, dsn)
-	if err != nil {
-		return nil, errors.Wrap(err, "can't open database")
 	}
 
 	db.SetMaxIdleConns(d.Options.MaxConnections / 3)
