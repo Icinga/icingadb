@@ -36,8 +36,6 @@ type Settings struct {
 func WithBackoff(
 	ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff, settings Settings,
 ) (err error) {
-	parentCtx := ctx
-
 	// Channel for retry deadline, which is set to the channel of NewTimer() if a timeout is configured,
 	// otherwise nil, so that it blocks forever if there is no timeout.
 	var timeout <-chan time.Time
@@ -87,14 +85,10 @@ func WithBackoff(
 
 			return
 		case <-ctx.Done():
-			if outerErr := parentCtx.Err(); outerErr != nil {
-				err = errors.Wrap(outerErr, "outer context canceled")
-			} else {
-				if err == nil {
-					err = ctx.Err()
-				}
-				err = errors.Wrap(err, "can't retry")
+			if err == nil {
+				err = ctx.Err()
 			}
+			err = errors.Wrap(err, "can't retry")
 
 			return
 		}
