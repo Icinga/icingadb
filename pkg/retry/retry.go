@@ -20,7 +20,10 @@ type IsRetryable func(error) bool
 
 // Settings aggregates optional settings for WithBackoff.
 type Settings struct {
-	// Timeout lets WithBackoff give up once elapsed (if >0).
+	// If >0, Timeout lets WithBackoff stop retrying once elapsed,
+	// but allows the RetryableFunc its execution time and **doesn't abort** it if it exceeds Timeout.
+	// This means that WithBackoff may not stop exactly after Timeout expires,
+	// or may not retry at all if the first execution of RetryableFunc already takes longer than Timeout.
 	Timeout time.Duration
 	// OnError is called if an error occurs.
 	OnError func(elapsed time.Duration, attempt uint64, err, lastErr error)
@@ -35,10 +38,13 @@ func WithBackoff(
 ) (err error) {
 	parentCtx := ctx
 
+	timeWindow, cancelTimeWindow := context.WithCancel(context.Background())
+	defer cancelTimeWindow()
+
 	if settings.Timeout > 0 {
-		var cancelCtx context.CancelFunc
-		ctx, cancelCtx = context.WithTimeout(ctx, settings.Timeout)
-		defer cancelCtx()
+		defer time.AfterFunc(settings.Timeout, func() {
+			cancelTimeWindow()
+		}).Stop()
 	}
 
 	start := time.Now()
@@ -69,8 +75,16 @@ func WithBackoff(
 			return
 		}
 
-		sleep := b(attempt)
 		select {
+		case <-time.After(b(attempt)):
+		case <-timeWindow.Done():
+			if err != nil {
+				err = errors.Wrap(err, "retry deadline exceeded")
+			} else {
+				err = errors.New("retry deadline exceeded")
+			}
+
+			return
 		case <-ctx.Done():
 			if outerErr := parentCtx.Err(); outerErr != nil {
 				err = errors.Wrap(outerErr, "outer context canceled")
@@ -82,7 +96,6 @@ func WithBackoff(
 			}
 
 			return
-		case <-time.After(sleep):
 		}
 	}
 }
