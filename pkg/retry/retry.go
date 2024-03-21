@@ -36,8 +36,6 @@ type Settings struct {
 func WithBackoff(
 	ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff, settings Settings,
 ) (err error) {
-	parentCtx := ctx
-
 	timeWindow, cancelTimeWindow := context.WithCancel(context.Background())
 	defer cancelTimeWindow()
 
@@ -86,14 +84,10 @@ func WithBackoff(
 
 			return
 		case <-ctx.Done():
-			if outerErr := parentCtx.Err(); outerErr != nil {
-				err = errors.Wrap(outerErr, "outer context canceled")
-			} else {
-				if err == nil {
-					err = ctx.Err()
-				}
-				err = errors.Wrap(err, "can't retry")
+			if err == nil {
+				err = ctx.Err()
 			}
+			err = errors.Wrap(err, "can't retry")
 
 			return
 		}
