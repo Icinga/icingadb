@@ -62,13 +62,15 @@ func WithBackoff(
 			settings.OnError(time.Since(start), attempt, err, prevErr)
 		}
 
-		isRetryable := retryable(err)
+		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+			if prevErr != nil {
+				err = errors.Wrap(err, prevErr.Error())
+			}
 
-		if prevErr != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
-			err = prevErr
+			return
 		}
 
-		if !isRetryable {
+		if !retryable(err) {
 			err = errors.Wrap(err, "can't retry")
 
 			return
@@ -85,10 +87,7 @@ func WithBackoff(
 
 			return
 		case <-ctx.Done():
-			if err == nil {
-				err = ctx.Err()
-			}
-			err = errors.Wrap(err, "can't retry")
+			err = errors.Wrap(ctx.Err(), err.Error())
 
 			return
 		}
