@@ -78,18 +78,11 @@ func WithBackoff(
 		select {
 		case <-time.After(b(attempt)):
 		case <-timeWindow.Done():
-			if err != nil {
-				err = errors.Wrap(err, "retry deadline exceeded")
-			} else {
-				err = errors.New("retry deadline exceeded")
-			}
+			err = errors.Wrap(err, "retry deadline exceeded")
 
 			return
 		case <-ctx.Done():
-			if err == nil {
-				err = ctx.Err()
-			}
-			err = errors.Wrap(err, "can't retry")
+			err = errors.Wrap(err, ctx.Err().Error())
 
 			return
 		}
