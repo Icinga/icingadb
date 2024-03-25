@@ -1343,4 +1343,4 @@ CREATE TABLE icingadb_schema (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (4, CURRENT_TIMESTAMP() * 1000);
+  VALUES (4, UNIX_TIMESTAMP() * 1000);

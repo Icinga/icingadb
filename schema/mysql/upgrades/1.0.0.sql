@@ -288,4 +288,4 @@ INSERT INTO sla_history_downtime
   ON DUPLICATE KEY UPDATE sla_history_downtime.downtime_id = sla_history_downtime.downtime_id;
 
 INSERT INTO icingadb_schema (version, TIMESTAMP)
-  VALUES (3, CURRENT_TIMESTAMP() * 1000);
+  VALUES (3, UNIX_TIMESTAMP() * 1000);
