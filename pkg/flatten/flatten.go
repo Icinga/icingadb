@@ -31,12 +31,10 @@ func Flatten(value interface{}, prefix string) map[string]types.String {
 			for i, v := range value {
 				flatten(key+"["+strconv.Itoa(i)+"]", v)
 			}
+		case nil:
+			flattened[key] = types.MakeString("null")
 		default:
-			val := "null"
-			if value != nil {
-				val = fmt.Sprintf("%v", value)
-			}
-			flattened[key] = types.MakeString(val)
+			flattened[key] = types.MakeString(fmt.Sprintf("%v", value))
 		}
 	}
 
