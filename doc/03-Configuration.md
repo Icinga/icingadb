@@ -83,6 +83,8 @@ allowing to keep this information for longer with a smaller storage footprint.
 |--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | history-days | **Optional.** Number of days to retain historical data for all history categories. Use `options` in order to enable retention only for specific categories or to override the retention days configured here. |
 | sla-days     | **Optional.** Number of days to retain historical data for SLA reporting.                                                                                                                                     |
+| interval     | **Optional.** Interval for periodically cleaning up the historical data, defined as [duration string](#duration-string). Defaults to `"1h"`.                                                                  |
+| count        | **Optional.** Number of old historical data a single query can delete in a `"DELETE FROM ... LIMIT count"` manner. Defaults to `5000`.                                                                        |
 | options      | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification`, `sla` and `state`.                 |
 
 ## Appendix
