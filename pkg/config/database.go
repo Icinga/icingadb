@@ -17,11 +17,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
-
-var registerDriverOnce sync.Once
 
 // Database defines database client configuration.
 type Database struct {
@@ -38,10 +35,6 @@ type Database struct {
 // Open prepares the DSN string and driver configuration,
 // calls sqlx.Open, but returns *icingadb.DB.
 func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
-	registerDriverOnce.Do(func() {
-		icingadb.Register(logger)
-	})
-
 	var db *sqlx.DB
 	switch d.Type {
 	case "mysql":
@@ -77,6 +70,8 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 				return nil, errors.Wrap(err, "can't register TLS config")
 			}
 		}
+
+		icingadb.Register(logger)
 
 		c, err := mysql.NewConnector(config)
 		if err != nil {
