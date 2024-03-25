@@ -48,6 +48,42 @@ func TestSla(t *testing.T) {
 		End:      2000,
 		Expected: 60.0,
 	}, {
+		Name: "MultipleStateChangesDecimalsOddNumbers",
+		// Test flapping again, also that calculations are rounded correctly including decimal places.
+		Events: []SlaHistoryEvent{
+			&State{Time: 1000, State: 2, PreviousState: 99}, // -2.3%
+			&State{Time: 1023, State: 0, PreviousState: 2},
+			&State{Time: 1100, State: 2, PreviousState: 0}, // -14.2%
+			&State{Time: 1242, State: 0, PreviousState: 2},
+			&State{Time: 1300, State: 2, PreviousState: 0}, // -0.7%
+			&State{Time: 1307, State: 0, PreviousState: 2},
+			&State{Time: 1400, State: 2, PreviousState: 0}, // -26.6%
+			&State{Time: 1666, State: 0, PreviousState: 2},
+		},
+		Start:    1000,
+		End:      2000,
+		Expected: 56.2,
+	}, {
+		Name: "MultipleStateChangesDecimalsFractionOneThird",
+		// Test decimal representation of a fraction including precision and scale.
+		Events: []SlaHistoryEvent{
+			&State{Time: 1000, State: 2, PreviousState: 99}, // -33.3..%
+			&State{Time: 1100, State: 0, PreviousState: 2},
+		},
+		Start:    1000,
+		End:      1300,
+		Expected: 66.6667,
+	}, {
+		Name: "MultipleStateChangesDecimalsFractionSeventhPart",
+		// Test decimal representation of a fraction including precision and scale.
+		Events: []SlaHistoryEvent{
+			&State{Time: 1000, State: 2, PreviousState: 99}, // -85.7142..%
+			&State{Time: 1600, State: 0, PreviousState: 2},
+		},
+		Start:    1000,
+		End:      1700,
+		Expected: 14.2857,
+	}, {
 		Name: "OverlappingDowntimesAndProblems",
 		// SLA should be 90%:
 		// 1000..1100: OK, no downtime

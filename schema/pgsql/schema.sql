@@ -166,7 +166,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  RETURN 100 * (total_time - problem_time) / total_time;
+  RETURN (100 * (total_time - problem_time)::decimal / total_time)::decimal(7, 4);
 END;
 $$;
 
