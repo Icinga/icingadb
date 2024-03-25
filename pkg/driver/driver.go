@@ -19,8 +19,6 @@ const (
 	PostgreSQL string = "postgres"
 )
 
-var timeout = time.Minute * 5
-
 type InitConnFunc func(context.Context, driver.Conn) error
 
 // RetryConnector wraps driver.Connector with retry logic.
@@ -58,7 +56,7 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		shouldRetry,
 		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
 		retry.Settings{
-			Timeout: timeout,
+			Timeout: time.Minute * 5,
 			OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
 				telemetry.UpdateCurrentDbConnErr(err)
 
