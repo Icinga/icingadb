@@ -17,6 +17,7 @@ func TestFlatten(t *testing.T) {
 		{"bool", "b", true, map[string]types.String{"b": types.MakeString("true")}},
 		{"int", "c", 42, map[string]types.String{"c": types.MakeString("42")}},
 		{"float", "d", 77.7, map[string]types.String{"d": types.MakeString("77.7")}},
+		{"large_float", "e", 1e23, map[string]types.String{"e": types.MakeString("100000000000000000000000")}},
 		{"string", "f", "\x00", map[string]types.String{"f": types.MakeString("\x00")}},
 		{"nil_slice", "g", []any(nil), map[string]types.String{"g": {}}},
 		{"empty_slice", "h", []any{}, map[string]types.String{"h": {}}},

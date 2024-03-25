@@ -33,6 +33,8 @@ func Flatten(value interface{}, prefix string) map[string]types.String {
 			}
 		case nil:
 			flattened[key] = types.MakeString("null")
+		case float64:
+			flattened[key] = types.MakeString(strconv.FormatFloat(value, 'f', -1, 64))
 		default:
 			flattened[key] = types.MakeString(fmt.Sprintf("%v", value))
 		}
