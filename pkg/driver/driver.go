@@ -87,7 +87,7 @@ func (d Driver) OpenConnector(name string) (driver.Connector, error) {
 func Register(logger *logging.Logger) {
 	sql.Register(MySQL, &Driver{ctxDriver: &mysql.MySQLDriver{}, Logger: logger})
 	sql.Register(PostgreSQL, &Driver{ctxDriver: PgSQLDriver{}, Logger: logger})
-	_ = mysql.SetLogger(mysqlLogger(func(v ...interface{}) { logger.Debug(v...) }))
+	_ = mysql.SetLogger(mysqlLogger(logger.Debug))
 	sqlx.BindDriver(PostgreSQL, sqlx.DOLLAR)
 }
 
