@@ -2,12 +2,12 @@ package telemetry
 
 import (
 	"context"
-	"github.com/go-redis/redis/v8"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"strconv"
 	"time"

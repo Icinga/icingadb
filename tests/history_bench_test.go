@@ -3,10 +3,10 @@ package icingadb_test
 import (
 	"context"
 	"fmt"
-	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	"github.com/icinga/icinga-testing/utils"
 	"github.com/jmoiron/sqlx"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/require"
 	"strconv"
 	"testing"
