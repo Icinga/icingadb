@@ -3,7 +3,6 @@ package icingadb
 import (
 	"context"
 	"database/sql/driver"
-	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
@@ -82,16 +81,11 @@ func (c RetryConnector) Driver() driver.Driver {
 	return c.Connector.Driver()
 }
 
-// Register sets the default mysql logger to the given one.
-func Register(logger *logging.Logger) {
-	_ = mysql.SetLogger(mysqlLogger(logger.Debug))
-}
-
-// mysqlLogger is an adapter that allows ordinary functions to be used as a logger for mysql.SetLogger.
-type mysqlLogger func(v ...interface{})
+// MysqlFuncLogger is an adapter that allows ordinary functions to be used as a logger for mysql.SetLogger.
+type MysqlFuncLogger func(v ...interface{})
 
 // Print implements the mysql.Logger interface.
-func (log mysqlLogger) Print(v ...interface{}) {
+func (log MysqlFuncLogger) Print(v ...interface{}) {
 	log(v)
 }
 

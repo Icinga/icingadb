@@ -71,7 +71,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			}
 		}
 
-		icingadb.Register(logger)
+		_ = mysql.SetLogger(icingadb.MysqlFuncLogger(logger.Debug))
 
 		c, err := mysql.NewConnector(config)
 		if err != nil {
