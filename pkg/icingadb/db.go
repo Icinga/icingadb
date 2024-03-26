@@ -54,8 +54,10 @@ type Options struct {
 	// The default is 2^13, which in our tests showed the best performance in terms of execution time and parallelism.
 	MaxRowsPerTransaction int `yaml:"max_rows_per_transaction" default:"8192"`
 
-	// WsrepSyncWait defines which kinds of SQL statements catch up all pending sync between nodes first, see:
-	// https://mariadb.com/kb/en/galera-cluster-system-variables/#wsrep_sync_wait
+	// WsrepSyncWait enforces Galera cluster nodes to perform strict cluster-wide causality checks
+	// before executing specific SQL queries determined by the number you provided.
+	// Please refer to the below link for a detailed description.
+	// https://icinga.com/docs/icinga-db/latest/doc/03-Configuration/#galera-cluster
 	WsrepSyncWait int `yaml:"wsrep_sync_wait" default:"7"`
 }
 
