@@ -52,6 +52,7 @@ database:
 
     # Enforce Galera cluster nodes to perform strict cluster-wide causality checks before executing
     # specific SQL queries determined by the number you provided.
+    # Note: You can only set this option to a number "0 - 15".
     # Defaults to 7.
     # See https://icinga.com/docs/icinga-db/latest/doc/03-Configuration/#galera-cluster
 #    wsrep_sync_wait: 7

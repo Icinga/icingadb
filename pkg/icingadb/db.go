@@ -75,6 +75,9 @@ func (o *Options) Validate() error {
 	if o.MaxRowsPerTransaction < 1 {
 		return errors.New("max_rows_per_transaction must be at least 1")
 	}
+	if o.WsrepSyncWait < 0 || o.WsrepSyncWait > 15 {
+		return errors.New("wsrep_sync_wait can only be set to a number between 0 and 15")
+	}
 
 	return nil
 }
