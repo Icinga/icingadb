@@ -29,19 +29,38 @@ This is also the database used in
 [Icinga DB Web](https://icinga.com/docs/icinga-db-web) to view and work with the data.
 In high availability setups, all Icinga DB instances must write to the same database.
 
-| Option   | Description                                                                                            |
-|----------|--------------------------------------------------------------------------------------------------------|
-| type     | **Optional.** Either `mysql` (default) or `pgsql`.                                                     |
-| host     | **Required.** Database host or absolute Unix socket path.                                              |
-| port     | **Optional.** Database port. By default, the MySQL or PostgreSQL port, depending on the database type. |
-| database | **Required.** Database name.                                                                           |
-| user     | **Required.** Database username.                                                                       |
-| password | **Optional.** Database password.                                                                       |
-| tls      | **Optional.** Whether to use TLS.                                                                      |
-| cert     | **Optional.** Path to TLS client certificate.                                                          |
-| key      | **Optional.** Path to TLS private key.                                                                 |
-| ca       | **Optional.** Path to TLS CA certificate.                                                              |
-| insecure | **Optional.** Whether not to verify the peer.                                                          |
+| Option   | Description                                                                                                                                                                      |
+|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| type     | **Optional.** Either `mysql` (default) or `pgsql`.                                                                                                                               |
+| host     | **Required.** Database host or absolute Unix socket path.                                                                                                                        |
+| port     | **Optional.** Database port. By default, the MySQL or PostgreSQL port, depending on the database type.                                                                           |
+| database | **Required.** Database name.                                                                                                                                                     |
+| user     | **Required.** Database username.                                                                                                                                                 |
+| password | **Optional.** Database password.                                                                                                                                                 |
+| tls      | **Optional.** Whether to use TLS.                                                                                                                                                |
+| cert     | **Optional.** Path to TLS client certificate.                                                                                                                                    |
+| key      | **Optional.** Path to TLS private key.                                                                                                                                           |
+| ca       | **Optional.** Path to TLS CA certificate.                                                                                                                                        |
+| insecure | **Optional.** Whether not to verify the peer.                                                                                                                                    |
+| options  | **Optional.** List of low-level database options that can be set to influence some Icinga DB internal default behaviours. See [database options](#database-options) for details. |
+
+### Database Options
+
+Each of these configuration options are highly technical with thoroughly considered and tested default values that you
+should only change when you exactly know what you are doing. You can use these options to influence the Icinga DB default
+behaviour, how it interacts with databases, thus the defaults are usually sufficient for most users and do not need any
+manual adjustments.
+
+!!! important
+
+    Do not change the defaults if you do not have to!
+
+| Option                         | Description                                                                                                                                      |
+|--------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| max_connections                | **Optional.** Maximum number of database connections Icinga DB is allowed to open in parallel if necessary. Defaults to `16`.                    |
+| max_connections_per_table      | **Optional.** Maximum number of queries Icinga DB is allowed to execute on a single table concurrently. Defaults to `8`.                         |
+| max_placeholders_per_statement | **Optional.** Maximum number of placeholders Icinga DB is allowed to use for a single SQL statement. Defaults to `8192`.                         |
+| max_rows_per_transaction       | **Optional.** Maximum number of rows Icinga DB is allowed to `SELECT`,`DELETE`,`UPDATE` or `INSERT` in a single transaction. Defaults to `8192`. |
 
 ## Logging Configuration
 
