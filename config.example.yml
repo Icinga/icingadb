@@ -79,6 +79,16 @@ retention:
   # Number of days to retain historical data for SLA reporting. By default, it is retained forever.
 #  sla-days:
 
+  # Interval for periodically cleaning up the historical data, defined as a duration string.
+  # A duration string is a sequence of decimal numbers and a unit suffix, such as "20s".
+  # Valid units are "ms", "s", "m", "h".
+  # Defaults to "1h".
+#  interval: 1h
+
+  # Number of old historical entries a single query can delete in a "DELETE FROM ... LIMIT count" manner.
+  # By default, this is limited to 5000 entries.
+#  count: 5000
+
   # Map of history category to number of days to retain its data in order to
   # enable retention only for specific categories or to
   # override the number that has been configured in history-days.
