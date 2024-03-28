@@ -30,7 +30,7 @@ type Checkable struct {
 	IconImageAlt          string       `json:"icon_image_alt"`
 	IconImageId           types.Binary `json:"icon_image_id"`
 	IsVolatile            types.Bool   `json:"is_volatile"`
-	MaxCheckAttempts      float64      `json:"max_check_attempts"`
+	MaxCheckAttempts      uint32       `json:"max_check_attempts"`
 	Notes                 string       `json:"notes"`
 	NotesUrlId            types.Binary `json:"notes_url_id"`
 	NotificationsEnabled  types.Bool   `json:"notifications_enabled"`

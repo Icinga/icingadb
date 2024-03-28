@@ -724,8 +724,8 @@ type stateRow = struct {
 	StateTimeUsec       uint32
 	State               uint8
 	StateType           uint8
-	CurrentCheckAttempt uint16
-	MaxCheckAttempts    uint16
+	CurrentCheckAttempt uint32
+	MaxCheckAttempts    uint32
 	LastState           uint8
 	LastHardState       uint8
 	Output              sql.NullString
@@ -798,10 +798,10 @@ func convertStateRows(
 			HardState:         row.LastHardState,
 			PreviousSoftState: row.LastState,
 			PreviousHardState: previousHardState,
-			CheckAttempt:      uint8(row.CurrentCheckAttempt),
+			CheckAttempt:      row.CurrentCheckAttempt,
 			Output:            icingadbTypes.String{NullString: row.Output},
 			LongOutput:        icingadbTypes.String{NullString: row.LongOutput},
-			MaxCheckAttempts:  uint32(row.MaxCheckAttempts),
+			MaxCheckAttempts:  row.MaxCheckAttempts,
 			CheckSource:       icingadbTypes.String{NullString: row.CheckSource},
 		})
 

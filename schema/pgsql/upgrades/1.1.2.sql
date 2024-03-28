@@ -137,3 +137,12 @@ BEGIN
   RETURN (100 * (total_time - problem_time)::decimal / total_time)::decimal(7, 4);
 END;
 $$;
+
+ALTER TABLE host_state ALTER COLUMN check_attempt TYPE uint;
+
+ALTER TABLE service_state ALTER COLUMN check_attempt TYPE uint;
+
+COMMENT ON COLUMN state_history.check_attempt IS 'optional schema upgrade not applied yet, see https://icinga.com/docs/icinga-db/latest/doc/04-Upgrading/#upgrading-to-icinga-db-v112';
+
+INSERT INTO icingadb_schema (version, timestamp)
+  VALUES (3, extract(epoch from now()) * 1000);
