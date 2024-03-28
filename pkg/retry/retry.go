@@ -3,6 +3,7 @@ package retry
 import (
 	"context"
 	"database/sql/driver"
+	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/lib/pq"
@@ -65,7 +66,7 @@ func WithBackoff(
 		}
 
 		if !isRetryable {
-			err = errors.Wrap(err, "can't retry")
+			err = errors.Wrap(err, "can't retry non-retryable error")
 
 			return
 		}
@@ -76,10 +77,19 @@ func WithBackoff(
 			if outerErr := parentCtx.Err(); outerErr != nil {
 				err = errors.Wrap(outerErr, "outer context canceled")
 			} else {
+				var errMsg string
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) && settings.Timeout > 0 {
+					errMsg = fmt.Sprintf("can't retry as timeout of %v has been exceeded", settings.Timeout)
+				} else {
+					// This shouldn't happen as the context should either be the parentCtx or be
+					// wrapped as context.WithTimeout. However, just to be future-proof...
+					errMsg = "can't retry as subcontext is canceled"
+				}
+
 				if err == nil {
 					err = ctx.Err()
 				}
-				err = errors.Wrap(err, "can't retry")
+				err = errors.Wrap(err, errMsg)
 			}
 
 			return
