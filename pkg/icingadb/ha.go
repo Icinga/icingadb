@@ -9,7 +9,6 @@ import (
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/driver"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
@@ -246,7 +245,7 @@ func (h *HA) realize(ctx context.Context, s *icingaredisv1.IcingaStatus, t *type
 			isoLvl := sql.LevelSerializable
 			selectLock := ""
 
-			if h.db.DriverName() == driver.MySQL {
+			if h.db.DriverName() == MySQL {
 				// The RDBMS may actually be a Percona XtraDB Cluster which doesn't
 				// support serializable transactions, but only their following equivalent:
 				isoLvl = sql.LevelRepeatableRead

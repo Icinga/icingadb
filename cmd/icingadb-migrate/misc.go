@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/sha1"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/driver"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
@@ -110,7 +109,7 @@ func sliceIdoHistory[Row any](
 	args["checkpoint"] = checkpoint
 	args["bulk"] = 20000
 
-	if ht.snapshot.DriverName() != driver.MySQL {
+	if ht.snapshot.DriverName() != icingadb.MySQL {
 		query = strings.ReplaceAll(query, " USE INDEX (PRIMARY)", "")
 	}
 
