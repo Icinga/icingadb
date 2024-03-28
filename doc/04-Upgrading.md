@@ -3,6 +3,70 @@
 Specific version upgrades are described below. Please note that version upgrades are incremental.
 If you are upgrading across multiple versions, make sure to follow the steps for each of them.
 
+## Upgrading to Icinga DB v1.1.2
+
+Please apply the `1.1.2.sql` upgrade script to your database. For package installations, you can find this file at
+`/usr/share/icingadb/schema/mysql/upgrades/` or `/usr/share/icingadb/schema/pgsql/upgrades/`, depending on your
+database vendor.
+
+!!! warning
+
+    With MySQL and MariaDB, a locking issue can occur if the schema upgrade is applied while the history view is
+    accessed in Icinga DB Web. This can result in the upgrade being delayed unnecessarily and blocking other queries.
+    Please see [unblock history tables](#unblock-history-tables) for how to detect and resolve this situation.
+
+### Unblock History Tables
+
+!!! info
+
+    You don't need to read this section if you are using PostgreSQL. This applies to MySQL/MariaDB users only.
+
+In order to fix a loading performance issue of the history view in Icinga DB Web, this upgrade script adds an
+appropriate index on the `history` table. Creating this new index normally takes place without blocking any other
+queries. However, this may hang for a relatively considerable time, blocking all Icinga DB queries on all`*_history`
+tables and the `history` table inclusively if there is an ongoing, long-running query on the `history` table. One way
+of causing this to happen is if an Icinga Web user accesses the `icingadb/history` view just before you are running
+this script. Depending on how many entries you have in the history table, Icinga DB Web may take quite a long time to
+load, until your web servers timeout (if any) kicks in.
+
+When you observe that the upgrade script has been taking unusually long (`> 60s`) to complete, you can perform the
+following analysis on another console and unblock it if necessary. It is important to note though that the script may
+need some time to perform the reindexing on the `history` table even if it is not blocked. Nonetheless, you can use the
+`show processlist` command to determine whether an excessive number of queries have been stuck in a waiting state.
+
+```
+MariaDB [icingadb]> show processlist;
++------+-----+-----+----------+-----+------+---------------------------------+------------------------------------+-----+
+| Id   | ... | ... | db       | ... | Time | State                           | Info                               | ... |
++------+-----+-----+----------+-----+------+---------------------------------+------------------------------------+-----+
+| 1475 | ... | ... | icingadb | ... | 1222 | Waiting for table metadata lock | INSERT INTO "notification_history" | ... |
+| 1485 | ... | ... | icingadb | ... | 1262 | Creating sort index             | SELECT history.id, history....     | ... |
+| 1494 | ... | ... | icingadb | ... | 1224 | Waiting for table metadata lock | ALTER TABLE history ADD INDEX ...  | ... |
+| 1499 | ... | ... | icingadb | ... | 1215 | Waiting for table metadata lock | INSERT INTO "notification_history" | ... |
+| 1500 | ... | ... | icingadb | ... | 1215 | Waiting for table metadata lock | INSERT INTO "state_history" ...    | ... |
+| ...  | ... | ... |   ...    | ... | ...  |               ...               |                 ...                | ... |
++------+-----+-----+----------+-----+------+---------------------------------+------------------------------------+-----+
+```
+
+In the above output are way too many Icinga DB queries, including the `ALTER TABLE history ADD INDEX` query from the
+upgrade script, waiting for a metadata lock, they are just minimised to the bare essentials. Unfortunately, only one of
+these queries is holding the `table metadata lock` that everyone else is now waiting for, which in this case is a
+`SELECT` statement initiated by Icinga DB Web in the `icingadb/history` view, which takes an unimaginably long time.
+Note that there might be multiple `SELECT` statements started before the upgrade script in your case when the history
+view of your Icinga DB Web is opened by different Icinga Web users at the same time.
+
+You can now either just wait for the `SELECT` statements to finish by themselves and let them block the upgrade script
+and all Icinga DB queries on all `*_history` tables or forcibly terminate them and let the remaining queries do their
+work. In this case, cancelling that one blocking `SELECT` query will let the upgrade script continue normally without
+blocking any other queries.
+``` 
+MariaDB [icingadb]> kill 1485;
+```
+In case you are insecure about which Icinga DB Web queries are blocking, you may simply cancel all long-running
+`SELECT` statements listed with `show processlist` (see column `Time`). Cancelling a `SELECT` query will neither
+crash Icinga DB nor corrupt your database, so feel free to abort every single one of them matching the Icinga DB
+database (see column `db`).
+
 ## Upgrading to Icinga DB v1.1.1
 
 Please apply the `1.1.1.sql` upgrade script to your database.
