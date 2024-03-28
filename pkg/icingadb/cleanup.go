@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"github.com/icinga/icingadb/internal"
+	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/driver"
+	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/types"
+	"go.uber.org/zap"
 	"time"
 )
 
@@ -41,19 +44,50 @@ func (db *DB) CleanupOlderThan(
 	count uint64, olderThan time.Time, onSuccess ...OnSuccess[struct{}],
 ) (uint64, error) {
 	var counter com.Counter
-	defer db.log(ctx, stmt.Build(db.DriverName(), 0), &counter).Stop()
+	var n int64
+
+	q := db.Rebind(stmt.Build(db.DriverName(), count))
+
+	defer db.log(ctx, q, &counter).Stop()
 
 	for {
-		q := db.Rebind(stmt.Build(db.DriverName(), count))
-		rs, err := db.NamedExecContext(ctx, q, cleanupWhere{
-			EnvironmentId: envId,
-			Time:          types.UnixMilli(olderThan),
-		})
-		if err != nil {
-			return 0, internal.CantPerformQuery(err, q)
-		}
+		err := retry.WithBackoff(
+			ctx,
+			func(ctx context.Context) error {
+				rs, err := db.NamedExecContext(ctx, q, cleanupWhere{
+					EnvironmentId: envId,
+					Time:          types.UnixMilli(olderThan),
+				})
+				if err != nil {
+					return internal.CantPerformQuery(err, q)
+				}
 
-		n, err := rs.RowsAffected()
+				n, err = rs.RowsAffected()
+				if err != nil {
+					return err
+				}
+
+				return nil
+			},
+			retry.Retryable,
+			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+			retry.Settings{
+				Timeout: time.Minute * 5,
+				OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+					if lastErr == nil || err.Error() != lastErr.Error() {
+						db.logger.Warnw("Can't execute query. Retrying", zap.Error(err))
+					}
+				},
+				OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
+					if attempt > 0 {
+						db.logger.Infow("Query retried successfully after error",
+							zap.Duration("after", elapsed),
+							zap.Uint64("attempts", attempt+1),
+							zap.NamedError("recovered_error", lastErr))
+					}
+				},
+			},
+		)
 		if err != nil {
 			return 0, err
 		}
