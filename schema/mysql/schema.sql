@@ -1289,7 +1289,7 @@ CREATE TABLE history (
   CONSTRAINT fk_history_notification_history FOREIGN KEY (notification_history_id) REFERENCES notification_history (id) ON DELETE CASCADE,
   CONSTRAINT fk_history_state_history FOREIGN KEY (state_history_id) REFERENCES state_history (id) ON DELETE CASCADE,
 
-  INDEX idx_history_event_time (event_time) COMMENT 'History filtered/ordered by event_time',
+  INDEX idx_history_event_time_event_type (event_time, event_type) COMMENT 'History filtered/ordered by event_time/event_type',
   INDEX idx_history_acknowledgement (acknowledgement_history_id),
   INDEX idx_history_comment (comment_history_id),
   INDEX idx_history_downtime (downtime_history_id),
