@@ -405,7 +405,7 @@ CREATE TABLE host_state (
   hard_state tinyuint NOT NULL,
   previous_soft_state tinyuint NOT NULL,
   previous_hard_state tinyuint NOT NULL,
-  check_attempt tinyuint NOT NULL,
+  check_attempt uint NOT NULL,
   severity smalluint NOT NULL,
 
   output text DEFAULT NULL,
@@ -675,7 +675,7 @@ CREATE TABLE service_state (
   hard_state tinyuint NOT NULL,
   previous_soft_state tinyuint NOT NULL,
   previous_hard_state tinyuint NOT NULL,
-  check_attempt tinyuint NOT NULL,
+  check_attempt uint NOT NULL,
   severity smalluint NOT NULL,
 
   output text DEFAULT NULL,
@@ -1846,7 +1846,7 @@ CREATE TABLE state_history (
   hard_state tinyuint NOT NULL,
   previous_soft_state tinyuint NOT NULL,
   previous_hard_state tinyuint NOT NULL,
-  check_attempt tinyuint NOT NULL,
+  check_attempt uint NOT NULL, -- may be a tinyuint, see https://icinga.com/docs/icinga-db/latest/doc/04-Upgrading/#upgrading-to-icinga-db-v112
   output text DEFAULT NULL,
   long_output text DEFAULT NULL,
   max_check_attempts uint NOT NULL,
@@ -2181,4 +2181,4 @@ CREATE TABLE icingadb_schema (
 ALTER SEQUENCE icingadb_schema_id_seq OWNED BY icingadb_schema.id;
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (2, extract(epoch from now()) * 1000);
+  VALUES (3, extract(epoch from now()) * 1000);
