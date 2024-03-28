@@ -144,7 +144,11 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 	stream := "icinga:history:stream:" + key
 	for {
 		select {
-		case bulk := <-bulks:
+		case bulk, ok := <-bulks:
+			if !ok {
+				return nil
+			}
+
 			ids := make([]string, len(bulk))
 			for i := range bulk {
 				ids[i] = bulk[i].ID
