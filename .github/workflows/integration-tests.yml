@@ -16,9 +16,14 @@ jobs:
       matrix:
         database:
           - name: MySQL
-            type: mysql
+            type: MYSQL
+            image: mysql:latest
+          - name: MariaDB
+            type: MYSQL
+            image: mariadb:latest
           - name: PostgreSQL
-            type: pgsql
+            type: PGSQL
+            image: postgres:latest
 
     name: ${{ matrix.database.name }}
     runs-on: ubuntu-latest
@@ -41,6 +46,7 @@ jobs:
         run: ./icingadb-test -icingatesting.debuglog debug.log -test.v
         env:
           ICINGADB_TESTS_DATABASE_TYPE: ${{ matrix.database.type }}
+          ICINGA_TESTING_${{ matrix.database.type }}_IMAGE: ${{ matrix.database.image }}
           ICINGA_TESTING_ICINGADB_BINARY: ${{ github.workspace }}/icingadb
           ICINGA_TESTING_ICINGADB_SCHEMA_MYSQL: ${{ github.workspace }}/schema/mysql/schema.sql
           ICINGA_TESTING_ICINGADB_SCHEMA_PGSQL: ${{ github.workspace }}/schema/pgsql/schema.sql
@@ -51,6 +57,6 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.database.type }}-debug.log.xz
+          name: ${{ matrix.database.name }}-debug.log.xz
           path: debug.log.xz
           retention-days: 1
