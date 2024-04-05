@@ -200,17 +200,13 @@ func (h *HA) controller() {
 				default:
 				}
 
-				var realizeCtx context.Context
-				var cancelRealizeCtx context.CancelFunc
-				if h.responsible {
-					realizeCtx, cancelRealizeCtx = context.WithDeadline(h.ctx, m.ExpiryTime())
-				} else {
-					realizeCtx, cancelRealizeCtx = context.WithCancel(h.ctx)
-				}
+				// Ensure that updating/inserting the instance row is completed by the current heartbeat's expiry time.
+				realizeCtx, cancelRealizeCtx := context.WithDeadline(h.ctx, m.ExpiryTime())
 				err = h.realize(realizeCtx, s, t, envId, shouldLogRoutineEvents)
 				cancelRealizeCtx()
 				if errors.Is(err, context.DeadlineExceeded) {
-					h.signalHandover("context deadline exceeded")
+					h.signalHandover("instance update/insert deadline exceeded heartbeat expiry time")
+
 					continue
 				}
 				if err != nil {
@@ -252,6 +248,10 @@ func (h *HA) realize(
 		takeover         string
 		otherResponsible bool
 	)
+
+	if _, ok := ctx.Deadline(); !ok {
+		panic("can't use context w/o deadline in realize()")
+	}
 
 	err := retry.WithBackoff(
 		ctx,
@@ -358,6 +358,7 @@ func (h *HA) realize(
 		retry.Retryable,
 		backoff.NewExponentialWithJitter(time.Millisecond*256, time.Second*3),
 		retry.Settings{
+			// Intentionally no timeout is set, as we use a context with a deadline.
 			OnError: func(_ time.Duration, attempt uint64, err, lastErr error) {
 				if lastErr == nil || err.Error() != lastErr.Error() {
 					log := h.logger.Debugw
