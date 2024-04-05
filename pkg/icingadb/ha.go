@@ -154,7 +154,7 @@ func (h *HA) controller() {
 	//    expiration time. Therefore, we use a deadline ctx to retry.WithBackoff() in realize() which expires earlier
 	//    than our default timeout.
 	// 2) Since we do not want to exit before our default timeout expires, we have to repeat step 1 until it does.
-	retryTimeout := time.NewTimer(5 * time.Minute)
+	retryTimeout := time.NewTimer(retry.DefaultTimeout)
 	defer retryTimeout.Stop()
 
 	for {
@@ -179,7 +179,7 @@ func (h *HA) controller() {
 					h.realizeLostHeartbeat()
 
 					// Reset retry timeout so that the next iterations have the full amount of time available again.
-					retry.ResetTimeout(retryTimeout, 5*time.Minute)
+					retry.ResetTimeout(retryTimeout, retry.DefaultTimeout)
 
 					continue
 				}
@@ -251,7 +251,7 @@ func (h *HA) controller() {
 			// But this is the best place to catch all scenarios where the timeout needs to be reset.
 			// And since HA needs quite a bit of refactoring anyway to e.g. return immediately after calling h.abort(),
 			// it's fine to have it here for now.
-			retry.ResetTimeout(retryTimeout, 5*time.Minute)
+			retry.ResetTimeout(retryTimeout, retry.DefaultTimeout)
 		case <-h.heartbeat.Done():
 			if err := h.heartbeat.Err(); err != nil {
 				h.abort(err)

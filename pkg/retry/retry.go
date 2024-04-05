@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// DefaultTimeout is our opinionated default timeout for retrying database and Redis operations.
+const DefaultTimeout = 5 * time.Minute
+
 // RetryableFunc is a retryable function.
 type RetryableFunc func(context.Context) error
 
