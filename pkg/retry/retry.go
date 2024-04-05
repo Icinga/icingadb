@@ -90,6 +90,18 @@ func WithBackoff(
 	}
 }
 
+// ResetTimeout changes the possibly expired timer t to expire after duration d.
+//
+// If the timer has already expired and nothing has been received from its channel,
+// it is automatically drained as if the timer had never expired.
+func ResetTimeout(t *time.Timer, d time.Duration) {
+	if !t.Stop() {
+		<-t.C
+	}
+
+	t.Reset(d)
+}
+
 // Retryable returns true for common errors that are considered retryable,
 // i.e. temporary, timeout, DNS, connection refused and reset, host down and unreachable and
 // network down and unreachable errors. In addition, any database error is considered retryable.
