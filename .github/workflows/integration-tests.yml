@@ -15,12 +15,12 @@ jobs:
       fail-fast: false
       matrix:
         database:
-          - name: mysql
-            pretty_name: MySQL
-          - name: pgsql
-            pretty_name: PostgreSQL
+          - name: MySQL
+            type: mysql
+          - name: PostgreSQL
+            type: pgsql
 
-    name: ${{ matrix.database.pretty_name }}
+    name: ${{ matrix.database.name }}
     runs-on: ubuntu-latest
 
     steps:
@@ -40,7 +40,7 @@ jobs:
       - name: Run Integration Tests
         run: ./icingadb-test -icingatesting.debuglog debug.log -test.v
         env:
-          ICINGADB_TESTS_DATABASE_TYPE: ${{ matrix.database.name }}
+          ICINGADB_TESTS_DATABASE_TYPE: ${{ matrix.database.type }}
           ICINGA_TESTING_ICINGADB_BINARY: ${{ github.workspace }}/icingadb
           ICINGA_TESTING_ICINGADB_SCHEMA_MYSQL: ${{ github.workspace }}/schema/mysql/schema.sql
           ICINGA_TESTING_ICINGADB_SCHEMA_PGSQL: ${{ github.workspace }}/schema/pgsql/schema.sql
@@ -51,6 +51,6 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v6
         with:
-          name: ${{ matrix.database.name }}-debug.log.xz
+          name: ${{ matrix.database.type }}-debug.log.xz
           path: debug.log.xz
           retention-days: 1
