@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"io/ioutil"
+	"io"
 	"math"
 	"net/http"
 	"sort"
@@ -717,7 +717,7 @@ func processCheckResult(t *testing.T, client *utils.Icinga2Client, hostname stri
 	response, err := client.PostJson("/v1/actions/process-check-result", bytes.NewBuffer(reqBody))
 	require.NoError(t, err, "process-check-result")
 	if !assert.Equal(t, 200, response.StatusCode, "process-check-result") {
-		body, err := ioutil.ReadAll(response.Body)
+		body, err := io.ReadAll(response.Body)
 		require.NoError(t, err, "reading process-check-result response")
 		it.Logger(t).Error("process-check-result", zap.ByteString("api-response", body))
 		t.FailNow()
