@@ -61,7 +61,12 @@ func WithBackoff(
 			return
 		}
 
-		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		// Retryable function may have exited prematurely due to context errors.
+		// We explicitly check the context error here, as the error returned by the retryable function can pass the
+		// error.Is() checks even though it is not a real context error, e.g.
+		// https://cs.opensource.google/go/go/+/refs/tags/go1.22.2:src/net/net.go;l=422
+		// https://cs.opensource.google/go/go/+/refs/tags/go1.22.2:src/net/net.go;l=601
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(ctx.Err(), context.Canceled) {
 			if prevErr != nil {
 				err = errors.Wrap(err, prevErr.Error())
 			}
