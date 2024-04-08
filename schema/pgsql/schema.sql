@@ -2074,7 +2074,7 @@ ALTER TABLE history ALTER COLUMN comment_history_id SET STORAGE PLAIN;
 ALTER TABLE history ALTER COLUMN flapping_history_id SET STORAGE PLAIN;
 ALTER TABLE history ALTER COLUMN acknowledgement_history_id SET STORAGE PLAIN;
 
-CREATE INDEX idx_history_event_time ON history(event_time);
+CREATE INDEX idx_history_event_time_event_type ON history(event_time, event_type);
 CREATE INDEX idx_history_acknowledgement ON history(acknowledgement_history_id);
 CREATE INDEX idx_history_comment ON history(comment_history_id);
 CREATE INDEX idx_history_downtime ON history(downtime_history_id);
@@ -2095,7 +2095,7 @@ COMMENT ON COLUMN history.comment_history_id IS 'comment_history.comment_id';
 COMMENT ON COLUMN history.flapping_history_id IS 'flapping_history.id';
 COMMENT ON COLUMN history.acknowledgement_history_id IS 'acknowledgement_history.id';
 
-COMMENT ON INDEX idx_history_event_time IS 'History filtered/ordered by event_time';
+COMMENT ON INDEX idx_history_event_time_event_type IS 'History filtered/ordered by event_time/event_type';
 COMMENT ON INDEX idx_history_host_service_id IS 'Host/service history detail filter';
 
 CREATE TABLE sla_history_state (
