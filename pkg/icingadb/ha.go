@@ -387,7 +387,7 @@ func (h *HA) realize(
 		backoff.NewExponentialWithJitter(time.Millisecond*256, time.Second*3),
 		retry.Settings{
 			// Intentionally no timeout is set, as we use a context with a deadline.
-			OnError: func(_ time.Duration, attempt uint64, err, lastErr error) {
+			OnRetryableError: func(_ time.Duration, attempt uint64, err, lastErr error) {
 				if lastErr == nil || err.Error() != lastErr.Error() {
 					log := h.logger.Debugw
 					if attempt > 2 {

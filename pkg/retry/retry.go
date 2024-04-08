@@ -28,8 +28,8 @@ type Settings struct {
 	// This means that WithBackoff may not stop exactly after Timeout expires,
 	// or may not retry at all if the first execution of RetryableFunc already takes longer than Timeout.
 	Timeout time.Duration
-	// OnError is called if an error occurs.
-	OnError func(elapsed time.Duration, attempt uint64, err, lastErr error)
+	// OnRetryableError is called if a retryable error occurs.
+	OnRetryableError func(elapsed time.Duration, attempt uint64, err, lastErr error)
 	// OnSuccess is called once the operation succeeds.
 	OnSuccess func(elapsed time.Duration, attempt uint64, lastErr error)
 }
@@ -61,10 +61,6 @@ func WithBackoff(
 			return
 		}
 
-		if settings.OnError != nil {
-			settings.OnError(time.Since(start), attempt, err, prevErr)
-		}
-
 		if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 			if prevErr != nil {
 				err = errors.Wrap(err, prevErr.Error())
@@ -77,6 +73,10 @@ func WithBackoff(
 			err = errors.Wrap(err, "can't retry")
 
 			return
+		}
+
+		if settings.OnRetryableError != nil {
+			settings.OnRetryableError(time.Since(start), attempt, err, prevErr)
 		}
 
 		select {

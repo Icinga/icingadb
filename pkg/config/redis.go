@@ -86,7 +86,7 @@ func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc
 			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
 			retry.Settings{
 				Timeout: retry.DefaultTimeout,
-				OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+				OnRetryableError: func(_ time.Duration, _ uint64, err, lastErr error) {
 					if lastErr == nil || err.Error() != lastErr.Error() {
 						logger.Warnw("Can't connect to Redis. Retrying", zap.Error(err))
 					}

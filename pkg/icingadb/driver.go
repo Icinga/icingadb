@@ -56,7 +56,7 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
 		retry.Settings{
 			Timeout: retry.DefaultTimeout,
-			OnError: func(_ time.Duration, _ uint64, err, lastErr error) {
+			OnRetryableError: func(_ time.Duration, _ uint64, err, lastErr error) {
 				telemetry.UpdateCurrentDbConnErr(err)
 
 				if lastErr == nil || err.Error() != lastErr.Error() {
