@@ -292,7 +292,7 @@ CREATE TABLE host_state (
   hard_state tinyint unsigned NOT NULL,
   previous_soft_state tinyint unsigned NOT NULL,
   previous_hard_state tinyint unsigned NOT NULL,
-  check_attempt tinyint unsigned NOT NULL,
+  check_attempt int unsigned NOT NULL,
   severity smallint unsigned NOT NULL,
 
   output longtext DEFAULT NULL,
@@ -460,7 +460,7 @@ CREATE TABLE service_state (
   hard_state tinyint unsigned NOT NULL,
   previous_soft_state tinyint unsigned NOT NULL,
   previous_hard_state tinyint unsigned NOT NULL,
-  check_attempt tinyint unsigned NOT NULL,
+  check_attempt int unsigned NOT NULL,
   severity smallint unsigned NOT NULL,
 
   output longtext DEFAULT NULL,
@@ -1147,7 +1147,7 @@ CREATE TABLE state_history (
   hard_state tinyint unsigned NOT NULL,
   previous_soft_state tinyint unsigned NOT NULL,
   previous_hard_state tinyint unsigned NOT NULL,
-  check_attempt tinyint unsigned NOT NULL,
+  check_attempt int unsigned NOT NULL, -- may be a tinyint unsigned, see https://icinga.com/docs/icinga-db/latest/doc/04-Upgrading/#upgrading-to-icinga-db-v112
   output longtext DEFAULT NULL,
   long_output longtext DEFAULT NULL,
   max_check_attempts int unsigned NOT NULL,
@@ -1343,4 +1343,4 @@ CREATE TABLE icingadb_schema (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (4, UNIX_TIMESTAMP() * 1000);
+  VALUES (5, UNIX_TIMESTAMP() * 1000);

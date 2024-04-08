@@ -9,7 +9,7 @@ type State struct {
 	EnvironmentMeta           `json:",inline"`
 	AcknowledgementCommentId  types.Binary               `json:"acknowledgement_comment_id"`
 	LastCommentId             types.Binary               `json:"last_comment_id"`
-	CheckAttempt              uint8                      `json:"check_attempt"`
+	CheckAttempt              uint32                     `json:"check_attempt"`
 	CheckCommandline          types.String               `json:"check_commandline"`
 	CheckSource               types.String               `json:"check_source"`
 	SchedulingSource          types.String               `json:"scheduling_source"`

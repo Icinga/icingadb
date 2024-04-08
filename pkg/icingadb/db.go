@@ -93,8 +93,8 @@ func NewDb(db *sqlx.DB, logger *logging.Logger, options *Options) *DB {
 }
 
 const (
-	expectedMysqlSchemaVersion    = 4
-	expectedPostgresSchemaVersion = 2
+	expectedMysqlSchemaVersion    = 5
+	expectedPostgresSchemaVersion = 3
 )
 
 // CheckSchema asserts the database schema of the expected version being present.
