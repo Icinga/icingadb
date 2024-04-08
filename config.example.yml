@@ -25,7 +25,7 @@ database:
 
   # List of low-level database options that can be set to influence some Icinga DB internal default behaviours.
   # Do not change the defaults if you don't have to!
-  options:
+#  options:
     # Maximum number of connections Icinga DB is allowed to open in parallel to the database.
     # By default, Icinga DB is allowed to open up to "16" connections whenever necessary.
     # Setting this to a number less than or equal to "-1" allows Icinga DB to open an unlimited number of connections.
@@ -75,7 +75,7 @@ redis:
 # Icinga DB logs its activities at various severity levels and any errors that occur either
 # on the console or in systemd's journal. The latter is used automatically when running under systemd.
 # In any case, the default log level is 'info'.
-logging:
+#logging:
   # Default logging level. Can be set to 'fatal', 'error', 'warn', 'info' or 'debug'.
   # If not set, defaults to 'info'.
 #  level: info
@@ -91,7 +91,7 @@ logging:
 #  interval: 20s
 
   # Map of component-logging level pairs to define a different log level than the default value for each component.
-  options:
+#  options:
 #    config-sync:
 #    database:
 #    dump-signals:
@@ -106,7 +106,7 @@ logging:
 
 # Retention is an optional feature to limit the number of days that historical data is available,
 # as no historical data is deleted by default.
-retention:
+#retention:
   # Number of days to retain full historical data. By default, historical data is retained forever.
 #  history-days:
 
@@ -126,7 +126,7 @@ retention:
   # Map of history category to number of days to retain its data in order to
   # enable retention only for specific categories or to
   # override the number that has been configured in history-days.
-  options:
+#  options:
 #    acknowledgement:
 #    comment:
 #    downtime:
