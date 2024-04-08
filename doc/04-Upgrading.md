@@ -9,11 +9,39 @@ Please apply the `1.1.2.sql` upgrade script to your database. For package instal
 `/usr/share/icingadb/schema/mysql/upgrades/` or `/usr/share/icingadb/schema/pgsql/upgrades/`, depending on your
 database vendor.
 
+As the daemon checks the schema version, the recommended way to perform the upgrade is to stop the daemon, apply the
+schema upgrade and then start the new daemon version. If you want to minimize downtime as much as possible, it is safe
+to apply this schema upgrade while the Icinga DB v1.1.1 daemon is still running and then restart the daemon with the
+new version. Please keep in mind that depending on the distribution, your package manager may automatically attempt to
+restart the daemon when upgrading the package.
+
 !!! warning
 
     With MySQL and MariaDB, a locking issue can occur if the schema upgrade is applied while the history view is
     accessed in Icinga DB Web. This can result in the upgrade being delayed unnecessarily and blocking other queries.
     Please see [unblock history tables](#unblock-history-tables) for how to detect and resolve this situation.
+
+### Upgrading the state_history Table
+
+This release includes fixes for hosts and services reaching check attempt 256. However, on existing installations,
+the schema upgrade required to fix the history tables isn't automatically applied by `1.1.2.sql` as a rewrite of the
+whole `state_history` table is required. This can take a lot of time depending on the history size and the performance
+of the database. During this time that table will be locked exclusively and can't be accessed otherwise. This means that
+the existing history can't be viewed in Icinga Web and new history entries will be buffered in Redis.
+
+There is a separate upgrade script `optional/1.1.2-history.sql` to perform the rewrite of the `state_history` table.
+This allows you to postpone part of the upgrade to a longer maintenance window in the future, or skip it entirely
+if you deem this safe for your installation.
+
+!!! warning
+
+    Until `optional/1.1.2-history.sql` is applied, you'll have to lower `max_check_attempts` to 255 or less, otherwise
+    Icinga DB will crash with a database error if hosts/services reach check attempt 256. If you need to lower
+    `max_check_attempts` but want to keep the same timespan from an outage to a hard state, you can raise
+    `retry_interval` instead so that `max_check_attempts * retry_interval` stays the same.
+
+If you apply it, be sure that `1.1.2.sql` was already applied before. Do not interrupt it! At best use tmux/screen not
+to lose your SSH session.
 
 ### Unblock History Tables
 
