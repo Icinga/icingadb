@@ -142,3 +142,12 @@ CREATE INDEX CONCURRENTLY idx_history_event_time_event_type ON history(event_tim
 COMMENT ON INDEX idx_history_event_time_event_type IS 'History filtered/ordered by event_time/event_type';
 
 DROP INDEX idx_history_event_time;
+
+ALTER TABLE host_state ALTER COLUMN check_attempt TYPE uint;
+
+ALTER TABLE service_state ALTER COLUMN check_attempt TYPE uint;
+
+COMMENT ON COLUMN state_history.check_attempt IS 'optional schema upgrade not applied yet, see https://icinga.com/docs/icinga-db/latest/doc/04-Upgrading/#upgrading-to-icinga-db-v112';
+
+INSERT INTO icingadb_schema (version, timestamp)
+  VALUES (3, extract(epoch from now()) * 1000);
