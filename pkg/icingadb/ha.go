@@ -394,7 +394,7 @@ func (h *HA) realize(
 						log = h.logger.Infow
 					}
 
-					log("Can't update or insert instance. Retrying", zap.Error(err), zap.Uint64("retry count", attempt))
+					log("Can't update or insert instance. Retrying", zap.Error(err))
 				}
 			},
 			OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
