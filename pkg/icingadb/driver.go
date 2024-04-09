@@ -66,9 +66,9 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 			OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
 				telemetry.UpdateCurrentDbConnErr(nil)
 
-				if attempt > 0 {
+				if attempt > 1 {
 					c.logger.Infow("Reconnected to database",
-						zap.Duration("after", elapsed), zap.Uint64("attempts", attempt+1))
+						zap.Duration("after", elapsed), zap.Uint64("attempts", attempt))
 				}
 			},
 		},

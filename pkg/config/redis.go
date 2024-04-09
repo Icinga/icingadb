@@ -92,9 +92,9 @@ func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc
 					}
 				},
 				OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
-					if attempt > 0 {
+					if attempt > 1 {
 						logger.Infow("Reconnected to Redis",
-							zap.Duration("after", elapsed), zap.Uint64("attempts", attempt+1))
+							zap.Duration("after", elapsed), zap.Uint64("attempts", attempt))
 					}
 				},
 			},

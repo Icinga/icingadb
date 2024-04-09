@@ -390,7 +390,7 @@ func (h *HA) realize(
 			OnRetryableError: func(_ time.Duration, attempt uint64, err, lastErr error) {
 				if lastErr == nil || err.Error() != lastErr.Error() {
 					log := h.logger.Debugw
-					if attempt > 2 {
+					if attempt > 3 {
 						log = h.logger.Infow
 					}
 
@@ -398,10 +398,10 @@ func (h *HA) realize(
 				}
 			},
 			OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
-				if attempt > 0 {
+				if attempt > 1 {
 					log := h.logger.Debugw
 
-					if attempt > 3 {
+					if attempt > 4 {
 						// We log errors with severity info starting from the fourth attempt, (see above)
 						// so we need to log success with severity info from the fifth attempt.
 						log = h.logger.Infow
@@ -409,7 +409,7 @@ func (h *HA) realize(
 
 					log("Instance updated/inserted successfully after error",
 						zap.Duration("after", elapsed),
-						zap.Uint64("attempts", attempt+1),
+						zap.Uint64("attempts", attempt),
 						zap.NamedError("recovered_error", lastErr))
 				}
 			},

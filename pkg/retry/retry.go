@@ -50,7 +50,7 @@ func WithBackoff(
 	}
 
 	start := time.Now()
-	for attempt := uint64(0); ; /* true */ attempt++ {
+	for attempt := uint64(1); ; /* true */ attempt++ {
 		prevErr := err
 
 		if err = retryableFunc(ctx); err == nil {

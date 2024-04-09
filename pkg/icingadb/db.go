@@ -680,10 +680,10 @@ func (db *DB) getDefaultRetrySettings() retry.Settings {
 			}
 		},
 		OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
-			if attempt > 0 {
+			if attempt > 1 {
 				db.logger.Infow("Query retried successfully after error",
 					zap.Duration("after", elapsed),
-					zap.Uint64("attempts", attempt+1),
+					zap.Uint64("attempts", attempt),
 					zap.NamedError("recovered_error", lastErr))
 			}
 		},
