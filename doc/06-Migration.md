@@ -20,7 +20,7 @@ packages, it is automatically installed as well.
 ### Preparing the Configuration
 
 Please take the [example configuration] as a starting point and copy it to the
-host you will perform the migration on.  The following sections will guide you
+host you will perform the migration on. The following sections will guide you
 through how to adjust it for your needs.
 
 #### Environment ID
