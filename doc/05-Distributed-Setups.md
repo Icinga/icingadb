@@ -11,22 +11,22 @@ First, you need an Icinga 2 high availability setup with two master nodes, such 
 [here](https://icinga.com/docs/icinga-2/latest/doc/06-distributed-monitoring#high-availability-master-with-agents).
 
 Each of the master nodes must have the Icinga DB feature enabled and
-have their own dedicated Redis server set up for it, so that each node writes the monitoring data separately.
+have their own dedicated Redis® server set up for it, so that each node writes the monitoring data separately.
 The setup steps per node are no different from a single node setup and can be found in the
 [Icinga 2 installation documentation](https://icinga.com/docs/icinga-2/latest/doc/02-installation).
-Each Redis server will always have the complete data available as long as
-its corresponding Icinga 2 master is running and writing to its Redis.
+Each Redis® server will always have the complete data available as long as
+its corresponding Icinga 2 master is running and writing to its Redis®.
 This is because the Icinga 2 master nodes synchronize their data and events with each other as long as
 they are connected,
 and each takes over the entire configuration in case the other node or their connection to each other fails.
 
-For each Redis server you need to set up its own dedicated Icinga DB instance that connects to it,
+For each Redis® server you need to set up its own dedicated Icinga DB instance that connects to it,
 but the Icinga DB instances must write to the same database, which of course can be replicated or a cluster.
 So the steps from the standard
 [Icinga DB installation documentation](https://icinga.com/docs/icinga-db/latest/doc/02-installation)
 can be followed. However, as mentioned, the database only needs to be set up once.
 
-All in all, an Icinga DB HA environment involves setting up two Icinga 2 master nodes, two Redis servers,
+All in all, an Icinga DB HA environment involves setting up two Icinga 2 master nodes, two Redis® servers,
 two Icinga DB instances and one database.
 
 Please read the note about the [environment ID](#environment-id),
@@ -48,9 +48,9 @@ Which Icinga DB instance is responsible is determined by a specific database ope
 can only be performed by one instance first.
 In the case of concurrent operations, simply put, only one wins via a locking mechanism.
 Of course, this is only true if the environment is healthy.
-Icinga DB is not trying to be responsible if its corresponding Redis server is unavailable or
-Icinga 2 is not writing data to Redis.
-If Icinga 2 or Redis become unavailable for more than 60 seconds,
+Icinga DB is not trying to be responsible if its corresponding Redis® server is unavailable or
+Icinga 2 is not writing data to Redis®.
+If Icinga 2 or Redis® become unavailable for more than 60 seconds,
 Icinga DB releases responsibility so the other instance can take over.
 
 ## Multiple Environments

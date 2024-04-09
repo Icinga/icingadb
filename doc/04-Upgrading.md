@@ -27,7 +27,7 @@ This release includes fixes for hosts and services reaching check attempt 256. H
 the schema upgrade required to fix the history tables isn't automatically applied by `1.1.2.sql` as a rewrite of the
 whole `state_history` table is required. This can take a lot of time depending on the history size and the performance
 of the database. During this time that table will be locked exclusively and can't be accessed otherwise. This means that
-the existing history can't be viewed in Icinga Web and new history entries will be buffered in Redis.
+the existing history can't be viewed in Icinga Web and new history entries will be buffered in Redis®.
 
 There is a separate upgrade script `optional/1.1.2-history.sql` to perform the rewrite of the `state_history` table.
 This allows you to postpone part of the upgrade to a longer maintenance window in the future, or skip it entirely
@@ -103,7 +103,7 @@ For package installations, you can find this file at `/usr/share/icingadb/schema
 
 Note that this upgrade will change the `history` table, which can take some time depending on the size of the table and
 the performance of the database. While the upgrade is running, that table will be locked and can't be accessed. This
-means that the existing history can't be viewed in Icinga Web and new history entries will be buffered in Redis.
+means that the existing history can't be viewed in Icinga Web and new history entries will be buffered in Redis®.
 
 As the daemon checks the schema version, the recommended way to perform the upgrade is to stop the daemon, apply the
 schema upgrade and then start the new daemon version. If you want to minimize downtime as much as possible, it is safe
@@ -124,20 +124,20 @@ restart the daemon when upgrading the package.
 
 ## Upgrading to Icinga DB RC2
 
-Icinga DB RC2 is a complete rewrite compared to RC1. Because of this, a lot has changed in the Redis and database
+Icinga DB RC2 is a complete rewrite compared to RC1. Because of this, a lot has changed in the Redis® and database
 schema, which is why they have to be deleted and recreated. The configuration file has changed from `icingadb.ini`
 to `config.yml`. Instead of the INI format, we are now using YAML and have introduced more configuration options. We
-have also changed the packages of `icingadb-redis`, which is why the Redis CLI commands are now prefixed with `icingadb`
-instead of just `icinga`, i.e. the Redis CLI is now accessed via `icingadb-redis-cli`.
+have also changed the packages of `icingadb-redis`, which is why the Redis® CLI commands are now prefixed with `icingadb`
+instead of just `icinga`, i.e. the Redis® CLI is now accessed via `icingadb-redis-cli`.
 
 Please follow the steps below to upgrade to Icinga DB RC2:
 
 1. Stop Icinga 2 and Icinga DB.
-2. Flush your Redis instances using `icinga-redis-cli flushall` (note the `icinga` prefix as we did not
+2. Flush your Redis® instances using `icinga-redis-cli flushall` (note the `icinga` prefix as we did not
    upgrade `icingadb-redis` yet) and stop them afterwards.
 3. Upgrade Icinga 2 to version 2.13.2 or newer.
 4. Remove the `icinga-redis` package where installed as it may conflict with `icingadb-redis`.
-5. Install Icinga DB Redis (`icingadb-redis`) on your primary Icinga 2 nodes to version 6.2.6 or newer.
+5. Install Redis® (`icingadb-redis`) on your primary Icinga 2 nodes to version 6.2.6 or newer.
 6. Upgrade Icinga DB to RC2.
 7. Drop the Icinga DB MySQL database and recreate it using the provided schema.
-8. Start Icinga DB Redis, Icinga 2 and Icinga DB.
+8. Start Redis®, Icinga 2 and Icinga DB.
