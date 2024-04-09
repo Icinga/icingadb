@@ -7,7 +7,6 @@ import (
 	"github.com/goccy/go-yaml"
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
-	"io/ioutil"
 	"os"
 )
 
@@ -118,7 +117,7 @@ func (t *TLS) MakeConfig(serverName string) (*tls.Config, error) {
 	if t.Insecure {
 		tlsConfig.InsecureSkipVerify = true
 	} else if t.Ca != "" {
-		raw, err := ioutil.ReadFile(t.Ca)
+		raw, err := os.ReadFile(t.Ca)
 		if err != nil {
 			return nil, errors.Wrap(err, "can't read CA file")
 		}

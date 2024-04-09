@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"io"
-	"io/ioutil"
 	"reflect"
 	"sort"
 )
@@ -102,7 +101,7 @@ func packValue(in reflect.Value, out io.Writer) error {
 		// If there aren't any values to pack, ...
 		if l < 1 {
 			// ... create one and pack it - panics on disallowed type.
-			_ = packValue(reflect.Zero(in.Type().Elem()), ioutil.Discard)
+			_ = packValue(reflect.Zero(in.Type().Elem()), io.Discard)
 		}
 
 		return nil
@@ -140,13 +139,13 @@ func packValue(in reflect.Value, out io.Writer) error {
 						packedKey = key.Slice(0, key.Len()).Interface().([]byte)
 					} else {
 						// Not just stringify the key (below), but also pack it (here) - panics on disallowed type.
-						_ = packValue(iter.Key(), ioutil.Discard)
+						_ = packValue(iter.Key(), io.Discard)
 
 						packedKey = []byte(fmt.Sprint(key.Interface()))
 					}
 				} else {
 					// Not just stringify the key (below), but also pack it (here) - panics on disallowed type.
-					_ = packValue(iter.Key(), ioutil.Discard)
+					_ = packValue(iter.Key(), io.Discard)
 
 					packedKey = []byte(fmt.Sprint(key.Interface()))
 				}
@@ -176,8 +175,8 @@ func packValue(in reflect.Value, out io.Writer) error {
 			typ := in.Type()
 
 			// ... create one and pack it - panics on disallowed type.
-			_ = packValue(reflect.Zero(typ.Key()), ioutil.Discard)
-			_ = packValue(reflect.Zero(typ.Elem()), ioutil.Discard)
+			_ = packValue(reflect.Zero(typ.Key()), io.Discard)
+			_ = packValue(reflect.Zero(typ.Elem()), io.Discard)
 		}
 
 		return nil
@@ -186,7 +185,7 @@ func packValue(in reflect.Value, out io.Writer) error {
 			err := packValue(reflect.Value{}, out)
 
 			// Create a fictive referenced value and pack it - panics on disallowed type.
-			_ = packValue(reflect.Zero(in.Type().Elem()), ioutil.Discard)
+			_ = packValue(reflect.Zero(in.Type().Elem()), io.Discard)
 
 			return err
 		} else {
