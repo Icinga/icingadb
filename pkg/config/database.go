@@ -42,6 +42,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 
 		config.User = d.User
 		config.Passwd = d.Password
+		config.Logger = icingadb.MysqlFuncLogger(logger.Debug)
 
 		if d.isUnixAddr() {
 			config.Net = "unix"
@@ -70,8 +71,6 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 				return nil, errors.Wrap(err, "can't register TLS config")
 			}
 		}
-
-		_ = mysql.SetLogger(icingadb.MysqlFuncLogger(logger.Debug))
 
 		c, err := mysql.NewConnector(config)
 		if err != nil {
