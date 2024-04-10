@@ -53,7 +53,7 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 			return
 		},
 		retry.Retryable,
-		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
+		backoff.NewExponentialWithJitter(128*time.Millisecond, 1*time.Minute),
 		retry.Settings{
 			Timeout: retry.DefaultTimeout,
 			OnRetryableError: func(_ time.Duration, _ uint64, err, lastErr error) {

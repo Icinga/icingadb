@@ -97,7 +97,7 @@ func (h *Heartbeat) controller(ctx context.Context) {
 	// Message producer loop.
 	g.Go(func() error {
 		// We expect heartbeats every second but only read them every 3 seconds.
-		throttle := time.NewTicker(time.Second * 3)
+		throttle := time.NewTicker(3 * time.Second)
 		defer throttle.Stop()
 
 		for id := "$"; ; {

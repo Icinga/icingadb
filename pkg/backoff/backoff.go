@@ -14,10 +14,10 @@ type Backoff func(uint64) time.Duration
 // It panics if min >= max.
 func NewExponentialWithJitter(min, max time.Duration) Backoff {
 	if min <= 0 {
-		min = time.Millisecond * 100
+		min = 100 * time.Millisecond
 	}
 	if max <= 0 {
-		max = time.Second * 10
+		max = 10 * time.Second
 	}
 	if min >= max {
 		panic("max must be larger than min")
