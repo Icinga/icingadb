@@ -110,7 +110,19 @@ func (db *DB) CheckSchema(ctx context.Context) error {
 
 	var version uint16
 
-	err := db.QueryRowxContext(ctx, "SELECT version FROM icingadb_schema ORDER BY id DESC LIMIT 1").Scan(&version)
+	err := retry.WithBackoff(
+		ctx,
+		func(ctx context.Context) (err error) {
+			query := "SELECT version FROM icingadb_schema ORDER BY id DESC LIMIT 1"
+			err = db.QueryRowxContext(ctx, query).Scan(&version)
+			if err != nil {
+				err = internal.CantPerformQuery(err, query)
+			}
+			return
+		},
+		retry.Retryable,
+		backoff.NewExponentialWithJitter(128*time.Millisecond, 1*time.Minute),
+		db.getDefaultRetrySettings())
 	if err != nil {
 		return errors.Wrap(err, "can't check database schema version")
 	}
