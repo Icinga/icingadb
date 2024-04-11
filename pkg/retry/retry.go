@@ -8,10 +8,12 @@ import (
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"net"
-	"strings"
 	"syscall"
 	"time"
 )
+
+// DefaultTimeout is our opinionated default timeout for retrying database and Redis operations.
+const DefaultTimeout = 5 * time.Minute
 
 // RetryableFunc is a retryable function.
 type RetryableFunc func(context.Context) error
@@ -21,10 +23,15 @@ type IsRetryable func(error) bool
 
 // Settings aggregates optional settings for WithBackoff.
 type Settings struct {
-	// Timeout lets WithBackoff give up once elapsed (if >0).
+	// If >0, Timeout lets WithBackoff stop retrying gracefully once elapsed based on the following criteria:
+	// * If the execution of RetryableFunc has taken longer than Timeout, no further attempts are made.
+	// * If Timeout elapses during the sleep phase between retries, one final retry is attempted.
+	// * RetryableFunc is always granted its full execution time and is not canceled if it exceeds Timeout.
+	// This means that WithBackoff may not stop exactly after Timeout expires,
+	// or may not retry at all if the first execution of RetryableFunc already takes longer than Timeout.
 	Timeout time.Duration
-	// OnError is called if an error occurs.
-	OnError func(elapsed time.Duration, attempt uint64, err, lastErr error)
+	// OnRetryableError is called if a retryable error occurs.
+	OnRetryableError func(elapsed time.Duration, attempt uint64, err, lastErr error)
 	// OnSuccess is called once the operation succeeds.
 	OnSuccess func(elapsed time.Duration, attempt uint64, lastErr error)
 }
@@ -34,16 +41,19 @@ type Settings struct {
 func WithBackoff(
 	ctx context.Context, retryableFunc RetryableFunc, retryable IsRetryable, b backoff.Backoff, settings Settings,
 ) (err error) {
-	parentCtx := ctx
+	// Channel for retry deadline, which is set to the channel of NewTimer() if a timeout is configured,
+	// otherwise nil, so that it blocks forever if there is no timeout.
+	var timeout <-chan time.Time
 
 	if settings.Timeout > 0 {
-		var cancelCtx context.CancelFunc
-		ctx, cancelCtx = context.WithTimeout(ctx, settings.Timeout)
-		defer cancelCtx()
+		t := time.NewTimer(settings.Timeout)
+		defer t.Stop()
+		timeout = t.C
 	}
 
 	start := time.Now()
-	for attempt := uint64(0); ; /* true */ attempt++ {
+	timedOut := false
+	for attempt := uint64(1); ; /* true */ attempt++ {
 		prevErr := err
 
 		if err = retryableFunc(ctx); err == nil {
@@ -54,43 +64,72 @@ func WithBackoff(
 			return
 		}
 
-		if settings.OnError != nil {
-			settings.OnError(time.Since(start), attempt, err, prevErr)
+		// Retryable function may have exited prematurely due to context errors.
+		// We explicitly check the context error here, as the error returned by the retryable function can pass the
+		// error.Is() checks even though it is not a real context error, e.g.
+		// https://cs.opensource.google/go/go/+/refs/tags/go1.22.2:src/net/net.go;l=422
+		// https://cs.opensource.google/go/go/+/refs/tags/go1.22.2:src/net/net.go;l=601
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) || errors.Is(ctx.Err(), context.Canceled) {
+			if prevErr != nil {
+				err = errors.Wrap(err, prevErr.Error())
+			}
+
+			return
 		}
 
-		isRetryable := retryable(err)
-
-		if prevErr != nil && (errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)) {
-			err = prevErr
-		}
-
-		if !isRetryable {
+		if !retryable(err) {
 			err = errors.Wrap(err, "can't retry")
 
 			return
 		}
 
-		sleep := b(attempt)
 		select {
-		case <-ctx.Done():
-			if outerErr := parentCtx.Err(); outerErr != nil {
-				err = errors.Wrap(outerErr, "outer context canceled")
-			} else {
-				if err == nil {
-					err = ctx.Err()
-				}
-				err = errors.Wrap(err, "can't retry")
-			}
+		case <-timeout:
+			// Stop retrying immediately if executing the retryable function took longer than the timeout.
+			timedOut = true
+		default:
+		}
+
+		if timedOut {
+			err = errors.Wrap(err, "retry deadline exceeded")
 
 			return
-		case <-time.After(sleep):
+		}
+
+		if settings.OnRetryableError != nil {
+			settings.OnRetryableError(time.Since(start), attempt, err, prevErr)
+		}
+
+		select {
+		case <-time.After(b(attempt)):
+		case <-timeout:
+			// Do not stop retrying immediately, but start one last attempt to mitigate timing issues where
+			// the timeout expires while waiting for the next attempt and
+			// therefore no retries have happened during this possibly long period.
+			timedOut = true
+		case <-ctx.Done():
+			err = errors.Wrap(ctx.Err(), err.Error())
+
+			return
 		}
 	}
 }
 
+// ResetTimeout changes the possibly expired timer t to expire after duration d.
+//
+// If the timer has already expired and nothing has been received from its channel,
+// it is automatically drained as if the timer had never expired.
+func ResetTimeout(t *time.Timer, d time.Duration) {
+	if !t.Stop() {
+		<-t.C
+	}
+
+	t.Reset(d)
+}
+
 // Retryable returns true for common errors that are considered retryable,
 // i.e. temporary, timeout, DNS, connection refused and reset, host down and unreachable and
-// network down and unreachable errors.
+// network down and unreachable errors. In addition, any database error is considered retryable.
 func Retryable(err error) bool {
 	var temporary interface {
 		Temporary() bool
@@ -144,43 +183,10 @@ func Retryable(err error) bool {
 		return true
 	}
 
-	var e *mysql.MySQLError
-	if errors.As(err, &e) {
-		switch e.Number {
-		case 1053, 1205, 1213, 2006:
-			// 1053: Server shutdown in progress
-			// 1205: Lock wait timeout
-			// 1213: Deadlock found when trying to get lock
-			// 2006: MySQL server has gone away
-			return true
-		default:
-			return false
-		}
-	}
-
-	var pe *pq.Error
-	if errors.As(err, &pe) {
-		switch pe.Code {
-		case "08000", // connection_exception
-			"08006", // connection_failure
-			"08001", // sqlclient_unable_to_establish_sqlconnection
-			"08004", // sqlserver_rejected_establishment_of_sqlconnection
-			"40001", // serialization_failure
-			"40P01", // deadlock_detected
-			"54000", // program_limit_exceeded
-			"55006", // object_in_use
-			"55P03", // lock_not_available
-			"57P01", // admin_shutdown
-			"57P02", // crash_shutdown
-			"57P03", // cannot_connect_now
-			"58000", // system_error
-			"58030", // io_error
-			"XX000": // internal_error
-			return true
-		default:
-			// Class 53 - Insufficient Resources
-			return strings.HasPrefix(string(pe.Code), "53")
-		}
+	var mye *mysql.MySQLError
+	var pqe *pq.Error
+	if errors.As(err, &mye) || errors.As(err, &pqe) {
+		return true
 	}
 
 	return false

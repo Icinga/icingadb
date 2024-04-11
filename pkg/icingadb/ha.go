@@ -148,8 +148,19 @@ func (h *HA) controller() {
 	defer routineLogTicker.Stop()
 	shouldLogRoutineEvents := true
 
+	// The retry logic in HA is twofold:
+	//
+	// 1) Updating or inserting the instance row based on the current heartbeat must be done within the heartbeat's
+	//    expiration time. Therefore, we use a deadline ctx to retry.WithBackoff() in realize() which expires earlier
+	//    than our default timeout.
+	// 2) Since we do not want to exit before our default timeout expires, we have to repeat step 1 until it does.
+	retryTimeout := time.NewTimer(retry.DefaultTimeout)
+	defer retryTimeout.Stop()
+
 	for {
 		select {
+		case <-retryTimeout.C:
+			h.abort(errors.New("retry deadline exceeded"))
 		case m := <-h.heartbeat.Events():
 			if m != nil {
 				now := time.Now()
@@ -163,8 +174,13 @@ func (h *HA) controller() {
 				}
 				if tt.Before(now.Add(-1 * peerTimeout)) {
 					h.logger.Errorw("Received heartbeat from the past", zap.Time("time", tt))
+
 					h.signalHandover("received heartbeat from the past")
 					h.realizeLostHeartbeat()
+
+					// Reset retry timeout so that the next iterations have the full amount of time available again.
+					retry.ResetTimeout(retryTimeout, retry.DefaultTimeout)
+
 					continue
 				}
 				s, err := m.Stats().IcingaStatus()
@@ -200,17 +216,17 @@ func (h *HA) controller() {
 				default:
 				}
 
-				var realizeCtx context.Context
-				var cancelRealizeCtx context.CancelFunc
-				if h.responsible {
-					realizeCtx, cancelRealizeCtx = context.WithDeadline(h.ctx, m.ExpiryTime())
-				} else {
-					realizeCtx, cancelRealizeCtx = context.WithCancel(h.ctx)
-				}
+				// Ensure that updating/inserting the instance row is completed by the current heartbeat's expiry time.
+				realizeCtx, cancelRealizeCtx := context.WithDeadline(h.ctx, m.ExpiryTime())
 				err = h.realize(realizeCtx, s, t, envId, shouldLogRoutineEvents)
 				cancelRealizeCtx()
 				if errors.Is(err, context.DeadlineExceeded) {
-					h.signalHandover("context deadline exceeded")
+					h.signalHandover("instance update/insert deadline exceeded heartbeat expiry time")
+
+					// Instance insert/update was not completed by the expiration time of the current heartbeat.
+					// Pass control back to the loop to try again with the next heartbeat,
+					// or exit the loop when the retry timeout has expired. Therefore,
+					// retry timeout is **not** reset here so that retries continue until the timeout has expired.
 					continue
 				}
 				if err != nil {
@@ -228,6 +244,14 @@ func (h *HA) controller() {
 				h.signalHandover("lost heartbeat")
 				h.realizeLostHeartbeat()
 			}
+
+			// Reset retry timeout so that the next iterations have the full amount of time available again.
+			// Don't be surprised by the location of the code,
+			// as it is obvious that the timer is also reset after an error that ends the loop anyway.
+			// But this is the best place to catch all scenarios where the timeout needs to be reset.
+			// And since HA needs quite a bit of refactoring anyway to e.g. return immediately after calling h.abort(),
+			// it's fine to have it here for now.
+			retry.ResetTimeout(retryTimeout, retry.DefaultTimeout)
 		case <-h.heartbeat.Done():
 			if err := h.heartbeat.Err(); err != nil {
 				h.abort(err)
@@ -252,6 +276,10 @@ func (h *HA) realize(
 		takeover         string
 		otherResponsible bool
 	)
+
+	if _, ok := ctx.Deadline(); !ok {
+		panic("can't use context w/o deadline in realize()")
+	}
 
 	err := retry.WithBackoff(
 		ctx,
@@ -358,14 +386,31 @@ func (h *HA) realize(
 		retry.Retryable,
 		backoff.NewExponentialWithJitter(time.Millisecond*256, time.Second*3),
 		retry.Settings{
-			OnError: func(_ time.Duration, attempt uint64, err, lastErr error) {
+			// Intentionally no timeout is set, as we use a context with a deadline.
+			OnRetryableError: func(_ time.Duration, attempt uint64, err, lastErr error) {
 				if lastErr == nil || err.Error() != lastErr.Error() {
 					log := h.logger.Debugw
-					if attempt > 2 {
+					if attempt > 3 {
 						log = h.logger.Infow
 					}
 
-					log("Can't update or insert instance. Retrying", zap.Error(err), zap.Uint64("retry count", attempt))
+					log("Can't update or insert instance. Retrying", zap.Error(err))
+				}
+			},
+			OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
+				if attempt > 1 {
+					log := h.logger.Debugw
+
+					if attempt > 4 {
+						// We log errors with severity info starting from the fourth attempt, (see above)
+						// so we need to log success with severity info from the fifth attempt.
+						log = h.logger.Infow
+					}
+
+					log("Instance updated/inserted successfully after error",
+						zap.Duration("after", elapsed),
+						zap.Uint64("attempts", attempt),
+						zap.NamedError("recovered_error", lastErr))
 				}
 			},
 		},
