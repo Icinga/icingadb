@@ -7,6 +7,7 @@ import (
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
+	"io"
 	"net"
 	"syscall"
 	"time"
@@ -173,6 +174,9 @@ func Retryable(err error) bool {
 		return true
 	}
 	if errors.Is(err, syscall.EPIPE) {
+		return true
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return true
 	}
 
