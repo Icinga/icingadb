@@ -1,5 +1,39 @@
 # Icinga DB Changelog
 
+## 1.2.0 (2024-04-11)
+
+This release addresses multiple issues related to fault recoveries,
+with a particular focus on retryable database errors that may occur when using Icinga DB with database clusters.
+
+Since there may be a large number of errors that are resolved by retrying after a certain amount of time,
+#698 changed the retry behavior to retry every database-related error for five minutes.
+This helps Icinga DB survive network hiccups or more complicated database situations,
+such as working with a database cluster.
+
+The latter was specifically addressed in #711 for Galera Clusters on MySQL or MariaDB by configuring `wsrep_sync_wait` on used database sessions.
+Galera users should refer to the [Configuration documentation](doc/03-Configuration.md#database-options) for more details.
+
+In summary, the most notable changes are as follows:
+
+* Custom Variables: Render large numbers as-is, not using scientific notation. #657
+* Enhance retries for database errors and other failures for up to five minutes. #693, #698, #739, #740
+* MySQL/MariaDB: Use strict SQL mode. #699
+* MySQL/MariaDB Galera Cluster: Set `wsrep_sync_wait` for cluster-wide causality checks. #711
+* Don't crash history sync in the absence of Redis®[\*](doc/TRADEMARKS.md#redis). #725
+* Update dependencies. [27 times](https://github.com/Icinga/icingadb/pulls?q=is%3Apr+is%3Amerged+label%3Adependencies+milestone%3A1.2.0)
+
+### Schema
+
+In addition to mandatory schema upgrades, this release includes an optional upgrade that can be applied subsequently.
+Details are available in the [Upgrading documentation](doc/04-Upgrading.md#upgrading-to-icinga-db-v120) and #656.
+
+All schema changes are listed below:
+
+* Allow host and service check attempts >= 256. #656
+* Composite `INDEX` for the history table to speed up history view in Icinga DB Web. #686
+* MySQL/MariaDB: Fix `icingadb_schema.timestamp` not being Unix time. #700
+* PostgreSQL: Change `get_sla_ok_percent` to return decimal numbers in SLA overview. #710
+
 ## 1.1.1 (2023-08-09)
 
 This release fixes a few crashes in the Icinga DB daemon, addresses some shortcomings in the database schema,
