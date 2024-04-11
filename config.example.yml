@@ -57,19 +57,19 @@ database:
     # See https://icinga.com/docs/icinga-db/latest/doc/03-Configuration/#galera-cluster
 #    wsrep_sync_wait: 7
 
-# Connection configuration for the Redis server where Icinga 2 writes its configuration, state and history items.
+# Connection configuration for the Redis® server where Icinga 2 writes its configuration, state and history items.
 # This is the same connection as configured in the 'icingadb' feature of the corresponding Icinga 2 node.
-# High availability setups require a dedicated Redis server per Icinga 2 node and
+# High availability setups require a dedicated Redis® server per Icinga 2 node and
 # therefore a dedicated Icinga DB instance that connects to it.
 redis:
-  # Redis host or absolute Unix socket path.
+  # Host name or address, or absolute Unix socket path.
   host: localhost
 
-  # Redis port.
-  # Defaults to '6380' since the Redis server provided by the 'icingadb-redis' package listens on that port.
+  # TCP port.
+  # Defaults to '6380' as the Redis® open source server provided by the 'icingadb-redis' package listens on that port.
 #  port: 6380
 
-  # Redis password.
+  # Authentication password.
 #  password:
 
 # Icinga DB logs its activities at various severity levels and any errors that occur either

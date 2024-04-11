@@ -12,15 +12,15 @@ see the [Upgrading](04-Upgrading.md) documentation for the necessary steps.
 ![Icinga DB Daemon](images/icingadb-daemon.png)
 
 Before installing Icinga DB, make sure you have installed [Icinga 2](https://icinga.com/docs/icinga-2),
-set up a Redis server, and enabled the `icingadb` feature.
+set up a Redis® server, and enabled the `icingadb` feature.
 The Icinga 2 installation documentation covers all the necessary steps.
 Additionally, Icinga offers the `icingadb-redis` package for all supported operating systems,
-which ships an up-to-date Redis server version and is pre-configured for the Icinga DB components.
+which ships an up-to-date Redis® open source server version and is pre-configured for the Icinga DB components.
 
 !!! tip
 
     Although Icinga DB can run anywhere in an Icinga environment,
-    we recommend to install it where the corresponding Icinga 2 node and Redis server is running to
+    we recommend to install it where the corresponding Icinga 2 node and Redis® server is running to
     keep latency between the components low.
 
 <!-- {% else %} -->
@@ -271,7 +271,7 @@ psql -U icingadb icingadb < /usr/share/icingadb/schema/pgsql/schema.sql
 
 Icinga DB installs its configuration file to `/etc/icingadb/config.yml`,
 pre-populating most of the settings for a local setup. Before running Icinga DB,
-adjust the Redis and database credentials and, if necessary, the connection configuration.
+adjust the Redis® and database credentials and, if necessary, the connection configuration.
 The configuration file explains general settings.
 All available settings can be found under [Configuration](03-Configuration.md).
 
@@ -286,8 +286,8 @@ systemctl enable --now icingadb
 
 ## Installing Icinga DB Web
 
-With Icinga 2, Redis, Icinga DB and the database fully set up, it is now time to install Icinga DB Web,
-which connects to both Redis and the database to display and work with the monitoring data.
+With Icinga 2, Redis®, Icinga DB and the database fully set up, it is now time to install Icinga DB Web,
+which connects to both Redis® and the database to display and work with the monitoring data.
 
 ![Icinga DB Web](images/icingadb-web.png)
 

@@ -3,24 +3,24 @@
 The configuration is stored in `/etc/icingadb/config.yml`.
 See [config.example.yml](../config.example.yml) for an example configuration.
 
-## Redis Configuration
+## Redis® Configuration
 
-Connection configuration for the Redis server where Icinga 2 writes its configuration, state and history items.
+Connection configuration for the Redis® server where Icinga 2 writes its configuration, state and history items.
 This is the same connection as configured in the
 [Icinga DB feature](https://icinga.com/docs/icinga-2/latest/doc/14-features/#icinga-db) of
-the corresponding Icinga 2 node. High availability setups require a dedicated Redis server per Icinga 2 node and
+the corresponding Icinga 2 node. High availability setups require a dedicated Redis® server per Icinga 2 node and
 therefore a dedicated Icinga DB instance that connects to it.
 
-| Option   | Description                                                                                                                        |
-|----------|------------------------------------------------------------------------------------------------------------------------------------|
-| host     | **Required.** Redis host or absolute Unix socket path.                                                                             |
-| port     | **Optional.** Redis port. Defaults to `6380` since the Redis server provided by the `icingadb-redis` package listens on that port. |
-| password | **Optional.** The password to use.                                                                                                 |
-| tls      | **Optional.** Whether to use TLS.                                                                                                  |
-| cert     | **Optional.** Path to TLS client certificate.                                                                                      |
-| key      | **Optional.** Path to TLS private key.                                                                                             |
-| ca       | **Optional.** Path to TLS CA certificate.                                                                                          |
-| insecure | **Optional.** Whether not to verify the peer.                                                                                      |
+| Option   | Description                                                                                                             |
+|----------|-------------------------------------------------------------------------------------------------------------------------|
+| host     | **Required.** Host name or address, or absolute Unix socket path.                                                       |
+| port     | **Optional.** TCP port. Defaults to `6380` matching the Redis® open source server port in the `icingadb-redis` package. |
+| password | **Optional.** Authentication password.                                                                                  |
+| tls      | **Optional.** Whether to use TLS.                                                                                       |
+| cert     | **Optional.** Path to TLS client certificate.                                                                           |
+| key      | **Optional.** Path to TLS private key.                                                                                  |
+| ca       | **Optional.** Path to TLS CA certificate.                                                                               |
+| insecure | **Optional.** Whether not to verify the peer.                                                                           |
 
 ## Database Configuration
 
@@ -76,19 +76,19 @@ Configuration of the logging component used by Icinga DB.
 
 ### Logging Components
 
-| Component         | Description                                                                    |
-|-------------------|--------------------------------------------------------------------------------|
-| config-sync       | Config object synchronization between Redis and MySQL.                         |
-| database          | Database connection status and queries.                                        |
-| dump-signals      | Dump signals received from Icinga.                                             |
-| heartbeat         | Icinga heartbeats received through Redis.                                      |
-| high-availability | Manages responsibility of Icinga DB instances.                                 |
-| history-sync      | Synchronization of history entries from Redis to MySQL.                        |
-| overdue-sync      | Calculation and synchronization of the overdue status of checkables.           |
-| redis             | Redis connection status and queries.                                           |
-| retention         | Deletes historical data that exceed their configured retention period.         |
-| runtime-updates   | Runtime updates of config objects after the initial config synchronization.    |
-| telemetry         | Reporting of Icinga DB status to Icinga 2 via Redis (for monitoring purposes). |
+| Component         | Description                                                                     |
+|-------------------|---------------------------------------------------------------------------------|
+| config-sync       | Config object synchronization between Redis® and MySQL.                         |
+| database          | Database connection status and queries.                                         |
+| dump-signals      | Dump signals received from Icinga.                                              |
+| heartbeat         | Icinga heartbeats received through Redis®.                                      |
+| high-availability | Manages responsibility of Icinga DB instances.                                  |
+| history-sync      | Synchronization of history entries from Redis® to MySQL.                        |
+| overdue-sync      | Calculation and synchronization of the overdue status of checkables.            |
+| redis             | Redis® connection status and queries.                                           |
+| retention         | Deletes historical data that exceed their configured retention period.          |
+| runtime-updates   | Runtime updates of config objects after the initial config synchronization.     |
+| telemetry         | Reporting of Icinga DB status to Icinga 2 via Redis® (for monitoring purposes). |
 
 ## Retention
 
