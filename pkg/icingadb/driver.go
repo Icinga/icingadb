@@ -52,7 +52,7 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 
 			return
 		},
-		shouldRetry,
+		retry.Retryable,
 		backoff.NewExponentialWithJitter(time.Millisecond*128, time.Minute*1),
 		retry.Settings{
 			Timeout: retry.DefaultTimeout,
@@ -87,12 +87,4 @@ type MysqlFuncLogger func(v ...interface{})
 // Print implements the mysql.Logger interface.
 func (log MysqlFuncLogger) Print(v ...interface{}) {
 	log(v)
-}
-
-func shouldRetry(err error) bool {
-	if errors.Is(err, driver.ErrBadConn) {
-		return true
-	}
-
-	return retry.Retryable(err)
 }
