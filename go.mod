@@ -1,6 +1,6 @@
 module github.com/icinga/icingadb
 
-go 1.18
+go 1.22
 
 require (
 	github.com/creasty/defaults v1.7.0
