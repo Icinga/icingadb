@@ -8,7 +8,6 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -64,7 +63,7 @@ func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
 	c := redis.NewClient(options)
 
 	opts := c.Options()
-	opts.PoolSize = utils.MaxInt(32, opts.PoolSize)
+	opts.PoolSize = max(32, opts.PoolSize)
 	opts.MaxRetries = opts.PoolSize + 1 // https://github.com/go-redis/redis/issues/1737
 	c = redis.NewClient(opts)
 

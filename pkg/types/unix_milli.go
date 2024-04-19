@@ -6,13 +6,12 @@ import (
 	"encoding"
 	"encoding/json"
 	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"strconv"
 	"time"
 )
 
-// UnixMilli is a nullable millisecond UNIX timestamp in databases and JSON.
+// UnixMilli is a nullable millisecond Unix timestamp in databases and JSON.
 type UnixMilli time.Time
 
 // Time returns the time.Time conversion of UnixMilli.
@@ -37,7 +36,7 @@ func (t *UnixMilli) UnmarshalText(text []byte) error {
 		return internal.CantParseFloat64(err, string(text))
 	}
 
-	*t = UnixMilli(utils.FromUnixMilli(int64(parsed)))
+	*t = UnixMilli(time.UnixMilli(int64(parsed)))
 	return nil
 }
 
@@ -52,8 +51,7 @@ func (t *UnixMilli) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return internal.CantParseFloat64(err, string(data))
 	}
-	tt := utils.FromUnixMilli(int64(ms))
-	*t = UnixMilli(tt)
+	*t = UnixMilli(time.UnixMilli(int64(ms)))
 
 	return nil
 }
@@ -69,8 +67,7 @@ func (t *UnixMilli) Scan(src interface{}) error {
 	if !ok {
 		return errors.Errorf("bad int64 type assertion from %#v", src)
 	}
-	tt := utils.FromUnixMilli(v)
-	*t = UnixMilli(tt)
+	*t = UnixMilli(time.UnixMilli(v))
 
 	return nil
 }
