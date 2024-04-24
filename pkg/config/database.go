@@ -189,27 +189,15 @@ func unknownDbType(t string) error {
 //
 // https://mariadb.com/kb/en/galera-cluster-system-variables/#wsrep_sync_wait
 func setGaleraOpts(ctx context.Context, conn driver.Conn, wsrepSyncWait int64) error {
-	const galeraOpts = "SET SESSION wsrep_sync_wait=?"
+	galeraOpts := "SET SESSION wsrep_sync_wait=" + strconv.FormatInt(wsrepSyncWait, 10)
 
-	stmt, err := conn.(driver.ConnPrepareContext).PrepareContext(ctx, galeraOpts)
+	_, err := conn.(driver.ExecerContext).ExecContext(ctx, galeraOpts, nil)
 	if err != nil {
 		if errors.Is(err, &mysql.MySQLError{Number: 1193}) { // Unknown system variable
 			return nil
 		}
 
-		return errors.Wrap(err, "cannot prepare "+galeraOpts)
-	}
-	// This is just for an unexpected exit and any returned error can safely be ignored and in case
-	// of the normal function exit, the stmt is closed manually, and its error is handled gracefully.
-	defer func() { _ = stmt.Close() }()
-
-	_, err = stmt.(driver.StmtExecContext).ExecContext(ctx, []driver.NamedValue{{Value: wsrepSyncWait}})
-	if err != nil {
 		return errors.Wrap(err, "cannot execute "+galeraOpts)
-	}
-
-	if err = stmt.Close(); err != nil {
-		return errors.Wrap(err, "cannot close prepared statement "+galeraOpts)
 	}
 
 	return nil
