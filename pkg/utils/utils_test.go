@@ -3,6 +3,7 @@ package utils
 import (
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 func TestChanFromSlice(t *testing.T) {
@@ -51,4 +52,9 @@ func requireClosedEmpty(t *testing.T, ch <-chan int) {
 	default:
 		require.Fail(t, "receiving should not block")
 	}
+}
+
+func TestFromUnixMilli_Float(t *testing.T) {
+	const ms = 1714489037339
+	require.Equal(t, time.UnixMilli(ms), FromUnixMilli(ms))
 }
