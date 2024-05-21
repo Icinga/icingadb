@@ -64,14 +64,16 @@ func (t *UnixMilli) Scan(src interface{}) error {
 		return nil
 	}
 
-	v, ok := src.(int64)
-	if !ok {
-		return errors.Errorf("bad int64 type assertion from %#v", src)
-	}
-	tt := time.UnixMilli(v)
-	*t = UnixMilli(tt)
+	switch v := src.(type) {
+	case []byte:
+		return t.fromByteString(v)
+	case int64:
+		*t = UnixMilli(time.UnixMilli(v))
 
-	return nil
+		return nil
+	default:
+		return errors.Errorf("bad int64/[]byte type assertion from %#v", src)
+	}
 }
 
 // Value implements the driver.Valuer interface.
