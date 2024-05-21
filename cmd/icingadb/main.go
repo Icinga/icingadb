@@ -39,6 +39,7 @@ func main() {
 
 func run() int {
 	cmd := command.New()
+
 	logs, err := logging.NewLoggingFromConfig(utils.AppName(), cmd.Config.Logging)
 	if err != nil {
 		utils.PrintErrorThenExit(err, ExitFailure)

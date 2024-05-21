@@ -9,7 +9,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/redis"
-	goflags "github.com/jessevdk/go-flags"
+	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"os"
 	"time"
@@ -17,20 +17,20 @@ import (
 
 // Command provides factories for creating Redis and Database connections from Config.
 type Command struct {
-	Flags  *icingadbconfig.Flags
+	Flags  icingadbconfig.Flags
 	Config *icingadbconfig.Config
 }
 
-// New creates and returns a new Command, parses CLI flags and YAML the config, and initializes the logger.
+// New parses CLI flags and the YAML configuration and returns a new Command.
+// New prints any error during parsing to [os.Stderr] and exits.
 func New() *Command {
-	flags, err := config.ParseFlags[icingadbconfig.Flags]()
-	if err != nil {
-		var cliErr *goflags.Error
-		if errors.As(err, &cliErr) && cliErr.Type == goflags.ErrHelp {
-			os.Exit(0)
+	var flags icingadbconfig.Flags
+	if err := config.ParseFlags(&flags); err != nil {
+		if errors.Is(err, config.ErrInvalidArgument) {
+			panic(err)
 		}
 
-		os.Exit(2)
+		utils.PrintErrorThenExit(err, 2)
 	}
 
 	if flags.Version {
