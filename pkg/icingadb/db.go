@@ -520,7 +520,7 @@ func (db *DB) CreateStreamed(
 	ctx context.Context, entities <-chan database.Entity, onSuccess ...OnSuccess[database.Entity],
 ) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
-	if first == nil {
+	if err != nil {
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
@@ -542,7 +542,7 @@ func (db *DB) CreateIgnoreStreamed(
 	ctx context.Context, entities <-chan database.Entity, onSuccess ...OnSuccess[database.Entity],
 ) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
-	if first == nil {
+	if err != nil {
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
@@ -564,7 +564,7 @@ func (db *DB) UpsertStreamed(
 	ctx context.Context, entities <-chan database.Entity, onSuccess ...OnSuccess[database.Entity],
 ) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
-	if first == nil {
+	if err != nil {
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
@@ -583,7 +583,7 @@ func (db *DB) UpsertStreamed(
 // concurrency is controlled via Options.MaxConnectionsPerTable.
 func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan database.Entity) error {
 	first, forward, err := com.CopyFirst(ctx, entities)
-	if first == nil {
+	if err != nil {
 		return errors.Wrap(err, "can't copy first entity")
 	}
 	sem := db.GetSemaphoreForTable(database.TableName(first))
