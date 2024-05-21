@@ -78,6 +78,11 @@ func NewClientFromConfig(c *Config, logger *logging.Logger) (*Client, error) {
 	return NewClient(redis.NewClient(options), logger, &c.Options), nil
 }
 
+// GetAddr returns the Redis host:port or Unix socket address.
+func (c *Client) GetAddr() string {
+	return c.Client.Options().Addr
+}
+
 // HPair defines Redis hashes field-value pairs.
 type HPair struct {
 	Field string

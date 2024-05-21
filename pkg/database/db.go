@@ -36,6 +36,7 @@ type DB struct {
 
 	Options *Options
 
+	addr              string
 	logger            *logging.Logger
 	tableSemaphores   map[string]*semaphore.Weighted
 	tableSemaphoresMu sync.Mutex
@@ -90,18 +91,9 @@ func (o *Options) Validate() error {
 	return nil
 }
 
-// NewDb returns a new DB wrapper for a pre-existing sqlx.DB.
-func NewDb(db *sqlx.DB, logger *logging.Logger, options *Options) *DB {
-	return &DB{
-		DB:              db,
-		logger:          logger,
-		Options:         options,
-		tableSemaphores: make(map[string]*semaphore.Weighted),
-	}
-}
-
 // NewDbFromConfig returns a new DB from Config.
 func NewDbFromConfig(c *Config, logger *logging.Logger, connectorCallbacks RetryConnectorCallbacks) (*DB, error) {
+	var addr string
 	var db *sqlx.DB
 
 	switch c.Type {
@@ -151,6 +143,7 @@ func NewDbFromConfig(c *Config, logger *logging.Logger, connectorCallbacks Retry
 			return setGaleraOpts(ctx, conn, int64(c.Options.WsrepSyncWait))
 		}
 
+		addr = config.Addr
 		db = sqlx.NewDb(sql.OpenDB(NewConnector(connector, logger, connectorCallbacks)), MySQL)
 	case "pgsql":
 		uri := &url.URL{
@@ -168,9 +161,12 @@ func NewDbFromConfig(c *Config, logger *logging.Logger, connectorCallbacks Retry
 			// string. See also https://github.com/lib/pq/issues/796
 			"host": {c.Host},
 		}
-		if c.Port != 0 {
-			query["port"] = []string{strconv.FormatInt(int64(c.Port), 10)}
+
+		port := c.Port
+		if port == 0 {
+			port = 5432
 		}
+		query["port"] = []string{strconv.FormatInt(int64(port), 10)}
 
 		if _, err := c.TlsOptions.MakeConfig(c.Host); err != nil {
 			return nil, err
@@ -205,6 +201,7 @@ func NewDbFromConfig(c *Config, logger *logging.Logger, connectorCallbacks Retry
 			return nil, errors.Wrap(err, "can't open pgsql database")
 		}
 
+		addr = utils.JoinHostPort(c.Host, port)
 		db = sqlx.NewDb(sql.OpenDB(NewConnector(connector, logger, connectorCallbacks)), PostgreSQL)
 	default:
 		return nil, unknownDbType(c.Type)
@@ -215,7 +212,18 @@ func NewDbFromConfig(c *Config, logger *logging.Logger, connectorCallbacks Retry
 
 	db.Mapper = reflectx.NewMapperFunc("db", strcase.Snake)
 
-	return NewDb(db, logger, &c.Options), nil
+	return &DB{
+		DB:              db,
+		Options:         &c.Options,
+		addr:            addr,
+		logger:          logger,
+		tableSemaphores: make(map[string]*semaphore.Weighted),
+	}, nil
+}
+
+// GetAddr returns the database host:port or Unix socket address.
+func (db *DB) GetAddr() string {
+	return db.addr
 }
 
 // BuildColumns returns all columns of the given struct.

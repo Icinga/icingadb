@@ -60,7 +60,7 @@ func run() int {
 	}
 	defer db.Close()
 	{
-		logger.Infof("Connecting to database at '%s'", utils.JoinHostPort(cmd.Config.Database.Host, cmd.Config.Database.Port))
+		logger.Infof("Connecting to database at '%s'", db.GetAddr())
 		err := db.Ping()
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
@@ -76,7 +76,7 @@ func run() int {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
 	}
 	{
-		logger.Infof("Connecting to Redis at '%s'", utils.JoinHostPort(cmd.Config.Redis.Host, cmd.Config.Redis.Port))
+		logger.Infof("Connecting to Redis at '%s'", rc.GetAddr())
 		_, err := rc.Ping(context.Background()).Result()
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to Redis"))
