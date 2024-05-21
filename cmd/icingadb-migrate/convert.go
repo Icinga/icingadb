@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"github.com/icinga/icingadb/pkg/database"
+	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/types"
@@ -86,7 +87,7 @@ func convertCommentRows(
 				EntryTime:    entryTime,
 				Author:       row.AuthorName,
 				Comment:      row.CommentData,
-				EntryType:    types.CommentType(row.EntryType),
+				EntryType:    icingadbTypes.CommentType(row.EntryType),
 				IsPersistent: types.Bool{Bool: row.IsPersistent != 0, Valid: true},
 				IsSticky:     types.Bool{Bool: false, Valid: true},
 				ExpireTime:   expireTime,
@@ -691,7 +692,7 @@ func convertNotificationRows(
 //
 // [1]: https://github.com/Icinga/icinga2/blob/32c7f7730db154ba0dff5856a8985d125791c/lib/db_ido/dbevents.cpp#L1507-L1524
 // [2]: https://github.com/Icinga/icingadb/blob/8f31ac143875498797725adb9bfacf3d4/pkg/types/notification_type.go#L53-L61
-func convertNotificationType(notificationReason, state uint8) types.NotificationType {
+func convertNotificationType(notificationReason, state uint8) icingadbTypes.NotificationType {
 	switch notificationReason {
 	case 0: // state
 		if state == 0 {
@@ -793,7 +794,7 @@ func convertStateRows(
 				ServiceId:     serviceId,
 			},
 			EventTime:         ts,
-			StateType:         types.StateType(row.StateType),
+			StateType:         icingadbTypes.StateType(row.StateType),
 			SoftState:         row.State,
 			HardState:         row.LastHardState,
 			PreviousSoftState: row.LastState,
@@ -818,7 +819,7 @@ func convertStateRows(
 			EventTime:      ts,
 		})
 
-		if types.StateType(row.StateType) == types.StateHard {
+		if icingadbTypes.StateType(row.StateType) == icingadbTypes.StateHard {
 			// only hard state changes are relevant for SLA history, discard all others
 
 			sla = append(sla, &history.SlaHistoryState{
@@ -834,7 +835,7 @@ func convertStateRows(
 					ServiceId:     serviceId,
 				},
 				EventTime:         ts,
-				StateType:         types.StateType(row.StateType),
+				StateType:         icingadbTypes.StateType(row.StateType),
 				HardState:         row.LastHardState,
 				PreviousHardState: previousHardState,
 			})
