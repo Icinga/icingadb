@@ -59,11 +59,12 @@ redis:
 
 			require.NoError(t, os.WriteFile(tempFile.Name(), []byte(st.input), 0o600))
 
-			if actual, err := config.FromYAMLFile[Config](tempFile.Name()); st.output == nil {
+			var actual Config
+			if err := config.FromYAMLFile(tempFile.Name(), &actual); st.output == nil {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, st.output, actual)
+				require.Equal(t, *st.output, actual)
 			}
 		})
 	}

@@ -1,7 +1,6 @@
 package command
 
 import (
-	"fmt"
 	"github.com/icinga/icingadb/internal"
 	icingadbconfig "github.com/icinga/icingadb/internal/config"
 	"github.com/icinga/icingadb/pkg/config"
@@ -18,7 +17,7 @@ import (
 // Command provides factories for creating Redis and Database connections from Config.
 type Command struct {
 	Flags  icingadbconfig.Flags
-	Config *icingadbconfig.Config
+	Config icingadbconfig.Config
 }
 
 // New parses CLI flags and the YAML configuration and returns a new Command.
@@ -38,10 +37,13 @@ func New() *Command {
 		os.Exit(0)
 	}
 
-	cfg, err := config.FromYAMLFile[icingadbconfig.Config](flags.Config)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(2)
+	var cfg icingadbconfig.Config
+	if err := config.FromYAMLFile(flags.Config, &cfg); err != nil {
+		if errors.Is(err, config.ErrInvalidArgument) {
+			panic(err)
+		}
+
+		utils.PrintErrorThenExit(err, 1)
 	}
 
 	return &Command{

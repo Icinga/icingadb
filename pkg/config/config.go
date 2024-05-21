@@ -11,40 +11,42 @@ import (
 	"reflect"
 )
 
-// ErrInvalidArgument is the error returned by [ParseFlags]
+// ErrInvalidArgument is the error returned by [ParseFlags] or [FromYAMLFile] if
 // its parsing result cannot be stored in the value pointed to by the designated passed argument which
 // must be a non-nil pointer.
 var ErrInvalidArgument = stderrors.New("invalid argument")
 
-// FromYAMLFile returns a new value of type T created from the given YAML config file.
-func FromYAMLFile[T any, P interface {
-	*T
-	Validator
-}](name string) (*T, error) {
+// FromYAMLFile parses the given YAML file and stores the result
+// in the value pointed to by v. If v is nil or not a pointer,
+// FromYAMLFile returns an [ErrInvalidArgument] error.
+func FromYAMLFile(name string, v Validator) error {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Pointer || rv.IsNil() {
+		return errors.Wrapf(ErrInvalidArgument, "non-nil pointer expected, got %T", v)
+	}
+
 	f, err := os.Open(name)
 	if err != nil {
-		return nil, errors.Wrap(err, "can't open YAML file "+name)
+		return errors.Wrap(err, "can't open YAML file "+name)
 	}
 	defer func(f *os.File) {
 		_ = f.Close()
 	}(f)
 
-	c := P(new(T))
-
-	if err := defaults.Set(c); err != nil {
-		return nil, errors.Wrap(err, "can't set config defaults")
+	if err := defaults.Set(v); err != nil {
+		return errors.Wrap(err, "can't set config defaults")
 	}
 
 	d := yaml.NewDecoder(f, yaml.DisallowUnknownField())
-	if err := d.Decode(c); err != nil {
-		return nil, errors.Wrap(err, "can't parse YAML file "+name)
+	if err := d.Decode(v); err != nil {
+		return errors.Wrap(err, "can't parse YAML file "+name)
 	}
 
-	if err := c.Validate(); err != nil {
-		return nil, errors.Wrap(err, "invalid configuration")
+	if err := v.Validate(); err != nil {
+		return errors.Wrap(err, "invalid configuration")
 	}
 
-	return c, nil
+	return nil
 }
 
 // ParseFlags parses CLI flags and stores the result
