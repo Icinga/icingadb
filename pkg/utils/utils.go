@@ -8,21 +8,12 @@ import (
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/utf8string"
-	"math"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
-
-// FromUnixMilli creates and returns a time.Time value
-// from the given milliseconds since the Unix epoch ms.
-func FromUnixMilli(ms int64) time.Time {
-	sec, dec := math.Modf(float64(ms) / 1e3)
-
-	return time.Unix(int64(sec), int64(dec*(1e9)))
-}
 
 // Timed calls the given callback with the time that has elapsed since the start.
 //

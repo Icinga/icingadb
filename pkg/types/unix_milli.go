@@ -1,11 +1,11 @@
 package types
 
 import (
+	"bytes"
 	"database/sql"
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"strconv"
 	"time"
@@ -26,35 +26,35 @@ func (t UnixMilli) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return []byte(strconv.FormatInt(time.Time(t).UnixMilli(), 10)), nil
-}
-
-// UnmarshalText implements the encoding.TextUnmarshaler interface.
-func (t *UnixMilli) UnmarshalText(text []byte) error {
-	parsed, err := strconv.ParseFloat(string(text), 64)
-	if err != nil {
-		return CantParseFloat64(err, string(text))
-	}
-
-	*t = UnixMilli(utils.FromUnixMilli(int64(parsed)))
-	return nil
+	return []byte(strconv.FormatInt(t.Time().UnixMilli(), 10)), nil
 }
 
 // UnmarshalJSON implements the json.Unmarshaler interface.
 // Unmarshals from milliseconds. Supports JSON null.
 func (t *UnixMilli) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" || len(data) == 0 {
+	if bytes.Equal(data, []byte("null")) || len(data) == 0 {
 		return nil
 	}
 
-	ms, err := strconv.ParseFloat(string(data), 64)
-	if err != nil {
-		return CantParseFloat64(err, string(data))
-	}
-	tt := utils.FromUnixMilli(int64(ms))
-	*t = UnixMilli(tt)
+	return t.fromByteString(data)
+}
 
-	return nil
+// MarshalText implements the encoding.TextMarshaler interface.
+func (t UnixMilli) MarshalText() ([]byte, error) {
+	if time.Time(t).IsZero() {
+		return []byte{}, nil
+	}
+
+	return []byte(strconv.FormatInt(t.Time().UnixMilli(), 10)), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+func (t *UnixMilli) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		return nil
+	}
+
+	return t.fromByteString(text)
 }
 
 // Scan implements the sql.Scanner interface.
@@ -68,7 +68,7 @@ func (t *UnixMilli) Scan(src interface{}) error {
 	if !ok {
 		return errors.Errorf("bad int64 type assertion from %#v", src)
 	}
-	tt := utils.FromUnixMilli(v)
+	tt := time.UnixMilli(v)
 	*t = UnixMilli(tt)
 
 	return nil
@@ -84,11 +84,23 @@ func (t UnixMilli) Value() (driver.Value, error) {
 	return t.Time().UnixMilli(), nil
 }
 
+func (t *UnixMilli) fromByteString(data []byte) error {
+	i, err := strconv.ParseInt(string(data), 10, 64)
+	if err != nil {
+		return CantParseInt64(err, string(data))
+	}
+
+	*t = UnixMilli(time.UnixMilli(i))
+
+	return nil
+}
+
 // Assert interface compliance.
 var (
-	_ json.Marshaler           = (*UnixMilli)(nil)
+	_ encoding.TextMarshaler   = (*UnixMilli)(nil)
 	_ encoding.TextUnmarshaler = (*UnixMilli)(nil)
+	_ json.Marshaler           = (*UnixMilli)(nil)
 	_ json.Unmarshaler         = (*UnixMilli)(nil)
-	_ sql.Scanner              = (*UnixMilli)(nil)
 	_ driver.Valuer            = (*UnixMilli)(nil)
+	_ sql.Scanner              = (*UnixMilli)(nil)
 )
