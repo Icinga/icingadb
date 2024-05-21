@@ -5,7 +5,7 @@ import (
 	"crypto/sha1"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/objectpacker"
-	icingadbTypes "github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icingadb/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v6"
@@ -63,12 +63,12 @@ func hashAny(in interface{}) []byte {
 }
 
 // convertTime converts *nix timestamps from the IDO for Icinga DB.
-func convertTime(ts int64, tsUs uint32) icingadbTypes.UnixMilli {
+func convertTime(ts int64, tsUs uint32) types.UnixMilli {
 	if ts == 0 && tsUs == 0 {
-		return icingadbTypes.UnixMilli{}
+		return types.UnixMilli{}
 	}
 
-	return icingadbTypes.UnixMilli(time.Unix(ts, int64(tsUs)*int64(time.Microsecond/time.Nanosecond)))
+	return types.UnixMilli(time.Unix(ts, int64(tsUs)*int64(time.Microsecond/time.Nanosecond)))
 }
 
 // calcObjectId calculates the ID of the config object named name1 for Icinga DB.
@@ -239,7 +239,7 @@ type icingaDbOutputStage struct {
 	insert, upsert []database.Entity
 }
 
-var types = historyTypes{
+var typesToMigrate = historyTypes{
 	{
 		name:            "ack & comment",
 		idoTable:        "icinga_commenthistory",

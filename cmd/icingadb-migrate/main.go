@@ -12,7 +12,7 @@ import (
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/logging"
-	icingadbTypes "github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
@@ -136,7 +136,7 @@ func parseConfig(f *Flags) (_ *Config, exit int) {
 var nonWords = regexp.MustCompile(`\W+`)
 
 // mkCache ensures <f.Cache>/<history type>.sqlite3 files are present and contain their schema
-// and initializes types[*].cache. (On non-recoverable errors the whole program exits.)
+// and initializes typesToMigrate[*].cache. (On non-recoverable errors the whole program exits.)
 func mkCache(f *Flags, c *Config, mapper *reflectx.Mapper) {
 	log.Info("Preparing cache")
 
@@ -144,7 +144,7 @@ func mkCache(f *Flags, c *Config, mapper *reflectx.Mapper) {
 		log.With("dir", f.Cache).Fatalf("%+v", errors.Wrap(err, "can't create directory"))
 	}
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		if ht.cacheSchema == "" {
 			return
 		}
@@ -203,10 +203,10 @@ func connect(which string, cfg *config.Database) *database.DB {
 	return db
 }
 
-// startIdoTx initializes types[*].snapshot with new repeatable-read-isolated ido transactions.
+// startIdoTx initializes typesToMigrate[*].snapshot with new repeatable-read-isolated ido transactions.
 // (On non-recoverable errors the whole program exits.)
 func startIdoTx(ido *database.DB) {
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		tx, err := ido.BeginTxx(context.Background(), &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 		if err != nil {
 			log.Fatalf("%+v", errors.Wrap(err, "can't begin snapshot transaction"))
@@ -216,10 +216,10 @@ func startIdoTx(ido *database.DB) {
 	})
 }
 
-// computeIdRange initializes types[*].fromId and types[*].toId.
+// computeIdRange initializes typesToMigrate[*].fromId and typesToMigrate[*].toId.
 // (On non-recoverable errors the whole program exits.)
 func computeIdRange(c *Config) {
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		getBorderId := func(id *uint64, timeColumns []string, compOperator string, borderTime int32, sortOrder string) {
 			deZeroFied := make([]string, 0, len(timeColumns))
 			for _, column := range timeColumns {
@@ -258,7 +258,7 @@ func computeIdRange(c *Config) {
 //go:embed embed/ido_migration_progress_schema.sql
 var idoMigrationProgressSchema string
 
-// computeProgress initializes types[*].lastId, types[*].total and types[*].done.
+// computeProgress initializes typesToMigrate[*].lastId, typesToMigrate[*].total and typesToMigrate[*].done.
 // (On non-recoverable errors the whole program exits.)
 func computeProgress(c *Config, idb *database.DB, envId []byte) {
 	if _, err := idb.Exec(idoMigrationProgressSchema); err != nil {
@@ -266,7 +266,7 @@ func computeProgress(c *Config, idb *database.DB, envId []byte) {
 	}
 
 	envIdHex := hex.EncodeToString(envId)
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		var query = idb.Rebind(
 			"SELECT last_ido_id FROM ido_migration_progress" +
 				" WHERE environment_id=? AND history_type=? AND from_ts=? AND to_ts=?",
@@ -280,7 +280,7 @@ func computeProgress(c *Config, idb *database.DB, envId []byte) {
 		}
 	})
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		if ht.cacheFiller != nil {
 			err := ht.snapshot.Get(
 				&ht.cacheTotal,
@@ -298,7 +298,7 @@ func computeProgress(c *Config, idb *database.DB, envId []byte) {
 		}
 	})
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		var rows []struct {
 			Migrated uint8
 			Cnt      int64
@@ -331,16 +331,16 @@ func computeProgress(c *Config, idb *database.DB, envId []byte) {
 	})
 }
 
-// fillCache fills <f.Cache>/<history type>.sqlite3 (actually types[*].cacheFiller does).
+// fillCache fills <f.Cache>/<history type>.sqlite3 (actually typesToMigrate[*].cacheFiller does).
 func fillCache() {
 	progress := mpb.New()
-	for _, ht := range types {
+	for _, ht := range typesToMigrate {
 		if ht.cacheFiller != nil {
 			ht.setupBar(progress, ht.cacheTotal)
 		}
 	}
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		if ht.cacheFiller != nil {
 			ht.cacheFiller(ht)
 		}
@@ -352,11 +352,11 @@ func fillCache() {
 // migrate does the actual migration.
 func migrate(c *Config, idb *database.DB, envId []byte) {
 	progress := mpb.New()
-	for _, ht := range types {
+	for _, ht := range typesToMigrate {
 		ht.setupBar(progress, ht.total)
 	}
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		ht.migrate(c, idb, envId, ht)
 	})
 
@@ -366,7 +366,7 @@ func migrate(c *Config, idb *database.DB, envId []byte) {
 // migrate does the actual migration for one history type.
 func migrateOneType[IdoRow any](
 	c *Config, idb *database.DB, envId []byte, ht *historyType,
-	convertRows func(env string, envId icingadbTypes.Binary,
+	convertRows func(env string, envId types.Binary,
 		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
 		idoRows []IdoRow) (stages []icingaDbOutputStage, checkpoint any),
 ) {
@@ -469,7 +469,7 @@ func migrateOneType[IdoRow any](
 
 // cleanupCache removes <f.Cache>/<history type>.sqlite3 files.
 func cleanupCache(f *Flags) {
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		if ht.cacheFile != "" {
 			if err := ht.cache.Close(); err != nil {
 				log.With("file", ht.cacheFile).Warnf("%+v", errors.Wrap(err, "can't close SQLite database"))
