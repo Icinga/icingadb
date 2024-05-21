@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
+	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
@@ -95,7 +96,14 @@ func (r *RuntimeUpdates) Sync(
 
 		g.Go(structifyStream(
 			ctx, updateMessages, upsertEntities, upsertedFifo, deleteIds, deletedFifo,
-			structify.MakeMapStructifier(reflect.TypeOf(s.Entity()).Elem(), "json"),
+			structify.MakeMapStructifier(
+				reflect.TypeOf(s.Entity()).Elem(),
+				"json",
+				func(a any) {
+					if initer, ok := a.(contracts.Initer); ok {
+						initer.Init()
+					}
+				}),
 		))
 
 		g.Go(func() error {
@@ -155,7 +163,14 @@ func (r *RuntimeUpdates) Sync(
 		updateMessagesByKey["icinga:"+strcase.Delimited(cv.Name(), ':')] = updateMessages
 		g.Go(structifyStream(
 			ctx, updateMessages, upsertEntities, nil, deleteIds, nil,
-			structify.MakeMapStructifier(reflect.TypeOf(cv.Entity()).Elem(), "json"),
+			structify.MakeMapStructifier(
+				reflect.TypeOf(cv.Entity()).Elem(),
+				"json",
+				func(a any) {
+					if initer, ok := a.(contracts.Initer); ok {
+						initer.Init()
+					}
+				}),
 		))
 
 		customvars, flatCustomvars, errs := v1.ExpandCustomvars(ctx, upsertEntities)

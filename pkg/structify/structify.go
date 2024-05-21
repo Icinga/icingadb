@@ -3,7 +3,6 @@ package structify
 import (
 	"encoding"
 	"fmt"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/constraints"
 	"reflect"
@@ -27,17 +26,15 @@ type MapStructifier = func(map[string]interface{}) (interface{}, error)
 // MakeMapStructifier builds a function which parses a map's string values into a new struct of type t
 // and returns a pointer to it. tag specifies which tag connects struct fields to map keys.
 // MakeMapStructifier panics if it detects an unsupported type (suitable for usage in init() or global vars).
-func MakeMapStructifier(t reflect.Type, tag string) MapStructifier {
+func MakeMapStructifier(t reflect.Type, tag string, initer func(any)) MapStructifier {
 	tree := buildStructTree(t, tag)
 
 	return func(kv map[string]interface{}) (interface{}, error) {
 		vPtr := reflect.New(t)
 		ptr := vPtr.Interface()
-
-		if initer, ok := ptr.(contracts.Initer); ok {
-			initer.Init()
+		if initer != nil {
+			initer(ptr)
 		}
-
 		vPtrElem := vPtr.Elem()
 		err := errors.Wrapf(structifyMapByTree(kv, tree, vPtrElem, vPtrElem, new([]int)), "can't structify map %#v by tree %#v", kv, tree)
 
