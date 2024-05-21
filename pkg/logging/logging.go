@@ -84,6 +84,11 @@ func NewLogging(name string, level zapcore.Level, output string, options Options
 		nil
 }
 
+// NewLoggingFromConfig returns a new Logging from Config.
+func NewLoggingFromConfig(name string, c Config) (*Logging, error) {
+	return NewLogging(name, c.Level, c.Output, c.Options, c.Interval)
+}
+
 // GetChildLogger returns a named child logger.
 // Log levels for named child loggers are obtained from the logging options and, if not found,
 // set to the default log level.

@@ -39,13 +39,7 @@ func main() {
 
 func run() int {
 	cmd := command.New()
-	logs, err := logging.NewLogging(
-		utils.AppName(),
-		cmd.Config.Logging.Level,
-		cmd.Config.Logging.Output,
-		cmd.Config.Logging.Options,
-		cmd.Config.Logging.Interval,
-	)
+	logs, err := logging.NewLoggingFromConfig(utils.AppName(), cmd.Config.Logging)
 	if err != nil {
 		utils.Fatal(errors.Wrap(err, "can't configure logging"))
 	}
