@@ -9,7 +9,6 @@ import (
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/retry"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -157,7 +156,7 @@ func (db *DB) BuildColumns(subject interface{}) []string {
 func (db *DB) BuildDeleteStmt(from interface{}) string {
 	return fmt.Sprintf(
 		`DELETE FROM "%s" WHERE id IN (?)`,
-		utils.TableName(from),
+		database.TableName(from),
 	)
 }
 
@@ -167,7 +166,7 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 
 	return fmt.Sprintf(
 		`INSERT INTO "%s" ("%s") VALUES (%s)`,
-		utils.TableName(into),
+		database.TableName(into),
 		strings.Join(columns, `", "`),
 		fmt.Sprintf(":%s", strings.Join(columns, ", :")),
 	), len(columns)
@@ -176,7 +175,7 @@ func (db *DB) BuildInsertStmt(into interface{}) (string, int) {
 // BuildInsertIgnoreStmt returns an INSERT statement for the specified struct for
 // which the database ignores rows that have already been inserted.
 func (db *DB) BuildInsertIgnoreStmt(into interface{}) (string, int) {
-	table := utils.TableName(into)
+	table := database.TableName(into)
 	columns := db.BuildColumns(into)
 	var clause string
 
@@ -203,7 +202,7 @@ func (db *DB) BuildSelectStmt(table interface{}, columns interface{}) string {
 	q := fmt.Sprintf(
 		`SELECT "%s" FROM "%s"`,
 		strings.Join(db.BuildColumns(columns), `", "`),
-		utils.TableName(table),
+		database.TableName(table),
 	)
 
 	if scoper, ok := table.(database.Scoper); ok {
@@ -225,7 +224,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 
 	return fmt.Sprintf(
 		`UPDATE "%s" SET %s WHERE id = :id`,
-		utils.TableName(update),
+		database.TableName(update),
 		strings.Join(set, ", "),
 	), len(columns) + 1 // +1 because of WHERE id = :id
 }
@@ -233,7 +232,7 @@ func (db *DB) BuildUpdateStmt(update interface{}) (string, int) {
 // BuildUpsertStmt returns an upsert statement for the given struct.
 func (db *DB) BuildUpsertStmt(subject interface{}) (stmt string, placeholders int) {
 	insertColumns := db.BuildColumns(subject)
-	table := utils.TableName(subject)
+	table := database.TableName(subject)
 	var updateColumns []string
 
 	if upserter, ok := subject.(database.Upserter); ok {
@@ -572,7 +571,7 @@ func (db *DB) CreateStreamed(
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
-	sem := db.GetSemaphoreForTable(utils.TableName(first))
+	sem := db.GetSemaphoreForTable(database.TableName(first))
 	stmt, placeholders := db.BuildInsertStmt(first)
 
 	return db.NamedBulkExec(
@@ -594,7 +593,7 @@ func (db *DB) CreateIgnoreStreamed(
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
-	sem := db.GetSemaphoreForTable(utils.TableName(first))
+	sem := db.GetSemaphoreForTable(database.TableName(first))
 	stmt, placeholders := db.BuildInsertIgnoreStmt(first)
 
 	return db.NamedBulkExec(
@@ -616,7 +615,7 @@ func (db *DB) UpsertStreamed(
 		return errors.Wrap(err, "can't copy first entity")
 	}
 
-	sem := db.GetSemaphoreForTable(utils.TableName(first))
+	sem := db.GetSemaphoreForTable(database.TableName(first))
 	stmt, placeholders := db.BuildUpsertStmt(first)
 
 	return db.NamedBulkExec(
@@ -634,7 +633,7 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan database.Entit
 	if first == nil {
 		return errors.Wrap(err, "can't copy first entity")
 	}
-	sem := db.GetSemaphoreForTable(utils.TableName(first))
+	sem := db.GetSemaphoreForTable(database.TableName(first))
 	stmt, _ := db.BuildUpdateStmt(first)
 
 	return db.NamedBulkExecTx(ctx, stmt, db.Options.MaxRowsPerTransaction, sem, forward)
@@ -648,7 +647,7 @@ func (db *DB) UpdateStreamed(ctx context.Context, entities <-chan database.Entit
 func (db *DB) DeleteStreamed(
 	ctx context.Context, entityType database.Entity, ids <-chan interface{}, onSuccess ...OnSuccess[any],
 ) error {
-	sem := db.GetSemaphoreForTable(utils.TableName(entityType))
+	sem := db.GetSemaphoreForTable(database.TableName(entityType))
 	return db.BulkExec(
 		ctx, db.BuildDeleteStmt(entityType), db.Options.MaxPlaceholdersPerStatement, sem, ids, onSuccess...,
 	)

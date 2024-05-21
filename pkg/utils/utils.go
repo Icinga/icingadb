@@ -5,8 +5,6 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
-	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/utf8string"
@@ -34,15 +32,6 @@ func Name(t interface{}) string {
 	s := strings.TrimLeft(fmt.Sprintf("%T", t), "*")
 
 	return s[strings.LastIndex(s, ".")+1:]
-}
-
-// TableName returns the table of t.
-func TableName(t interface{}) string {
-	if tn, ok := t.(database.TableNamer); ok {
-		return tn.TableName()
-	} else {
-		return strcase.Snake(Name(t))
-	}
 }
 
 // Timed calls the given callback with the time that has elapsed since the start.

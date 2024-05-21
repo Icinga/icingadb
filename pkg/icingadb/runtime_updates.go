@@ -13,7 +13,6 @@ import (
 	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/icinga/icingadb/pkg/structify"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
@@ -131,7 +130,7 @@ func (r *RuntimeUpdates) Sync(
 				}
 			}).Stop()
 
-			sem := r.db.GetSemaphoreForTable(utils.TableName(s.Entity()))
+			sem := r.db.GetSemaphoreForTable(database.TableName(s.Entity()))
 
 			onSuccess := []OnSuccess[any]{OnSuccessIncrement[any](&counter), OnSuccessIncrement[any](stat)}
 			if !allowParallel {

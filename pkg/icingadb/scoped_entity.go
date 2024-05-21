@@ -2,7 +2,6 @@ package icingadb
 
 import (
 	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/utils"
 )
 
 // ScopedEntity combines an entity and a scope that specifies
@@ -20,7 +19,7 @@ func (e ScopedEntity) Scope() interface{} {
 
 // TableName implements the contracts.TableNamer interface.
 func (e ScopedEntity) TableName() string {
-	return utils.TableName(e.Entity)
+	return database.TableName(e.Entity)
 }
 
 // NewScopedEntity returns a new ScopedEntity.
