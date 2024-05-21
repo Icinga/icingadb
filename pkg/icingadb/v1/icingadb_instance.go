@@ -11,7 +11,7 @@ type IcingadbInstance struct {
 	Heartbeat                         types.UnixMilli `json:"heartbeat"`
 	Responsible                       types.Bool      `json:"responsible"`
 	Icinga2Version                    string          `json:"icinga2_version"`
-	Icinga2StartTime                  types.UnixMilli `json:"icinga2_start_Time"`
+	Icinga2StartTime                  types.UnixMilli `json:"icinga2_start_time"`
 	Icinga2NotificationsEnabled       types.Bool      `json:"icinga2_notifications_enabled"`
 	Icinga2ActiveServiceChecksEnabled types.Bool      `json:"icinga2_active_service_checks_enabled"`
 	Icinga2ActiveHostChecksEnabled    types.Bool      `json:"icinga2_active_host_checks_enabled"`
