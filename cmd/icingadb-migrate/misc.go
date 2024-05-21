@@ -5,7 +5,7 @@ import (
 	"crypto/sha1"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
-	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
+	"github.com/icinga/icingadb/pkg/objectpacker"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
