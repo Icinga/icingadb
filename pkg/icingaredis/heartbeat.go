@@ -4,10 +4,10 @@ import (
 	"context"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
 	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"sync"
@@ -26,7 +26,7 @@ type Heartbeat struct {
 	events         chan *HeartbeatMessage
 	lastReceivedMs int64
 	cancelCtx      context.CancelFunc
-	client         *Client
+	client         *redis.Client
 	done           chan struct{}
 	errMu          sync.Mutex
 	err            error
@@ -34,7 +34,7 @@ type Heartbeat struct {
 }
 
 // NewHeartbeat returns a new Heartbeat and starts the heartbeat controller loop.
-func NewHeartbeat(ctx context.Context, client *Client, logger *logging.Logger) *Heartbeat {
+func NewHeartbeat(ctx context.Context, client *redis.Client, logger *logging.Logger) *Heartbeat {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
 	heartbeat := &Heartbeat{

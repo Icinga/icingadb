@@ -9,12 +9,11 @@ import (
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/overdue"
-	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 	"regexp"
 	"strconv"
@@ -25,12 +24,12 @@ import (
 // Sync specifies the source and destination of an overdue sync.
 type Sync struct {
 	db     *database.DB
-	redis  *icingaredis.Client
+	redis  *redis.Client
 	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *database.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,

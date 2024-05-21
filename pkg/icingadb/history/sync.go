@@ -6,15 +6,14 @@ import (
 	"github.com/icinga/icingadb/pkg/database"
 	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
-	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/icinga/icingadb/pkg/types"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 	"reflect"
 	"sync"
@@ -23,12 +22,12 @@ import (
 // Sync specifies the source and destination of a history sync.
 type Sync struct {
 	db     *database.DB
-	redis  *icingaredis.Client
+	redis  *redis.Client
 	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *database.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -154,7 +153,7 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 
 			cmd := s.redis.XDel(ctx, stream, ids...)
 			if _, err := cmd.Result(); err != nil {
-				return icingaredis.WrapCmdErr(cmd)
+				return redis.WrapCmdErr(cmd)
 			}
 
 			counter.Add(uint64(len(ids)))

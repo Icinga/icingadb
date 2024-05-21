@@ -1,20 +1,21 @@
-package icingaredis
+package redis
 
 import (
 	"context"
+	"crypto/tls"
+	"fmt"
+	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/common"
-	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
-	"github.com/icinga/icingadb/pkg/strcase"
-	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
-	"runtime"
+	"net"
 	"time"
 )
 
@@ -28,43 +29,49 @@ type Client struct {
 	logger *logging.Logger
 }
 
-// Options define user configurable Redis options.
-type Options struct {
-	BlockTimeout        time.Duration `yaml:"block_timeout"         default:"1s"`
-	HMGetCount          int           `yaml:"hmget_count"           default:"4096"`
-	HScanCount          int           `yaml:"hscan_count"           default:"4096"`
-	MaxHMGetConnections int           `yaml:"max_hmget_connections" default:"8"`
-	Timeout             time.Duration `yaml:"timeout"               default:"30s"`
-	XReadCount          int           `yaml:"xread_count"           default:"4096"`
-}
-
-// Validate checks constraints in the supplied Redis options and returns an error if they are violated.
-func (o *Options) Validate() error {
-	if o.BlockTimeout <= 0 {
-		return errors.New("block_timeout must be positive")
-	}
-	if o.HMGetCount < 1 {
-		return errors.New("hmget_count must be at least 1")
-	}
-	if o.HScanCount < 1 {
-		return errors.New("hscan_count must be at least 1")
-	}
-	if o.MaxHMGetConnections < 1 {
-		return errors.New("max_hmget_connections must be at least 1")
-	}
-	if o.Timeout == 0 {
-		return errors.New("timeout cannot be 0. Configure a value greater than zero, or use -1 for no timeout")
-	}
-	if o.XReadCount < 1 {
-		return errors.New("xread_count must be at least 1")
-	}
-
-	return nil
-}
-
-// NewClient returns a new icingaredis.Client wrapper for a pre-existing *redis.Client.
+// NewClient returns a new Client wrapper for a pre-existing redis.Client.
 func NewClient(client *redis.Client, logger *logging.Logger, options *Options) *Client {
 	return &Client{Client: client, logger: logger, Options: options}
+}
+
+// NewClientFromConfig returns a new Client from Config.
+func NewClientFromConfig(c *Config, logger *logging.Logger) (*Client, error) {
+	tlsConfig, err := c.TlsOptions.MakeConfig(c.Host)
+	if err != nil {
+		return nil, err
+	}
+
+	var dialer ctxDialerFunc
+	dl := &net.Dialer{Timeout: 15 * time.Second}
+
+	if tlsConfig == nil {
+		dialer = dl.DialContext
+	} else {
+		dialer = (&tls.Dialer{NetDialer: dl, Config: tlsConfig}).DialContext
+	}
+
+	options := &redis.Options{
+		Dialer:      dialWithLogging(dialer, logger),
+		Password:    c.Password,
+		DB:          0, // Use default DB,
+		ReadTimeout: c.Options.Timeout,
+		TLSConfig:   tlsConfig,
+	}
+
+	if utils.IsUnixAddr(c.Host) {
+		options.Network = "unix"
+		options.Addr = c.Host
+	} else {
+		options.Network = "tcp"
+		options.Addr = net.JoinHostPort(c.Host, fmt.Sprint(c.Port))
+	}
+
+	client := redis.NewClient(options)
+	options = client.Options()
+	options.PoolSize = utils.MaxInt(32, options.PoolSize)
+	options.MaxRetries = options.PoolSize + 1 // https://github.com/go-redis/redis/issues/1737
+
+	return NewClient(redis.NewClient(options), logger, &c.Options), nil
 }
 
 // HPair defines Redis hashes field-value pairs.
@@ -210,27 +217,6 @@ func (c *Client) XReadUntilResult(ctx context.Context, a *redis.XReadArgs) ([]re
 	}
 }
 
-// YieldAll yields all entities from Redis that belong to the specified SyncSubject.
-func (c Client) YieldAll(ctx context.Context, subject *common.SyncSubject) (<-chan database.Entity, <-chan error) {
-	key := strcase.Delimited(types.Name(subject.Entity()), ':')
-	if subject.WithChecksum() {
-		key = "icinga:checksum:" + key
-	} else {
-		key = "icinga:" + key
-	}
-
-	pairs, errs := c.HYield(ctx, key)
-	g, ctx := errgroup.WithContext(ctx)
-	// Let errors from HYield cancel the group.
-	com.ErrgroupReceive(g, errs)
-
-	desired, errs := CreateEntities(ctx, subject.FactoryForDelta(), pairs, runtime.NumCPU())
-	// Let errors from CreateEntities cancel the group.
-	com.ErrgroupReceive(g, errs)
-
-	return desired, com.WaitAsync(g)
-}
-
 func (c *Client) log(ctx context.Context, key string, counter *com.Counter) periodic.Stopper {
 	return periodic.Start(ctx, c.logger.Interval(), func(tick periodic.Tick) {
 		// We may never get to progress logging here,
@@ -242,4 +228,41 @@ func (c *Client) log(ctx context.Context, key string, counter *com.Counter) peri
 	}, periodic.OnStop(func(tick periodic.Tick) {
 		c.logger.Debugf("Finished fetching from %s with %d items in %s", key, counter.Total(), tick.Elapsed)
 	}))
+}
+
+type ctxDialerFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
+
+// dialWithLogging returns a Redis Dialer with logging capabilities.
+func dialWithLogging(dialer ctxDialerFunc, logger *logging.Logger) ctxDialerFunc {
+	// dial behaves like net.Dialer#DialContext,
+	// but re-tries on common errors that are considered retryable.
+	return func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
+		err = retry.WithBackoff(
+			ctx,
+			func(ctx context.Context) (err error) {
+				conn, err = dialer(ctx, network, addr)
+				return
+			},
+			retry.Retryable,
+			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+			retry.Settings{
+				Timeout: retry.DefaultTimeout,
+				OnRetryableError: func(_ time.Duration, _ uint64, err, lastErr error) {
+					if lastErr == nil || err.Error() != lastErr.Error() {
+						logger.Warnw("Can't connect to Redis. Retrying", zap.Error(err))
+					}
+				},
+				OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
+					if attempt > 1 {
+						logger.Infow("Reconnected to Redis",
+							zap.Duration("after", elapsed), zap.Uint64("attempts", attempt))
+					}
+				},
+			},
+		)
+
+		err = errors.Wrap(err, "can't connect to Redis")
+
+		return
+	}
 }

@@ -3,8 +3,8 @@ package history
 import (
 	"github.com/icinga/icingadb/pkg/icingadb/types"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/icinga/icingadb/pkg/structify"
-	"github.com/redis/go-redis/v9"
 	"reflect"
 )
 

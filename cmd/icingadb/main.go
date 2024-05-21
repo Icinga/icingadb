@@ -13,10 +13,10 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/okzk/sdnotify"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"os"
@@ -356,7 +356,7 @@ func run() int {
 }
 
 // monitorRedisSchema monitors rc's icinga:schema version validity.
-func monitorRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) {
+func monitorRedisSchema(logger *logging.Logger, rc *redis.Client, pos string) {
 	for {
 		var err error
 		pos, err = checkRedisSchema(logger, rc, pos)
@@ -368,7 +368,7 @@ func monitorRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos stri
 }
 
 // checkRedisSchema verifies rc's icinga:schema version.
-func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) (newPos string, err error) {
+func checkRedisSchema(logger *logging.Logger, rc *redis.Client, pos string) (newPos string, err error) {
 	if pos == "0-0" {
 		defer time.AfterFunc(3*time.Second, func() {
 			logger.Info("Waiting for Icinga 2 to write into Redis, please make sure you have started Icinga 2 and the Icinga DB feature is enabled")

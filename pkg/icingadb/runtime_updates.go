@@ -7,14 +7,13 @@ import (
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/database"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
-	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
+	"github.com/icinga/icingadb/pkg/redis"
 	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/icinga/icingadb/pkg/structify"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -27,12 +26,12 @@ import (
 // RuntimeUpdates specifies the source and destination of runtime updates.
 type RuntimeUpdates struct {
 	db     *database.DB
-	redis  *icingaredis.Client
+	redis  *redis.Client
 	logger *logging.Logger
 }
 
 // NewRuntimeUpdates creates a new RuntimeUpdates.
-func NewRuntimeUpdates(db *database.DB, redis *icingaredis.Client, logger *logging.Logger) *RuntimeUpdates {
+func NewRuntimeUpdates(db *database.DB, redis *redis.Client, logger *logging.Logger) *RuntimeUpdates {
 	return &RuntimeUpdates{
 		db:     db,
 		redis:  redis,
@@ -42,18 +41,18 @@ func NewRuntimeUpdates(db *database.DB, redis *icingaredis.Client, logger *loggi
 
 // ClearStreams returns the stream key to ID mapping of the runtime update streams
 // for later use in Sync and clears the streams themselves.
-func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state icingaredis.Streams, err error) {
-	config = icingaredis.Streams{"icinga:runtime": "0-0"}
-	state = icingaredis.Streams{"icinga:runtime:state": "0-0"}
+func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state redis.Streams, err error) {
+	config = redis.Streams{"icinga:runtime": "0-0"}
+	state = redis.Streams{"icinga:runtime:state": "0-0"}
 
 	var keys []string
-	for _, streams := range [...]icingaredis.Streams{config, state} {
+	for _, streams := range [...]redis.Streams{config, state} {
 		for key := range streams {
 			keys = append(keys, key)
 		}
 	}
 
-	err = icingaredis.WrapCmdErr(r.redis.Del(ctx, keys...))
+	err = redis.WrapCmdErr(r.redis.Del(ctx, keys...))
 	return
 }
 
@@ -61,7 +60,7 @@ func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state icinga
 // Note that Sync must be only be called configuration synchronization has been completed.
 // allowParallel allows synchronizing out of order (not FIFO).
 func (r *RuntimeUpdates) Sync(
-	ctx context.Context, factoryFuncs []database.EntityFactoryFunc, streams icingaredis.Streams, allowParallel bool,
+	ctx context.Context, factoryFuncs []database.EntityFactoryFunc, streams redis.Streams, allowParallel bool,
 ) error {
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -228,7 +227,7 @@ func (r *RuntimeUpdates) Sync(
 
 // xRead reads from the runtime update streams and sends the data to the corresponding updateMessages channel.
 // The updateMessages channel is determined by a "redis_key" on each redis message.
-func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[string]chan<- redis.XMessage, streams icingaredis.Streams) func() error {
+func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[string]chan<- redis.XMessage, streams redis.Streams) func() error {
 	return func() error {
 		defer func() {
 			for _, updateMessages := range updateMessagesByKey {
@@ -283,7 +282,7 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 			} else {
 				for _, cmd := range cmds {
 					if cmd.Err() != nil {
-						r.logger.Errorw("Can't trim runtime updates stream", zap.Error(icingaredis.WrapCmdErr(cmd)))
+						r.logger.Errorw("Can't trim runtime updates stream", zap.Error(redis.WrapCmdErr(cmd)))
 					}
 				}
 			}
