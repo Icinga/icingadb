@@ -1,13 +1,7 @@
 package contracts
 
-// Equaler is implemented by every type that is comparable.
-type Equaler interface {
-	Equal(Equaler) bool // Equal checks for equality.
-}
-
 // Checksum is a unique identifier of an entity.
 type Checksum interface {
-	Equaler
 	// String returns the string representation form of the Checksum.
 	// The String method is used to use the Checksum in functions
 	// where it needs to be compared or hashed.

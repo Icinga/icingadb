@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/pkg/errors"
 )
 
@@ -17,17 +16,6 @@ type Binary []byte
 
 // nullBinary for validating whether a Binary is valid.
 var nullBinary Binary
-
-// Equal returns whether the binaries are the same length and
-// contain the same bytes.
-func (binary Binary) Equal(equaler contracts.Equaler) bool {
-	b, ok := equaler.(Binary)
-	if !ok {
-		panic("bad Binary type assertion")
-	}
-
-	return bytes.Equal(binary, b)
-}
 
 // Valid returns whether the Binary is valid.
 func (binary Binary) Valid() bool {
