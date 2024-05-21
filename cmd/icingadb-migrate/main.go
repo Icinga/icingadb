@@ -79,7 +79,7 @@ func main() {
 
 	ido, idb := connectAll(c)
 
-	if err := idb.CheckSchema(context.Background()); err != nil {
+	if err := icingadb.CheckSchema(context.Background(), idb); err != nil {
 		log.Fatalf("%+v", err)
 	}
 
