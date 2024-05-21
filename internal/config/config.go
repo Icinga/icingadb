@@ -1,12 +1,8 @@
 package config
 
 import (
-	"github.com/creasty/defaults"
-	"github.com/goccy/go-yaml"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/pkg/errors"
-	"os"
 )
 
 // Config defines Icinga DB config.
@@ -41,30 +37,4 @@ type Flags struct {
 	Version bool `long:"version" description:"print version and exit"`
 	// Config is the path to the config file
 	Config string `short:"c" long:"config" description:"path to config file" required:"true" default:"/etc/icingadb/config.yml"`
-}
-
-// FromYAMLFile returns a new Config value created from the given YAML config file.
-func FromYAMLFile(name string) (*Config, error) {
-	f, err := os.Open(name)
-	if err != nil {
-		return nil, errors.Wrap(err, "can't open YAML file "+name)
-	}
-	defer f.Close()
-
-	c := &Config{}
-	d := yaml.NewDecoder(f, yaml.DisallowUnknownField())
-
-	if err := defaults.Set(c); err != nil {
-		return nil, errors.Wrap(err, "can't set config defaults")
-	}
-
-	if err := d.Decode(c); err != nil {
-		return nil, errors.Wrap(err, "can't parse YAML file "+name)
-	}
-
-	if err := c.Validate(); err != nil {
-		return nil, errors.Wrap(err, "invalid configuration")
-	}
-
-	return c, nil
 }

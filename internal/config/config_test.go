@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/creasty/defaults"
+	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/stretchr/testify/require"
 	"os"
@@ -58,7 +59,7 @@ redis:
 
 			require.NoError(t, os.WriteFile(tempFile.Name(), []byte(st.input), 0o600))
 
-			if actual, err := FromYAMLFile(tempFile.Name()); st.output == nil {
+			if actual, err := config.FromYAMLFile[Config](tempFile.Name()); st.output == nil {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)

@@ -38,7 +38,7 @@ func New() *Command {
 		os.Exit(0)
 	}
 
-	cfg, err := icingadbconfig.FromYAMLFile(flags.Config)
+	cfg, err := config.FromYAMLFile[icingadbconfig.Config](flags.Config)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)
