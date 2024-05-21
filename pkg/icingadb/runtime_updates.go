@@ -99,11 +99,7 @@ func (r *RuntimeUpdates) Sync(
 			structify.MakeMapStructifier(
 				reflect.TypeOf(s.Entity()).Elem(),
 				"json",
-				func(a any) {
-					if initer, ok := a.(contracts.Initer); ok {
-						initer.Init()
-					}
-				}),
+				contracts.SafeInit),
 		))
 
 		g.Go(func() error {
@@ -166,11 +162,7 @@ func (r *RuntimeUpdates) Sync(
 			structify.MakeMapStructifier(
 				reflect.TypeOf(cv.Entity()).Elem(),
 				"json",
-				func(a any) {
-					if initer, ok := a.(contracts.Initer); ok {
-						initer.Init()
-					}
-				}),
+				contracts.SafeInit),
 		))
 
 		customvars, flatCustomvars, errs := v1.ExpandCustomvars(ctx, upsertEntities)

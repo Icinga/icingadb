@@ -181,11 +181,7 @@ func writeOneEntityStage(structPtr interface{}) stageFunc {
 	structifier := structify.MakeMapStructifier(
 		reflect.TypeOf(structPtr).Elem(),
 		"json",
-		func(a any) {
-			if initer, ok := a.(contracts.Initer); ok {
-				initer.Init()
-			}
-		})
+		contracts.SafeInit)
 
 	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
 		ptr, err := structifier(entry.Values)
@@ -324,11 +320,7 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 	structifier := structify.MakeMapStructifier(
 		reflect.TypeOf((*NotificationHistory)(nil)).Elem(),
 		"structify",
-		func(a any) {
-			if initer, ok := a.(contracts.Initer); ok {
-				initer.Init()
-			}
-		})
+		contracts.SafeInit)
 
 	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
 		rawNotificationHistory, err := structifier(entry.Values)

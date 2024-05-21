@@ -19,3 +19,11 @@ type Checksumer interface {
 type Initer interface {
 	Init() // Init initializes the object.
 }
+
+// SafeInit attempts to initialize the passed argument by calling its Init method,
+// but only if the argument implements the [Initer] interface.
+func SafeInit(v any) {
+	if initer, ok := v.(Initer); ok {
+		initer.Init()
+	}
+}

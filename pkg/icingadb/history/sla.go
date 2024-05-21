@@ -12,11 +12,7 @@ import (
 var slaStateStructify = structify.MakeMapStructifier(
 	reflect.TypeOf((*history.SlaHistoryState)(nil)).Elem(),
 	"json",
-	func(a any) {
-		if initer, ok := a.(contracts.Initer); ok {
-			initer.Init()
-		}
-	})
+	contracts.SafeInit)
 
 func stateHistoryToSlaEntity(entry redis.XMessage) ([]history.UpserterEntity, error) {
 	slaStateInterface, err := slaStateStructify(entry.Values)
