@@ -145,9 +145,16 @@ func MaxInt(x, y int) int {
 	return y
 }
 
+// IsUnixAddr indicates whether the given host string represents a Unix socket address.
+//
+// A host string that begins with a forward slash ('/') is considered Unix socket address.
+func IsUnixAddr(host string) bool {
+	return strings.HasPrefix(host, "/")
+}
+
 // JoinHostPort is like its equivalent in net., but handles UNIX sockets as well.
 func JoinHostPort(host string, port int) string {
-	if strings.HasPrefix(host, "/") {
+	if IsUnixAddr(host) {
 		return host
 	}
 

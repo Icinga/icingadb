@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/strcase"
+	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 	"github.com/lib/pq"
@@ -17,7 +18,6 @@ import (
 	"net"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -55,7 +55,7 @@ func (d *Database) Open(logger *logging.Logger) (*database.DB, error) {
 		config.Passwd = d.Password
 		config.Logger = database.MysqlFuncLogger(logger.Debug)
 
-		if d.isUnixAddr() {
+		if utils.IsUnixAddr(d.Host) {
 			config.Net = "unix"
 			config.Addr = d.Host
 		} else {
@@ -180,10 +180,6 @@ func (d *Database) Validate() error {
 	}
 
 	return d.Options.Validate()
-}
-
-func (d *Database) isUnixAddr() bool {
-	return strings.HasPrefix(d.Host, "/")
 }
 
 func unknownDbType(t string) error {

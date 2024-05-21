@@ -13,7 +13,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"net"
-	"strings"
 	"time"
 )
 
@@ -53,7 +52,7 @@ func (r *Redis) NewClient(logger *logging.Logger) (*icingaredis.Client, error) {
 		TLSConfig:   tlsConfig,
 	}
 
-	if strings.HasPrefix(r.Host, "/") {
+	if utils.IsUnixAddr(r.Host) {
 		options.Network = "unix"
 		options.Addr = r.Host
 	} else {
