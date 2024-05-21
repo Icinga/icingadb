@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -30,6 +30,6 @@ type Downtime struct {
 	ZoneId             types.Binary    `json:"zone_id"`
 }
 
-func NewDowntime() contracts.Entity {
+func NewDowntime() database.Entity {
 	return &Downtime{}
 }

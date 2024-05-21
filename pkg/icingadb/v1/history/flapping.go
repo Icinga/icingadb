@@ -3,6 +3,7 @@ package history
 import (
 	"database/sql/driver"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/types"
 )
@@ -72,9 +73,9 @@ func (et FlappingEventTime) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
-	_ UpserterEntity       = (*FlappingHistory)(nil)
-	_ contracts.Initer     = (*HistoryFlapping)(nil)
-	_ contracts.TableNamer = (*HistoryFlapping)(nil)
-	_ UpserterEntity       = (*HistoryFlapping)(nil)
-	_ driver.Valuer        = FlappingEventTime{}
+	_ UpserterEntity      = (*FlappingHistory)(nil)
+	_ contracts.Initer    = (*HistoryFlapping)(nil)
+	_ database.TableNamer = (*HistoryFlapping)(nil)
+	_ UpserterEntity      = (*HistoryFlapping)(nil)
+	_ driver.Valuer       = FlappingEventTime{}
 )

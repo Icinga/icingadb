@@ -1,15 +1,15 @@
 package history
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
 // UpserterEntity provides upsert for entities.
 type UpserterEntity interface {
-	contracts.Upserter
-	contracts.Entity
+	database.Upserter
+	database.Entity
 }
 
 // HistoryTableEntity is embedded by every concrete history type that has its own table.
@@ -29,17 +29,17 @@ type HistoryEntity struct {
 }
 
 // Fingerprint implements part of the contracts.Entity interface.
-func (he HistoryEntity) Fingerprint() contracts.Fingerprinter {
+func (he HistoryEntity) Fingerprint() database.Fingerprinter {
 	return he
 }
 
 // ID implements part of the contracts.Entity interface.
-func (he HistoryEntity) ID() contracts.ID {
+func (he HistoryEntity) ID() database.ID {
 	return he.Id
 }
 
 // SetID implements part of the contracts.Entity interface.
-func (he *HistoryEntity) SetID(id contracts.ID) {
+func (he *HistoryEntity) SetID(id database.ID) {
 	he.Id = id.(types.Binary)
 }
 
@@ -71,10 +71,10 @@ type HistoryMeta struct {
 
 // Assert interface compliance.
 var (
-	_ contracts.Entity   = (*HistoryTableEntity)(nil)
-	_ contracts.Upserter = HistoryTableEntity{}
-	_ contracts.Entity   = (*HistoryEntity)(nil)
-	_ contracts.Upserter = HistoryEntity{}
-	_ contracts.Entity   = (*HistoryMeta)(nil)
-	_ contracts.Upserter = (*HistoryMeta)(nil)
+	_ database.Entity   = (*HistoryTableEntity)(nil)
+	_ database.Upserter = HistoryTableEntity{}
+	_ database.Entity   = (*HistoryEntity)(nil)
+	_ database.Upserter = HistoryEntity{}
+	_ database.Entity   = (*HistoryMeta)(nil)
+	_ database.Upserter = (*HistoryMeta)(nil)
 )

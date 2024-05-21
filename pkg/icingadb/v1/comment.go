@@ -1,7 +1,7 @@
 package v1
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -22,6 +22,6 @@ type Comment struct {
 	ZoneId             types.Binary      `json:"zone_id"`
 }
 
-func NewComment() contracts.Entity {
+func NewComment() database.Entity {
 	return &Comment{}
 }

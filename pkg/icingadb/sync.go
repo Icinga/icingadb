@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
@@ -109,7 +109,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	// Create
 	if len(delta.Create) > 0 {
 		s.logger.Infof("Inserting %d items of type %s", len(delta.Create), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
-		var entities <-chan contracts.Entity
+		var entities <-chan database.Entity
 		if delta.Subject.WithChecksum() {
 			pairs, errs := s.redis.HMYield(
 				ctx,
@@ -129,7 +129,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		}
 
 		g.Go(func() error {
-			return s.db.CreateStreamed(ctx, entities, OnSuccessIncrement[contracts.Entity](stat))
+			return s.db.CreateStreamed(ctx, entities, OnSuccessIncrement[database.Entity](stat))
 		})
 	}
 
@@ -153,7 +153,7 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		g.Go(func() error {
 			// Using upsert here on purpose as this is the fastest way to do bulk updates.
 			// However, there is a risk that errors in the sync implementation could silently insert new rows.
-			return s.db.UpsertStreamed(ctx, entities, OnSuccessIncrement[contracts.Entity](stat))
+			return s.db.UpsertStreamed(ctx, entities, OnSuccessIncrement[database.Entity](stat))
 		})
 	}
 
@@ -211,7 +211,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 }
 
 // getCounterForEntity returns the appropriate counter (config/state) from telemetry.Stats for e.
-func getCounterForEntity(e contracts.Entity) *com.Counter {
+func getCounterForEntity(e database.Entity) *com.Counter {
 	switch e.(type) {
 	case *v1.HostState, *v1.ServiceState:
 		return &telemetry.Stats.State

@@ -2,7 +2,7 @@ package com
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"golang.org/x/sync/errgroup"
 	"sync"
 	"time"
@@ -23,7 +23,7 @@ func NeverSplit[T any]() BulkChunkSplitPolicy[T] {
 
 // SplitOnDupId returns a state machine which tracks the inputs' IDs.
 // Once an already seen input arrives, it demands splitting.
-func SplitOnDupId[T contracts.IDer]() BulkChunkSplitPolicy[T] {
+func SplitOnDupId[T database.IDer]() BulkChunkSplitPolicy[T] {
 	seenIds := map[string]struct{}{}
 
 	return func(ider T) bool {
@@ -182,6 +182,6 @@ func oneBulk[T any](ctx context.Context, ch <-chan T) <-chan []T {
 }
 
 var (
-	_ BulkChunkSplitPolicyFactory[struct{}]         = NeverSplit[struct{}]
-	_ BulkChunkSplitPolicyFactory[contracts.Entity] = SplitOnDupId[contracts.Entity]
+	_ BulkChunkSplitPolicyFactory[struct{}]        = NeverSplit[struct{}]
+	_ BulkChunkSplitPolicyFactory[database.Entity] = SplitOnDupId[database.Entity]
 )

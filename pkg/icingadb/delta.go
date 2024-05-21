@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/utils"
 	"go.uber.org/zap"
@@ -23,7 +24,7 @@ type Delta struct {
 
 // NewDelta creates a new Delta and starts calculating it. The caller must ensure
 // that no duplicate entities are sent to the same stream.
-func NewDelta(ctx context.Context, actual, desired <-chan contracts.Entity, subject *common.SyncSubject, logger *logging.Logger) *Delta {
+func NewDelta(ctx context.Context, actual, desired <-chan database.Entity, subject *common.SyncSubject, logger *logging.Logger) *Delta {
 	delta := &Delta{
 		Subject: subject,
 		done:    make(chan error, 1),
@@ -40,7 +41,7 @@ func (delta *Delta) Wait() error {
 	return <-delta.done
 }
 
-func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan contracts.Entity) {
+func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database.Entity) {
 	defer close(delta.done)
 
 	start := time.Now()
@@ -117,7 +118,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan contract
 
 // checksumsMatch returns whether the checksums of two entities are the same.
 // Both entities must implement contracts.Checksumer.
-func checksumsMatch(a, b contracts.Entity) bool {
+func checksumsMatch(a, b database.Entity) bool {
 	c1 := a.(contracts.Checksumer).Checksum()
 	c2 := b.(contracts.Checksumer).Checksum()
 	return c1.Equal(c2)

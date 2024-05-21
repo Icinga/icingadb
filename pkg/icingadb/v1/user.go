@@ -2,6 +2,7 @@ package v1
 
 import (
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -39,23 +40,23 @@ type UsergroupMember struct {
 	UsergroupId types.Binary `json:"usergroup_id"`
 }
 
-func NewUser() contracts.Entity {
+func NewUser() database.Entity {
 	return &User{}
 }
 
-func NewUserCustomvar() contracts.Entity {
+func NewUserCustomvar() database.Entity {
 	return &UserCustomvar{}
 }
 
-func NewUsergroup() contracts.Entity {
+func NewUsergroup() database.Entity {
 	return &Usergroup{}
 }
 
-func NewUsergroupCustomvar() contracts.Entity {
+func NewUsergroupCustomvar() database.Entity {
 	return &UsergroupCustomvar{}
 }
 
-func NewUsergroupMember() contracts.Entity {
+func NewUsergroupMember() database.Entity {
 	return &UsergroupMember{}
 }
 

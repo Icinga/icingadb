@@ -5,7 +5,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"golang.org/x/exp/utf8string"
@@ -38,7 +38,7 @@ func Name(t interface{}) string {
 
 // TableName returns the table of t.
 func TableName(t interface{}) string {
-	if tn, ok := t.(contracts.TableNamer); ok {
+	if tn, ok := t.(database.TableNamer); ok {
 		return tn.TableName()
 	} else {
 		return Key(Name(t), '_')

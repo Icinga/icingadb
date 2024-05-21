@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"crypto/sha1"
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/objectpacker"
 	icingadbTypes "github.com/icinga/icingadb/pkg/types"
@@ -36,8 +36,8 @@ type IdoMigrationProgress struct {
 
 // Assert interface compliance.
 var (
-	_ contracts.Upserter = (*IdoMigrationProgressUpserter)(nil)
-	_ contracts.Upserter = (*IdoMigrationProgress)(nil)
+	_ database.Upserter = (*IdoMigrationProgressUpserter)(nil)
+	_ database.Upserter = (*IdoMigrationProgress)(nil)
 )
 
 // log is the root logger.
@@ -237,7 +237,7 @@ func (hts historyTypes) forEach(f func(*historyType)) {
 }
 
 type icingaDbOutputStage struct {
-	insert, upsert []contracts.Entity
+	insert, upsert []database.Entity
 }
 
 var types = historyTypes{

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/pkg/errors"
 )
 
@@ -127,7 +128,7 @@ func (binary Binary) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
-	_ contracts.ID             = (*Binary)(nil)
+	_ database.ID              = (*Binary)(nil)
 	_ encoding.TextMarshaler   = (*Binary)(nil)
 	_ encoding.TextUnmarshaler = (*Binary)(nil)
 	_ json.Marshaler           = (*Binary)(nil)

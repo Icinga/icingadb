@@ -1,6 +1,8 @@
 package v1
 
-import "github.com/icinga/icingadb/pkg/contracts"
+import (
+	"github.com/icinga/icingadb/pkg/database"
+)
 
 type ActionUrl struct {
 	EntityWithoutChecksum `json:",inline"`
@@ -20,14 +22,14 @@ type IconImage struct {
 	IconImage             string `json:"icon_image"`
 }
 
-func NewActionUrl() contracts.Entity {
+func NewActionUrl() database.Entity {
 	return &ActionUrl{}
 }
 
-func NewNotesUrl() contracts.Entity {
+func NewNotesUrl() database.Entity {
 	return &NotesUrl{}
 }
 
-func NewIconImage() contracts.Entity {
+func NewIconImage() database.Entity {
 	return &IconImage{}
 }

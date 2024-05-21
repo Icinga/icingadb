@@ -1,12 +1,12 @@
 package v1
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 )
 
-var StateFactories = []contracts.EntityFactoryFunc{NewHostState, NewServiceState}
+var StateFactories = []database.EntityFactoryFunc{NewHostState, NewServiceState}
 
-var ConfigFactories = []contracts.EntityFactoryFunc{
+var ConfigFactories = []database.EntityFactoryFunc{
 	NewActionUrl,
 	NewCheckcommand,
 	NewCheckcommandArgument,

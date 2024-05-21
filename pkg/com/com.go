@@ -3,6 +3,7 @@ package com
 import (
 	"context"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -38,8 +39,8 @@ func ErrgroupReceive(g *errgroup.Group, err <-chan error) {
 
 // CopyFirst asynchronously forwards all items from input to forward and synchronously returns the first item.
 func CopyFirst(
-	ctx context.Context, input <-chan contracts.Entity,
-) (first contracts.Entity, forward <-chan contracts.Entity, err error) {
+	ctx context.Context, input <-chan database.Entity,
+) (first database.Entity, forward <-chan database.Entity, err error) {
 	var ok bool
 	select {
 	case <-ctx.Done():
@@ -52,7 +53,7 @@ func CopyFirst(
 	}
 
 	// Buffer of one because we receive an entity and send it back immediately.
-	fwd := make(chan contracts.Entity, 1)
+	fwd := make(chan database.Entity, 1)
 	fwd <- first
 
 	forward = fwd

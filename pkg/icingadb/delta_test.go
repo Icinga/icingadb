@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/types"
@@ -58,11 +59,11 @@ func TestDelta(t *testing.T) {
 	// that only show depending on the order in which actual and desired values are processed for an ID.
 	type SendOrder struct {
 		Name string
-		Send func(id uint64, test TestData, chActual, chDesired chan<- contracts.Entity)
+		Send func(id uint64, test TestData, chActual, chDesired chan<- database.Entity)
 	}
 	sendOrders := []SendOrder{{
 		Name: "ActualFirst",
-		Send: func(id uint64, test TestData, chActual, chDesired chan<- contracts.Entity) {
+		Send: func(id uint64, test TestData, chActual, chDesired chan<- database.Entity) {
 			if test.Actual != 0 {
 				chActual <- makeEndpoint(id, test.Actual)
 			}
@@ -72,7 +73,7 @@ func TestDelta(t *testing.T) {
 		},
 	}, {
 		Name: "DesiredFirst",
-		Send: func(id uint64, test TestData, chActual, chDesired chan<- contracts.Entity) {
+		Send: func(id uint64, test TestData, chActual, chDesired chan<- database.Entity) {
 			if test.Desired != 0 {
 				chDesired <- makeEndpoint(id, test.Desired)
 			}
@@ -87,8 +88,8 @@ func TestDelta(t *testing.T) {
 			for _, sendOrder := range sendOrders {
 				t.Run(sendOrder.Name, func(t *testing.T) {
 					id := uint64(0x42)
-					chActual := make(chan contracts.Entity)
-					chDesired := make(chan contracts.Entity)
+					chActual := make(chan database.Entity)
+					chDesired := make(chan database.Entity)
 					subject := common.NewSyncSubject(v1.NewEndpoint)
 					logger := logging.NewLogger(zaptest.NewLogger(t).Sugar(), time.Second)
 
@@ -116,8 +117,8 @@ func TestDelta(t *testing.T) {
 	}
 
 	t.Run("Combined", func(t *testing.T) {
-		chActual := make(chan contracts.Entity)
-		chDesired := make(chan contracts.Entity)
+		chActual := make(chan database.Entity)
+		chDesired := make(chan database.Entity)
 		subject := common.NewSyncSubject(v1.NewEndpoint)
 		logger := logging.NewLogger(zaptest.NewLogger(t).Sugar(), time.Second)
 
@@ -215,11 +216,11 @@ func BenchmarkDelta(b *testing.B) {
 }
 
 func benchmarkDelta(b *testing.B, numEntities int) {
-	chActual := make([]chan contracts.Entity, b.N)
-	chDesired := make([]chan contracts.Entity, b.N)
+	chActual := make([]chan database.Entity, b.N)
+	chDesired := make([]chan database.Entity, b.N)
 	for i := 0; i < b.N; i++ {
-		chActual[i] = make(chan contracts.Entity, numEntities)
-		chDesired[i] = make(chan contracts.Entity, numEntities)
+		chActual[i] = make(chan database.Entity, numEntities)
+		chDesired[i] = make(chan database.Entity, numEntities)
 	}
 	makeEndpoint := func(id1, id2, checksum uint64) *v1.Endpoint {
 		e := new(v1.Endpoint)
@@ -232,7 +233,7 @@ func benchmarkDelta(b *testing.B, numEntities int) {
 	}
 	for i := 0; i < numEntities; i++ {
 		// each iteration writes exactly one entity to each channel
-		var eActual, eDesired contracts.Entity
+		var eActual, eDesired database.Entity
 		switch i % 3 {
 		case 0: // distinct IDs
 			eActual = makeEndpoint(1, uint64(i), uint64(i))

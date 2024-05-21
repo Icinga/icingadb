@@ -1,7 +1,7 @@
 package history
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/types"
 )
 
@@ -44,8 +44,8 @@ type SlaHistoryState struct {
 
 // Assert interface compliance.
 var (
-	_ UpserterEntity       = (*StateHistory)(nil)
-	_ contracts.TableNamer = (*HistoryState)(nil)
-	_ UpserterEntity       = (*HistoryState)(nil)
-	_ UpserterEntity       = (*SlaHistoryState)(nil)
+	_ UpserterEntity      = (*StateHistory)(nil)
+	_ database.TableNamer = (*HistoryState)(nil)
+	_ UpserterEntity      = (*HistoryState)(nil)
+	_ UpserterEntity      = (*SlaHistoryState)(nil)
 )
