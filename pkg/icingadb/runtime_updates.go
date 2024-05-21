@@ -26,13 +26,13 @@ import (
 
 // RuntimeUpdates specifies the source and destination of runtime updates.
 type RuntimeUpdates struct {
-	db     *DB
+	db     *database.DB
 	redis  *icingaredis.Client
 	logger *logging.Logger
 }
 
 // NewRuntimeUpdates creates a new RuntimeUpdates.
-func NewRuntimeUpdates(db *DB, redis *icingaredis.Client, logger *logging.Logger) *RuntimeUpdates {
+func NewRuntimeUpdates(db *database.DB, redis *icingaredis.Client, logger *logging.Logger) *RuntimeUpdates {
 	return &RuntimeUpdates{
 		db:     db,
 		redis:  redis,
@@ -110,11 +110,11 @@ func (r *RuntimeUpdates) Sync(
 			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
 			sem := semaphore.NewWeighted(1)
 
-			onSuccess := []OnSuccess[database.Entity]{
-				OnSuccessIncrement[database.Entity](&counter), OnSuccessIncrement[database.Entity](stat),
+			onSuccess := []database.OnSuccess[database.Entity]{
+				database.OnSuccessIncrement[database.Entity](&counter), database.OnSuccessIncrement[database.Entity](stat),
 			}
 			if !allowParallel {
-				onSuccess = append(onSuccess, OnSuccessSendTo(upsertedFifo))
+				onSuccess = append(onSuccess, database.OnSuccessSendTo(upsertedFifo))
 			}
 
 			return r.db.NamedBulkExec(
@@ -132,9 +132,9 @@ func (r *RuntimeUpdates) Sync(
 
 			sem := r.db.GetSemaphoreForTable(database.TableName(s.Entity()))
 
-			onSuccess := []OnSuccess[any]{OnSuccessIncrement[any](&counter), OnSuccessIncrement[any](stat)}
+			onSuccess := []database.OnSuccess[any]{database.OnSuccessIncrement[any](&counter), database.OnSuccessIncrement[any](stat)}
 			if !allowParallel {
-				onSuccess = append(onSuccess, OnSuccessSendTo(deletedFifo))
+				onSuccess = append(onSuccess, database.OnSuccessSendTo(deletedFifo))
 			}
 
 			return r.db.BulkExec(ctx, r.db.BuildDeleteStmt(s.Entity()), deleteCount, sem, deleteIds, onSuccess...)
@@ -177,8 +177,8 @@ func (r *RuntimeUpdates) Sync(
 
 			return r.db.NamedBulkExec(
 				ctx, cvStmt, cvCount, sem, customvars, database.SplitOnDupId[database.Entity],
-				OnSuccessIncrement[database.Entity](&counter),
-				OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
+				database.OnSuccessIncrement[database.Entity](&counter),
+				database.OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
 			)
 		})
 
@@ -197,8 +197,8 @@ func (r *RuntimeUpdates) Sync(
 
 			return r.db.NamedBulkExec(
 				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars,
-				database.SplitOnDupId[database.Entity], OnSuccessIncrement[database.Entity](&counter),
-				OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
+				database.SplitOnDupId[database.Entity], database.OnSuccessIncrement[database.Entity](&counter),
+				database.OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
 			)
 		})
 

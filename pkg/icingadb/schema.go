@@ -16,12 +16,12 @@ const (
 )
 
 // CheckSchema asserts the database schema of the expected version being present.
-func CheckSchema(ctx context.Context, db *DB) error {
+func CheckSchema(ctx context.Context, db *database.DB) error {
 	var expectedDbSchemaVersion uint16
 	switch db.DriverName() {
-	case MySQL:
+	case database.MySQL:
 		expectedDbSchemaVersion = expectedMysqlSchemaVersion
-	case PostgreSQL:
+	case database.PostgreSQL:
 		expectedDbSchemaVersion = expectedPostgresSchemaVersion
 	}
 
@@ -39,7 +39,7 @@ func CheckSchema(ctx context.Context, db *DB) error {
 		},
 		retry.Retryable,
 		backoff.NewExponentialWithJitter(128*time.Millisecond, 1*time.Minute),
-		db.getDefaultRetrySettings())
+		db.GetDefaultRetrySettings())
 	if err != nil {
 		return errors.Wrap(err, "can't check database schema version")
 	}

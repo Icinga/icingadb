@@ -6,7 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
-	"github.com/icinga/icingadb/pkg/icingadb"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/strcase"
@@ -30,15 +30,15 @@ type Database struct {
 	User       string           `yaml:"user"`
 	Password   string           `yaml:"password"`
 	TlsOptions TLS              `yaml:",inline"`
-	Options    icingadb.Options `yaml:"options"`
+	Options    database.Options `yaml:"options"`
 }
 
 // Open prepares the DSN string and driver configuration,
 // calls sqlx.Open, but returns *icingadb.DB.
-func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
+func (d *Database) Open(logger *logging.Logger) (*database.DB, error) {
 	var db *sqlx.DB
 
-	connectorCallbacks := icingadb.RetryConnectorCallbacks{
+	connectorCallbacks := database.RetryConnectorCallbacks{
 		OnRetryableError: func(_ time.Duration, _ uint64, err, _ error) {
 			telemetry.UpdateCurrentDbConnErr(err)
 		},
@@ -53,7 +53,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 
 		config.User = d.User
 		config.Passwd = d.Password
-		config.Logger = icingadb.MysqlFuncLogger(logger.Debug)
+		config.Logger = database.MysqlFuncLogger(logger.Debug)
 
 		if d.isUnixAddr() {
 			config.Net = "unix"
@@ -92,7 +92,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			return setGaleraOpts(ctx, conn, int64(d.Options.WsrepSyncWait))
 		}
 
-		db = sqlx.NewDb(sql.OpenDB(icingadb.NewConnector(c, logger, connectorCallbacks)), icingadb.MySQL)
+		db = sqlx.NewDb(sql.OpenDB(database.NewConnector(c, logger, connectorCallbacks)), database.MySQL)
 	case "pgsql":
 		uri := &url.URL{
 			Scheme: "postgres",
@@ -146,7 +146,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			return nil, errors.Wrap(err, "can't open pgsql database")
 		}
 
-		db = sqlx.NewDb(sql.OpenDB(icingadb.NewConnector(connector, logger, connectorCallbacks)), icingadb.PostgreSQL)
+		db = sqlx.NewDb(sql.OpenDB(database.NewConnector(connector, logger, connectorCallbacks)), database.PostgreSQL)
 	default:
 		return nil, unknownDbType(d.Type)
 	}
@@ -156,7 +156,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 
 	db.Mapper = reflectx.NewMapperFunc("db", strcase.Snake)
 
-	return icingadb.NewDb(db, logger, &d.Options), nil
+	return database.NewDb(db, logger, &d.Options), nil
 }
 
 // Validate checks constraints in the supplied database configuration and returns an error if they are violated.

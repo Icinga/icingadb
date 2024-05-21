@@ -1,11 +1,10 @@
-package icingadb
+package database
 
 import (
 	"context"
 	"fmt"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/types"
 	"time"
@@ -58,7 +57,7 @@ func (db *DB) CleanupOlderThan(
 					Time:          types.UnixMilli(olderThan),
 				})
 				if err != nil {
-					return database.CantPerformQuery(err, q)
+					return CantPerformQuery(err, q)
 				}
 
 				rowsDeleted, err = rs.RowsAffected()
@@ -67,7 +66,7 @@ func (db *DB) CleanupOlderThan(
 			},
 			retry.Retryable,
 			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
-			db.getDefaultRetrySettings(),
+			db.GetDefaultRetrySettings(),
 		)
 		if err != nil {
 			return 0, err

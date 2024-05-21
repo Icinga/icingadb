@@ -1,4 +1,4 @@
-package icingadb
+package database
 
 import (
 	"context"
