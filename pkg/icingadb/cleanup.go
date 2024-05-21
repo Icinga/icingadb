@@ -3,9 +3,9 @@ package icingadb
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/types"
 	"time"
@@ -58,7 +58,7 @@ func (db *DB) CleanupOlderThan(
 					Time:          types.UnixMilli(olderThan),
 				})
 				if err != nil {
-					return internal.CantPerformQuery(err, q)
+					return database.CantPerformQuery(err, q)
 				}
 
 				rowsDeleted, err = rs.RowsAffected()

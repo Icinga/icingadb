@@ -6,9 +6,9 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"github.com/google/uuid"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/database"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
@@ -338,7 +338,7 @@ func (h *HA) realize(
 				}
 
 			default:
-				return internal.CantPerformQuery(errQuery, query)
+				return database.CantPerformQuery(errQuery, query)
 			}
 
 			i := v1.IcingadbInstance{
@@ -365,7 +365,7 @@ func (h *HA) realize(
 
 			stmt, _ := h.db.BuildUpsertStmt(i)
 			if _, err := tx.NamedExecContext(ctx, stmt, i); err != nil {
-				return internal.CantPerformQuery(err, stmt)
+				return database.CantPerformQuery(err, stmt)
 			}
 
 			if takeover != "" {
@@ -373,7 +373,7 @@ func (h *HA) realize(
 				_, err := tx.ExecContext(ctx, stmt, "n", envId, h.instanceId)
 
 				if err != nil {
-					return internal.CantPerformQuery(err, stmt)
+					return database.CantPerformQuery(err, stmt)
 				}
 			}
 
@@ -441,7 +441,7 @@ func (h *HA) realize(
 func (h *HA) realizeLostHeartbeat() {
 	stmt := h.db.Rebind("UPDATE icingadb_instance SET responsible = ? WHERE id = ?")
 	if _, err := h.db.ExecContext(h.ctx, stmt, "n", h.instanceId); err != nil && !utils.IsContextCanceled(err) {
-		h.logger.Warnw("Can't update instance", zap.Error(internal.CantPerformQuery(err, stmt)))
+		h.logger.Warnw("Can't update instance", zap.Error(database.CantPerformQuery(err, stmt)))
 	}
 }
 
@@ -451,7 +451,7 @@ func (h *HA) insertEnvironment() error {
 	stmt, _ := h.db.BuildInsertIgnoreStmt(h.environment)
 
 	if _, err := h.db.NamedExecContext(h.ctx, stmt, h.environment); err != nil {
-		return internal.CantPerformQuery(err, stmt)
+		return database.CantPerformQuery(err, stmt)
 	}
 
 	return nil
