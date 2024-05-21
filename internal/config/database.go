@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
+	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
@@ -29,7 +30,7 @@ type Database struct {
 	Database   string           `yaml:"database"`
 	User       string           `yaml:"user"`
 	Password   string           `yaml:"password"`
-	TlsOptions TLS              `yaml:",inline"`
+	TlsOptions config.TLS       `yaml:",inline"`
 	Options    database.Options `yaml:"options"`
 }
 

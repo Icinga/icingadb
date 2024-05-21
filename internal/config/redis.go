@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"github.com/icinga/icingadb/pkg/backoff"
+	"github.com/icinga/icingadb/pkg/config"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
@@ -21,7 +22,7 @@ type Redis struct {
 	Host       string              `yaml:"host"`
 	Port       int                 `yaml:"port" default:"6380"`
 	Password   string              `yaml:"password"`
-	TlsOptions TLS                 `yaml:",inline"`
+	TlsOptions config.TLS          `yaml:",inline"`
 	Options    icingaredis.Options `yaml:"options"`
 }
 
