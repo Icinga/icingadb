@@ -1,7 +1,6 @@
 package logging
 
 import (
-	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"os"
@@ -28,9 +27,6 @@ var defaultEncConfig = zapcore.EncoderConfig{
 	EncodeDuration: zapcore.StringDurationEncoder,
 	EncodeCaller:   zapcore.ShortCallerEncoder,
 }
-
-// Options define child loggers with their desired log level.
-type Options map[string]zapcore.Level
 
 // Logging implements access to a default logger and named child loggers.
 // Log levels can be configured per named child via Options which, if not configured,
@@ -115,17 +111,4 @@ func (l *Logging) GetChildLogger(name string) *Logger {
 // GetLogger returns the default logger.
 func (l *Logging) GetLogger() *Logger {
 	return l.logger
-}
-
-// AssertOutput returns an error if output is not a valid logger output.
-func AssertOutput(o string) error {
-	if o == CONSOLE || o == JOURNAL {
-		return nil
-	}
-
-	return invalidOutput(o)
-}
-
-func invalidOutput(o string) error {
-	return fmt.Errorf("%s is not a valid logger output. Must be either %q or %q", o, CONSOLE, JOURNAL)
 }
