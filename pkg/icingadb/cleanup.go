@@ -1,10 +1,11 @@
-package database
+package icingadb
 
 import (
 	"context"
 	"fmt"
 	"github.com/icinga/icingadb/pkg/backoff"
 	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/icinga/icingadb/pkg/types"
 	"time"
@@ -17,34 +18,18 @@ type CleanupStmt struct {
 	Column string
 }
 
-// Build assembles the cleanup statement for the specified database driver with the given limit.
-func (stmt *CleanupStmt) Build(driverName string, limit uint64) string {
-	switch driverName {
-	case MySQL:
-		return fmt.Sprintf(`DELETE FROM %[1]s WHERE environment_id = :environment_id AND %[2]s < :time
-ORDER BY %[2]s LIMIT %[3]d`, stmt.Table, stmt.Column, limit)
-	case PostgreSQL:
-		return fmt.Sprintf(`WITH rows AS (
-SELECT %[1]s FROM %[2]s WHERE environment_id = :environment_id AND %[3]s < :time ORDER BY %[3]s LIMIT %[4]d
-)
-DELETE FROM %[2]s WHERE %[1]s IN (SELECT %[1]s FROM rows)`, stmt.PK, stmt.Table, stmt.Column, limit)
-	default:
-		panic(fmt.Sprintf("invalid database type %s", driverName))
-	}
-}
-
 // CleanupOlderThan deletes all rows with the specified statement that are older than the given time.
 // Deletes a maximum of as many rows per round as defined in count. Actually deleted rows will be passed to onSuccess.
 // Returns the total number of rows deleted.
-func (db *DB) CleanupOlderThan(
-	ctx context.Context, stmt CleanupStmt, envId types.Binary,
-	count uint64, olderThan time.Time, onSuccess ...OnSuccess[struct{}],
+func (stmt *CleanupStmt) CleanupOlderThan(
+	ctx context.Context, db *database.DB, envId types.Binary,
+	count uint64, olderThan time.Time, onSuccess ...database.OnSuccess[struct{}],
 ) (uint64, error) {
 	var counter com.Counter
 
-	q := db.Rebind(stmt.Build(db.DriverName(), count))
+	q := db.Rebind(stmt.build(db.DriverName(), count))
 
-	defer db.log(ctx, q, &counter).Stop()
+	defer db.Log(ctx, q, &counter).Stop()
 
 	for {
 		var rowsDeleted int64
@@ -57,7 +42,7 @@ func (db *DB) CleanupOlderThan(
 					Time:          types.UnixMilli(olderThan),
 				})
 				if err != nil {
-					return CantPerformQuery(err, q)
+					return database.CantPerformQuery(err, q)
 				}
 
 				rowsDeleted, err = rs.RowsAffected()
@@ -86,6 +71,22 @@ func (db *DB) CleanupOlderThan(
 	}
 
 	return counter.Total(), nil
+}
+
+// build assembles the cleanup statement for the specified database driver with the given limit.
+func (stmt *CleanupStmt) build(driverName string, limit uint64) string {
+	switch driverName {
+	case database.MySQL:
+		return fmt.Sprintf(`DELETE FROM %[1]s WHERE environment_id = :environment_id AND %[2]s < :time
+ORDER BY %[2]s LIMIT %[3]d`, stmt.Table, stmt.Column, limit)
+	case database.PostgreSQL:
+		return fmt.Sprintf(`WITH rows AS (
+SELECT %[1]s FROM %[2]s WHERE environment_id = :environment_id AND %[3]s < :time ORDER BY %[3]s LIMIT %[4]d
+)
+DELETE FROM %[2]s WHERE %[1]s IN (SELECT %[1]s FROM rows)`, stmt.PK, stmt.Table, stmt.Column, limit)
+	default:
+		panic(fmt.Sprintf("invalid database type %s", driverName))
+	}
 }
 
 type cleanupWhere struct {

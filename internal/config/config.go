@@ -3,6 +3,7 @@ package config
 import (
 	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
+	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
@@ -11,10 +12,10 @@ import (
 
 // Config defines Icinga DB config.
 type Config struct {
-	Database  Database       `yaml:"database"`
-	Redis     Redis          `yaml:"redis"`
-	Logging   logging.Config `yaml:"logging"`
-	Retention Retention      `yaml:"retention"`
+	Database  database.Config `yaml:"database"`
+	Redis     Redis           `yaml:"redis"`
+	Logging   logging.Config  `yaml:"logging"`
+	Retention Retention       `yaml:"retention"`
 }
 
 // Validate checks constraints in the supplied configuration and returns an error if they are violated.

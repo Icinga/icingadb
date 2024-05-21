@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/icinga/icingadb/pkg/database"
+	"github.com/icinga/icingadb/pkg/icingadb"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
@@ -21,7 +22,7 @@ const (
 )
 
 type retentionStatement struct {
-	database.CleanupStmt
+	icingadb.CleanupStmt
 	RetentionType
 	Category string
 }
@@ -30,7 +31,7 @@ type retentionStatement struct {
 var RetentionStatements = []retentionStatement{{
 	RetentionType: RetentionHistory,
 	Category:      "acknowledgement",
-	CleanupStmt: database.CleanupStmt{
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "acknowledgement_history",
 		PK:     "id",
 		Column: "clear_time",
@@ -38,7 +39,7 @@ var RetentionStatements = []retentionStatement{{
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "comment",
-	CleanupStmt: database.CleanupStmt{
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "comment_history",
 		PK:     "comment_id",
 		Column: "remove_time",
@@ -46,7 +47,7 @@ var RetentionStatements = []retentionStatement{{
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "downtime",
-	CleanupStmt: database.CleanupStmt{
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "downtime_history",
 		PK:     "downtime_id",
 		Column: "end_time",
@@ -54,7 +55,7 @@ var RetentionStatements = []retentionStatement{{
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "flapping",
-	CleanupStmt: database.CleanupStmt{
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "flapping_history",
 		PK:     "id",
 		Column: "end_time",
@@ -62,7 +63,7 @@ var RetentionStatements = []retentionStatement{{
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "notification",
-	CleanupStmt: database.CleanupStmt{
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "notification_history",
 		PK:     "id",
 		Column: "send_time",
@@ -70,7 +71,7 @@ var RetentionStatements = []retentionStatement{{
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "state",
-	CleanupStmt: database.CleanupStmt{
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "state_history",
 		PK:     "id",
 		Column: "event_time",
@@ -78,7 +79,7 @@ var RetentionStatements = []retentionStatement{{
 }, {
 	RetentionType: RetentionSla,
 	Category:      "sla_downtime",
-	CleanupStmt: database.CleanupStmt{
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "sla_history_downtime",
 		PK:     "downtime_id",
 		Column: "downtime_end",
@@ -86,7 +87,7 @@ var RetentionStatements = []retentionStatement{{
 }, {
 	RetentionType: RetentionSla,
 	Category:      "sla_state",
-	CleanupStmt: database.CleanupStmt{
+	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "sla_history_state",
 		PK:     "id",
 		Column: "event_time",
@@ -186,8 +187,8 @@ func (r *Retention) Start(ctx context.Context) error {
 			r.logger.Debugf("Cleaning up historical data for category %s from table %s older than %s",
 				stmt.Category, stmt.Table, olderThan)
 
-			deleted, err := r.db.CleanupOlderThan(
-				ctx, stmt.CleanupStmt, e.Id, r.count, olderThan,
+			deleted, err := stmt.CleanupOlderThan(
+				ctx, r.db, e.Id, r.count, olderThan,
 				database.OnSuccessIncrement[struct{}](&telemetry.Stats.HistoryCleanup),
 			)
 			if err != nil {

@@ -6,10 +6,12 @@ import (
 	"github.com/icinga/icingadb/internal/config"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingaredis"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	goflags "github.com/jessevdk/go-flags"
 	"github.com/pkg/errors"
 	"os"
+	"time"
 )
 
 // Command provides factories for creating Redis and Database connections from Config.
@@ -49,7 +51,14 @@ func New() *Command {
 
 // Database creates and returns a new icingadb.DB connection from config.Config.
 func (c Command) Database(l *logging.Logger) (*database.DB, error) {
-	return c.Config.Database.Open(l)
+	return database.NewDbFromConfig(&c.Config.Database, l, database.RetryConnectorCallbacks{
+		OnRetryableError: func(_ time.Duration, _ uint64, err, _ error) {
+			telemetry.UpdateCurrentDbConnErr(err)
+		},
+		OnSuccess: func(_ time.Duration, _ uint64, _ error) {
+			telemetry.UpdateCurrentDbConnErr(nil)
+		},
+	})
 }
 
 // Redis creates and returns a new icingaredis.Client connection from config.Config.
