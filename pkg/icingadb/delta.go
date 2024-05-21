@@ -7,7 +7,7 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/icinga/icingadb/pkg/types"
 	"go.uber.org/zap"
 	"time"
 )
@@ -104,8 +104,8 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 	delta.Update = update
 	delta.Delete = actual
 
-	delta.logger.Debugw(fmt.Sprintf("Finished %s delta", utils.Name(delta.Subject.Entity())),
-		zap.String("subject", utils.Name(delta.Subject.Entity())),
+	delta.logger.Debugw(fmt.Sprintf("Finished %s delta", types.Name(delta.Subject.Entity())),
+		zap.String("subject", types.Name(delta.Subject.Entity())),
 		zap.Duration("time_total", time.Since(start)),
 		zap.Duration("time_actual", endActual.Sub(start)),
 		zap.Duration("time_desired", endDesired.Sub(start)),

@@ -4,7 +4,7 @@ import (
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
-	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/icinga/icingadb/pkg/types"
 )
 
 // SyncSubject defines information about entities to be synchronized.
@@ -63,7 +63,7 @@ func (s SyncSubject) FactoryForDelta() database.EntityFactoryFunc {
 
 // Name returns the declared name of the entity.
 func (s SyncSubject) Name() string {
-	return utils.Name(s.entity)
+	return types.Name(s.entity)
 }
 
 // WithChecksum returns whether entities from the factory implement contracts.Checksumer.

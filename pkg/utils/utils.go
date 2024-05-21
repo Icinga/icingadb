@@ -24,16 +24,6 @@ func FromUnixMilli(ms int64) time.Time {
 	return time.Unix(int64(sec), int64(dec*(1e9)))
 }
 
-// Name returns the declared name of type t.
-// Name is used in combination with Key
-// to automatically guess an entity's
-// database table and Redis key.
-func Name(t interface{}) string {
-	s := strings.TrimLeft(fmt.Sprintf("%T", t), "*")
-
-	return s[strings.LastIndex(s, ".")+1:]
-}
-
 // Timed calls the given callback with the time that has elapsed since the start.
 //
 // Timed should be installed by defer:
