@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/creasty/defaults"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/icinga/icingadb/pkg/logging"
@@ -15,6 +16,15 @@ type Config struct {
 	Redis     redis.Config    `yaml:"redis"`
 	Logging   logging.Config  `yaml:"logging"`
 	Retention RetentionConfig `yaml:"retention"`
+}
+
+func (c *Config) SetDefaults() {
+	// Since SetDefaults() is called after the default values of the struct's fields have been evaluated,
+	// setting the default port only works here because
+	// the embedded Redis config struct itself does not provide a default value.
+	if defaults.CanUpdate(c.Redis.Port) {
+		c.Redis.Port = 6380
+	}
 }
 
 // Validate checks constraints in the supplied configuration and returns an error if they are violated.

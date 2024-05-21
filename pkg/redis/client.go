@@ -62,8 +62,12 @@ func NewClientFromConfig(c *Config, logger *logging.Logger) (*Client, error) {
 		options.Network = "unix"
 		options.Addr = c.Host
 	} else {
+		port := c.Port
+		if port == 0 {
+			port = 6379
+		}
 		options.Network = "tcp"
-		options.Addr = net.JoinHostPort(c.Host, fmt.Sprint(c.Port))
+		options.Addr = net.JoinHostPort(c.Host, fmt.Sprint(port))
 	}
 
 	client := redis.NewClient(options)

@@ -43,7 +43,7 @@ func (o *Options) Validate() error {
 // Config defines Config client configuration.
 type Config struct {
 	Host       string     `yaml:"host"`
-	Port       int        `yaml:"port" default:"6380"`
+	Port       int        `yaml:"port"`
 	Password   string     `yaml:"password"`
 	TlsOptions config.TLS `yaml:",inline"`
 	Options    Options    `yaml:"options"`
