@@ -47,3 +47,10 @@ type TableNamer interface {
 type Scoper interface {
 	Scope() any
 }
+
+// PgsqlOnConflictConstrainter implements the PgsqlOnConflictConstraint method,
+// which returns the primary or unique key constraint name of the PostgreSQL table.
+type PgsqlOnConflictConstrainter interface {
+	// PgsqlOnConflictConstraint returns the primary or unique key constraint name of the PostgreSQL table.
+	PgsqlOnConflictConstraint() string
+}
