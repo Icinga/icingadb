@@ -2,15 +2,29 @@ package com
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 )
 
+// Waiter implements the Wait method,
+// which blocks until execution is complete.
+type Waiter interface {
+	Wait() error // Wait waits for execution to complete.
+}
+
+// The WaiterFunc type is an adapter to allow the use of ordinary functions as Waiter.
+// If f is a function with the appropriate signature, WaiterFunc(f) is a Waiter that calls f.
+type WaiterFunc func() error
+
+// Wait implements the Waiter interface.
+func (f WaiterFunc) Wait() error {
+	return f()
+}
+
 // WaitAsync calls Wait() on the passed Waiter in a new goroutine and
 // sends the first non-nil error (if any) to the returned channel.
 // The returned channel is always closed when the Waiter is done.
-func WaitAsync(w contracts.Waiter) <-chan error {
+func WaitAsync(w Waiter) <-chan error {
 	errs := make(chan error, 1)
 
 	go func() {

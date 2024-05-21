@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/common"
-	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/periodic"
@@ -78,7 +77,7 @@ type HPair struct {
 func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan error) {
 	pairs := make(chan HPair, c.Options.HScanCount)
 
-	return pairs, com.WaitAsync(contracts.WaiterFunc(func() error {
+	return pairs, com.WaitAsync(com.WaiterFunc(func() error {
 		var counter com.Counter
 		defer c.log(ctx, key, &counter).Stop()
 		defer close(pairs)
@@ -129,7 +128,7 @@ func (c *Client) HYield(ctx context.Context, key string) (<-chan HPair, <-chan e
 func (c *Client) HMYield(ctx context.Context, key string, fields ...string) (<-chan HPair, <-chan error) {
 	pairs := make(chan HPair)
 
-	return pairs, com.WaitAsync(contracts.WaiterFunc(func() error {
+	return pairs, com.WaitAsync(com.WaiterFunc(func() error {
 		var counter com.Counter
 		defer c.log(ctx, key, &counter).Stop()
 
