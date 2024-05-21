@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/go-sql-driver/mysql"
 	"github.com/icinga/icingadb/pkg/icingadb"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/strcase"
 	"github.com/jmoiron/sqlx"
@@ -36,6 +37,16 @@ type Database struct {
 // calls sqlx.Open, but returns *icingadb.DB.
 func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 	var db *sqlx.DB
+
+	connectorCallbacks := icingadb.RetryConnectorCallbacks{
+		OnRetryableError: func(_ time.Duration, _ uint64, err, _ error) {
+			telemetry.UpdateCurrentDbConnErr(err)
+		},
+		OnSuccess: func(_ time.Duration, _ uint64, _ error) {
+			telemetry.UpdateCurrentDbConnErr(nil)
+		},
+	}
+
 	switch d.Type {
 	case "mysql":
 		config := mysql.NewConfig()
@@ -77,12 +88,11 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			return nil, errors.Wrap(err, "can't open mysql database")
 		}
 
-		wsrepSyncWait := int64(d.Options.WsrepSyncWait)
-		setWsrepSyncWait := func(ctx context.Context, conn driver.Conn) error {
-			return setGaleraOpts(ctx, conn, wsrepSyncWait)
+		connectorCallbacks.OnInitConn = func(ctx context.Context, conn driver.Conn) error {
+			return setGaleraOpts(ctx, conn, int64(d.Options.WsrepSyncWait))
 		}
 
-		db = sqlx.NewDb(sql.OpenDB(icingadb.NewConnector(c, logger, setWsrepSyncWait)), icingadb.MySQL)
+		db = sqlx.NewDb(sql.OpenDB(icingadb.NewConnector(c, logger, connectorCallbacks)), icingadb.MySQL)
 	case "pgsql":
 		uri := &url.URL{
 			Scheme: "postgres",
@@ -136,7 +146,7 @@ func (d *Database) Open(logger *logging.Logger) (*icingadb.DB, error) {
 			return nil, errors.Wrap(err, "can't open pgsql database")
 		}
 
-		db = sqlx.NewDb(sql.OpenDB(icingadb.NewConnector(connector, logger, nil)), icingadb.PostgreSQL)
+		db = sqlx.NewDb(sql.OpenDB(icingadb.NewConnector(connector, logger, connectorCallbacks)), icingadb.PostgreSQL)
 	default:
 		return nil, unknownDbType(d.Type)
 	}

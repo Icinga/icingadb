@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql/driver"
 	"github.com/icinga/icingadb/pkg/backoff"
-	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/icinga/icingadb/pkg/logging"
 	"github.com/icinga/icingadb/pkg/retry"
 	"github.com/pkg/errors"
@@ -18,7 +17,16 @@ const (
 	PostgreSQL string = "postgres"
 )
 
-type InitConnFunc func(context.Context, driver.Conn) error
+// OnInitConnFunc can be used to execute post Connect() arbitrary actions.
+// It will be called after successfully initiated a new connection using the connector's Connect method.
+type OnInitConnFunc func(context.Context, driver.Conn) error
+
+// RetryConnectorCallbacks specifies callbacks that are executed upon certain events.
+type RetryConnectorCallbacks struct {
+	OnInitConn       OnInitConnFunc
+	OnRetryableError retry.OnRetryableErrorFunc
+	OnSuccess        retry.OnSuccessFunc
+}
 
 // RetryConnector wraps driver.Connector with retry logic.
 type RetryConnector struct {
@@ -26,14 +34,12 @@ type RetryConnector struct {
 
 	logger *logging.Logger
 
-	// initConn can be used to execute post Connect() arbitrary actions.
-	// It will be called after successfully initiated a new connection using the connector's Connect method.
-	initConn InitConnFunc
+	callbacks RetryConnectorCallbacks
 }
 
 // NewConnector creates a fully initialized RetryConnector from the given args.
-func NewConnector(c driver.Connector, logger *logging.Logger, init InitConnFunc) *RetryConnector {
-	return &RetryConnector{Connector: c, logger: logger, initConn: init}
+func NewConnector(c driver.Connector, logger *logging.Logger, callbacks RetryConnectorCallbacks) *RetryConnector {
+	return &RetryConnector{Connector: c, logger: logger, callbacks: callbacks}
 }
 
 // Connect implements part of the driver.Connector interface.
@@ -43,8 +49,8 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		ctx,
 		func(ctx context.Context) (err error) {
 			conn, err = c.Connector.Connect(ctx)
-			if err == nil && c.initConn != nil {
-				if err = c.initConn(ctx, conn); err != nil {
+			if err == nil && c.callbacks.OnInitConn != nil {
+				if err = c.callbacks.OnInitConn(ctx, conn); err != nil {
 					// We're going to retry this, so just don't bother whether Close() fails!
 					_ = conn.Close()
 				}
@@ -56,15 +62,19 @@ func (c RetryConnector) Connect(ctx context.Context) (driver.Conn, error) {
 		backoff.NewExponentialWithJitter(128*time.Millisecond, 1*time.Minute),
 		retry.Settings{
 			Timeout: retry.DefaultTimeout,
-			OnRetryableError: func(_ time.Duration, _ uint64, err, lastErr error) {
-				telemetry.UpdateCurrentDbConnErr(err)
+			OnRetryableError: func(elapsed time.Duration, attempt uint64, err, lastErr error) {
+				if c.callbacks.OnRetryableError != nil {
+					c.callbacks.OnRetryableError(elapsed, attempt, err, lastErr)
+				}
 
 				if lastErr == nil || err.Error() != lastErr.Error() {
 					c.logger.Warnw("Can't connect to database. Retrying", zap.Error(err))
 				}
 			},
-			OnSuccess: func(elapsed time.Duration, attempt uint64, _ error) {
-				telemetry.UpdateCurrentDbConnErr(nil)
+			OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
+				if c.callbacks.OnSuccess != nil {
+					c.callbacks.OnSuccess(elapsed, attempt, lastErr)
+				}
 
 				if attempt > 1 {
 					c.logger.Infow("Reconnected to database",
