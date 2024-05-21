@@ -4,7 +4,6 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
-	"github.com/icinga/icingadb/internal"
 	"github.com/pkg/errors"
 	"strconv"
 )
@@ -15,7 +14,7 @@ type CommentType uint8
 // UnmarshalJSON implements the json.Unmarshaler interface.
 func (ct *CommentType) UnmarshalJSON(data []byte) error {
 	var i uint8
-	if err := internal.UnmarshalJSON(data, &i); err != nil {
+	if err := UnmarshalJSON(data, &i); err != nil {
 		return err
 	}
 
@@ -34,7 +33,7 @@ func (ct *CommentType) UnmarshalText(text []byte) error {
 
 	i, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		return internal.CantParseUint64(err, s)
+		return CantParseUint64(err, s)
 	}
 
 	c := CommentType(i)

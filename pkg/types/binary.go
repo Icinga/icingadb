@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/pkg/errors"
 )
@@ -54,7 +53,7 @@ func (binary *Binary) UnmarshalText(text []byte) error {
 	b := make([]byte, hex.DecodedLen(len(text)))
 	_, err := hex.Decode(b, text)
 	if err != nil {
-		return internal.CantDecodeHex(err, string(text))
+		return CantDecodeHex(err, string(text))
 	}
 	*binary = b
 
@@ -69,7 +68,7 @@ func (binary Binary) MarshalJSON() ([]byte, error) {
 		return []byte("null"), nil
 	}
 
-	return internal.MarshalJSON(binary.String())
+	return MarshalJSON(binary.String())
 }
 
 // UnmarshalJSON implements a custom unmarshal function to decode
@@ -81,12 +80,12 @@ func (binary *Binary) UnmarshalJSON(data []byte) error {
 	}
 
 	var s string
-	if err := internal.UnmarshalJSON(data, &s); err != nil {
+	if err := UnmarshalJSON(data, &s); err != nil {
 		return err
 	}
 	b, err := hex.DecodeString(s)
 	if err != nil {
-		return internal.CantDecodeHex(err, s)
+		return CantDecodeHex(err, s)
 	}
 	*binary = b
 

@@ -2,7 +2,6 @@ package icingaredis
 
 import (
 	"context"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/database"
@@ -54,7 +53,7 @@ func CreateEntities(ctx context.Context, factoryFunc database.EntityFactoryFunc,
 					}
 
 					e := factoryFunc()
-					if err := internal.UnmarshalJSON([]byte(pair.Value), e); err != nil {
+					if err := types.UnmarshalJSON([]byte(pair.Value), e); err != nil {
 						return err
 					}
 					e.SetID(id)

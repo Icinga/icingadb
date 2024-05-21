@@ -2,7 +2,6 @@ package history
 
 import (
 	"context"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/database"
 	"github.com/icinga/icingadb/pkg/icingadb"
@@ -330,7 +329,7 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 		}
 
 		var users []types.Binary
-		err = internal.UnmarshalJSON([]byte(notificationHistory.UserIds.String), &users)
+		err = types.UnmarshalJSON([]byte(notificationHistory.UserIds.String), &users)
 		if err != nil {
 			return nil, err
 		}

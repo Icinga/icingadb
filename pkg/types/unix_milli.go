@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 	"encoding"
 	"encoding/json"
-	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"strconv"
@@ -34,7 +33,7 @@ func (t UnixMilli) MarshalJSON() ([]byte, error) {
 func (t *UnixMilli) UnmarshalText(text []byte) error {
 	parsed, err := strconv.ParseFloat(string(text), 64)
 	if err != nil {
-		return internal.CantParseFloat64(err, string(text))
+		return CantParseFloat64(err, string(text))
 	}
 
 	*t = UnixMilli(utils.FromUnixMilli(int64(parsed)))
@@ -50,7 +49,7 @@ func (t *UnixMilli) UnmarshalJSON(data []byte) error {
 
 	ms, err := strconv.ParseFloat(string(data), 64)
 	if err != nil {
-		return internal.CantParseFloat64(err, string(data))
+		return CantParseFloat64(err, string(data))
 	}
 	tt := utils.FromUnixMilli(int64(ms))
 	*t = UnixMilli(tt)
