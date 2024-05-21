@@ -74,11 +74,6 @@ func Checksum(data interface{}) []byte {
 	return chksm[:]
 }
 
-// Fatal panics with the given error.
-func Fatal(err error) {
-	panic(err)
-}
-
 // IsDeadlock returns whether the given error signals serialization failure.
 func IsDeadlock(err error) bool {
 	var e *mysql.MySQLError
@@ -163,4 +158,10 @@ func ChanFromSlice[T any](values []T) <-chan T {
 	close(ch)
 
 	return ch
+}
+
+// PrintErrorThenExit prints the given error to [os.Stderr] and exits with the specified error code.
+func PrintErrorThenExit(err error, exitCode int) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(exitCode)
 }

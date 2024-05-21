@@ -41,8 +41,9 @@ func run() int {
 	cmd := command.New()
 	logs, err := logging.NewLoggingFromConfig(utils.AppName(), cmd.Config.Logging)
 	if err != nil {
-		utils.Fatal(errors.Wrap(err, "can't configure logging"))
+		utils.PrintErrorThenExit(err, ExitFailure)
 	}
+
 	// When started by systemd, NOTIFY_SOCKET is set by systemd for Type=notify supervised services, which is the
 	// default setting for the Icinga DB service. So we notify that Icinga DB finished starting up.
 	_ = sdnotify.Ready()
