@@ -1,7 +1,7 @@
 package icingadb
 
 import (
-	"github.com/icinga/icingadb/pkg/database"
+	"github.com/icinga/icinga-go-library/database"
 )
 
 // ScopedEntity combines an entity and a scope that specifies

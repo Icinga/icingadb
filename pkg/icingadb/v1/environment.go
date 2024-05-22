@@ -2,7 +2,7 @@ package v1
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icinga-go-library/types"
 )
 
 type Environment struct {

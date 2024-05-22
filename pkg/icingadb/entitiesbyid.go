@@ -2,7 +2,7 @@ package icingadb
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/database"
+	"github.com/icinga/icinga-go-library/database"
 )
 
 // EntitiesById is a map of key-contracts.Entity pairs.

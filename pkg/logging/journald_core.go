@@ -1,7 +1,7 @@
 package logging
 
 import (
-	"github.com/icinga/icingadb/pkg/strcase"
+	"github.com/icinga/icinga-go-library/strcase"
 	"github.com/pkg/errors"
 	"github.com/ssgreg/journald"
 	"go.uber.org/zap/zapcore"

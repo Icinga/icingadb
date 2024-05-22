@@ -3,11 +3,11 @@ package icingadb
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icingadb/pkg/backoff"
-	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/database"
-	"github.com/icinga/icingadb/pkg/retry"
-	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icinga-go-library/backoff"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/retry"
+	"github.com/icinga/icinga-go-library/types"
 	"time"
 )
 

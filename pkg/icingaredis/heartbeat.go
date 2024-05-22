@@ -2,11 +2,11 @@ package icingaredis
 
 import (
 	"context"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/types"
+	"github.com/icinga/icinga-go-library/utils"
 	v1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/redis"
-	"github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"

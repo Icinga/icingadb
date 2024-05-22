@@ -2,10 +2,10 @@ package history
 
 import (
 	"database/sql/driver"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/database"
 	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
-	"github.com/icinga/icingadb/pkg/types"
 )
 
 type CommentHistoryEntity struct {

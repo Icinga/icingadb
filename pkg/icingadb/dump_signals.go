@@ -2,8 +2,8 @@ package icingadb
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/redis"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"

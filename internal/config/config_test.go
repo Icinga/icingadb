@@ -2,8 +2,8 @@ package config
 
 import (
 	"github.com/creasty/defaults"
-	"github.com/icinga/icingadb/pkg/config"
-	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icinga-go-library/config"
+	"github.com/icinga/icinga-go-library/logging"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"

@@ -1,10 +1,10 @@
 package history
 
 import (
-	"github.com/icinga/icingadb/pkg/database"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
-	"github.com/icinga/icingadb/pkg/types"
 )
 
 type NotificationHistory struct {

@@ -2,7 +2,7 @@ package flatten
 
 import (
 	"fmt"
-	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icinga-go-library/types"
 	"strconv"
 )
 

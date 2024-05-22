@@ -3,9 +3,9 @@ package database
 import (
 	"context"
 	"database/sql/driver"
-	"github.com/icinga/icingadb/pkg/backoff"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/retry"
+	"github.com/icinga/icinga-go-library/backoff"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/retry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"time"

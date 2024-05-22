@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"github.com/go-sql-driver/mysql"
-	"github.com/icinga/icingadb/pkg/backoff"
+	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/lib/pq"
 	"github.com/pkg/errors"
 	"io"

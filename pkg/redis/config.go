@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"github.com/icinga/icingadb/pkg/config"
+	"github.com/icinga/icinga-go-library/config"
 	"github.com/pkg/errors"
 	"time"
 )
