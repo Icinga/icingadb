@@ -28,12 +28,12 @@ type Client struct {
 
 // Options define user configurable Redis options.
 type Options struct {
-	BlockTimeout        time.Duration `yaml:"block_timeout"         default:"1s"`
-	HMGetCount          int           `yaml:"hmget_count"           default:"4096"`
-	HScanCount          int           `yaml:"hscan_count"           default:"4096"`
-	MaxHMGetConnections int           `yaml:"max_hmget_connections" default:"8"`
-	Timeout             time.Duration `yaml:"timeout"               default:"30s"`
-	XReadCount          int           `yaml:"xread_count"           default:"4096"`
+	BlockTimeout        time.Duration `yaml:"block_timeout" env:"BLOCK_TIMEOUT" default:"1s"`
+	HMGetCount          int           `yaml:"hmget_count" env:"HMGET_COUNT" default:"4096"`
+	HScanCount          int           `yaml:"hscan_count" env:"HSCAN_COUNT" default:"4096"`
+	MaxHMGetConnections int           `yaml:"max_hmget_connections" env:"MAX_HMGET_CONNECTIONS" default:"8"`
+	Timeout             time.Duration `yaml:"timeout" env:"TIMEOUT" default:"30s"`
+	XReadCount          int           `yaml:"xread_count" env:"XREAD_COUNT" default:"4096"`
 }
 
 // Validate checks constraints in the supplied Redis options and returns an error if they are violated.

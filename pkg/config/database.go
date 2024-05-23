@@ -22,14 +22,14 @@ import (
 
 // Database defines database client configuration.
 type Database struct {
-	Type       string           `yaml:"type" default:"mysql"`
-	Host       string           `yaml:"host"`
-	Port       int              `yaml:"port"`
-	Database   string           `yaml:"database"`
-	User       string           `yaml:"user"`
-	Password   string           `yaml:"password"`
+	Type       string           `yaml:"type" env:"TYPE" default:"mysql"`
+	Host       string           `yaml:"host" env:"HOST"`
+	Port       int              `yaml:"port" env:"PORT"`
+	Database   string           `yaml:"database" env:"DATABASE"`
+	User       string           `yaml:"user" env:"USER"`
+	Password   string           `yaml:"password" env:"PASSWORD"`
 	TlsOptions TLS              `yaml:",inline"`
-	Options    icingadb.Options `yaml:"options"`
+	Options    icingadb.Options `yaml:"options" envPrefix:"OPTIONS_"`
 }
 
 // Open prepares the DSN string and driver configuration,

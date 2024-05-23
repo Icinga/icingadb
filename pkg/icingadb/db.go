@@ -37,29 +37,29 @@ type DB struct {
 // Options define user configurable database options.
 type Options struct {
 	// Maximum number of open connections to the database.
-	MaxConnections int `yaml:"max_connections" default:"16"`
+	MaxConnections int `yaml:"max_connections" env:"MAX_CONNECTIONS" default:"16"`
 
 	// Maximum number of connections per table,
 	// regardless of what the connection is actually doing,
 	// e.g. INSERT, UPDATE, DELETE.
-	MaxConnectionsPerTable int `yaml:"max_connections_per_table" default:"8"`
+	MaxConnectionsPerTable int `yaml:"max_connections_per_table" env:"MAX_CONNECTIONS_PER_TABLE" default:"8"`
 
 	// MaxPlaceholdersPerStatement defines the maximum number of placeholders in an
 	// INSERT, UPDATE or DELETE statement. Theoretically, MySQL can handle up to 2^16-1 placeholders,
 	// but this increases the execution time of queries and thus reduces the number of queries
 	// that can be executed in parallel in a given time.
 	// The default is 2^13, which in our tests showed the best performance in terms of execution time and parallelism.
-	MaxPlaceholdersPerStatement int `yaml:"max_placeholders_per_statement" default:"8192"`
+	MaxPlaceholdersPerStatement int `yaml:"max_placeholders_per_statement" env:"MAX_PLACEHOLDERS_PER_STATEMENT" default:"8192"`
 
 	// MaxRowsPerTransaction defines the maximum number of rows per transaction.
 	// The default is 2^13, which in our tests showed the best performance in terms of execution time and parallelism.
-	MaxRowsPerTransaction int `yaml:"max_rows_per_transaction" default:"8192"`
+	MaxRowsPerTransaction int `yaml:"max_rows_per_transaction" env:"MAX_ROWS_PER_TRANSACTION" default:"8192"`
 
 	// WsrepSyncWait enforces Galera cluster nodes to perform strict cluster-wide causality checks
 	// before executing specific SQL queries determined by the number you provided.
 	// Please refer to the below link for a detailed description.
 	// https://icinga.com/docs/icinga-db/latest/doc/03-Configuration/#galera-cluster
-	WsrepSyncWait int `yaml:"wsrep_sync_wait" default:"7"`
+	WsrepSyncWait int `yaml:"wsrep_sync_wait" env:"WSREP_SYNC_WAIT" default:"7"`
 }
 
 // Validate checks constraints in the supplied database options and returns an error if they are violated.
