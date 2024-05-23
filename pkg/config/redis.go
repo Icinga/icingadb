@@ -19,11 +19,11 @@ import (
 
 // Redis defines Redis client configuration.
 type Redis struct {
-	Host       string              `yaml:"host"`
-	Port       int                 `yaml:"port" default:"6380"`
-	Password   string              `yaml:"password"`
+	Host       string              `yaml:"host" env:"HOST"`
+	Port       int                 `yaml:"port" env:"PORT" default:"6380"`
+	Password   string              `yaml:"password" env:"PASSWORD"`
 	TlsOptions TLS                 `yaml:",inline"`
-	Options    icingaredis.Options `yaml:"options"`
+	Options    icingaredis.Options `yaml:"options" envPrefix:"OPTIONS_"`
 }
 
 type ctxDialerFunc = func(ctx context.Context, network, addr string) (net.Conn, error)

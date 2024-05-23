@@ -35,7 +35,13 @@ func New() *Command {
 		os.Exit(0)
 	}
 
-	cfg, err := config.FromYAMLFile(flags.Config)
+	var cfg *config.Config
+	if flags.ConfigFromEnv {
+		cfg, err = config.FromEnv()
+	} else {
+		cfg, err = config.FromYAMLFile(flags.Config)
+	}
+
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(2)

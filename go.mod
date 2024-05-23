@@ -3,6 +3,7 @@ module github.com/icinga/icingadb
 go 1.22
 
 require (
+	github.com/caarlos0/env/v11 v11.0.1
 	github.com/creasty/defaults v1.7.0
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/goccy/go-yaml v1.11.3

@@ -3,6 +3,7 @@ package config
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/caarlos0/env/v11"
 	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
 	"github.com/jessevdk/go-flags"
@@ -12,10 +13,10 @@ import (
 
 // Config defines Icinga DB config.
 type Config struct {
-	Database  Database  `yaml:"database"`
-	Redis     Redis     `yaml:"redis"`
-	Logging   Logging   `yaml:"logging"`
-	Retention Retention `yaml:"retention"`
+	Database  Database  `yaml:"database" envPrefix:"DATABASE_"`
+	Redis     Redis     `yaml:"redis" envPrefix:"REDIS_"`
+	Logging   Logging   `yaml:"logging" envPrefix:"LOGGING_"`
+	Retention Retention `yaml:"retention" envPrefix:"RETENTION_"`
 }
 
 // Validate checks constraints in the supplied configuration and returns an error if they are violated.
@@ -40,6 +41,8 @@ func (c *Config) Validate() error {
 type Flags struct {
 	// Version decides whether to just print the version and exit.
 	Version bool `long:"version" description:"print version and exit"`
+	// ConfigFromEnv decides whether to load the config from environment variables.
+	ConfigFromEnv bool `long:"config-from-env" description:"load config from env vars"`
 	// Config is the path to the config file
 	Config string `short:"c" long:"config" description:"path to config file" required:"true" default:"/etc/icingadb/config.yml"`
 }
@@ -70,6 +73,25 @@ func FromYAMLFile(name string) (*Config, error) {
 	return c, nil
 }
 
+// FromEnv returns a new Config value created from environment variables.
+func FromEnv() (*Config, error) {
+	c := &Config{}
+
+	if err := defaults.Set(c); err != nil {
+		return nil, errors.Wrap(err, "can't set config defaults")
+	}
+
+	if err := env.ParseWithOptions(c, env.Options{Prefix: "ICINGADB_"}); err != nil {
+		return nil, errors.Wrap(err, "can't parse env vars")
+	}
+
+	if err := c.Validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid configuration")
+	}
+
+	return c, nil
+}
+
 // ParseFlags parses CLI flags and
 // returns a Flags value created from them.
 func ParseFlags() (*Flags, error) {
@@ -85,11 +107,11 @@ func ParseFlags() (*Flags, error) {
 
 // TLS provides TLS configuration options for Redis and Database.
 type TLS struct {
-	Enable   bool   `yaml:"tls"`
-	Cert     string `yaml:"cert"`
-	Key      string `yaml:"key"`
-	Ca       string `yaml:"ca"`
-	Insecure bool   `yaml:"insecure"`
+	Enable   bool   `yaml:"tls" env:"TLS"`
+	Cert     string `yaml:"cert" env:"CERT"`
+	Key      string `yaml:"key" env:"KEY"`
+	Ca       string `yaml:"ca" env:"CA"`
+	Insecure bool   `yaml:"insecure" env:"INSECURE"`
 }
 
 // MakeConfig assembles a tls.Config from t and serverName.
