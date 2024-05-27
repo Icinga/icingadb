@@ -2,9 +2,10 @@ package history
 
 import (
 	"database/sql/driver"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
-	"github.com/icinga/icingadb/pkg/types"
 )
 
 type AckHistoryUpserter struct {
@@ -74,9 +75,9 @@ func (et AckEventTime) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
-	_ UpserterEntity       = (*AcknowledgementHistory)(nil)
-	_ contracts.Initer     = (*HistoryAck)(nil)
-	_ contracts.TableNamer = (*HistoryAck)(nil)
-	_ UpserterEntity       = (*HistoryAck)(nil)
-	_ driver.Valuer        = AckEventTime{}
+	_ UpserterEntity      = (*AcknowledgementHistory)(nil)
+	_ contracts.Initer    = (*HistoryAck)(nil)
+	_ database.TableNamer = (*HistoryAck)(nil)
+	_ UpserterEntity      = (*HistoryAck)(nil)
+	_ driver.Valuer       = AckEventTime{}
 )

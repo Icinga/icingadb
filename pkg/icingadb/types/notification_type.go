@@ -3,7 +3,7 @@ package types
 import (
 	"database/sql/driver"
 	"encoding"
-	"github.com/icinga/icingadb/internal"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/pkg/errors"
 	"strconv"
 )
@@ -17,7 +17,7 @@ func (nt *NotificationType) UnmarshalText(text []byte) error {
 
 	i, err := strconv.ParseUint(s, 10, 64)
 	if err != nil {
-		return internal.CantParseUint64(err, s)
+		return types.CantParseUint64(err, s)
 	}
 
 	n := NotificationType(i)

@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"github.com/creasty/defaults"
 	"github.com/goccy/go-yaml"
-	"github.com/icinga/icingadb/pkg/config"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/types"
+	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/pkg/icingadb"
-	"github.com/icinga/icingadb/pkg/logging"
-	icingadbTypes "github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jessevdk/go-flags"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
@@ -41,11 +41,11 @@ type Flags struct {
 // Config defines the YAML config structure.
 type Config struct {
 	IDO struct {
-		config.Database `yaml:"-,inline"`
+		database.Config `yaml:"-,inline"`
 		From            int32 `yaml:"from"`
 		To              int32 `yaml:"to" default:"2147483647"`
 	} `yaml:"ido"`
-	IcingaDB config.Database `yaml:"icingadb"`
+	IcingaDB database.Config `yaml:"icingadb"`
 	// Icinga2 specifies information the IDO doesn't provide.
 	Icinga2 struct {
 		// Env specifies the environment ID, hex.
@@ -78,7 +78,7 @@ func main() {
 
 	ido, idb := connectAll(c)
 
-	if err := idb.CheckSchema(context.Background()); err != nil {
+	if err := icingadb.CheckSchema(context.Background(), idb); err != nil {
 		log.Fatalf("%+v", err)
 	}
 
@@ -135,7 +135,7 @@ func parseConfig(f *Flags) (_ *Config, exit int) {
 var nonWords = regexp.MustCompile(`\W+`)
 
 // mkCache ensures <f.Cache>/<history type>.sqlite3 files are present and contain their schema
-// and initializes types[*].cache. (On non-recoverable errors the whole program exits.)
+// and initializes typesToMigrate[*].cache. (On non-recoverable errors the whole program exits.)
 func mkCache(f *Flags, c *Config, mapper *reflectx.Mapper) {
 	log.Info("Preparing cache")
 
@@ -143,7 +143,7 @@ func mkCache(f *Flags, c *Config, mapper *reflectx.Mapper) {
 		log.With("dir", f.Cache).Fatalf("%+v", errors.Wrap(err, "can't create directory"))
 	}
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		if ht.cacheSchema == "" {
 			return
 		}
@@ -170,12 +170,12 @@ func mkCache(f *Flags, c *Config, mapper *reflectx.Mapper) {
 }
 
 // connectAll connects to ido and idb (Icinga DB) as c specifies. (On non-recoverable errors the whole program exits.)
-func connectAll(c *Config) (ido, idb *icingadb.DB) {
+func connectAll(c *Config) (ido, idb *database.DB) {
 	log.Info("Connecting to databases")
 	eg, _ := errgroup.WithContext(context.Background())
 
 	eg.Go(func() error {
-		ido = connect("IDO", &c.IDO.Database)
+		ido = connect("IDO", &c.IDO.Config)
 		return nil
 	})
 
@@ -189,8 +189,12 @@ func connectAll(c *Config) (ido, idb *icingadb.DB) {
 }
 
 // connect connects to which DB as cfg specifies. (On non-recoverable errors the whole program exits.)
-func connect(which string, cfg *config.Database) *icingadb.DB {
-	db, err := cfg.Open(logging.NewLogger(zap.NewNop().Sugar(), 20*time.Second))
+func connect(which string, cfg *database.Config) *database.DB {
+	db, err := database.NewDbFromConfig(
+		cfg,
+		logging.NewLogger(zap.NewNop().Sugar(), 20*time.Second),
+		database.RetryConnectorCallbacks{},
+	)
 	if err != nil {
 		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
 	}
@@ -202,10 +206,10 @@ func connect(which string, cfg *config.Database) *icingadb.DB {
 	return db
 }
 
-// startIdoTx initializes types[*].snapshot with new repeatable-read-isolated ido transactions.
+// startIdoTx initializes typesToMigrate[*].snapshot with new repeatable-read-isolated ido transactions.
 // (On non-recoverable errors the whole program exits.)
-func startIdoTx(ido *icingadb.DB) {
-	types.forEach(func(ht *historyType) {
+func startIdoTx(ido *database.DB) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		tx, err := ido.BeginTxx(context.Background(), &sql.TxOptions{Isolation: sql.LevelRepeatableRead})
 		if err != nil {
 			log.Fatalf("%+v", errors.Wrap(err, "can't begin snapshot transaction"))
@@ -215,10 +219,10 @@ func startIdoTx(ido *icingadb.DB) {
 	})
 }
 
-// computeIdRange initializes types[*].fromId and types[*].toId.
+// computeIdRange initializes typesToMigrate[*].fromId and typesToMigrate[*].toId.
 // (On non-recoverable errors the whole program exits.)
 func computeIdRange(c *Config) {
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		getBorderId := func(id *uint64, timeColumns []string, compOperator string, borderTime int32, sortOrder string) {
 			deZeroFied := make([]string, 0, len(timeColumns))
 			for _, column := range timeColumns {
@@ -257,15 +261,15 @@ func computeIdRange(c *Config) {
 //go:embed embed/ido_migration_progress_schema.sql
 var idoMigrationProgressSchema string
 
-// computeProgress initializes types[*].lastId, types[*].total and types[*].done.
+// computeProgress initializes typesToMigrate[*].lastId, typesToMigrate[*].total and typesToMigrate[*].done.
 // (On non-recoverable errors the whole program exits.)
-func computeProgress(c *Config, idb *icingadb.DB, envId []byte) {
+func computeProgress(c *Config, idb *database.DB, envId []byte) {
 	if _, err := idb.Exec(idoMigrationProgressSchema); err != nil {
 		log.Fatalf("%+v", errors.Wrap(err, "can't create table ido_migration_progress"))
 	}
 
 	envIdHex := hex.EncodeToString(envId)
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		var query = idb.Rebind(
 			"SELECT last_ido_id FROM ido_migration_progress" +
 				" WHERE environment_id=? AND history_type=? AND from_ts=? AND to_ts=?",
@@ -279,7 +283,7 @@ func computeProgress(c *Config, idb *icingadb.DB, envId []byte) {
 		}
 	})
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		if ht.cacheFiller != nil {
 			err := ht.snapshot.Get(
 				&ht.cacheTotal,
@@ -297,7 +301,7 @@ func computeProgress(c *Config, idb *icingadb.DB, envId []byte) {
 		}
 	})
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		var rows []struct {
 			Migrated uint8
 			Cnt      int64
@@ -330,16 +334,16 @@ func computeProgress(c *Config, idb *icingadb.DB, envId []byte) {
 	})
 }
 
-// fillCache fills <f.Cache>/<history type>.sqlite3 (actually types[*].cacheFiller does).
+// fillCache fills <f.Cache>/<history type>.sqlite3 (actually typesToMigrate[*].cacheFiller does).
 func fillCache() {
 	progress := mpb.New()
-	for _, ht := range types {
+	for _, ht := range typesToMigrate {
 		if ht.cacheFiller != nil {
 			ht.setupBar(progress, ht.cacheTotal)
 		}
 	}
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		if ht.cacheFiller != nil {
 			ht.cacheFiller(ht)
 		}
@@ -349,13 +353,13 @@ func fillCache() {
 }
 
 // migrate does the actual migration.
-func migrate(c *Config, idb *icingadb.DB, envId []byte) {
+func migrate(c *Config, idb *database.DB, envId []byte) {
 	progress := mpb.New()
-	for _, ht := range types {
+	for _, ht := range typesToMigrate {
 		ht.setupBar(progress, ht.total)
 	}
 
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		ht.migrate(c, idb, envId, ht)
 	})
 
@@ -364,8 +368,8 @@ func migrate(c *Config, idb *icingadb.DB, envId []byte) {
 
 // migrate does the actual migration for one history type.
 func migrateOneType[IdoRow any](
-	c *Config, idb *icingadb.DB, envId []byte, ht *historyType,
-	convertRows func(env string, envId icingadbTypes.Binary,
+	c *Config, idb *database.DB, envId []byte, ht *historyType,
+	convertRows func(env string, envId types.Binary,
 		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
 		idoRows []IdoRow) (stages []icingaDbOutputStage, checkpoint any),
 ) {
@@ -431,7 +435,7 @@ func migrateOneType[IdoRow any](
 					ch := utils.ChanFromSlice(stage.insert)
 
 					if err := idb.CreateIgnoreStreamed(context.Background(), ch); err != nil {
-						log.With("backend", "Icinga DB", "op", "INSERT IGNORE", "table", utils.TableName(stage.insert[0])).
+						log.With("backend", "Icinga DB", "op", "INSERT IGNORE", "table", database.TableName(stage.insert[0])).
 							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 					}
 				}
@@ -440,7 +444,7 @@ func migrateOneType[IdoRow any](
 					ch := utils.ChanFromSlice(stage.upsert)
 
 					if err := idb.UpsertStreamed(context.Background(), ch); err != nil {
-						log.With("backend", "Icinga DB", "op", "UPSERT", "table", utils.TableName(stage.upsert[0])).
+						log.With("backend", "Icinga DB", "op", "UPSERT", "table", database.TableName(stage.upsert[0])).
 							Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 					}
 				}
@@ -468,7 +472,7 @@ func migrateOneType[IdoRow any](
 
 // cleanupCache removes <f.Cache>/<history type>.sqlite3 files.
 func cleanupCache(f *Flags) {
-	types.forEach(func(ht *historyType) {
+	typesToMigrate.forEach(func(ht *historyType) {
 		if ht.cacheFile != "" {
 			if err := ht.cache.Close(); err != nil {
 				log.With("file", ht.cacheFile).Warnf("%+v", errors.Wrap(err, "can't close SQLite database"))

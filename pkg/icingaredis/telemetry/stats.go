@@ -2,12 +2,11 @@ package telemetry
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/icingaredis"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/periodic"
-	"github.com/icinga/icingadb/pkg/utils"
-	"github.com/redis/go-redis/v9"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/periodic"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/utils"
 	"go.uber.org/zap"
 	"strconv"
 	"time"
@@ -19,7 +18,7 @@ var Stats struct {
 }
 
 // WriteStats periodically forwards Stats to Redis for being monitored by Icinga 2.
-func WriteStats(ctx context.Context, client *icingaredis.Client, logger *logging.Logger) {
+func WriteStats(ctx context.Context, client *redis.Client, logger *logging.Logger) {
 	counters := map[string]*com.Counter{
 		"config_sync":     &Stats.Config,
 		"state_sync":      &Stats.State,
@@ -44,7 +43,7 @@ func WriteStats(ctx context.Context, client *icingaredis.Client, logger *logging
 				Values: data,
 			})
 			if err := cmd.Err(); err != nil && !utils.IsContextCanceled(err) {
-				logger.Warnw("Can't update own stats", zap.Error(icingaredis.WrapCmdErr(cmd)))
+				logger.Warnw("Can't update own stats", zap.Error(redis.WrapCmdErr(cmd)))
 			}
 		}
 	})

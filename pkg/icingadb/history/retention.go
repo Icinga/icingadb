@@ -3,11 +3,12 @@ package history
 import (
 	"context"
 	"fmt"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/periodic"
 	"github.com/icinga/icingadb/pkg/icingadb"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/periodic"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"time"
@@ -117,7 +118,7 @@ func (o RetentionOptions) Validate() error {
 
 // Retention deletes rows from history tables that exceed their configured retention period.
 type Retention struct {
-	db          *icingadb.DB
+	db          *database.DB
 	logger      *logging.Logger
 	historyDays uint64
 	slaDays     uint64
@@ -128,7 +129,7 @@ type Retention struct {
 
 // NewRetention returns a new Retention.
 func NewRetention(
-	db *icingadb.DB, historyDays uint64, slaDays uint64, interval time.Duration,
+	db *database.DB, historyDays uint64, slaDays uint64, interval time.Duration,
 	count uint64, options RetentionOptions, logger *logging.Logger,
 ) *Retention {
 	return &Retention{
@@ -186,9 +187,9 @@ func (r *Retention) Start(ctx context.Context) error {
 			r.logger.Debugf("Cleaning up historical data for category %s from table %s older than %s",
 				stmt.Category, stmt.Table, olderThan)
 
-			deleted, err := r.db.CleanupOlderThan(
-				ctx, stmt.CleanupStmt, e.Id, r.count, olderThan,
-				icingadb.OnSuccessIncrement[struct{}](&telemetry.Stats.HistoryCleanup),
+			deleted, err := stmt.CleanupOlderThan(
+				ctx, r.db, e.Id, r.count, olderThan,
+				database.OnSuccessIncrement[struct{}](&telemetry.Stats.HistoryCleanup),
 			)
 			if err != nil {
 				select {

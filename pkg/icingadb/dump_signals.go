@@ -2,10 +2,9 @@ package icingadb
 
 import (
 	"context"
-	"github.com/icinga/icingadb/pkg/icingaredis"
-	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -13,7 +12,7 @@ import (
 // DumpSignals reads dump signals from a Redis stream via Listen.
 // Dump-done signals are passed on via Done channels, while InProgress must be checked for dump-wip signals.
 type DumpSignals struct {
-	redis        *icingaredis.Client
+	redis        *redis.Client
 	logger       *logging.Logger
 	mutex        sync.Mutex
 	doneCh       map[string]chan struct{}
@@ -22,7 +21,7 @@ type DumpSignals struct {
 }
 
 // NewDumpSignals returns new DumpSignals.
-func NewDumpSignals(redis *icingaredis.Client, logger *logging.Logger) *DumpSignals {
+func NewDumpSignals(redis *redis.Client, logger *logging.Logger) *DumpSignals {
 	return &DumpSignals{
 		redis:        redis,
 		logger:       logger,

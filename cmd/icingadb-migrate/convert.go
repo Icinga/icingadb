@@ -3,11 +3,12 @@ package main
 import (
 	"database/sql"
 	_ "embed"
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
+	"github.com/icinga/icinga-go-library/utils"
+	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
-	icingadbTypes "github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"strconv"
@@ -48,10 +49,10 @@ type commentRow = struct {
 }
 
 func convertCommentRows(
-	env string, envId icingadbTypes.Binary,
+	env string, envId types.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []commentRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
-	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []contracts.Entity
+	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []database.Entity
 
 	for _, row := range idoRows {
 		checkpoint = row.CommenthistoryId
@@ -81,14 +82,14 @@ func convertCommentRows(
 				},
 				CommentHistoryUpserter: history.CommentHistoryUpserter{
 					RemoveTime:     removeTime,
-					HasBeenRemoved: icingadbTypes.Bool{Bool: !removeTime.Time().IsZero(), Valid: true},
+					HasBeenRemoved: types.Bool{Bool: !removeTime.Time().IsZero(), Valid: true},
 				},
 				EntryTime:    entryTime,
 				Author:       row.AuthorName,
 				Comment:      row.CommentData,
 				EntryType:    icingadbTypes.CommentType(row.EntryType),
-				IsPersistent: icingadbTypes.Bool{Bool: row.IsPersistent != 0, Valid: true},
-				IsSticky:     icingadbTypes.Bool{Bool: false, Valid: true},
+				IsPersistent: types.Bool{Bool: row.IsPersistent != 0, Valid: true},
+				IsSticky:     types.Bool{Bool: false, Valid: true},
 				ExpireTime:   expireTime,
 			})
 
@@ -150,10 +151,10 @@ func convertCommentRows(
 				},
 				AckHistoryUpserter: history.AckHistoryUpserter{ClearTime: clearTime},
 				SetTime:            setTime,
-				Author:             icingadbTypes.MakeString(row.AuthorName),
-				Comment:            icingadbTypes.MakeString(row.CommentData),
+				Author:             types.MakeString(row.AuthorName),
+				Comment:            types.MakeString(row.CommentData),
 				ExpireTime:         convertTime(row.ExpirationTime, 0),
-				IsPersistent: icingadbTypes.Bool{
+				IsPersistent: types.Bool{
 					Bool:  row.IsPersistent != 0,
 					Valid: true,
 				},
@@ -234,10 +235,10 @@ type downtimeRow = struct {
 }
 
 func convertDowntimeRows(
-	env string, envId icingadbTypes.Binary,
+	env string, envId types.Binary,
 	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []downtimeRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
-	var downtimeHistory, allHistory, sla []contracts.Entity
+	var downtimeHistory, allHistory, sla []database.Entity
 
 	for _, row := range idoRows {
 		checkpoint = row.DowntimehistoryId
@@ -255,10 +256,10 @@ func convertDowntimeRows(
 		triggerTime := convertTime(row.TriggerTime, 0)
 		actualStart := convertTime(row.ActualStartTime, row.ActualStartTimeUsec)
 		actualEnd := convertTime(row.ActualEndTime, row.ActualEndTimeUsec)
-		var startTime, endTime, cancelTime icingadbTypes.UnixMilli
+		var startTime, endTime, cancelTime types.UnixMilli
 
 		if scheduledEnd.Time().IsZero() {
-			scheduledEnd = icingadbTypes.UnixMilli(scheduledStart.Time().Add(time.Duration(row.Duration) * time.Second))
+			scheduledEnd = types.UnixMilli(scheduledStart.Time().Add(time.Duration(row.Duration) * time.Second))
 		}
 
 		if actualStart.Time().IsZero() {
@@ -290,14 +291,14 @@ func convertDowntimeRows(
 				ServiceId:     serviceId,
 			},
 			DowntimeHistoryUpserter: history.DowntimeHistoryUpserter{
-				HasBeenCancelled: icingadbTypes.Bool{Bool: row.WasCancelled != 0, Valid: true},
+				HasBeenCancelled: types.Bool{Bool: row.WasCancelled != 0, Valid: true},
 				CancelTime:       cancelTime,
 			},
 			TriggeredById:      calcObjectId(env, row.TriggeredBy),
 			EntryTime:          convertTime(row.EntryTime, 0),
 			Author:             row.AuthorName,
 			Comment:            row.CommentData,
-			IsFlexible:         icingadbTypes.Bool{Bool: row.IsFixed == 0, Valid: true},
+			IsFlexible:         types.Bool{Bool: row.IsFixed == 0, Valid: true},
 			FlexibleDuration:   uint64(row.Duration) * 1000,
 			ScheduledStartTime: scheduledStart,
 			ScheduledEndTime:   scheduledEnd,
@@ -336,7 +337,7 @@ func convertDowntimeRows(
 				StartTime:         startTime,
 				CancelTime:        cancelTime,
 				EndTime:           endTime,
-				HasBeenCancelled:  icingadbTypes.Bool{Bool: row.WasCancelled != 0, Valid: true},
+				HasBeenCancelled:  types.Bool{Bool: row.WasCancelled != 0, Valid: true},
 			}
 
 			h2.EventTime.History = h2
@@ -352,7 +353,7 @@ func convertDowntimeRows(
 				ServiceId:     serviceId,
 			},
 			DowntimeStart:    startTime,
-			HasBeenCancelled: icingadbTypes.Bool{Bool: row.WasCancelled != 0, Valid: true},
+			HasBeenCancelled: types.Bool{Bool: row.WasCancelled != 0, Valid: true},
 			CancelTime:       cancelTime,
 			EndTime:          endTime,
 		}
@@ -383,7 +384,7 @@ type flappingRow = struct {
 }
 
 func convertFlappingRows(
-	env string, envId icingadbTypes.Binary,
+	env string, envId types.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []flappingRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
 	if len(idoRows) < 1 {
@@ -401,12 +402,12 @@ func convertFlappingRows(
 	)
 
 	// Needed for start time (see below).
-	cachedById := make(map[uint64]icingadbTypes.UnixMilli, len(cached))
+	cachedById := make(map[uint64]types.UnixMilli, len(cached))
 	for _, c := range cached {
 		cachedById[c.HistoryId] = convertTime(c.EventTime, c.EventTimeUsec)
 	}
 
-	var flappingHistory, flappingHistoryUpserts, allHistory []contracts.Entity
+	var flappingHistory, flappingHistoryUpserts, allHistory []database.Entity
 	for _, row := range idoRows {
 		checkpoint = row.FlappinghistoryId
 
@@ -417,7 +418,7 @@ func convertFlappingRows(
 		ts := convertTime(row.EventTime.Int64, row.EventTimeUsec)
 
 		// Needed for ID (see below).
-		var start icingadbTypes.UnixMilli
+		var start types.UnixMilli
 		if row.EventType == 1001 { // end
 			var ok bool
 			start, ok = cachedById[row.FlappinghistoryId]
@@ -454,7 +455,7 @@ func convertFlappingRows(
 				},
 				FlappingHistoryUpserter: history.FlappingHistoryUpserter{
 					EndTime:               ts,
-					PercentStateChangeEnd: icingadbTypes.Float{NullFloat64: row.PercentStateChange},
+					PercentStateChangeEnd: types.Float{NullFloat64: row.PercentStateChange},
 					FlappingThresholdLow:  float32(row.LowThreshold),
 					FlappingThresholdHigh: float32(row.HighThreshold),
 				},
@@ -495,7 +496,7 @@ func convertFlappingRows(
 					FlappingThresholdHigh: float32(row.HighThreshold),
 				},
 				StartTime:               start,
-				PercentStateChangeStart: icingadbTypes.Float{NullFloat64: row.PercentStateChange},
+				PercentStateChangeStart: types.Float{NullFloat64: row.PercentStateChange},
 			})
 
 			h := &history.HistoryFlapping{
@@ -541,7 +542,7 @@ type notificationRow = struct {
 }
 
 func convertNotificationRows(
-	env string, envId icingadbTypes.Binary,
+	env string, envId types.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []notificationRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
 	if len(idoRows) < 1 {
@@ -590,7 +591,7 @@ func convertNotificationRows(
 		perId[contact.Name1] = struct{}{}
 	}
 
-	var notificationHistory, userNotificationHistory, allHistory []contracts.Entity
+	var notificationHistory, userNotificationHistory, allHistory []database.Entity
 	for _, row := range idoRows {
 		checkpoint = row.NotificationId
 
@@ -646,7 +647,7 @@ func convertNotificationRows(
 			SendTime:          ts,
 			State:             row.State,
 			PreviousHardState: previousHardState,
-			Text:              icingadbTypes.MakeString(text),
+			Text:              types.MakeString(text),
 			UsersNotified:     row.ContactsNotified,
 		})
 
@@ -737,7 +738,7 @@ type stateRow = struct {
 }
 
 func convertStateRows(
-	env string, envId icingadbTypes.Binary,
+	env string, envId types.Binary,
 	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []stateRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
 	if len(idoRows) < 1 {
@@ -758,7 +759,7 @@ func convertStateRows(
 		cachedById[c.HistoryId] = c.PreviousHardState
 	}
 
-	var stateHistory, allHistory, sla []contracts.Entity
+	var stateHistory, allHistory, sla []database.Entity
 	for _, row := range idoRows {
 		checkpoint = row.StatehistoryId
 
@@ -799,10 +800,10 @@ func convertStateRows(
 			PreviousSoftState: row.LastState,
 			PreviousHardState: previousHardState,
 			CheckAttempt:      row.CurrentCheckAttempt,
-			Output:            icingadbTypes.String{NullString: row.Output},
-			LongOutput:        icingadbTypes.String{NullString: row.LongOutput},
+			Output:            types.String{NullString: row.Output},
+			LongOutput:        types.String{NullString: row.LongOutput},
 			MaxCheckAttempts:  row.MaxCheckAttempts,
-			CheckSource:       icingadbTypes.String{NullString: row.CheckSource},
+			CheckSource:       types.String{NullString: row.CheckSource},
 		})
 
 		allHistory = append(allHistory, &history.HistoryState{

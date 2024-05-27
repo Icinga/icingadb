@@ -1,24 +1,26 @@
 package v1
 
 import (
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/types"
+	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 )
 
 type Notification struct {
 	EntityWithChecksum    `json:",inline"`
 	EnvironmentMeta       `json:",inline"`
 	NameCiMeta            `json:",inline"`
-	HostId                types.Binary             `json:"host_id"`
-	ServiceId             types.Binary             `json:"service_id"`
-	NotificationcommandId types.Binary             `json:"notificationcommand_id"`
-	TimesBegin            types.Int                `json:"times_begin"`
-	TimesEnd              types.Int                `json:"times_end"`
-	NotificationInterval  uint32                   `json:"notification_interval"`
-	TimeperiodId          types.Binary             `json:"timeperiod_id"`
-	States                types.NotificationStates `json:"states"`
-	Types                 types.NotificationTypes  `json:"types"`
-	ZoneId                types.Binary             `json:"zone_id"`
+	HostId                types.Binary                     `json:"host_id"`
+	ServiceId             types.Binary                     `json:"service_id"`
+	NotificationcommandId types.Binary                     `json:"notificationcommand_id"`
+	TimesBegin            types.Int                        `json:"times_begin"`
+	TimesEnd              types.Int                        `json:"times_end"`
+	NotificationInterval  uint32                           `json:"notification_interval"`
+	TimeperiodId          types.Binary                     `json:"timeperiod_id"`
+	States                icingadbTypes.NotificationStates `json:"states"`
+	Types                 icingadbTypes.NotificationTypes  `json:"types"`
+	ZoneId                types.Binary                     `json:"zone_id"`
 }
 
 type NotificationUser struct {
@@ -48,23 +50,23 @@ type NotificationCustomvar struct {
 	NotificationId types.Binary `json:"notification_id"`
 }
 
-func NewNotification() contracts.Entity {
+func NewNotification() database.Entity {
 	return &Notification{}
 }
 
-func NewNotificationUser() contracts.Entity {
+func NewNotificationUser() database.Entity {
 	return &NotificationUser{}
 }
 
-func NewNotificationUsergroup() contracts.Entity {
+func NewNotificationUsergroup() database.Entity {
 	return &NotificationUsergroup{}
 }
 
-func NewNotificationRecipient() contracts.Entity {
+func NewNotificationRecipient() database.Entity {
 	return &NotificationRecipient{}
 }
 
-func NewNotificationCustomvar() contracts.Entity {
+func NewNotificationCustomvar() database.Entity {
 	return &NotificationCustomvar{}
 }
 

@@ -3,14 +3,14 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/periodic"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/pkg/com"
 	"github.com/icinga/icingadb/pkg/icingaredis"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/periodic"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"regexp"
 	"runtime/metrics"
@@ -88,7 +88,7 @@ var startTime = time.Now().UnixMilli()
 
 // StartHeartbeat periodically writes heartbeats to Redis for being monitored by Icinga 2.
 func StartHeartbeat(
-	ctx context.Context, client *icingaredis.Client, logger *logging.Logger, ha ha, heartbeat *icingaredis.Heartbeat,
+	ctx context.Context, client *redis.Client, logger *logging.Logger, ha ha, heartbeat *icingaredis.Heartbeat,
 ) {
 	goMetrics := NewGoMetrics()
 
@@ -139,7 +139,7 @@ func StartHeartbeat(
 				silenceUntil = now.Add(time.Minute)
 			}
 
-			logw("Can't update own heartbeat", zap.Error(icingaredis.WrapCmdErr(cmd)))
+			logw("Can't update own heartbeat", zap.Error(redis.WrapCmdErr(cmd)))
 		} else {
 			lastErr = ""
 			silenceUntil = time.Time{}

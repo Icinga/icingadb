@@ -1,22 +1,23 @@
 package history
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
+	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
-	"github.com/icinga/icingadb/pkg/types"
 )
 
 type NotificationHistory struct {
 	HistoryTableEntity `json:",inline"`
 	HistoryTableMeta   `json:",inline"`
-	NotificationId     types.Binary           `json:"notification_id"`
-	Type               types.NotificationType `json:"type"`
-	SendTime           types.UnixMilli        `json:"send_time"`
-	State              uint8                  `json:"state"`
-	PreviousHardState  uint8                  `json:"previous_hard_state"`
-	Author             string                 `json:"author"`
-	Text               types.String           `json:"text"`
-	UsersNotified      uint16                 `json:"users_notified"`
+	NotificationId     types.Binary                   `json:"notification_id"`
+	Type               icingadbTypes.NotificationType `json:"type"`
+	SendTime           types.UnixMilli                `json:"send_time"`
+	State              uint8                          `json:"state"`
+	PreviousHardState  uint8                          `json:"previous_hard_state"`
+	Author             string                         `json:"author"`
+	Text               types.String                   `json:"text"`
+	UsersNotified      uint16                         `json:"users_notified"`
 }
 
 type UserNotificationHistory struct {
@@ -43,8 +44,8 @@ func (*HistoryNotification) TableName() string {
 
 // Assert interface compliance.
 var (
-	_ UpserterEntity       = (*NotificationHistory)(nil)
-	_ UpserterEntity       = (*UserNotificationHistory)(nil)
-	_ contracts.TableNamer = (*HistoryNotification)(nil)
-	_ UpserterEntity       = (*HistoryNotification)(nil)
+	_ UpserterEntity      = (*NotificationHistory)(nil)
+	_ UpserterEntity      = (*UserNotificationHistory)(nil)
+	_ database.TableNamer = (*HistoryNotification)(nil)
+	_ UpserterEntity      = (*HistoryNotification)(nil)
 )

@@ -2,8 +2,9 @@ package history
 
 import (
 	"database/sql/driver"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/types"
 )
 
 type DowntimeHistoryEntity struct {
@@ -11,17 +12,17 @@ type DowntimeHistoryEntity struct {
 }
 
 // Fingerprint implements part of the contracts.Entity interface.
-func (dhe DowntimeHistoryEntity) Fingerprint() contracts.Fingerprinter {
+func (dhe DowntimeHistoryEntity) Fingerprint() database.Fingerprinter {
 	return dhe
 }
 
 // ID implements part of the contracts.Entity interface.
-func (dhe DowntimeHistoryEntity) ID() contracts.ID {
+func (dhe DowntimeHistoryEntity) ID() database.ID {
 	return dhe.DowntimeId
 }
 
 // SetID implements part of the contracts.Entity interface.
-func (dhe *DowntimeHistoryEntity) SetID(id contracts.ID) {
+func (dhe *DowntimeHistoryEntity) SetID(id database.ID) {
 	dhe.DowntimeId = id.(types.Binary)
 }
 
@@ -148,14 +149,14 @@ func (et SlaDowntimeEndTime) Value() (driver.Value, error) {
 
 // Assert interface compliance.
 var (
-	_ contracts.Entity     = (*DowntimeHistoryEntity)(nil)
-	_ contracts.Upserter   = (*DowntimeHistoryUpserter)(nil)
-	_ UpserterEntity       = (*DowntimeHistory)(nil)
-	_ contracts.Initer     = (*HistoryDowntime)(nil)
-	_ contracts.TableNamer = (*HistoryDowntime)(nil)
-	_ UpserterEntity       = (*HistoryDowntime)(nil)
-	_ contracts.Initer     = (*SlaHistoryDowntime)(nil)
-	_ UpserterEntity       = (*SlaHistoryDowntime)(nil)
-	_ driver.Valuer        = DowntimeEventTime{}
-	_ driver.Valuer        = SlaDowntimeEndTime{}
+	_ database.Entity     = (*DowntimeHistoryEntity)(nil)
+	_ database.Upserter   = (*DowntimeHistoryUpserter)(nil)
+	_ UpserterEntity      = (*DowntimeHistory)(nil)
+	_ contracts.Initer    = (*HistoryDowntime)(nil)
+	_ database.TableNamer = (*HistoryDowntime)(nil)
+	_ UpserterEntity      = (*HistoryDowntime)(nil)
+	_ contracts.Initer    = (*SlaHistoryDowntime)(nil)
+	_ UpserterEntity      = (*SlaHistoryDowntime)(nil)
+	_ driver.Valuer       = DowntimeEventTime{}
+	_ driver.Valuer       = SlaDowntimeEndTime{}
 )

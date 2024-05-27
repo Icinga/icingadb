@@ -3,14 +3,16 @@ package icingadb
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/strcase"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/common"
-	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -20,13 +22,13 @@ import (
 
 // Sync implements a rendezvous point for Icinga DB and Redis to synchronize their entities.
 type Sync struct {
-	db     *DB
-	redis  *icingaredis.Client
+	db     *database.DB
+	redis  *redis.Client
 	logger *logging.Logger
 }
 
 // NewSync returns a new Sync.
-func NewSync(db *DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -37,8 +39,8 @@ func NewSync(db *DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
 // SyncAfterDump waits for a config dump to finish (using the dump parameter) and then starts a sync for the given
 // sync subject using the Sync function.
 func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, dump *DumpSignals) error {
-	typeName := utils.Name(subject.Entity())
-	key := "icinga:" + utils.Key(typeName, ':')
+	typeName := types.Name(subject.Entity())
+	key := "icinga:" + strcase.Delimited(typeName, ':')
 
 	startTime := time.Now()
 	logTicker := time.NewTicker(s.logger.Interval())
@@ -74,7 +76,7 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 	g, ctx := errgroup.WithContext(ctx)
 
-	desired, redisErrs := s.redis.YieldAll(ctx, subject)
+	desired, redisErrs := icingaredis.YieldAll(ctx, s.redis, subject)
 	// Let errors from Redis cancel our group.
 	com.ErrgroupReceive(g, redisErrs)
 
@@ -108,12 +110,12 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 
 	// Create
 	if len(delta.Create) > 0 {
-		s.logger.Infof("Inserting %d items of type %s", len(delta.Create), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
-		var entities <-chan contracts.Entity
+		s.logger.Infof("Inserting %d items of type %s", len(delta.Create), strcase.Delimited(types.Name(delta.Subject.Entity()), ' '))
+		var entities <-chan database.Entity
 		if delta.Subject.WithChecksum() {
 			pairs, errs := s.redis.HMYield(
 				ctx,
-				fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
+				fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
 				delta.Create.Keys()...)
 			// Let errors from Redis cancel our group.
 			com.ErrgroupReceive(g, errs)
@@ -129,16 +131,16 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		}
 
 		g.Go(func() error {
-			return s.db.CreateStreamed(ctx, entities, OnSuccessIncrement[contracts.Entity](stat))
+			return s.db.CreateStreamed(ctx, entities, database.OnSuccessIncrement[database.Entity](stat))
 		})
 	}
 
 	// Update
 	if len(delta.Update) > 0 {
-		s.logger.Infof("Updating %d items of type %s", len(delta.Update), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+		s.logger.Infof("Updating %d items of type %s", len(delta.Update), strcase.Delimited(types.Name(delta.Subject.Entity()), ' '))
 		pairs, errs := s.redis.HMYield(
 			ctx,
-			fmt.Sprintf("icinga:%s", utils.Key(utils.Name(delta.Subject.Entity()), ':')),
+			fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
 			delta.Update.Keys()...)
 		// Let errors from Redis cancel our group.
 		com.ErrgroupReceive(g, errs)
@@ -153,15 +155,15 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		g.Go(func() error {
 			// Using upsert here on purpose as this is the fastest way to do bulk updates.
 			// However, there is a risk that errors in the sync implementation could silently insert new rows.
-			return s.db.UpsertStreamed(ctx, entities, OnSuccessIncrement[contracts.Entity](stat))
+			return s.db.UpsertStreamed(ctx, entities, database.OnSuccessIncrement[database.Entity](stat))
 		})
 	}
 
 	// Delete
 	if len(delta.Delete) > 0 {
-		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), utils.Key(utils.Name(delta.Subject.Entity()), ' '))
+		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), strcase.Delimited(types.Name(delta.Subject.Entity()), ' '))
 		g.Go(func() error {
-			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), OnSuccessIncrement[any](stat))
+			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), database.OnSuccessIncrement[any](stat))
 		})
 	}
 
@@ -179,7 +181,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 
 	cv := common.NewSyncSubject(v1.NewCustomvar)
 
-	cvs, errs := s.redis.YieldAll(ctx, cv)
+	cvs, errs := icingaredis.YieldAll(ctx, s.redis, cv)
 	com.ErrgroupReceive(g, errs)
 
 	desiredCvs, desiredFlatCvs, errs := v1.ExpandCustomvars(ctx, cvs)
@@ -211,7 +213,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 }
 
 // getCounterForEntity returns the appropriate counter (config/state) from telemetry.Stats for e.
-func getCounterForEntity(e contracts.Entity) *com.Counter {
+func getCounterForEntity(e database.Entity) *com.Counter {
 	switch e.(type) {
 	case *v1.HostState, *v1.ServiceState:
 		return &telemetry.Stats.State

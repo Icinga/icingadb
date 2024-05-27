@@ -1,9 +1,9 @@
 package overdue
 
 import (
-	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
-	"github.com/icinga/icingadb/pkg/types"
 )
 
 type ServiceState struct {
@@ -11,7 +11,7 @@ type ServiceState struct {
 	IsOverdue types.Bool `json:"is_overdue"`
 }
 
-func NewServiceState(id string, overdue bool) (contracts.Entity, error) {
+func NewServiceState(id string, overdue bool) (database.Entity, error) {
 	hs := &ServiceState{IsOverdue: types.Bool{
 		Bool:  overdue,
 		Valid: true,
@@ -22,5 +22,5 @@ func NewServiceState(id string, overdue bool) (contracts.Entity, error) {
 
 // Assert interface compliance.
 var (
-	_ contracts.Entity = (*ServiceState)(nil)
+	_ database.Entity = (*ServiceState)(nil)
 )

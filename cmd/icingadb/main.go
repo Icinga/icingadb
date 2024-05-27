@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/internal/command"
 	"github.com/icinga/icingadb/pkg/common"
@@ -12,11 +15,8 @@ import (
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/okzk/sdnotify"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"os"
@@ -39,16 +39,12 @@ func main() {
 
 func run() int {
 	cmd := command.New()
-	logs, err := logging.NewLogging(
-		utils.AppName(),
-		cmd.Config.Logging.Level,
-		cmd.Config.Logging.Output,
-		cmd.Config.Logging.Options,
-		cmd.Config.Logging.Interval,
-	)
+
+	logs, err := logging.NewLoggingFromConfig(utils.AppName(), cmd.Config.Logging)
 	if err != nil {
-		utils.Fatal(errors.Wrap(err, "can't configure logging"))
+		utils.PrintErrorThenExit(err, ExitFailure)
 	}
+
 	// When started by systemd, NOTIFY_SOCKET is set by systemd for Type=notify supervised services, which is the
 	// default setting for the Icinga DB service. So we notify that Icinga DB finished starting up.
 	_ = sdnotify.Ready()
@@ -64,14 +60,14 @@ func run() int {
 	}
 	defer db.Close()
 	{
-		logger.Infof("Connecting to database at '%s'", utils.JoinHostPort(cmd.Config.Database.Host, cmd.Config.Database.Port))
+		logger.Infof("Connecting to database at '%s'", db.GetAddr())
 		err := db.Ping()
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
 		}
 	}
 
-	if err := db.CheckSchema(context.Background()); err != nil {
+	if err := icingadb.CheckSchema(context.Background(), db); err != nil {
 		logger.Fatalf("%+v", err)
 	}
 
@@ -80,7 +76,7 @@ func run() int {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
 	}
 	{
-		logger.Infof("Connecting to Redis at '%s'", utils.JoinHostPort(cmd.Config.Redis.Host, cmd.Config.Redis.Port))
+		logger.Infof("Connecting to Redis at '%s'", rc.GetAddr())
 		_, err := rc.Ping(context.Background()).Result()
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to Redis"))
@@ -356,7 +352,7 @@ func run() int {
 }
 
 // monitorRedisSchema monitors rc's icinga:schema version validity.
-func monitorRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) {
+func monitorRedisSchema(logger *logging.Logger, rc *redis.Client, pos string) {
 	for {
 		var err error
 		pos, err = checkRedisSchema(logger, rc, pos)
@@ -368,7 +364,7 @@ func monitorRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos stri
 }
 
 // checkRedisSchema verifies rc's icinga:schema version.
-func checkRedisSchema(logger *logging.Logger, rc *icingaredis.Client, pos string) (newPos string, err error) {
+func checkRedisSchema(logger *logging.Logger, rc *redis.Client, pos string) (newPos string, err error) {
 	if pos == "0-0" {
 		defer time.AfterFunc(3*time.Second, func() {
 			logger.Info("Waiting for Icinga 2 to write into Redis, please make sure you have started Icinga 2 and the Icinga DB feature is enabled")

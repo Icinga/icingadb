@@ -2,13 +2,12 @@ package v1
 
 import (
 	"context"
-	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/pkg/com"
-	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/flatten"
-	"github.com/icinga/icingadb/pkg/icingadb/objectpacker"
-	"github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/flatten"
+	"github.com/icinga/icinga-go-library/objectpacker"
+	"github.com/icinga/icinga-go-library/types"
+	"github.com/icinga/icinga-go-library/utils"
 	"golang.org/x/sync/errgroup"
 	"runtime"
 )
@@ -27,11 +26,11 @@ type CustomvarFlat struct {
 	Flatvalue        types.String `json:"flatvalue"`
 }
 
-func NewCustomvar() contracts.Entity {
+func NewCustomvar() database.Entity {
 	return &Customvar{}
 }
 
-func NewCustomvarFlat() contracts.Entity {
+func NewCustomvarFlat() database.Entity {
 	return &CustomvarFlat{}
 }
 
@@ -41,12 +40,12 @@ func NewCustomvarFlat() contracts.Entity {
 // and the third channel providing an error, if any.
 func ExpandCustomvars(
 	ctx context.Context,
-	cvs <-chan contracts.Entity,
-) (customvars, flatCustomvars <-chan contracts.Entity, errs <-chan error) {
+	cvs <-chan database.Entity,
+) (customvars, flatCustomvars <-chan database.Entity, errs <-chan error) {
 	g, ctx := errgroup.WithContext(ctx)
 
 	// Multiplex cvs to use them both for customvar and customvar_flat.
-	var forward chan contracts.Entity
+	var forward chan database.Entity
 	customvars, forward = multiplexCvs(ctx, g, cvs)
 	flatCustomvars = flattenCustomvars(ctx, g, forward)
 	errs = com.WaitAsync(g)
@@ -59,10 +58,10 @@ func ExpandCustomvars(
 func multiplexCvs(
 	ctx context.Context,
 	g *errgroup.Group,
-	cvs <-chan contracts.Entity,
-) (customvars1, customvars2 chan contracts.Entity) {
-	customvars1 = make(chan contracts.Entity)
-	customvars2 = make(chan contracts.Entity)
+	cvs <-chan database.Entity,
+) (customvars1, customvars2 chan database.Entity) {
+	customvars1 = make(chan database.Entity)
+	customvars2 = make(chan database.Entity)
 
 	g.Go(func() error {
 		defer close(customvars1)
@@ -96,8 +95,8 @@ func multiplexCvs(
 }
 
 // flattenCustomvars creates and yields flat custom variables from the provided custom variables.
-func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan contracts.Entity) (flatCustomvars chan contracts.Entity) {
-	flatCustomvars = make(chan contracts.Entity)
+func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan database.Entity) (flatCustomvars chan database.Entity) {
+	flatCustomvars = make(chan database.Entity)
 
 	g.Go(func() error {
 		defer close(flatCustomvars)
@@ -109,7 +108,7 @@ func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan contra
 				for entity := range cvs {
 					var value interface{}
 					customvar := entity.(*Customvar)
-					if err := internal.UnmarshalJSON([]byte(customvar.Value), &value); err != nil {
+					if err := types.UnmarshalJSON([]byte(customvar.Value), &value); err != nil {
 						return err
 					}
 

@@ -3,18 +3,18 @@ package icingadb
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/periodic"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/strcase"
+	"github.com/icinga/icinga-go-library/structify"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
-	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/periodic"
-	"github.com/icinga/icingadb/pkg/structify"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -26,13 +26,13 @@ import (
 
 // RuntimeUpdates specifies the source and destination of runtime updates.
 type RuntimeUpdates struct {
-	db     *DB
-	redis  *icingaredis.Client
+	db     *database.DB
+	redis  *redis.Client
 	logger *logging.Logger
 }
 
 // NewRuntimeUpdates creates a new RuntimeUpdates.
-func NewRuntimeUpdates(db *DB, redis *icingaredis.Client, logger *logging.Logger) *RuntimeUpdates {
+func NewRuntimeUpdates(db *database.DB, redis *redis.Client, logger *logging.Logger) *RuntimeUpdates {
 	return &RuntimeUpdates{
 		db:     db,
 		redis:  redis,
@@ -42,18 +42,18 @@ func NewRuntimeUpdates(db *DB, redis *icingaredis.Client, logger *logging.Logger
 
 // ClearStreams returns the stream key to ID mapping of the runtime update streams
 // for later use in Sync and clears the streams themselves.
-func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state icingaredis.Streams, err error) {
-	config = icingaredis.Streams{"icinga:runtime": "0-0"}
-	state = icingaredis.Streams{"icinga:runtime:state": "0-0"}
+func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state redis.Streams, err error) {
+	config = redis.Streams{"icinga:runtime": "0-0"}
+	state = redis.Streams{"icinga:runtime:state": "0-0"}
 
 	var keys []string
-	for _, streams := range [...]icingaredis.Streams{config, state} {
+	for _, streams := range [...]redis.Streams{config, state} {
 		for key := range streams {
 			keys = append(keys, key)
 		}
 	}
 
-	err = icingaredis.WrapCmdErr(r.redis.Del(ctx, keys...))
+	err = redis.WrapCmdErr(r.redis.Del(ctx, keys...))
 	return
 }
 
@@ -61,7 +61,7 @@ func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state icinga
 // Note that Sync must be only be called configuration synchronization has been completed.
 // allowParallel allows synchronizing out of order (not FIFO).
 func (r *RuntimeUpdates) Sync(
-	ctx context.Context, factoryFuncs []contracts.EntityFactoryFunc, streams icingaredis.Streams, allowParallel bool,
+	ctx context.Context, factoryFuncs []database.EntityFactoryFunc, streams redis.Streams, allowParallel bool,
 ) error {
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -72,16 +72,16 @@ func (r *RuntimeUpdates) Sync(
 		stat := getCounterForEntity(s.Entity())
 
 		updateMessages := make(chan redis.XMessage, r.redis.Options.XReadCount)
-		upsertEntities := make(chan contracts.Entity, r.redis.Options.XReadCount)
+		upsertEntities := make(chan database.Entity, r.redis.Options.XReadCount)
 		deleteIds := make(chan interface{}, r.redis.Options.XReadCount)
 
-		var upsertedFifo chan contracts.Entity
+		var upsertedFifo chan database.Entity
 		var deletedFifo chan interface{}
 		var upsertCount int
 		var deleteCount int
 		upsertStmt, upsertPlaceholders := r.db.BuildUpsertStmt(s.Entity())
 		if !allowParallel {
-			upsertedFifo = make(chan contracts.Entity, 1)
+			upsertedFifo = make(chan database.Entity, 1)
 			deletedFifo = make(chan interface{}, 1)
 			upsertCount = 1
 			deleteCount = 1
@@ -90,13 +90,16 @@ func (r *RuntimeUpdates) Sync(
 			deleteCount = r.db.Options.MaxPlaceholdersPerStatement
 		}
 
-		updateMessagesByKey[fmt.Sprintf("icinga:%s", utils.Key(s.Name(), ':'))] = updateMessages
+		updateMessagesByKey[fmt.Sprintf("icinga:%s", strcase.Delimited(s.Name(), ':'))] = updateMessages
 
 		r.logger.Debugf("Syncing runtime updates of %s", s.Name())
 
 		g.Go(structifyStream(
 			ctx, updateMessages, upsertEntities, upsertedFifo, deleteIds, deletedFifo,
-			structify.MakeMapStructifier(reflect.TypeOf(s.Entity()).Elem(), "json"),
+			structify.MakeMapStructifier(
+				reflect.TypeOf(s.Entity()).Elem(),
+				"json",
+				contracts.SafeInit),
 		))
 
 		g.Go(func() error {
@@ -110,15 +113,15 @@ func (r *RuntimeUpdates) Sync(
 			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
 			sem := semaphore.NewWeighted(1)
 
-			onSuccess := []OnSuccess[contracts.Entity]{
-				OnSuccessIncrement[contracts.Entity](&counter), OnSuccessIncrement[contracts.Entity](stat),
+			onSuccess := []database.OnSuccess[database.Entity]{
+				database.OnSuccessIncrement[database.Entity](&counter), database.OnSuccessIncrement[database.Entity](stat),
 			}
 			if !allowParallel {
-				onSuccess = append(onSuccess, OnSuccessSendTo(upsertedFifo))
+				onSuccess = append(onSuccess, database.OnSuccessSendTo(upsertedFifo))
 			}
 
 			return r.db.NamedBulkExec(
-				ctx, upsertStmt, upsertCount, sem, upsertEntities, com.SplitOnDupId[contracts.Entity], onSuccess...,
+				ctx, upsertStmt, upsertCount, sem, upsertEntities, database.SplitOnDupId[database.Entity], onSuccess...,
 			)
 		})
 
@@ -130,11 +133,11 @@ func (r *RuntimeUpdates) Sync(
 				}
 			}).Stop()
 
-			sem := r.db.GetSemaphoreForTable(utils.TableName(s.Entity()))
+			sem := r.db.GetSemaphoreForTable(database.TableName(s.Entity()))
 
-			onSuccess := []OnSuccess[any]{OnSuccessIncrement[any](&counter), OnSuccessIncrement[any](stat)}
+			onSuccess := []database.OnSuccess[any]{database.OnSuccessIncrement[any](&counter), database.OnSuccessIncrement[any](stat)}
 			if !allowParallel {
-				onSuccess = append(onSuccess, OnSuccessSendTo(deletedFifo))
+				onSuccess = append(onSuccess, database.OnSuccessSendTo(deletedFifo))
 			}
 
 			return r.db.BulkExec(ctx, r.db.BuildDeleteStmt(s.Entity()), deleteCount, sem, deleteIds, onSuccess...)
@@ -144,7 +147,7 @@ func (r *RuntimeUpdates) Sync(
 	// customvar and customvar_flat sync.
 	{
 		updateMessages := make(chan redis.XMessage, r.redis.Options.XReadCount)
-		upsertEntities := make(chan contracts.Entity, r.redis.Options.XReadCount)
+		upsertEntities := make(chan database.Entity, r.redis.Options.XReadCount)
 		deleteIds := make(chan interface{}, r.redis.Options.XReadCount)
 
 		cv := common.NewSyncSubject(v1.NewCustomvar)
@@ -153,10 +156,13 @@ func (r *RuntimeUpdates) Sync(
 		r.logger.Debug("Syncing runtime updates of " + cv.Name())
 		r.logger.Debug("Syncing runtime updates of " + cvFlat.Name())
 
-		updateMessagesByKey["icinga:"+utils.Key(cv.Name(), ':')] = updateMessages
+		updateMessagesByKey["icinga:"+strcase.Delimited(cv.Name(), ':')] = updateMessages
 		g.Go(structifyStream(
 			ctx, updateMessages, upsertEntities, nil, deleteIds, nil,
-			structify.MakeMapStructifier(reflect.TypeOf(cv.Entity()).Elem(), "json"),
+			structify.MakeMapStructifier(
+				reflect.TypeOf(cv.Entity()).Elem(),
+				"json",
+				contracts.SafeInit),
 		))
 
 		customvars, flatCustomvars, errs := v1.ExpandCustomvars(ctx, upsertEntities)
@@ -176,9 +182,9 @@ func (r *RuntimeUpdates) Sync(
 			sem := semaphore.NewWeighted(1)
 
 			return r.db.NamedBulkExec(
-				ctx, cvStmt, cvCount, sem, customvars, com.SplitOnDupId[contracts.Entity],
-				OnSuccessIncrement[contracts.Entity](&counter),
-				OnSuccessIncrement[contracts.Entity](&telemetry.Stats.Config),
+				ctx, cvStmt, cvCount, sem, customvars, database.SplitOnDupId[database.Entity],
+				database.OnSuccessIncrement[database.Entity](&counter),
+				database.OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
 			)
 		})
 
@@ -197,8 +203,8 @@ func (r *RuntimeUpdates) Sync(
 
 			return r.db.NamedBulkExec(
 				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars,
-				com.SplitOnDupId[contracts.Entity], OnSuccessIncrement[contracts.Entity](&counter),
-				OnSuccessIncrement[contracts.Entity](&telemetry.Stats.Config),
+				database.SplitOnDupId[database.Entity], database.OnSuccessIncrement[database.Entity](&counter),
+				database.OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
 			)
 		})
 
@@ -228,7 +234,7 @@ func (r *RuntimeUpdates) Sync(
 
 // xRead reads from the runtime update streams and sends the data to the corresponding updateMessages channel.
 // The updateMessages channel is determined by a "redis_key" on each redis message.
-func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[string]chan<- redis.XMessage, streams icingaredis.Streams) func() error {
+func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[string]chan<- redis.XMessage, streams redis.Streams) func() error {
 	return func() error {
 		defer func() {
 			for _, updateMessages := range updateMessagesByKey {
@@ -283,7 +289,7 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 			} else {
 				for _, cmd := range cmds {
 					if cmd.Err() != nil {
-						r.logger.Errorw("Can't trim runtime updates stream", zap.Error(icingaredis.WrapCmdErr(cmd)))
+						r.logger.Errorw("Can't trim runtime updates stream", zap.Error(redis.WrapCmdErr(cmd)))
 					}
 				}
 			}
@@ -295,11 +301,11 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 // those messages into Icinga DB entities (contracts.Entity) using the provided structifier.
 // Converted entities are inserted into the upsertEntities or deleteIds channel depending on the "runtime_type" message field.
 func structifyStream(
-	ctx context.Context, updateMessages <-chan redis.XMessage, upsertEntities, upserted chan contracts.Entity,
+	ctx context.Context, updateMessages <-chan redis.XMessage, upsertEntities, upserted chan database.Entity,
 	deleteIds, deleted chan interface{}, structifier structify.MapStructifier,
 ) func() error {
 	if upserted == nil {
-		upserted = make(chan contracts.Entity)
+		upserted = make(chan database.Entity)
 		close(upserted)
 	}
 
@@ -326,7 +332,7 @@ func structifyStream(
 					return errors.Wrapf(err, "can't structify values %#v", message.Values)
 				}
 
-				entity := ptr.(contracts.Entity)
+				entity := ptr.(database.Entity)
 
 				runtimeType := message.Values["runtime_type"]
 				if runtimeType == nil {

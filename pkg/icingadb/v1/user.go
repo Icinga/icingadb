@@ -1,22 +1,24 @@
 package v1
 
 import (
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/types"
+	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 )
 
 type User struct {
 	EntityWithChecksum   `json:",inline"`
 	EnvironmentMeta      `json:",inline"`
 	NameCiMeta           `json:",inline"`
-	DisplayName          string                   `json:"display_name"`
-	Email                string                   `json:"email"`
-	Pager                string                   `json:"pager"`
-	NotificationsEnabled types.Bool               `json:"notifications_enabled"`
-	TimeperiodId         types.Binary             `json:"timeperiod_id"`
-	States               types.NotificationStates `json:"states"`
-	Types                types.NotificationTypes  `json:"types"`
-	ZoneId               types.Binary             `json:"zone_id"`
+	DisplayName          string                           `json:"display_name"`
+	Email                string                           `json:"email"`
+	Pager                string                           `json:"pager"`
+	NotificationsEnabled types.Bool                       `json:"notifications_enabled"`
+	TimeperiodId         types.Binary                     `json:"timeperiod_id"`
+	States               icingadbTypes.NotificationStates `json:"states"`
+	Types                icingadbTypes.NotificationTypes  `json:"types"`
+	ZoneId               types.Binary                     `json:"zone_id"`
 }
 
 type UserCustomvar struct {
@@ -39,23 +41,23 @@ type UsergroupMember struct {
 	UsergroupId types.Binary `json:"usergroup_id"`
 }
 
-func NewUser() contracts.Entity {
+func NewUser() database.Entity {
 	return &User{}
 }
 
-func NewUserCustomvar() contracts.Entity {
+func NewUserCustomvar() database.Entity {
 	return &UserCustomvar{}
 }
 
-func NewUsergroup() contracts.Entity {
+func NewUsergroup() database.Entity {
 	return &Usergroup{}
 }
 
-func NewUsergroupCustomvar() contracts.Entity {
+func NewUsergroupCustomvar() database.Entity {
 	return &UsergroupCustomvar{}
 }
 
-func NewUsergroupMember() contracts.Entity {
+func NewUsergroupMember() database.Entity {
 	return &UsergroupMember{}
 }
 

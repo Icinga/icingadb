@@ -1,8 +1,7 @@
 package v1
 
 import (
-	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/pkg/types"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/pkg/errors"
 )
 
@@ -25,7 +24,7 @@ func (m StatsMessage) IcingaStatus() (*IcingaStatus, error) {
 			} `json:"status"`
 		}
 
-		if err := internal.UnmarshalJSON([]byte(s), &envelope); err != nil {
+		if err := types.UnmarshalJSON([]byte(s), &envelope); err != nil {
 			return nil, err
 		}
 
@@ -40,7 +39,7 @@ func (m StatsMessage) Time() (*types.UnixMilli, error) {
 	if s, ok := m["timestamp"].(string); ok {
 		var t types.UnixMilli
 
-		if err := internal.UnmarshalJSON([]byte(s), &t); err != nil {
+		if err := types.UnmarshalJSON([]byte(s), &t); err != nil {
 			return nil, err
 		}
 

@@ -2,21 +2,19 @@ package history
 
 import (
 	"context"
-	"github.com/icinga/icingadb/internal"
-	"github.com/icinga/icingadb/pkg/com"
+	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/periodic"
+	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/structify"
+	"github.com/icinga/icinga-go-library/types"
+	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/icingadb"
 	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
-	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
-	"github.com/icinga/icingadb/pkg/logging"
-	"github.com/icinga/icingadb/pkg/periodic"
-	"github.com/icinga/icingadb/pkg/structify"
-	"github.com/icinga/icingadb/pkg/types"
-	"github.com/icinga/icingadb/pkg/utils"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/errgroup"
 	"reflect"
 	"sync"
@@ -24,13 +22,13 @@ import (
 
 // Sync specifies the source and destination of a history sync.
 type Sync struct {
-	db     *icingadb.DB
-	redis  *icingaredis.Client
+	db     *database.DB
+	redis  *redis.Client
 	logger *logging.Logger
 }
 
 // NewSync creates a new Sync.
-func NewSync(db *icingadb.DB, redis *icingaredis.Client, logger *logging.Logger) *Sync {
+func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
 		db:     db,
 		redis:  redis,
@@ -156,7 +154,7 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 
 			cmd := s.redis.XDel(ctx, stream, ids...)
 			if _, err := cmd.Result(); err != nil {
-				return icingaredis.WrapCmdErr(cmd)
+				return redis.WrapCmdErr(cmd)
 			}
 
 			counter.Add(uint64(len(ids)))
@@ -180,7 +178,10 @@ type stageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMe
 // For each history event it receives, it parses that event into a new instance of that entity type and writes it to
 // the database. It writes exactly one entity to the database for each history event.
 func writeOneEntityStage(structPtr interface{}) stageFunc {
-	structifier := structify.MakeMapStructifier(reflect.TypeOf(structPtr).Elem(), "json")
+	structifier := structify.MakeMapStructifier(
+		reflect.TypeOf(structPtr).Elem(),
+		"json",
+		contracts.SafeInit)
 
 	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
 		ptr, err := structifier(entry.Values)
@@ -201,11 +202,11 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 		}
 
 		bufSize := s.db.Options.MaxPlaceholdersPerStatement
-		insert := make(chan contracts.Entity, bufSize) // Events sent to the database for insertion.
-		inserted := make(chan contracts.Entity)        // Events returned by the database after successful insertion.
-		skipped := make(chan redis.XMessage)           // Events skipping insert/inserted (no entities generated).
-		state := make(map[contracts.Entity]*State)     // Shared state between all entities created by one event.
-		var stateMu sync.Mutex                         // Synchronizes concurrent access to state.
+		insert := make(chan database.Entity, bufSize) // Events sent to the database for insertion.
+		inserted := make(chan database.Entity)        // Events returned by the database after successful insertion.
+		skipped := make(chan redis.XMessage)          // Events skipping insert/inserted (no entities generated).
+		state := make(map[database.Entity]*State)     // Shared state between all entities created by one event.
+		var stateMu sync.Mutex                        // Synchronizes concurrent access to state.
 
 		g, ctx := errgroup.WithContext(ctx)
 
@@ -257,7 +258,7 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 		g.Go(func() error {
 			defer close(inserted)
 
-			return s.db.UpsertStreamed(ctx, insert, icingadb.OnSuccessSendTo[contracts.Entity](inserted))
+			return s.db.UpsertStreamed(ctx, insert, database.OnSuccessSendTo[database.Entity](inserted))
 		})
 
 		g.Go(func() error {
@@ -316,7 +317,10 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 		UserIds       types.String `structify:"users_notified_ids"`
 	}
 
-	structifier := structify.MakeMapStructifier(reflect.TypeOf((*NotificationHistory)(nil)).Elem(), "structify")
+	structifier := structify.MakeMapStructifier(
+		reflect.TypeOf((*NotificationHistory)(nil)).Elem(),
+		"structify",
+		contracts.SafeInit)
 
 	return writeMultiEntityStage(func(entry redis.XMessage) ([]v1.UpserterEntity, error) {
 		rawNotificationHistory, err := structifier(entry.Values)
@@ -330,7 +334,7 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 		}
 
 		var users []types.Binary
-		err = internal.UnmarshalJSON([]byte(notificationHistory.UserIds.String), &users)
+		err = types.UnmarshalJSON([]byte(notificationHistory.UserIds.String), &users)
 		if err != nil {
 			return nil, err
 		}

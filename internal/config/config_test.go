@@ -2,7 +2,8 @@ package config
 
 import (
 	"github.com/creasty/defaults"
-	"github.com/icinga/icingadb/pkg/logging"
+	"github.com/icinga/icinga-go-library/config"
+	"github.com/icinga/icinga-go-library/logging"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
@@ -58,11 +59,12 @@ redis:
 
 			require.NoError(t, os.WriteFile(tempFile.Name(), []byte(st.input), 0o600))
 
-			if actual, err := FromYAMLFile(tempFile.Name()); st.output == nil {
+			var actual Config
+			if err := config.FromYAMLFile(tempFile.Name(), &actual); st.output == nil {
 				require.Error(t, err)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, st.output, actual)
+				require.Equal(t, *st.output, actual)
 			}
 		})
 	}
