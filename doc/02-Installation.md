@@ -31,7 +31,7 @@ The recommended way to install Icinga DB is to use prebuilt packages from our of
 !!! tip
 
     If you install Icinga DB on a node that has Icinga 2 or Icinga Web installed via packages,
-    proceed to [installing the Icinga DB package](#installing-icinga-db-web-package) as
+    proceed to [installing the Icinga DB package](#installing-icinga-db-package) as
     the repository is already configured.
 
 Here's how to add the official release repository:
