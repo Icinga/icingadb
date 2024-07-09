@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/icinga/icinga-go-library/backoff"
+	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/internal/command"
@@ -15,6 +18,8 @@ import (
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
+	"github.com/icinga/icingadb/schema/mysql"
+	"github.com/icinga/icingadb/schema/pgsql"
 	"github.com/okzk/sdnotify"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -67,8 +72,38 @@ func run() int {
 		}
 	}
 
-	if err := icingadb.CheckSchema(context.Background(), db); err != nil {
-		logger.Fatalf("%+v", err)
+	{
+		err := retry.WithBackoff(
+			context.Background(),
+			func(ctx context.Context) (err error) {
+				return database.AutoUpgradeSchema(
+					context.Background(), db, cmd.Config.Database.Database, "icingadb_schema", "version", "timestamp",
+					map[string]database.SchemaData{
+						database.MySQL: {
+							Schema: []string{mysql.Schema},
+							Upgrades: []database.SchemaUpgrade{
+								{Version: "3", DDL: []string{mysql.Upgrade100}},
+								{Version: "4", DDL: []string{mysql.Upgrade111}},
+								{Version: "5", DDL: []string{mysql.Upgrade120}},
+							},
+						},
+						database.PostgreSQL: {
+							Schema: []string{pgsql.Schema},
+							Upgrades: []database.SchemaUpgrade{
+								{Version: "2", DDL: []string{pgsql.Upgrade111}},
+								{Version: "3", DDL: []string{pgsql.Upgrade120}},
+							},
+						},
+					},
+				)
+			},
+			retry.Retryable,
+			backoff.NewExponentialWithJitter(128*time.Millisecond, time.Minute),
+			db.GetDefaultRetrySettings(),
+		)
+		if err != nil {
+			logger.Fatalf("%+v", errors.Wrap(err, "can't upgrade database schema"))
+		}
 	}
 
 	rc, err := cmd.Redis(logs.GetChildLogger("redis"))
