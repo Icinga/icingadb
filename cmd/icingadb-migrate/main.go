@@ -71,6 +71,10 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "bad env ID: %s\n", err.Error())
 		os.Exit(2)
 	}
+	if len(envId) != 20 {
+		_, _ = fmt.Fprintf(os.Stderr, "bad env ID: must be 20 bytes long, has %d bytes\n", len(envId))
+		os.Exit(2)
+	}
 
 	defer func() { _ = log.Sync() }()
 
