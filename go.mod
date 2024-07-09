@@ -7,7 +7,7 @@ require (
 	github.com/goccy/go-yaml v1.11.3
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
-	github.com/icinga/icinga-go-library v0.2.0
+	github.com/icinga/icinga-go-library v0.0.0-20240524085819-c4471687b760
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.22
@@ -21,6 +21,7 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/Icinga/go-libs v0.0.0-20220420130327-ef58ad52edd8 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
