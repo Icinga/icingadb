@@ -19,6 +19,7 @@ jobs:
           - {type: MYSQL, name: MySQL 5.5,         image: "icinga/icingadb-mysql:5.5"}
           - {type: MYSQL, name: MySQL 5.6,         image: "icinga/icingadb-mysql:5.6"}
           - {type: MYSQL, name: MySQL 5.7,         image: "mysql:5.7"}
+          - {type: MYSQL, name: MySQL 8,           image: "mysql:8"}
           - {type: MYSQL, name: MySQL latest,      image: "mysql:latest"}
           - {type: MYSQL, name: MariaDB 10.1,      image: "mariadb:10.1"}
           - {type: MYSQL, name: MariaDB 10.2,      image: "mariadb:10.2"}
