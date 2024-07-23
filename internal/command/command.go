@@ -33,7 +33,7 @@ func New() *Command {
 	}
 
 	if flags.Version {
-		internal.Version.Print()
+		internal.Version.Print("Icinga DB")
 		os.Exit(0)
 	}
 
