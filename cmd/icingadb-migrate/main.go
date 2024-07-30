@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
 	"database/sql"
 	_ "embed"
 	"encoding/hex"
@@ -69,6 +70,10 @@ func main() {
 	envId, err := hex.DecodeString(c.Icinga2.Env)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "bad env ID: %s\n", err.Error())
+		os.Exit(2)
+	}
+	if len(envId) != sha1.Size {
+		_, _ = fmt.Fprintf(os.Stderr, "bad env ID: must be %d bytes long, has %d bytes\n", sha1.Size, len(envId))
 		os.Exit(2)
 	}
 
