@@ -34,6 +34,7 @@ func NewScopedEntity(entity database.Entity, scope interface{}) *ScopedEntity {
 // OnSuccessApplyAndSendTo applies the provided callback to all the rows of type "T" and streams them to the
 // passed channel of type "U". The resulting closure is called with a context and stops as soon as this context
 // is canceled or when there are no more records to stream.
+// TODO(yh): Move this to our Icinga GO Library!
 func OnSuccessApplyAndSendTo[T any, U any](ch chan<- U, f func(T) U) database.OnSuccess[T] {
 	return func(ctx context.Context, rows []T) error {
 		for _, row := range rows {
