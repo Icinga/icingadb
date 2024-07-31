@@ -235,7 +235,7 @@ CREATE TABLE host (
   notes_url_id bytea20 DEFAULT NULL,
   notes text NOT NULL,
   icon_image_id bytea20 DEFAULT NULL,
-  icon_image_alt varchar(32) NOT NULL,
+  icon_image_alt text NOT NULL,
 
   zone_name citext NOT NULL,
   zone_id bytea20 DEFAULT NULL,
@@ -509,7 +509,7 @@ CREATE TABLE service (
   notes_url_id bytea20 DEFAULT NULL,
   notes text NOT NULL,
   icon_image_id bytea20 DEFAULT NULL,
-  icon_image_alt varchar(32) NOT NULL,
+  icon_image_alt text NOT NULL,
 
   zone_name citext NOT NULL,
   zone_id bytea20 DEFAULT NULL,
@@ -761,6 +761,7 @@ ALTER TABLE endpoint ALTER COLUMN zone_id SET STORAGE PLAIN;
 COMMENT ON COLUMN endpoint.id IS 'sha1(environment.id + name)';
 COMMENT ON COLUMN endpoint.environment_id IS 'environment.id';
 COMMENT ON COLUMN endpoint.name_checksum IS 'sha1(name)';
+COMMENT ON COLUMN endpoint.properties_checksum IS 'sha1(all properties)';
 COMMENT ON COLUMN endpoint.zone_id IS 'zone.id';
 
 CREATE TABLE environment (
@@ -1159,6 +1160,7 @@ COMMENT ON COLUMN comment.environment_id IS 'environment.id';
 COMMENT ON COLUMN comment.host_id IS 'host.id';
 COMMENT ON COLUMN comment.service_id IS 'service.id';
 COMMENT ON COLUMN comment.name_checksum IS 'sha1(name)';
+COMMENT ON COLUMN comment.properties_checksum IS 'sha1(all properties)';
 COMMENT ON COLUMN comment.name IS '255+1+255+1+36, i.e. "host.name!service.name!UUID"';
 COMMENT ON COLUMN comment.zone_id IS 'zone.id';
 
@@ -1288,6 +1290,7 @@ CREATE INDEX idx_notification_service_id ON notification(service_id);
 COMMENT ON COLUMN notification.id IS 'sha1(environment.id + name)';
 COMMENT ON COLUMN notification.environment_id IS 'environment.id';
 COMMENT ON COLUMN notification.name_checksum IS 'sha1(name)';
+COMMENT ON COLUMN notification.properties_checksum IS 'sha1(all properties)';
 COMMENT ON COLUMN notification.name IS '255+1+255+1+255, i.e. "host.name!service.name!notification.name"';
 COMMENT ON COLUMN notification.host_id IS 'host.id';
 COMMENT ON COLUMN notification.service_id IS 'service.id';
@@ -1471,7 +1474,7 @@ CREATE TABLE timeperiod_range (
   timeperiod_id bytea20 NOT NULL,
   range_key citext NOT NULL,
 
-  range_value varchar(255) NOT NULL,
+  range_value text NOT NULL,
 
   CONSTRAINT pk_timeperiod_range PRIMARY KEY (id)
 );
@@ -2181,4 +2184,4 @@ CREATE TABLE icingadb_schema (
 ALTER SEQUENCE icingadb_schema_id_seq OWNED BY icingadb_schema.id;
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (3, extract(epoch from now()) * 1000);
+  VALUES (4, extract(epoch from now()) * 1000);

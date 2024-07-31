@@ -208,7 +208,7 @@ CREATE TABLE host (
   notes_url_id binary(20) DEFAULT NULL COMMENT 'notes_url.id',
   notes text NOT NULL,
   icon_image_id binary(20) DEFAULT NULL COMMENT 'icon_image.id',
-  icon_image_alt varchar(32) NOT NULL,
+  icon_image_alt text NOT NULL,
 
   zone_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'zone.name',
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
@@ -376,7 +376,7 @@ CREATE TABLE service (
   notes_url_id binary(20) DEFAULT NULL COMMENT 'notes_url.id',
   notes text NOT NULL,
   icon_image_id binary(20) DEFAULT NULL COMMENT 'icon_image.id',
-  icon_image_alt varchar(32) NOT NULL,
+  icon_image_alt text NOT NULL,
 
   zone_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'zone.name',
   zone_id binary(20) DEFAULT NULL COMMENT 'zone.id',
@@ -506,7 +506,7 @@ CREATE TABLE endpoint (
   id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
-  properties_checksum binary(20) NOT NULL,
+  properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   name varchar(255) NOT NULL,
   name_ci varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -739,7 +739,7 @@ CREATE TABLE comment (
   service_id binary(20) DEFAULT NULL COMMENT 'service.id',
 
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
-  properties_checksum binary(20) NOT NULL,
+  properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
   name varchar(548) NOT NULL COMMENT '255+1+255+1+36, i.e. "host.name!service.name!UUID"',
 
   author varchar(255) NOT NULL COLLATE utf8mb4_unicode_ci,
@@ -808,7 +808,7 @@ CREATE TABLE notification (
   id binary(20) NOT NULL COMMENT 'sha1(environment.id + name)',
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
   name_checksum binary(20) NOT NULL COMMENT 'sha1(name)',
-  properties_checksum binary(20) NOT NULL,
+  properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   name varchar(767) NOT NULL COMMENT '255+1+255+1+255, i.e. "host.name!service.name!notification.name"',
   name_ci varchar(767) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -934,7 +934,7 @@ CREATE TABLE timeperiod_range (
   timeperiod_id binary(20) NOT NULL COMMENT 'timeperiod.id',
   range_key varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
 
-  range_value varchar(255) NOT NULL,
+  range_value text NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -1343,4 +1343,4 @@ CREATE TABLE icingadb_schema (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 INSERT INTO icingadb_schema (version, timestamp)
-  VALUES (5, UNIX_TIMESTAMP() * 1000);
+  VALUES (6, UNIX_TIMESTAMP() * 1000);
