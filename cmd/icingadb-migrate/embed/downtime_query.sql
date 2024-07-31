@@ -3,8 +3,9 @@ SELECT dh.downtimehistory_id, UNIX_TIMESTAMP(dh.entry_time) entry_time, dh.autho
   COALESCE(UNIX_TIMESTAMP(dh.scheduled_end_time), 0) scheduled_end_time, dh.was_started,
   COALESCE(UNIX_TIMESTAMP(dh.actual_start_time), 0) actual_start_time, dh.actual_start_time_usec,
   COALESCE(UNIX_TIMESTAMP(dh.actual_end_time), 0) actual_end_time, dh.actual_end_time_usec, dh.was_cancelled,
-  COALESCE(UNIX_TIMESTAMP(dh.trigger_time), 0) trigger_time, dh.name, o.objecttype_id,
-  o.name1, COALESCE(o.name2, '') name2, COALESCE(sd.name, '') triggered_by
+  COALESCE(UNIX_TIMESTAMP(dh.trigger_time), 0) trigger_time,
+  COALESCE(dh.name, CONCAT(o.name1, '!', COALESCE(o.name2, ''), '!', dh.downtimehistory_id, '-', dh.object_id)) name,
+  o.objecttype_id, o.name1, COALESCE(o.name2, '') name2, COALESCE(sd.name, '') triggered_by
 FROM icinga_downtimehistory dh USE INDEX (PRIMARY)
 INNER JOIN icinga_objects o ON o.object_id=dh.object_id
 LEFT JOIN icinga_scheduleddowntime sd ON sd.scheduleddowntime_id=dh.triggered_by_id
