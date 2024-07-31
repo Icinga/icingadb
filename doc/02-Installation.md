@@ -1,4 +1,5 @@
 <!-- {% if index %} -->
+
 # Installing Icinga DB
 
 The recommended way to install Icinga DB is to use prebuilt packages for
@@ -24,6 +25,7 @@ which ships an up-to-date Redis® open source server version and is pre-configur
     keep latency between the components low.
 
 <!-- {% else %} -->
+
 ## Adding Icinga Package Repository
 
 The recommended way to install Icinga DB is to use prebuilt packages from our official release repository.
@@ -38,7 +40,9 @@ Here's how to add the official release repository:
 
 <!-- {% if amazon_linux %} -->
 <!-- {% if not icingaDocs %} -->
+
 ### Amazon Linux 2 Repository
+
 <!-- {% endif %} -->
 !!! info
 
@@ -51,21 +55,28 @@ Here's how to add the official release repository:
 rpm --import https://packages.icinga.com/icinga.key
 wget https://packages.icinga.com/subscription/amazon/ICINGA-release.repo -O /etc/yum.repos.d/ICINGA-release.repo
 ```
+
 <!-- {% endif %} -->
 
 <!-- {% if centos %} -->
 <!-- {% if not icingaDocs %} -->
+
 ### CentOS Repository
+
 <!-- {% endif %} -->
+
 ```bash
 rpm --import https://packages.icinga.com/icinga.key
 wget https://packages.icinga.com/centos/ICINGA-release.repo -O /etc/yum.repos.d/ICINGA-release.repo
 ```
+
 <!-- {% endif %} -->
 
 <!-- {% if debian %} -->
 <!-- {% if not icingaDocs %} -->
+
 ### Debian Repository
+
 <!-- {% endif %} -->
 
 ```bash
@@ -82,11 +93,14 @@ DIST=$(awk -F"[)(]+" '/VERSION=/ {print $2}' /etc/os-release); \
 
 apt update
 ```
+
 <!-- {% endif %} -->
 
 <!-- {% if rhel %} -->
 <!-- {% if not icingaDocs %} -->
+
 ### RHEL Repository
+
 <!-- {% endif %} -->
 !!! info
 
@@ -99,11 +113,14 @@ apt update
 rpm --import https://packages.icinga.com/icinga.key
 wget https://packages.icinga.com/subscription/rhel/ICINGA-release.repo -O /etc/yum.repos.d/ICINGA-release.repo
 ```
+
 <!-- {% endif %} -->
 
 <!-- {% if sles %} -->
 <!-- {% if not icingaDocs %} -->
+
 ### SLES Repository
+
 <!-- {% endif %} -->
 !!! info
 
@@ -118,11 +135,14 @@ rpm --import https://packages.icinga.com/icinga.key
 zypper ar https://packages.icinga.com/subscription/sles/ICINGA-release.repo
 zypper ref
 ```
+
 <!-- {% endif %} -->
 
 <!-- {% if ubuntu %} -->
 <!-- {% if not icingaDocs %} -->
+
 ### Ubuntu Repository
+
 <!-- {% endif %} -->
 
 ```bash
@@ -139,6 +159,7 @@ wget -O - https://packages.icinga.com/icinga.key | apt-key add -
 
 apt update
 ```
+
 <!-- {% endif %} -->
 
 ## Installing Icinga DB Package
@@ -147,16 +168,22 @@ Use your distribution's package manager to install the `icingadb` package as fol
 
 <!-- {% if amazon_linux %} -->
 <!-- {% if not icingaDocs %} -->
+
 #### Amazon Linux 2
+
 <!-- {% endif %} -->
+
 ```bash
 yum install icingadb
 ```
+
 <!-- {% endif %} -->
 
 <!-- {% if centos %} -->
 <!-- {% if not icingaDocs %} -->
+
 #### CentOS
+
 <!-- {% endif %} -->
 !!! info
 
@@ -165,18 +192,24 @@ yum install icingadb
 ```bash
 yum install icingadb
 ```
+
 <!-- {% endif %} -->
 
 <!-- {% if debian or ubuntu %} -->
 <!-- {% if not icingaDocs %} -->
+
 #### Debian / Ubuntu
+
 <!-- {% endif %} -->
+
 ```bash
 apt install icingadb
 ```
+
 <!-- {% endif %} -->
 
 <!-- {% if rhel %} -->
+
 #### RHEL 8 or Later
 
 ```bash
@@ -188,15 +221,20 @@ dnf install icingadb
 ```bash
 yum install icingadb
 ```
+
 <!-- {% endif %} -->
 
 <!-- {% if sles %} -->
 <!-- {% if not icingaDocs %} -->
+
 #### SLES
+
 <!-- {% endif %} -->
+
 ```bash
 zypper install icingadb
 ```
+
 <!-- {% endif %} -->
 
 ## Setting up the Database

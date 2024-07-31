@@ -20,7 +20,7 @@ packages, it is automatically installed as well.
 ### Preparing the Configuration
 
 Please take the [example configuration] as a starting point and copy it to the
-host you will perform the migration on.  The following sections will guide you
+host you will perform the migration on. The following sections will guide you
 through how to adjust it for your needs.
 
 #### Environment ID
@@ -98,5 +98,7 @@ where it left off and reuse the cache if it is still present.
     protect yourself against SSH connection losses.
 
 [installation instructions]: 02-Installation.md
+
 [IDO]: https://icinga.com/docs/icinga-2/latest/doc/14-features/#ido-database-db-ido
+
 [example configuration]: icingadb-migration.example.yml
