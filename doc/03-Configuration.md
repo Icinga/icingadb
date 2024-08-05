@@ -68,11 +68,11 @@ manual adjustments.
 Configuration of the logging component used by Icinga DB.
 
 | Option   | Description                                                                                                                                                                                              |
-|----------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| level    | **Optional.** Specifies the default logging level. Can be set to `fatal`, `error`, `warn`, `info` or `debug`. Defaults to `info`.                                                                        |
-| output   | **Optional.** Configures the logging output. Can be set to `console` (stderr) or `systemd-journald`. If not set, logs to systemd-journald when running under systemd, otherwise stderr.                  |
-| interval | **Optional.** Interval for periodic logging defined as [duration string](#duration-string). Defaults to `"20s"`.                                                                                         |
-| options  | **Optional.** Map of component name to logging level in order to set a different logging level for each component instead of the default one. See [logging components](#logging-components) for details. |
+|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| level    | **Optional.** Specifies the default logging level. Can be set to `fatal`, `error`, `warn`, `info` or `debug`. Defaults to `info`.                                                                                                                     |
+| output   | **Optional.** Configures the logging output. Can be set to `console` (stderr) or `systemd-journald`. Defaults to systemd-journald when running under systemd, otherwise to console. See notes below for [systemd-journald](#systemd-journald-fields). |
+| interval | **Optional.** Interval for periodic logging defined as [duration string](#duration-string). Defaults to `"20s"`.                                                                                                                                      |
+| options  | **Optional.** Map of component name to logging level in order to set a different logging level for each component instead of the default one. See [logging components](#logging-components) for details.                                              |
 
 ### Logging Components
 
@@ -128,6 +128,20 @@ the cluster nodes resynchronise their states after each executed query, and may 
 However, this does not necessarily have to be the case if, for instance, Icinga DB is only allowed to connect to a
 single cluster node at a time. This is the case when a load balancer does not randomly route connections to all the
 nodes evenly, but always to the same node until it fails, or if your database cluster nodes have a virtual IP address
-fail over assigned. In such situations, you can set the `wsrep_sync_wait` system variable to `0` in the 
+fail over assigned. In such situations, you can set the `wsrep_sync_wait` system variable to `0` in the
 `/etc/icingadb/config.yml` file to disable it entirely, as Icinga DB doesn't have to wait for cluster
 synchronisation then.
+
+### Systemd Journald Fields
+
+When examining the journal with `journalctl`, fields containing additional information are hidden by default.
+Setting an appropriate
+[`--output` option](https://www.freedesktop.org/software/systemd/man/latest/journalctl.html#Output%20Options)
+will include them, such as: `--output verbose` or `--output json`.
+For example:
+
+```
+journalctl --unit icingadb.service --output verbose
+```
+
+All Icinga DB fields are prefixed with `ICINGADB_`, e.g., `ICINGADB_ERROR` for error messages.
