@@ -294,9 +294,15 @@ func (h *HA) realize(
 
 			if h.db.DriverName() == database.MySQL {
 				// The RDBMS may actually be a Percona XtraDB Cluster which doesn't
-				// support serializable transactions, but only their following equivalent:
+				// support serializable transactions, but only their equivalent SELECT ... LOCK IN SHARE MODE.
+				// However, in order to reduce the deadlocks on both sides, it is necessary to obtain an exclusive lock
+				// on the selected rows. This can be achieved by utilising the SELECT ... FOR UPDATE command.
+				// Nevertheless, deadlocks may still occur, when the "icingadb_instance" table is empty, i.e. when
+				// there's no available row to be locked exclusively.
+				//
+				// See also: https://dev.mysql.com/doc/refman/5.7/en/innodb-locking-reads.html
 				isoLvl = sql.LevelRepeatableRead
-				selectLock = " LOCK IN SHARE MODE"
+				selectLock = " FOR UPDATE"
 			}
 
 			tx, errBegin := h.db.BeginTxx(ctx, &sql.TxOptions{Isolation: isoLvl})
