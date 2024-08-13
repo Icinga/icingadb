@@ -3,7 +3,7 @@ module github.com/icinga/icingadb
 go 1.22
 
 require (
-	github.com/creasty/defaults v1.7.0
+	github.com/creasty/defaults v1.8.0
 	github.com/goccy/go-yaml v1.12.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
