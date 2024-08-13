@@ -3,10 +3,9 @@ package icingadb
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icinga-go-library/com"
+	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/database"
-	"github.com/icinga/icinga-go-library/logging"
-	"github.com/icinga/icinga-go-library/periodic"
+	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icinga-go-library/types"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/pkg/errors"
@@ -14,19 +13,8 @@ import (
 	"time"
 )
 
-// tableName defines the table name of v1.SlaLifecycle type.
-var tableName = database.TableName(v1.NewSlaLifecycle())
-
-// GetCheckableFromSlaLifecycle returns the original checkable from which the specified sla lifecycle were transformed.
-// When the passed entity is not of type *SlaLifecycle, it is returned as is.
-func GetCheckableFromSlaLifecycle(e database.Entity) database.Entity {
-	s, ok := e.(*v1.SlaLifecycle)
-	if !ok {
-		return e
-	}
-
-	return s.SourceEntity
-}
+// slaLifecycleTable defines the table name of v1.SlaLifecycle type.
+var slaLifecycleTable = database.TableName(v1.NewSlaLifecycle())
 
 // CreateSlaLifecyclesFromCheckables transforms the given checkables to sla lifecycle struct
 // and streams them into a returned channel.
@@ -52,13 +40,15 @@ func CreateSlaLifecyclesFromCheckables(
 					return nil
 				}
 
-				now := time.Now()
-
 				sl := &v1.SlaLifecycle{
 					EnvironmentMeta: v1.EnvironmentMeta{EnvironmentId: env.Id},
-					CreateTime:      types.UnixMilli(now),
+					CreateTime:      types.UnixMilli(time.Now()),
 					DeleteTime:      types.UnixMilli(time.Unix(0, 0)),
-					SourceEntity:    checkable,
+				}
+
+				if isDeleteEvent {
+					sl.DeleteTime = types.UnixMilli(time.Now())
+					sl.CreateTime = types.UnixMilli(time.Unix(0, 0))
 				}
 
 				switch subject.(type) {
@@ -68,18 +58,9 @@ func CreateSlaLifecyclesFromCheckables(
 				case *v1.Service:
 					sl.Id = checkable.ID().(types.Binary)
 					sl.ServiceId = sl.Id
-					if service, ok := checkable.(*v1.Service); ok {
-						// checkable may be of type v1.EntityWithChecksum if this is a deletion event triggered
-						// by the initial config sync as determined by the config delta calculation.
-						sl.HostId = service.HostId
-					}
+					sl.HostId = checkable.(*v1.Service).HostId
 				default:
 					return errors.Errorf("sla lifecycle for type %T is not supported", checkable)
-				}
-
-				if isDeleteEvent {
-					sl.DeleteTime = types.UnixMilli(now)
-					sl.CreateTime = types.UnixMilli(time.Unix(0, 0))
 				}
 
 				select {
@@ -94,37 +75,49 @@ func CreateSlaLifecyclesFromCheckables(
 	return slaLifecycles
 }
 
-// StreamIDsFromUpdatedSlaLifecycles updates the `delete_time` of the sla lifecycle table for each of the Checkables
-// consumed from the provided "entities" chan and upon successful execution of the query streams the original IDs
-// of the entities into the returned channel.
+// SyncCheckablesSlaLifecycle inserts one `create_time` sla lifecycle entry for each of the checkables from
+// the `host` and `service` tables and updates the `delete_time` of each of the sla lifecycle entries whose
+// host/service IDs cannot be found in the `host/service` tables.
 //
 // It's unlikely, but when a given Checkable doesn't already have a `create_time` entry in the database, the update
-// query won't update anything. Either way the entities IDs are streamed into the returned chan.
-func StreamIDsFromUpdatedSlaLifecycles(
-	ctx context.Context, db *database.DB, subject database.Entity, g *errgroup.Group, logger *logging.Logger, entities <-chan database.Entity,
-) <-chan any {
-	deleteEntityIDs := make(chan any, 1)
+// query won't update anything. Likewise, the insert statements may also become a no-op if the Checkables already
+// have a `create_time` entry with ´delete_time = 0`.
+//
+// This function retries any database errors for at least `5m` before giving up and failing with an error.
+func SyncCheckablesSlaLifecycle(ctx context.Context, db *database.DB) error {
+	hostInsertStmtFmt := `
+INSERT INTO %[1]s (id, environment_id, host_id, create_time)
+  SELECT id, environment_id, id, %[2]d AS create_time
+  FROM host WHERE NOT EXISTS(SELECT 1 FROM %[1]s WHERE service_id IS NULL AND delete_time = 0 AND host_id = host.id)`
 
-	g.Go(func() error {
-		defer close(deleteEntityIDs)
+	hostUpdateStmtFmt := `
+UPDATE %[1]s SET delete_time = %[2]d
+  WHERE service_id IS NULL AND delete_time = 0 AND NOT EXISTS(SELECT 1 FROM host WHERE host.id = %[1]s.id)`
 
-		var counter com.Counter
-		defer periodic.Start(ctx, logger.Interval(), func(_ periodic.Tick) {
-			if count := counter.Reset(); count > 0 {
-				logger.Infof("Updated %d %s sla lifecycles", count, types.Name(subject))
+	serviceInsertStmtFmt := `
+INSERT INTO %[1]s (id, environment_id, host_id, service_id, create_time)
+  SELECT id, environment_id, host_id, id, %[2]d AS create_time
+  FROM service WHERE NOT EXISTS(SELECT 1 FROM %[1]s WHERE delete_time = 0 AND service_id = service.id)`
+
+	serviceUpdateStmtFmt := `
+UPDATE %[1]s SET delete_time = %[2]d
+  WHERE delete_time = 0 AND service_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM service WHERE service.id = %[1]s.id)`
+
+	return retry.WithBackoff(
+		ctx,
+		func(context.Context) error {
+			eventTime := time.Now().UnixMilli()
+			for _, queryFmt := range []string{hostInsertStmtFmt, hostUpdateStmtFmt, serviceInsertStmtFmt, serviceUpdateStmtFmt} {
+				query := fmt.Sprintf(queryFmt, slaLifecycleTable, eventTime)
+				if _, err := db.ExecContext(ctx, query); err != nil {
+					return database.CantPerformQuery(err, query)
+				}
 			}
-		}).Stop()
 
-		sem := db.GetSemaphoreForTable(tableName)
-		stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, tableName)
-
-		// extractEntityId is used as a callback for the on success mechanism to extract the checkables id.
-		extractEntityId := func(e database.Entity) any { return e.(*v1.SlaLifecycle).SourceEntity.ID() }
-
-		return db.NamedBulkExec(
-			ctx, stmt, 1, sem, CreateSlaLifecyclesFromCheckables(ctx, subject, g, entities, true),
-			com.NeverSplit[database.Entity], OnSuccessApplyAndSendTo[database.Entity, any](deleteEntityIDs, extractEntityId))
-	})
-
-	return deleteEntityIDs
+			return nil
+		},
+		retry.Retryable,
+		backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+		db.GetDefaultRetrySettings(),
+	)
 }
