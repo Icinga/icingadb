@@ -12,9 +12,6 @@ type SlaLifecycle struct {
 	ServiceId             types.Binary    `json:"service_id"`
 	CreateTime            types.UnixMilli `json:"create_time"`
 	DeleteTime            types.UnixMilli `json:"delete_time"`
-
-	// The original checkable entity from which this sla lifecycle were transformed
-	SourceEntity database.Entity `json:"-" db:"-"`
 }
 
 func NewSlaLifecycle() database.Entity {
