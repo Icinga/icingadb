@@ -562,14 +562,14 @@ CREATE TABLE checkcommand_argument (
   id binary(20) NOT NULL COMMENT 'sha1(environment.id + checkcommand_id + argument_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
   checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
-  argument_key varchar(64) NOT NULL,
+  argument_key varchar(255) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   argument_value text DEFAULT NULL,
   argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
-  argument_key_override varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  argument_key_override varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   repeat_key enum('n', 'y') NOT NULL,
   required enum('n', 'y') NOT NULL,
   set_if varchar(255) DEFAULT NULL,
@@ -583,7 +583,7 @@ CREATE TABLE checkcommand_envvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.id + checkcommand_id + envvar_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
   checkcommand_id binary(20) NOT NULL COMMENT 'checkcommand.id',
-  envvar_key varchar(64) NOT NULL,
+  envvar_key varchar(255) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
@@ -626,14 +626,14 @@ CREATE TABLE eventcommand_argument (
   id binary(20) NOT NULL COMMENT 'sha1(environment.id + eventcommand_id + argument_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
   eventcommand_id binary(20) NOT NULL COMMENT 'eventcommand.id',
-  argument_key varchar(64) NOT NULL,
+  argument_key varchar(255) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   argument_value text DEFAULT NULL,
   argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
-  argument_key_override varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  argument_key_override varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   repeat_key enum('n', 'y') NOT NULL,
   required enum('n', 'y') NOT NULL,
   set_if varchar(255) DEFAULT NULL,
@@ -647,7 +647,7 @@ CREATE TABLE eventcommand_envvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.id + eventcommand_id + envvar_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
   eventcommand_id binary(20) NOT NULL COMMENT 'eventcommand.id',
-  envvar_key varchar(64) NOT NULL,
+  envvar_key varchar(255) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
@@ -688,14 +688,14 @@ CREATE TABLE notificationcommand_argument (
   id binary(20) NOT NULL COMMENT 'sha1(environment.id + notificationcommand_id + argument_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
   notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id',
-  argument_key varchar(64) NOT NULL,
+  argument_key varchar(255) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
   argument_value text DEFAULT NULL,
   argument_order smallint DEFAULT NULL,
   description text DEFAULT NULL,
-  argument_key_override varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  argument_key_override varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   repeat_key enum('n', 'y') NOT NULL,
   required enum('n', 'y') NOT NULL,
   set_if varchar(255) DEFAULT NULL,
@@ -709,7 +709,7 @@ CREATE TABLE notificationcommand_envvar (
   id binary(20) NOT NULL COMMENT 'sha1(environment.id + notificationcommand_id + envvar_key)',
   environment_id binary(20) NOT NULL COMMENT 'env.id',
   notificationcommand_id binary(20) NOT NULL COMMENT 'notificationcommand.id',
-  envvar_key varchar(64) NOT NULL,
+  envvar_key varchar(255) NOT NULL,
 
   properties_checksum binary(20) NOT NULL COMMENT 'sha1(all properties)',
 
