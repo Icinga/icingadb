@@ -4,7 +4,8 @@ Some Icinga DB upgrades require manual intervention, others do not. If you need 
 point you to the specific upgrade section on this page.
 
 Please note that version upgrades are incremental. If you are upgrading across multiple versions, make sure to follow
-the steps for each of them.
+the steps for each of them. For example, when upgrading from version 1.1.0 to 1.2.0, follow all instructions for
+upgrading to 1.1.1, then all for 1.2.0, including schema upgrades.
 
 ## Database Schema Upgrades
 
