@@ -9,6 +9,7 @@ CREATE TABLE `dependency_state` (
   `id` binary(20) NOT NULL,
   `dependency_id` binary(20) NOT NULL,
   `failed` enum('n', 'y') NOT NULL,
+  UNIQUE INDEX `dependency_state_dependency_id_uindex` (dependency_id),
   KEY `dependency_state_dependency_id_fk` (`dependency_id`),
   CONSTRAINT `dependency_state_dependency_id_fk` FOREIGN KEY (`dependency_id`) REFERENCES `dependency` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -23,7 +24,10 @@ CREATE TABLE `redundancy_group` (
 CREATE TABLE `redundancy_group_state` (
   `id` binary(20) NOT NULL,
   `redundancy_group_id` binary(20) NOT NULL,
-  `failed` enum('n', 'y') NOT NULL
+  `failed` enum('n', 'y') NOT NULL,
+  UNIQUE INDEX `redundancy_group_state_redundancy_group_id_uindex` (redundancy_group_id),
+  KEY `redundancy_group_state_redundancy_group_id_fk` (`redundancy_group_id`),
+  CONSTRAINT `redundancy_group_state_redundancy_group_id_fk` FOREIGN KEY (`redundancy_group_id`) REFERENCES `redundancy_group` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE `dependency_node` (
