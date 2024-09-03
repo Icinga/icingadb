@@ -47,9 +47,9 @@ In high availability setups, all Icinga DB instances must write to the same data
 ### Database Options
 
 Each of these configuration options are highly technical with thoroughly considered and tested default values that you
-should only change when you exactly know what you are doing. You can use these options to influence the Icinga DB default
-behaviour, how it interacts with databases, thus the defaults are usually sufficient for most users and do not need any
-manual adjustments.
+should only change when you exactly know what you are doing. You can use these options to influence the Icinga DB
+default behaviour, how it interacts with databases, thus the defaults are usually sufficient for most users and
+do not need any manual adjustments.
 
 !!! important
 
@@ -93,7 +93,7 @@ Configuration of the logging component used by Icinga DB.
 ## Retention
 
 By default, no historical data is deleted, which means that the longer the data is retained,
-the more disk space is required to store it.  History retention is an optional feature that allows to
+the more disk space is required to store it. History retention is an optional feature that allows to
 limit the number of days that historical data is available for each history category.
 There are separate options for the full history tables used to display history information in the web interface and
 SLA tables which store the minimal information required for SLA reporting,
