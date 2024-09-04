@@ -301,17 +301,24 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 // those messages into Icinga DB entities (contracts.Entity) using the provided structifier.
 // Converted entities are inserted into the upsertEntities or deleteIds channel depending on the "runtime_type" message field.
 func structifyStream(
-	ctx context.Context, updateMessages <-chan redis.XMessage, upsertEntities, upserted chan database.Entity,
-	deleteIds, deleted chan interface{}, structifier structify.MapStructifier,
+	ctx context.Context,
+	updateMessages <-chan redis.XMessage,
+	upsertEntities chan<- database.Entity,
+	upserted <-chan database.Entity,
+	deleteIds chan<- any,
+	deleted <-chan any,
+	structifier structify.MapStructifier,
 ) func() error {
 	if upserted == nil {
-		upserted = make(chan database.Entity)
-		close(upserted)
+		ch := make(chan database.Entity)
+		close(ch)
+		upserted = ch
 	}
 
 	if deleted == nil {
-		deleted = make(chan interface{})
-		close(deleted)
+		ch := make(chan any)
+		close(ch)
+		deleted = ch
 	}
 
 	return func() error {
