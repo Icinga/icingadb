@@ -1,6 +1,7 @@
 package types
 
 import (
+	"database/sql/driver"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -31,6 +32,31 @@ func TestAcknowledgementState_UnmarshalJSON(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, st.output, a)
+			}
+		})
+	}
+}
+
+func TestAcknowledgementState_Value(t *testing.T) {
+	subtests := []struct {
+		name   string
+		input  AcknowledgementState
+		output driver.Value
+		error  bool
+	}{
+		{name: "invalid", input: 3, error: true},
+		{name: "n", input: 0, output: "n"},
+		{name: "y", input: 1, output: "y"},
+		{name: "sticky", input: 2, output: "sticky"},
+	}
+
+	for _, st := range subtests {
+		t.Run(st.name, func(t *testing.T) {
+			if v, err := st.input.Value(); st.error {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, st.output, v)
 			}
 		})
 	}
