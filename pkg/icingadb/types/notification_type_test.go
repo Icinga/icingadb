@@ -33,3 +33,27 @@ func TestNotificationType_UnmarshalText(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationType_Value(t *testing.T) {
+	subtests := []struct {
+		name   string
+		input  NotificationType
+		output string
+		error  bool
+	}{
+		{name: "zero", input: 0, error: true},
+		{name: "bad", input: 3, error: true},
+		{name: "good", input: 32, output: "problem"},
+	}
+
+	for _, st := range subtests {
+		t.Run(st.name, func(t *testing.T) {
+			if v, err := st.input.Value(); st.error {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, st.output, v)
+			}
+		})
+	}
+}
