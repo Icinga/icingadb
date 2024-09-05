@@ -32,3 +32,27 @@ func TestNotificationStates_UnmarshalJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestNotificationStates_Value(t *testing.T) {
+	subtests := []struct {
+		name  string
+		input NotificationStates
+		error bool
+	}{
+		{name: "out-of-range", input: ^NotificationStates(0), error: true},
+		{name: "empty", input: 0},
+		{name: "single", input: 4},
+		{name: "multiple", input: 7},
+	}
+
+	for _, st := range subtests {
+		t.Run(st.name, func(t *testing.T) {
+			if v, err := st.input.Value(); st.error {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, int64(st.input), v)
+			}
+		})
+	}
+}
