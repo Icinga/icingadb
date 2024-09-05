@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"bytes"
 	"database/sql/driver"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
@@ -28,23 +27,16 @@ type AddressBin struct {
 	Host *Host `db:"-"`
 }
 
-var v4InV6Prefix = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff}
-
 // Value implements the driver.Valuer interface.
 func (ab AddressBin) Value() (driver.Value, error) {
 	if ab.Host == nil {
 		return nil, nil
 	}
 
-	ip := net.ParseIP(ab.Host.Address)
-	if ip == nil {
+	if ip := net.ParseIP(ab.Host.Address).To4(); ip == nil {
 		return nil, nil
-	}
-
-	if ip = bytes.TrimPrefix(ip, v4InV6Prefix); len(ip) == 4 {
-		return []byte(ip), nil
 	} else {
-		return nil, nil
+		return []byte(ip), nil
 	}
 }
 
