@@ -65,3 +65,39 @@ func TestDowntimeEventTime_Value(t *testing.T) {
 		})
 	}
 }
+
+func TestSlaDowntimeEndTime_Value(t *testing.T) {
+	cancel := types.UnixMilli(time.Unix(42, 240000000))
+	end := types.UnixMilli(time.Unix(1337, 733100000))
+
+	f := types.Bool{Bool: false, Valid: true}
+	T := types.Bool{Bool: true, Valid: true}
+
+	subtests := []struct {
+		name       string
+		cancelled  types.Bool
+		cancelTime types.UnixMilli
+		endTime    types.UnixMilli
+		output     driver.Value
+	}{
+		{name: "nil", cancelTime: cancel, endTime: end, output: int64(1337733)},
+		{name: "invalid", cancelled: types.Bool{Bool: true}, cancelTime: cancel, endTime: end, output: int64(1337733)},
+		{name: "false", cancelled: f, cancelTime: cancel, endTime: end, output: int64(1337733)},
+		{name: "true", cancelled: T, cancelTime: cancel, endTime: end, output: int64(42240)},
+		{name: "false-nil", cancelled: f, cancelTime: cancel},
+		{name: "true-nil", cancelled: T, endTime: end},
+	}
+
+	for _, st := range subtests {
+		t.Run(st.name, func(t *testing.T) {
+			v, err := (SlaDowntimeEndTime{History: &SlaHistoryDowntime{
+				HasBeenCancelled: st.cancelled,
+				CancelTime:       st.cancelTime,
+				EndTime:          st.endTime,
+			}}).Value()
+
+			require.NoError(t, err)
+			require.Equal(t, st.output, v)
+		})
+	}
+}
