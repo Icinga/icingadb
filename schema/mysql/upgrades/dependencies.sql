@@ -25,6 +25,7 @@ CREATE TABLE `redundancy_group_state` (
   `id` binary(20) NOT NULL,
   `redundancy_group_id` binary(20) NOT NULL,
   `failed` enum('n', 'y') NOT NULL,
+  `last_state_change` bigint unsigned NOT NULL,
   UNIQUE INDEX `redundancy_group_state_redundancy_group_id_uindex` (redundancy_group_id),
   KEY `redundancy_group_state_redundancy_group_id_fk` (`redundancy_group_id`),
   CONSTRAINT `redundancy_group_state_redundancy_group_id_fk` FOREIGN KEY (`redundancy_group_id`) REFERENCES `redundancy_group` (`id`)
