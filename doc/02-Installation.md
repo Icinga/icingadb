@@ -75,7 +75,7 @@ wget https://packages.icinga.com/centos/ICINGA-release.repo -O /etc/yum.repos.d/
 <!-- {% if debian %} -->
 <!-- {% if not icingaDocs %} -->
 
-### Debian Repository
+### Debian and Raspberry Pi OS Repository
 
 <!-- {% endif %} -->
 
@@ -198,7 +198,7 @@ yum install icingadb
 <!-- {% if debian or ubuntu %} -->
 <!-- {% if not icingaDocs %} -->
 
-#### Debian / Ubuntu
+#### Debian / Ubuntu / Raspberry Pi OS
 
 <!-- {% endif %} -->
 
@@ -338,7 +338,7 @@ you have completed the instructions here and can proceed to
 [installing Icinga DB Web on CentOS](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/02-CentOS/#installing-icinga-db-web-package),
 <!-- {% endif %} -->
 <!-- {% if debian %} -->
-[installing Icinga DB Web on Debian](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/03-Debian/#installing-icinga-db-web-package),
+[installing Icinga DB Web on Debian / Raspberry Pi OS](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/03-Debian/#installing-icinga-db-web-package),
 <!-- {% endif %} -->
 <!-- {% if rhel %} -->
 [installing Icinga DB Web on RHEL](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/04-RHEL/#installing-icinga-db-web-package),
