@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/strcase"
 	"github.com/icinga/icinga-go-library/structify"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
@@ -58,7 +59,7 @@ func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state redis.
 }
 
 // Sync synchronizes runtime update streams from s.redis to s.db and deletes the original data on success.
-// Note that Sync must be only be called configuration synchronization has been completed.
+// Note that Sync must only be called once configuration synchronization has been completed.
 // allowParallel allows synchronizing out of order (not FIFO).
 func (r *RuntimeUpdates) Sync(
 	ctx context.Context, factoryFuncs []database.EntityFactoryFunc, streams redis.Streams, allowParallel bool,
@@ -71,9 +72,21 @@ func (r *RuntimeUpdates) Sync(
 		s := common.NewSyncSubject(factoryFunc)
 		stat := getCounterForEntity(s.Entity())
 
+		// Multiplexer channels used to distribute the Redis entities to several consumers.
+		upsertEntitiesMultiplexer := make(chan database.Entity, 1)
+		deleteIdsMultiplexer := make(chan any, 1)
+
 		updateMessages := make(chan redis.XMessage, r.redis.Options.XReadCount)
 		upsertEntities := make(chan database.Entity, r.redis.Options.XReadCount)
 		deleteIds := make(chan interface{}, r.redis.Options.XReadCount)
+
+		var insertSlaEntities chan database.Entity
+		var updateSlaEntities chan database.Entity
+		switch s.Entity().(type) {
+		case *v1.Host, *v1.Service:
+			insertSlaEntities = make(chan database.Entity, r.redis.Options.XReadCount)
+			updateSlaEntities = make(chan database.Entity, r.redis.Options.XReadCount)
+		}
 
 		var upsertedFifo chan database.Entity
 		var deletedFifo chan interface{}
@@ -95,12 +108,46 @@ func (r *RuntimeUpdates) Sync(
 		r.logger.Debugf("Syncing runtime updates of %s", s.Name())
 
 		g.Go(structifyStream(
-			ctx, updateMessages, upsertEntities, upsertedFifo, deleteIds, deletedFifo,
+			ctx, updateMessages, upsertEntitiesMultiplexer, upsertedFifo, deleteIdsMultiplexer, deletedFifo,
 			structify.MakeMapStructifier(
 				reflect.TypeOf(s.Entity()).Elem(),
 				"json",
 				contracts.SafeInit),
 		))
+
+		// This worker consumes the "upsert" event from Redis and redistributes the entities to the "upsertEntities"
+		// channel and for Host/Service entities also to the "insertSlaEntities" channel.
+		g.Go(func() error {
+			defer close(upsertEntities)
+			if insertSlaEntities != nil {
+				defer close(insertSlaEntities)
+			}
+
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case entity, ok := <-upsertEntitiesMultiplexer:
+					if !ok {
+						return nil
+					}
+
+					select {
+					case upsertEntities <- entity:
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+
+					if insertSlaEntities != nil {
+						select {
+						case insertSlaEntities <- entity:
+						case <-ctx.Done():
+							return ctx.Err()
+						}
+					}
+				}
+			}
+		})
 
 		g.Go(func() error {
 			var counter com.Counter
@@ -125,6 +172,59 @@ func (r *RuntimeUpdates) Sync(
 			)
 		})
 
+		// Consumes from the "insertSlaEntities" channel and bulk inserts into the "sla_lifecycle" table.
+		g.Go(func() error {
+			var counter com.Counter
+			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
+				if count := counter.Reset(); count > 0 {
+					r.logger.Infof("Inserted %d %s sla lifecycles", count, s.Name())
+				}
+			}).Stop()
+
+			stmt, _ := r.db.BuildInsertIgnoreStmt(v1.NewSlaLifecycle())
+			return r.db.NamedBulkExec(
+				ctx, stmt, upsertCount, r.db.GetSemaphoreForTable(slaLifecycleTable),
+				CreateSlaLifecyclesFromCheckables(ctx, s.Entity(), g, insertSlaEntities, false),
+				com.NeverSplit[database.Entity], database.OnSuccessIncrement[database.Entity](&counter))
+		})
+
+		// This worker consumes the "delete" event from Redis and redistributes the IDs to the "deleteIds"
+		// channel and for Host/Service entities also to the "updateSlaEntities" channel.
+		g.Go(func() error {
+			defer close(deleteIds)
+			if updateSlaEntities != nil {
+				defer close(updateSlaEntities)
+			}
+
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case deleteId, ok := <-deleteIdsMultiplexer:
+					if !ok {
+						return nil
+					}
+
+					select {
+					case deleteIds <- deleteId:
+					case <-ctx.Done():
+						return ctx.Err()
+					}
+
+					if updateSlaEntities != nil {
+						entity := factoryFunc()
+						entity.SetID(deleteId.(types.Binary))
+
+						select {
+						case updateSlaEntities <- entity:
+						case <-ctx.Done():
+							return ctx.Err()
+						}
+					}
+				}
+			}
+		})
+
 		g.Go(func() error {
 			var counter com.Counter
 			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
@@ -141,6 +241,23 @@ func (r *RuntimeUpdates) Sync(
 			}
 
 			return r.db.BulkExec(ctx, r.db.BuildDeleteStmt(s.Entity()), deleteCount, sem, deleteIds, onSuccess...)
+		})
+
+		// Consumes from the "updateSlaEntities" channel and updates the "delete_time" of each
+		// SLA lifecycle entry with "delete_time = 0" to now.
+		g.Go(func() error {
+			var counter com.Counter
+			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
+				if count := counter.Reset(); count > 0 {
+					r.logger.Infof("Updated %d %s sla lifecycles", count, s.Name())
+				}
+			}).Stop()
+
+			stmt := fmt.Sprintf(`UPDATE %s SET delete_time = :delete_time WHERE "id" = :id AND "delete_time" = 0`, slaLifecycleTable)
+			return r.db.NamedBulkExec(
+				ctx, stmt, deleteCount, r.db.GetSemaphoreForTable(slaLifecycleTable),
+				CreateSlaLifecyclesFromCheckables(ctx, s.Entity(), g, updateSlaEntities, true),
+				com.NeverSplit[database.Entity], database.OnSuccessIncrement[database.Entity](&counter))
 		})
 	}
 
