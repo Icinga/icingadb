@@ -291,9 +291,11 @@ func (h *HA) realize(
 
 			if h.db.DriverName() == database.MySQL {
 				// The RDBMS may actually be a Percona XtraDB Cluster which doesn't
-				// support serializable transactions, but only their following equivalent:
+				// support serializable transactions, but only their equivalent SELECT ... LOCK IN SHARE MODE.
+				// We need even stronger locking to avoid deadlocks, so we use SELECT ... FOR UPDATE.
+				// See also: https://dev.mysql.com/doc/refman/5.7/en/innodb-locking-reads.html
 				isoLvl = sql.LevelRepeatableRead
-				selectLock = " LOCK IN SHARE MODE"
+				selectLock = " FOR UPDATE"
 			}
 
 			tx, errBegin := h.db.BeginTxx(ctx, &sql.TxOptions{Isolation: isoLvl})
