@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"github.com/google/uuid"
 	"github.com/icinga/icinga-go-library/backoff"
-	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/retry"
@@ -19,6 +18,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -35,7 +35,7 @@ type haState struct {
 
 // HA provides high availability and indicates whether a Takeover or Handover must be made.
 type HA struct {
-	state         com.Atomic[haState]
+	state         atomic.Pointer[haState]
 	ctx           context.Context
 	cancelCtx     context.CancelFunc
 	instanceId    types.Binary
@@ -121,7 +121,12 @@ func (h *HA) Takeover() chan string {
 
 // State returns the status quo.
 func (h *HA) State() (responsibleTsMilli int64, responsible, otherResponsible bool) {
-	state, _ := h.state.Load()
+	var state haState
+	statePtr := h.state.Load()
+	if statePtr != nil {
+		state = *statePtr
+	}
+
 	return state.responsibleTsMilli, state.responsible, state.otherResponsible
 }
 
@@ -428,9 +433,17 @@ func (h *HA) realize(
 
 		h.signalTakeover(takeover)
 	} else if otherResponsible {
-		if state, _ := h.state.Load(); !state.otherResponsible {
+		var state haState
+		statePtr := h.state.Load()
+		if statePtr != nil {
+			// Dereference pointer to create a copy of the value it points to.
+			// Ensures that any modifications do not directly affect the original data unless explicitly stored back.
+			state = *statePtr
+		}
+
+		if !state.otherResponsible {
 			state.otherResponsible = true
-			h.state.Store(state)
+			h.state.Store(&state)
 		}
 	}
 
@@ -496,7 +509,7 @@ func (h *HA) removeOldInstances(s *icingaredisv1.IcingaStatus, envId types.Binar
 // signalHandover gives up HA.responsible and notifies the HA.Handover chan.
 func (h *HA) signalHandover(reason string) {
 	if h.responsible {
-		h.state.Store(haState{
+		h.state.Store(&haState{
 			responsibleTsMilli: time.Now().UnixMilli(),
 			responsible:        false,
 			otherResponsible:   false,
@@ -514,7 +527,7 @@ func (h *HA) signalHandover(reason string) {
 // signalTakeover claims HA.responsible and notifies the HA.Takeover chan.
 func (h *HA) signalTakeover(reason string) {
 	if !h.responsible {
-		h.state.Store(haState{
+		h.state.Store(&haState{
 			responsibleTsMilli: time.Now().UnixMilli(),
 			responsible:        true,
 			otherResponsible:   false,
