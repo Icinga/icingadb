@@ -25,6 +25,7 @@ which ships an up-to-date Redis® open source server version and is pre-configur
     keep latency between the components low.
 
 <!-- {% else %} -->
+<!-- {% if not from_source %} -->
 
 ## Adding Icinga Package Repository
 
@@ -244,6 +245,7 @@ zypper install icingadb
 ```
 
 <!-- {% endif %} -->
+<!-- {% endif %} -->
 
 ## Setting up the Database
 
@@ -315,20 +317,32 @@ psql -U icingadb icingadb < /usr/share/icingadb/schema/pgsql/schema.sql
 
 ## Configuring Icinga DB
 
-Icinga DB installs its configuration file to `/etc/icingadb/config.yml`,
-pre-populating most of the settings for a local setup. Before running Icinga DB,
-adjust the Redis® and database credentials and, if necessary, the connection configuration.
+<!-- {% if from_source %} -->
+Create a local `config.yml` file using [the sample configuration](../config.example.yml).
+<!-- {% else %} -->
+The Icinga DB package installs its configuration file to `/etc/icingadb/config.yml`.
+<!-- {% endif %} -->
+Most of the settings are pre-populated for a local setup.
+Before running Icinga DB, adjust the Redis® and database credentials and, if necessary, the connection configuration.
 The configuration file explains general settings.
 All available settings can be found under [Configuration](03-Configuration.md).
 
 ## Running Icinga DB
 
+<!-- {% if from_source %} -->
+You can execute `icingadb` by running it with the locally accessible `config.yml` file:
+
+```bash
+icingadb -config /path/to/config.yml
+```
+<!-- {% else %} -->
 The `icingadb` package automatically installs the necessary systemd unit files to run Icinga DB.
 Please run the following command to enable and start its service:
 
 ```bash
 systemctl enable --now icingadb
 ```
+<!-- {% endif %} -->
 
 ## Installing Icinga DB Web
 
@@ -337,8 +351,7 @@ which connects to both Redis® and the database to display and work with the mon
 
 ![Icinga DB Web](images/icingadb-web.png)
 
-The Icinga DB Web package is also included in the Icinga repository, and since it is already set up,
-you have completed the instructions here and can proceed to
+You have completed the instructions here and can proceed to
 <!-- {% if amazon_linux %} -->
 [installing Icinga DB Web on Amazon Linux](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/01-Amazon-Linux/#installing-icinga-db-web-package),
 <!-- {% endif %} -->
@@ -356,6 +369,9 @@ you have completed the instructions here and can proceed to
 <!-- {% endif %} -->
 <!-- {% if ubuntu %} -->
 [installing Icinga DB Web on Ubuntu](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/06-Ubuntu/#installing-icinga-db-web-package),
+<!-- {% endif %} -->
+<!-- {% if from_source %} -->
+[installing Icinga DB Web From Source](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/From-Source),
 <!-- {% endif %} -->
 which will also guide you through the setup of the Icinga Web PHP framework,
 which is required to run the Icinga DB web module.
