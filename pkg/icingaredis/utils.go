@@ -28,27 +28,34 @@ func CreateEntities(ctx context.Context, factoryFunc database.EntityFactoryFunc,
 
 		for i := 0; i < concurrent; i++ {
 			g.Go(func() error {
-				for pair := range pairs {
-					var id types.Binary
-
-					if err := id.UnmarshalText([]byte(pair.Field)); err != nil {
-						return errors.Wrapf(err, "can't create ID from value %#v", pair.Field)
-					}
-
-					e := factoryFunc()
-					if err := types.UnmarshalJSON([]byte(pair.Value), e); err != nil {
-						return err
-					}
-					e.SetID(id)
-
+				for {
 					select {
-					case entities <- e:
+					case pair, ok := <-pairs:
+						if !ok {
+							return nil
+						}
+
+						var id types.Binary
+
+						if err := id.UnmarshalText([]byte(pair.Field)); err != nil {
+							return errors.Wrapf(err, "can't create ID from value %#v", pair.Field)
+						}
+
+						e := factoryFunc()
+						if err := types.UnmarshalJSON([]byte(pair.Value), e); err != nil {
+							return err
+						}
+						e.SetID(id)
+
+						select {
+						case entities <- e:
+						case <-ctx.Done():
+							return ctx.Err()
+						}
 					case <-ctx.Done():
 						return ctx.Err()
 					}
 				}
-
-				return nil
 			})
 		}
 
@@ -72,21 +79,28 @@ func SetChecksums(ctx context.Context, entities <-chan database.Entity, checksum
 
 		for i := 0; i < concurrent; i++ {
 			g.Go(func() error {
-				for entity := range entities {
-					if checksumer, ok := checksums[entity.ID().String()]; ok {
-						entity.(contracts.Checksumer).SetChecksum(checksumer.(contracts.Checksumer).Checksum())
-					} else {
-						return errors.Errorf("no checksum for %#v", entity)
-					}
-
+				for {
 					select {
-					case entitiesWithChecksum <- entity:
+					case entity, ok := <-entities:
+						if !ok {
+							return nil
+						}
+
+						if checksumer, ok := checksums[entity.ID().String()]; ok {
+							entity.(contracts.Checksumer).SetChecksum(checksumer.(contracts.Checksumer).Checksum())
+						} else {
+							return errors.Errorf("no checksum for %#v", entity)
+						}
+
+						select {
+						case entitiesWithChecksum <- entity:
+						case <-ctx.Done():
+							return ctx.Err()
+						}
 					case <-ctx.Done():
 						return ctx.Err()
 					}
 				}
-
-				return nil
 			})
 		}
 
