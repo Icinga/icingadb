@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/pkg/errors"
-	"strconv"
 )
 
 // CommentType specifies a comment's origin's kind.
@@ -30,25 +29,7 @@ func (ct *CommentType) UnmarshalJSON(data []byte) error {
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
 func (ct *CommentType) UnmarshalText(text []byte) error {
-	s := string(text)
-
-	i, err := strconv.ParseUint(s, 10, 64)
-	if err != nil {
-		return types.CantParseUint64(err, s)
-	}
-
-	c := CommentType(i)
-	if uint64(c) != i {
-		// Truncated due to above cast, obviously too high
-		return badCommentType(s)
-	}
-
-	if _, ok := commentTypes[c]; !ok {
-		return badCommentType(s)
-	}
-
-	*ct = c
-	return nil
+	return ct.UnmarshalJSON(text)
 }
 
 // Value implements the driver.Valuer interface.
