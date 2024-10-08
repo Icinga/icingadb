@@ -3,7 +3,6 @@ package types
 import (
 	"database/sql/driver"
 	"encoding"
-	"github.com/icinga/icinga-go-library/types"
 	"github.com/pkg/errors"
 	"strconv"
 )
@@ -15,17 +14,12 @@ type NotificationType uint16
 func (nt *NotificationType) UnmarshalText(text []byte) error {
 	s := string(text)
 
-	i, err := strconv.ParseUint(s, 10, 64)
+	i, err := strconv.ParseUint(s, 10, 16)
 	if err != nil {
-		return types.CantParseUint64(err, s)
+		return errors.Wrapf(err, "can't parse %q into uint16", s)
 	}
 
 	n := NotificationType(i)
-	if uint64(n) != i {
-		// Truncated due to above cast, obviously too high
-		return badNotificationType(s)
-	}
-
 	if _, ok := notificationTypes[n]; !ok {
 		return badNotificationType(s)
 	}

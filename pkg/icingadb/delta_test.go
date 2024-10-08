@@ -208,14 +208,14 @@ func testDeltaVerifyResult(t *testing.T, name string, expected map[uint64]uint64
 }
 
 func BenchmarkDelta(b *testing.B) {
-	for n := 1 << 10; n <= 1<<20; n <<= 1 {
-		b.Run(strconv.Itoa(n), func(b *testing.B) {
+	for n := uint64(1 << 10); n <= 1<<20; n <<= 1 {
+		b.Run(strconv.FormatUint(n, 10), func(b *testing.B) {
 			benchmarkDelta(b, n)
 		})
 	}
 }
 
-func benchmarkDelta(b *testing.B, numEntities int) {
+func benchmarkDelta(b *testing.B, numEntities uint64) {
 	chActual := make([]chan database.Entity, b.N)
 	chDesired := make([]chan database.Entity, b.N)
 	for i := 0; i < b.N; i++ {
@@ -231,20 +231,20 @@ func benchmarkDelta(b *testing.B, numEntities int) {
 		binary.BigEndian.PutUint64(e.PropertiesChecksum, checksum)
 		return e
 	}
-	for i := 0; i < numEntities; i++ {
+	for i := uint64(0); i < numEntities; i++ {
 		// each iteration writes exactly one entity to each channel
 		var eActual, eDesired database.Entity
 		switch i % 3 {
 		case 0: // distinct IDs
-			eActual = makeEndpoint(1, uint64(i), uint64(i))
-			eDesired = makeEndpoint(2, uint64(i), uint64(i))
+			eActual = makeEndpoint(1, i, i)
+			eDesired = makeEndpoint(2, i, i)
 		case 1: // same ID, same checksum
-			e := makeEndpoint(3, uint64(i), uint64(i))
+			e := makeEndpoint(3, i, i)
 			eActual = e
 			eDesired = e
 		case 2: // same ID, different checksum
-			eActual = makeEndpoint(4, uint64(i), uint64(i))
-			eDesired = makeEndpoint(4, uint64(i), uint64(i+1))
+			eActual = makeEndpoint(4, i, i)
+			eDesired = makeEndpoint(4, i, i+1)
 		}
 		for _, ch := range chActual {
 			ch <- eActual

@@ -11,6 +11,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -282,6 +283,14 @@ func convertDowntimeRows(
 			cancelTime = actualEnd
 		}
 
+		// The IDO duration is of type bigint, representing seconds, while Icinga DB's FlexibleDuration is an unsigned
+		// bigint, representing milliseconds. In theory, there should be no negative value in the IDO and multiplied
+		// with factor 1,000 should not overflow anything. In theory, at least. To make sure, invalid values are capped.
+		var flexibleDuration uint64
+		if durationSec := row.Duration; durationSec >= 0 && durationSec < math.MaxUint64/1_000 {
+			flexibleDuration = uint64(durationSec) * 1_000
+		}
+
 		downtimeHistory = append(downtimeHistory, &history.DowntimeHistory{
 			DowntimeHistoryEntity: history.DowntimeHistoryEntity{DowntimeId: id},
 			HistoryTableMeta: history.HistoryTableMeta{
@@ -299,7 +308,7 @@ func convertDowntimeRows(
 			Author:             row.AuthorName,
 			Comment:            row.CommentData,
 			IsFlexible:         types.Bool{Bool: row.IsFixed == 0, Valid: true},
-			FlexibleDuration:   uint64(row.Duration) * 1000,
+			FlexibleDuration:   flexibleDuration,
 			ScheduledStartTime: scheduledStart,
 			ScheduledEndTime:   scheduledEnd,
 			StartTime:          startTime,
