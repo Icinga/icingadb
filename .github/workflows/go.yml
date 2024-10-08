@@ -38,6 +38,14 @@ jobs:
         with:
           install-go: false
 
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          only-new-issues: true
+
+          # Enable the gosec linter w/o having to create a .golangci.yml config
+          args: -E gosec
+
   vet:
     runs-on: ubuntu-latest
     steps:
