@@ -173,6 +173,13 @@ func (r *Retention) Start(ctx context.Context) error {
 			continue
 		}
 
+		if time.Now().AddDate(0, 0, -int(days)).Before(time.Unix(0, 0)) {
+			r.logger.Errorf("Skipping history retention for category %s: "+
+				"%d days of retention will result in negative timestamps, overflowing unsigned timestamps",
+				stmt.Category, days)
+			continue
+		}
+
 		r.logger.Debugw(
 			fmt.Sprintf("Starting history retention for category %s", stmt.Category),
 			zap.Uint64("count", r.count),

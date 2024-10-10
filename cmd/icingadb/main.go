@@ -50,7 +50,7 @@ func run() int {
 	_ = sdnotify.Ready()
 
 	logger := logs.GetLogger()
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	logger.Infof("Starting Icinga DB daemon (%s)", internal.Version.Version)
 
@@ -58,7 +58,7 @@ func run() int {
 	if err != nil {
 		logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	{
 		logger.Infof("Connecting to database at '%s'", db.GetAddr())
 		err := db.Ping()
@@ -112,7 +112,7 @@ func run() int {
 		if err != nil {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
 		}
-		defer db.Close()
+		defer func() { _ = db.Close() }()
 		ha = icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
 
 		telemetryLogger := logs.GetChildLogger("telemetry")
@@ -125,7 +125,7 @@ func run() int {
 		// Give up after 3s, not 5m (default) not to hang for 5m if DB is down.
 		ctx, cancelCtx := context.WithTimeout(context.Background(), 3*time.Second)
 
-		ha.Close(ctx)
+		_ = ha.Close(ctx)
 		cancelCtx()
 	}()
 	s := icingadb.NewSync(db, rc, logs.GetChildLogger("config-sync"))
