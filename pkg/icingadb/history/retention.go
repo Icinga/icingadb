@@ -95,7 +95,7 @@ var RetentionStatements = []retentionStatement{{
 }}
 
 // RetentionOptions defines the non-default mapping of history categories with their retention period in days.
-type RetentionOptions map[string]uint64
+type RetentionOptions map[string]uint16
 
 // Validate checks constraints in the supplied retention options and
 // returns an error if they are violated.
@@ -120,8 +120,8 @@ func (o RetentionOptions) Validate() error {
 type Retention struct {
 	db          *database.DB
 	logger      *logging.Logger
-	historyDays uint64
-	slaDays     uint64
+	historyDays uint16
+	slaDays     uint16
 	interval    time.Duration
 	count       uint64
 	options     RetentionOptions
@@ -129,7 +129,7 @@ type Retention struct {
 
 // NewRetention returns a new Retention.
 func NewRetention(
-	db *database.DB, historyDays uint64, slaDays uint64, interval time.Duration,
+	db *database.DB, historyDays, slaDays uint16, interval time.Duration,
 	count uint64, options RetentionOptions, logger *logging.Logger,
 ) *Retention {
 	return &Retention{
@@ -156,7 +156,7 @@ func (r *Retention) Start(ctx context.Context) error {
 	errs := make(chan error, 1)
 
 	for _, stmt := range RetentionStatements {
-		var days uint64
+		var days uint16
 		switch stmt.RetentionType {
 		case RetentionHistory:
 			if d, ok := r.options[stmt.Category]; ok {
@@ -177,7 +177,7 @@ func (r *Retention) Start(ctx context.Context) error {
 			fmt.Sprintf("Starting history retention for category %s", stmt.Category),
 			zap.Uint64("count", r.count),
 			zap.Duration("interval", r.interval),
-			zap.Uint64("retention-days", days),
+			zap.Uint16("retention-days", days),
 		)
 
 		stmt := stmt
