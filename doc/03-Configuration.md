@@ -1,6 +1,6 @@
 # Configuration
 
-The configuration is stored in `/etc/icingadb/config.yml`.
+For package installations, the configuration is stored in `/etc/icingadb/config.yml`.
 See [config.example.yml](../config.example.yml) for an example configuration.
 
 ## Redis® Configuration
