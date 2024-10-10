@@ -7,5 +7,16 @@ ALTER TABLE notification MODIFY COLUMN properties_checksum binary(20) NOT NULL C
 
 ALTER TABLE timeperiod_range MODIFY COLUMN range_value text NOT NULL;
 
+ALTER TABLE checkcommand_argument MODIFY COLUMN argument_key varchar(255) NOT NULL;
+ALTER TABLE checkcommand_argument MODIFY COLUMN argument_key_override varchar(255) NOT NULL;
+ALTER TABLE eventcommand_argument MODIFY COLUMN argument_key varchar(255) NOT NULL;
+ALTER TABLE eventcommand_argument MODIFY COLUMN argument_key_override varchar(255) NOT NULL;
+ALTER TABLE notificationcommand_argument MODIFY COLUMN argument_key varchar(255) NOT NULL;
+ALTER TABLE notificationcommand_argument MODIFY COLUMN argument_key_override varchar(255) NOT NULL;
+
+ALTER TABLE checkcommand_envvar MODIFY COLUMN envvar_key varchar(255) NOT NULL;
+ALTER TABLE eventcommand_envvar MODIFY COLUMN envvar_key varchar(255) NOT NULL;
+ALTER TABLE notificationcommand_envvar MODIFY COLUMN envvar_key varchar(255) NOT NULL;
+
 INSERT INTO icingadb_schema (version, timestamp)
   VALUES (6, UNIX_TIMESTAMP() * 1000);
