@@ -428,6 +428,11 @@ func (h *HA) realize(
 
 		h.signalTakeover(takeover)
 	} else if otherResponsible {
+		if state, _ := h.state.Load(); state.responsible {
+			h.logger.Error("Other instance is responsible while this node itself is responsible, dropping responsibility")
+			h.signalHandover("other instance is responsible as well")
+			// h.signalHandover will update h.state
+		}
 		if state, _ := h.state.Load(); !state.otherResponsible {
 			state.otherResponsible = true
 			h.state.Store(state)
