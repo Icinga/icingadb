@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- used as a non-cryptographic hash function to hash IDs
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/objectpacker"
 	"github.com/icinga/icinga-go-library/types"
@@ -54,7 +54,7 @@ var objectTypes = map[uint8]string{1: "host", 2: "service"}
 
 // hashAny combines objectpacker.PackAny and SHA1 hashing.
 func hashAny(in interface{}) []byte {
-	hash := sha1.New()
+	hash := sha1.New() // #nosec G401 -- used as a non-cryptographic hash function to hash IDs
 	if err := objectpacker.PackAny(in, hash); err != nil {
 		panic(err)
 	}

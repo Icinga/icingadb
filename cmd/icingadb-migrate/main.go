@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 -- used as a non-cryptographic hash function to hash IDs
 	"database/sql"
 	_ "embed"
 	"encoding/hex"
