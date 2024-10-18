@@ -835,7 +835,7 @@ CREATE TABLE checkcommand_argument (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   checkcommand_id bytea20 NOT NULL,
-  argument_key varchar(64) NOT NULL,
+  argument_key varchar(255) NOT NULL,
 
   properties_checksum bytea20 NOT NULL,
 
@@ -867,7 +867,7 @@ CREATE TABLE checkcommand_envvar (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   checkcommand_id bytea20 NOT NULL,
-  envvar_key varchar(64) NOT NULL,
+  envvar_key varchar(255) NOT NULL,
 
   properties_checksum bytea20 NOT NULL,
 
@@ -941,7 +941,7 @@ CREATE TABLE eventcommand_argument (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   eventcommand_id bytea20 NOT NULL,
-  argument_key varchar(64) NOT NULL,
+  argument_key varchar(255) NOT NULL,
 
   properties_checksum bytea20 NOT NULL,
 
@@ -972,7 +972,7 @@ CREATE TABLE eventcommand_envvar (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   eventcommand_id bytea20 NOT NULL,
-  envvar_key varchar(64) NOT NULL,
+  envvar_key varchar(255) NOT NULL,
 
   properties_checksum bytea20 NOT NULL,
 
@@ -1045,7 +1045,7 @@ CREATE TABLE notificationcommand_argument (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   notificationcommand_id bytea20 NOT NULL,
-  argument_key varchar(64) NOT NULL,
+  argument_key varchar(255) NOT NULL,
 
   properties_checksum bytea20 NOT NULL,
 
@@ -1076,7 +1076,7 @@ CREATE TABLE notificationcommand_envvar (
   id bytea20 NOT NULL,
   environment_id bytea20 NOT NULL,
   notificationcommand_id bytea20 NOT NULL,
-  envvar_key varchar(64) NOT NULL,
+  envvar_key varchar(255) NOT NULL,
 
   properties_checksum bytea20 NOT NULL,
 
