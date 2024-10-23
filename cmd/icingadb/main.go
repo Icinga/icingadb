@@ -114,6 +114,7 @@ func run() int {
 			logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
 		}
 		defer func() { _ = db.Close() }()
+		db.SetMaxOpenConns(1)
 		ha = icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
 
 		telemetryLogger := logs.GetChildLogger("telemetry")
