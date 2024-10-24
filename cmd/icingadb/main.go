@@ -167,9 +167,14 @@ func run() int {
 						synctx, cancelSynctx := context.WithCancel(ha.Environment().NewContext(hactx))
 						g, synctx := errgroup.WithContext(synctx)
 						// WaitGroups for initial synchronization.
-						// Runtime updates must wait for initial synchronization to complete.
+						// Runtime updates and history pipelines must wait for the initial synchronization to
+						// complete by draining the `initConfigSyncDone` channel.
 						configInitSync := sync.WaitGroup{}
 						stateInitSync := &sync.WaitGroup{}
+
+						// A channel used to notify both the runtime updates and history pipelines workers
+						// about the successful initial config sync completion including the SLA lifecycles.
+						initConfigSyncDone := make(chan struct{})
 
 						// Clear the runtime update streams before starting anything else (rather than after the sync),
 						// otherwise updates may be lost.
@@ -243,7 +248,18 @@ func run() int {
 						})
 
 						g.Go(func() error {
+							// Unblock the runtime updates and history pipelines workers.
+							defer close(initConfigSyncDone)
+
+							// Wait for the actual initial config sync to finish before syncing the SLA lifecycles.
 							configInitSync.Wait()
+
+							logger.Info("Syncing Host and Service initial SLA lifecycle")
+
+							if err := icingadb.SyncCheckablesSlaLifecycle(synctx, db); err != nil {
+								return err
+							}
+
 							telemetry.OngoingSyncStartMilli.Store(0)
 
 							syncEnd := time.Now()
@@ -279,7 +295,8 @@ func run() int {
 						})
 
 						g.Go(func() error {
-							configInitSync.Wait()
+							// Wait for the initial config sync including the SLA lifecycles to finish!
+							<-initConfigSyncDone
 
 							if err := synctx.Err(); err != nil {
 								return err
@@ -304,7 +321,7 @@ func run() int {
 
 						g.Go(func() error {
 							// Wait for config and state sync to avoid putting additional pressure on the database.
-							configInitSync.Wait()
+							<-initConfigSyncDone
 							stateInitSync.Wait()
 
 							if err := synctx.Err(); err != nil {
