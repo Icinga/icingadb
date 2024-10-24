@@ -79,16 +79,17 @@ func GetCurrentDbConnErr() (string, int64) {
 // OngoingSyncStartMilli is to be updated by the main() function.
 var OngoingSyncStartMilli int64
 
-// LastSuccessfulSync is to be updated by the main() function.
-var LastSuccessfulSync atomic.Pointer[SuccessfulSync]
-
 var boolToStr = map[bool]string{false: "0", true: "1"}
 var startTime = time.Now().UnixMilli()
 
 // StartHeartbeat periodically writes heartbeats to Redis for being monitored by Icinga 2.
+// It returns an atomic pointer to SuccessfulSync,
+// which contains synchronisation statistics that the caller should update.
 func StartHeartbeat(
 	ctx context.Context, client *redis.Client, logger *logging.Logger, ha ha, heartbeat *icingaredis.Heartbeat,
-) {
+) *atomic.Pointer[SuccessfulSync] {
+	var syncStats atomic.Pointer[SuccessfulSync]
+	syncStats.Store(&SuccessfulSync{})
 	goMetrics := NewGoMetrics()
 
 	const interval = time.Second
@@ -100,7 +101,7 @@ func StartHeartbeat(
 		heartbeat := heartbeat.LastReceived()
 		responsibleTsMilli, responsible, otherResponsible := ha.State()
 		ongoingSyncStart := atomic.LoadInt64(&OngoingSyncStartMilli)
-		lastSync := LastSuccessfulSync.Load()
+		lastSync := syncStats.Load()
 		dbConnErr, dbConnErrSinceMilli := GetCurrentDbConnErr()
 		now := time.Now()
 
@@ -144,6 +145,8 @@ func StartHeartbeat(
 			silenceUntil = time.Time{}
 		}
 	})
+
+	return &syncStats
 }
 
 type goMetrics struct {
