@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/periodic"
 	"github.com/icinga/icinga-go-library/redis"
@@ -80,16 +79,17 @@ func GetCurrentDbConnErr() (string, int64) {
 // OngoingSyncStartMilli is to be updated by the main() function.
 var OngoingSyncStartMilli int64
 
-// LastSuccessfulSync is to be updated by the main() function.
-var LastSuccessfulSync com.Atomic[SuccessfulSync]
-
 var boolToStr = map[bool]string{false: "0", true: "1"}
 var startTime = time.Now().UnixMilli()
 
 // StartHeartbeat periodically writes heartbeats to Redis for being monitored by Icinga 2.
+// It returns an atomic pointer to SuccessfulSync,
+// which contains synchronisation statistics that the caller should update.
 func StartHeartbeat(
 	ctx context.Context, client *redis.Client, logger *logging.Logger, ha ha, heartbeat *icingaredis.Heartbeat,
-) {
+) *atomic.Pointer[SuccessfulSync] {
+	var syncStats atomic.Pointer[SuccessfulSync]
+	syncStats.Store(&SuccessfulSync{})
 	goMetrics := NewGoMetrics()
 
 	const interval = time.Second
@@ -101,7 +101,7 @@ func StartHeartbeat(
 		heartbeat := heartbeat.LastReceived()
 		responsibleTsMilli, responsible, otherResponsible := ha.State()
 		ongoingSyncStart := atomic.LoadInt64(&OngoingSyncStartMilli)
-		sync, _ := LastSuccessfulSync.Load()
+		lastSync := syncStats.Load()
 		dbConnErr, dbConnErrSinceMilli := GetCurrentDbConnErr()
 		now := time.Now()
 
@@ -117,8 +117,8 @@ func StartHeartbeat(
 			"ha-responsible-ts":       strconv.FormatInt(responsibleTsMilli, 10),
 			"ha-other-responsible":    boolToStr[otherResponsible],
 			"sync-ongoing-since":      strconv.FormatInt(ongoingSyncStart, 10),
-			"sync-success-finish":     strconv.FormatInt(sync.FinishMilli, 10),
-			"sync-success-duration":   strconv.FormatInt(sync.DurationMilli, 10),
+			"sync-success-finish":     strconv.FormatInt(lastSync.FinishMilli, 10),
+			"sync-success-duration":   strconv.FormatInt(lastSync.DurationMilli, 10),
 		}
 
 		ctx, cancel := context.WithDeadline(ctx, tick.Time.Add(interval))
@@ -145,6 +145,8 @@ func StartHeartbeat(
 			silenceUntil = time.Time{}
 		}
 	})
+
+	return &syncStats
 }
 
 type goMetrics struct {

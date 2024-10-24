@@ -101,6 +101,7 @@ func run() int {
 	// the heartbeat is not read while HA gets stuck when updating the instance table.
 	var heartbeat *icingaredis.Heartbeat
 	var ha *icingadb.HA
+	var telemetrySyncStats *atomic.Pointer[telemetry.SuccessfulSync]
 	{
 		rc, err := cmd.Redis(logs.GetChildLogger("redis"))
 		if err != nil {
@@ -116,7 +117,7 @@ func run() int {
 		ha = icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
 
 		telemetryLogger := logs.GetChildLogger("telemetry")
-		telemetry.StartHeartbeat(ctx, rc, telemetryLogger, ha, heartbeat)
+		telemetrySyncStats = telemetry.StartHeartbeat(ctx, rc, telemetryLogger, ha, heartbeat)
 		telemetry.WriteStats(ctx, rc, telemetryLogger)
 	}
 	// Closing ha on exit ensures that this instance retracts its heartbeat
@@ -250,7 +251,7 @@ func run() int {
 							logger := logs.GetChildLogger("config-sync")
 
 							if synctx.Err() == nil {
-								telemetry.LastSuccessfulSync.Store(telemetry.SuccessfulSync{
+								telemetrySyncStats.Store(&telemetry.SuccessfulSync{
 									FinishMilli:   syncEnd.UnixMilli(),
 									DurationMilli: elapsed.Milliseconds(),
 								})
