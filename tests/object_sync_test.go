@@ -173,7 +173,7 @@ func TestObjectSync(t *testing.T) {
 	t.Run("SlaLifeCycle", func(t *testing.T) {
 		t.Parallel()
 
-		slinfo := &SlaLifecycle{CreateTime: types.UnixMilli(time.Now())}
+		createTime := types.UnixMilli(time.Now())
 
 		t.Run("Hosts", func(t *testing.T) {
 			t.Parallel()
@@ -182,8 +182,14 @@ func TestObjectSync(t *testing.T) {
 				t.Run("Verify-Host-"+fmt.Sprint(hostId), func(t *testing.T) {
 					t.Parallel()
 
+					slinfo := &SlaLifecycle{CreateTime: createTime}
+
 					eventually.Assert(t, func(t require.TestingT) {
-						verifySlaLifeCycleRow(t, db, slinfo, host.Name, "")
+						// We can't join on the host table, as the sla lifecycle entries may reference hosts that have
+						// already been deleted. So fetch the host id from DB before performing the actual test.
+						require.NoError(t, fetchCheckableId(db, slinfo, host.Name, ""))
+
+						verifySlaLifecycleRow(t, db, slinfo, false)
 					}, 20*time.Second, 1*time.Second)
 				})
 			}
@@ -196,8 +202,14 @@ func TestObjectSync(t *testing.T) {
 				t.Run("Verify-Service-"+fmt.Sprint(serviceId), func(t *testing.T) {
 					t.Parallel()
 
+					slinfo := &SlaLifecycle{CreateTime: createTime}
+
 					eventually.Assert(t, func(t require.TestingT) {
-						verifySlaLifeCycleRow(t, db, slinfo, *service.HostName, service.Name)
+						// We can't join on the service table, as the sla lifecycle entries may reference services that
+						// have already been deleted. So fetch the service id from DB before performing the actual test.
+						require.NoError(t, fetchCheckableId(db, slinfo, *service.HostName, service.Name))
+
+						verifySlaLifecycleRow(t, db, slinfo, false)
 					}, 20*time.Second, 1*time.Second)
 				})
 			}
@@ -452,29 +464,71 @@ func TestObjectSync(t *testing.T) {
 		t.Run("SlaLifeCycle", func(t *testing.T) {
 			t.Parallel()
 
-			for serviceId, service := range makeTestSyncServices(t) {
-				//service.Name += fmt.Sprint(serviceId)
-
-				t.Run("Verify-Service-"+fmt.Sprint(serviceId), func(t *testing.T) {
-					t.Parallel()
-
-					client.CreateObject(t, "services", *service.HostName+"!"+service.Name, map[string]interface{}{
-						"attrs": makeIcinga2ApiAttributes(service, false),
-					})
-
-					slinfo := &SlaLifecycle{CreateTime: types.UnixMilli(time.Now())}
-					eventually.Assert(t, func(t require.TestingT) {
-						verifySlaLifeCycleRow(t, db, slinfo, *service.HostName, service.Name)
-					}, 20*time.Second, 1*time.Second)
-
-					client.DeleteObject(t, "services", *service.HostName+"!"+service.Name, false)
-
-					slinfo.DeleteTime = types.UnixMilli(time.Now())
-					eventually.Assert(t, func(t require.TestingT) {
-						verifySlaLifeCycleRow(t, db, slinfo, "", "")
-					}, 20*time.Second, 1*time.Second)
+			assertCheckableFunc := func(checkable any, objType string, objName string, host string, service string) {
+				client.CreateObject(t, objType, objName, map[string]any{
+					"attrs": makeIcinga2ApiAttributes(checkable, false),
 				})
+
+				slinfo := &SlaLifecycle{CreateTime: types.UnixMilli(time.Now())}
+				eventually.Assert(t, func(t require.TestingT) {
+					// We can't join on the host/service tables, as the sla lifecycle entries may reference checkables
+					// that have already been deleted. So fetch the host/service id from DB before performing the actual test.
+					require.NoError(t, fetchCheckableId(db, slinfo, host, service))
+
+					verifySlaLifecycleRow(t, db, slinfo, false)
+				}, 20*time.Second, 1*time.Second)
+
+				client.DeleteObject(t, objType, objName, false)
+
+				slinfo.DeleteTime = types.UnixMilli(time.Now())
+				eventually.Assert(t, func(t require.TestingT) {
+					verifySlaLifecycleRow(t, db, slinfo, false)
+				}, 20*time.Second, 1*time.Second)
+
+				client.CreateObject(t, objType, objName, map[string]interface{}{
+					"attrs": makeIcinga2ApiAttributes(checkable, false),
+				})
+
+				// We are recreating this checkable, so we only have to change the timestamps as the
+				// checkable id will remain the same.
+				slinfo.CreateTime = types.UnixMilli(time.Now())
+				slinfo.DeleteTime = types.UnixMilli(time.Time{})
+
+				eventually.Assert(t, func(t require.TestingT) {
+					verifySlaLifecycleRow(t, db, slinfo, true)
+				}, 20*time.Second, 1*time.Second)
+
+				client.DeleteObject(t, objType, objName, false)
+
+				slinfo.DeleteTime = types.UnixMilli(time.Now())
+				eventually.Assert(t, func(t require.TestingT) {
+					verifySlaLifecycleRow(t, db, slinfo, true)
+				}, 20*time.Second, 1*time.Second)
 			}
+
+			t.Run("Host", func(t *testing.T) {
+				t.Parallel()
+
+				for hostId, host := range makeTestSyncHosts(t) {
+					t.Run("Verify-Host-"+fmt.Sprint(hostId), func(t *testing.T) {
+						t.Parallel()
+
+						assertCheckableFunc(host, "hosts", host.Name, host.Name, "")
+					})
+				}
+			})
+
+			t.Run("Service", func(t *testing.T) {
+				t.Parallel()
+
+				for serviceId, service := range makeTestSyncServices(t) {
+					t.Run("Verify-Service-"+fmt.Sprint(serviceId), func(t *testing.T) {
+						t.Parallel()
+
+						assertCheckableFunc(service, "services", *service.HostName+"!"+service.Name, *service.HostName, service.Name)
+					})
+				}
+			})
 		})
 
 		t.Run("User", func(t *testing.T) {
@@ -1247,59 +1301,78 @@ func verifyIcingaDbRow(t require.TestingT, db *sqlx.DB, obj interface{}) {
 	require.False(t, rows.Next(), "SQL query should return only one row: %s", query)
 }
 
-func verifySlaLifeCycleRow(t require.TestingT, db *sqlx.DB, slinfo *SlaLifecycle, host string, service string) {
-	query := `SELECT "create_time", "delete_time", "sla_lifecycle"."host_id", "sla_lifecycle"."service_id" FROM "sla_lifecycle"`
+// verifySlaLifecycleRow verifies the sla lifecycle entries matching the given host/service id. It checks the creation
+// and deletion time of the specified checkable. When the provided checkable was recreated, it also additionally requires
+// two sla lifecycle entries to exist that match the checkables id.
+func verifySlaLifecycleRow(t require.TestingT, db *sqlx.DB, slinfo *SlaLifecycle, isRecreated bool) {
+	query := `SELECT "create_time", "delete_time" FROM "sla_lifecycle" WHERE "host_id" = ?`
 	var args []interface{}
-	if !slinfo.HostID.Valid() {
-		query += ` INNER JOIN "host" ON "host"."id"="sla_lifecycle"."host_id"`
-		where := ` WHERE "host"."name"=?`
-
-		args = append(args, host)
-		if service == "" {
-			where += ` AND "service_id" IS NULL`
-		} else {
-			query += ` INNER JOIN "service" ON "service"."id"="sla_lifecycle"."service_id"`
-			where += ` AND "service"."name"=?`
-			args = append(args, service)
-		}
-
-		query += where + ` AND "delete_time" = 0`
+	args = []interface{}{slinfo.HostID}
+	if !slinfo.ServiceID.Valid() {
+		query += ` AND "service_id" IS NULL`
 	} else {
-		query += ` WHERE "host_id"=?`
-		args = []interface{}{slinfo.HostID}
-		if !slinfo.ServiceID.Valid() {
-			query += ` AND "service_id" IS NULL`
-		} else {
-			query += ` AND "service_id"=?`
-			args = append(args, slinfo.ServiceID)
-		}
+		query += ` AND "service_id" = ?`
+		args = append(args, slinfo.ServiceID)
 	}
+	query += ` ORDER BY "create_time" ASC`
 
 	var resultSet []SlaLifecycle
 	err := db.Select(&resultSet, db.Rebind(query), args...)
 	require.NoError(t, err, "querying sla lifecycle should not fail: Query: %q", query)
 
-	require.Len(t, resultSet, 1, "there should be one sla lifecycle entry")
-
-	result := resultSet[0]
 	zerotimestamp := time.Unix(0, 0)
+	var result SlaLifecycle
 
-	require.NotEqual(t, zerotimestamp, result.CreateTime.Time())
+	if isRecreated {
+		require.Len(t, resultSet, 2, "there should be two sla lifecycle entry")
+
+		result = resultSet[1]
+		recreated := resultSet[0]
+		assert.NotEqual(t, zerotimestamp, recreated.CreateTime.Time())
+		assert.NotEqual(t, zerotimestamp, recreated.DeleteTime.Time())
+
+		assert.Less(t, recreated.CreateTime.Time(), slinfo.CreateTime.Time())
+		assert.Less(t, recreated.DeleteTime.Time(), slinfo.CreateTime.Time())
+
+		if !slinfo.DeleteTime.Time().IsZero() {
+			assert.Less(t, recreated.CreateTime.Time(), slinfo.DeleteTime.Time())
+			assert.Less(t, recreated.DeleteTime.Time(), slinfo.DeleteTime.Time())
+		}
+	} else {
+		require.Len(t, resultSet, 1, "there should be one sla lifecycle entry")
+
+		result = resultSet[0]
+	}
+
+	assert.NotEqual(t, zerotimestamp, result.CreateTime.Time())
 	assert.WithinDuration(t, slinfo.CreateTime.Time(), result.CreateTime.Time(), time.Minute)
 
 	if slinfo.DeleteTime.Time().IsZero() {
-		// We can't join on the host/service tables, as the sla lifecycle entries may reference entries that have
-		// already been deleted. So cache the host/service id to use as a filter when asserting the sla lifecycles
-		// delete event.
-		slinfo.HostID = result.HostID
-		slinfo.ServiceID = result.ServiceID
-
-		require.Equal(t, zerotimestamp, result.DeleteTime.Time())
+		assert.Equal(t, zerotimestamp, result.DeleteTime.Time())
 	} else {
-		require.NotEqual(t, zerotimestamp, result.DeleteTime.Time())
-		require.Less(t, result.CreateTime.Time(), result.DeleteTime.Time())
+		assert.NotEqual(t, zerotimestamp, result.DeleteTime.Time())
+		assert.Less(t, result.CreateTime.Time(), result.DeleteTime.Time())
 		assert.WithinDuration(t, slinfo.DeleteTime.Time(), result.DeleteTime.Time(), time.Minute)
 	}
+}
+
+// fetchCheckableId retrieves host/service id from the database matching the given host/service
+// name and scans to the provided slinfo. Returns an error on any database failure.
+func fetchCheckableId(db *sqlx.DB, slinfo *SlaLifecycle, host string, service string) error {
+	query := `SELECT "sla_lifecycle"."host_id", "sla_lifecycle"."service_id"
+				FROM "sla_lifecycle" INNER JOIN "host" ON "host"."id"="sla_lifecycle"."host_id"`
+
+	where := ` WHERE "host"."name" = ?`
+	args := []interface{}{host}
+	if service == "" {
+		where += ` AND "service_id" IS NULL`
+	} else {
+		query += ` INNER JOIN "service" ON "service"."id"="sla_lifecycle"."service_id"`
+		where += ` AND "service"."name" = ?`
+		args = append(args, service)
+	}
+
+	return db.QueryRowx(db.Rebind(query+where), args...).StructScan(slinfo)
 }
 
 type SlaLifecycle struct {
