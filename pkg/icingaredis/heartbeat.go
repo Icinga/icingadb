@@ -24,7 +24,7 @@ const Timeout = time.Minute
 type Heartbeat struct {
 	active         bool
 	events         chan *HeartbeatMessage
-	lastReceivedMs int64
+	lastReceivedMs atomic.Int64
 	cancelCtx      context.CancelFunc
 	client         *redis.Client
 	done           chan struct{}
@@ -59,7 +59,7 @@ func (h *Heartbeat) Events() <-chan *HeartbeatMessage {
 
 // LastReceived returns the last heartbeat's receive time in ms.
 func (h *Heartbeat) LastReceived() int64 {
-	return atomic.LoadInt64(&h.lastReceivedMs)
+	return h.lastReceivedMs.Load()
 }
 
 // Close stops the heartbeat controller loop, waits for it to finish, and returns an error if any.
@@ -138,7 +138,7 @@ func (h *Heartbeat) controller(ctx context.Context) {
 					h.active = true
 				}
 
-				atomic.StoreInt64(&h.lastReceivedMs, m.received.UnixMilli())
+				h.lastReceivedMs.Store(m.received.UnixMilli())
 				h.sendEvent(m)
 			case <-time.After(Timeout):
 				if h.active {
@@ -149,7 +149,7 @@ func (h *Heartbeat) controller(ctx context.Context) {
 					h.logger.Warn("Waiting for Icinga heartbeat")
 				}
 
-				atomic.StoreInt64(&h.lastReceivedMs, 0)
+				h.lastReceivedMs.Store(0)
 			case <-ctx.Done():
 				return ctx.Err()
 			}

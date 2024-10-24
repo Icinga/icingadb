@@ -77,7 +77,7 @@ func GetCurrentDbConnErr() (string, int64) {
 }
 
 // OngoingSyncStartMilli is to be updated by the main() function.
-var OngoingSyncStartMilli int64
+var OngoingSyncStartMilli atomic.Int64
 
 var boolToStr = map[bool]string{false: "0", true: "1"}
 var startTime = time.Now().UnixMilli()
@@ -100,7 +100,7 @@ func StartHeartbeat(
 	periodic.Start(ctx, interval, func(tick periodic.Tick) {
 		heartbeat := heartbeat.LastReceived()
 		responsibleTsMilli, responsible, otherResponsible := ha.State()
-		ongoingSyncStart := atomic.LoadInt64(&OngoingSyncStartMilli)
+		ongoingSyncStart := OngoingSyncStartMilli.Load()
 		lastSync := syncStats.Load()
 		dbConnErr, dbConnErrSinceMilli := GetCurrentDbConnErr()
 		now := time.Now()
