@@ -6,13 +6,13 @@ require (
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/goccy/go-yaml v1.12.0
 	github.com/google/uuid v1.6.0
+	github.com/icinga/icinga-go-library v0.3.0
 	github.com/icinga/icinga-testing v0.0.0-20240322142451-494ccd6d03e8
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/redis/go-redis/v9 v9.7.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
-	golang.org/x/exp v0.0.0-20221012112151-59b0eab1532e
 	golang.org/x/sync v0.8.0
 )
 

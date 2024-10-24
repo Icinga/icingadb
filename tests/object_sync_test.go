@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-testing/services"
 	"github.com/icinga/icinga-testing/utils"
 	"github.com/icinga/icinga-testing/utils/eventually"
@@ -16,9 +17,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"golang.org/x/exp/slices"
 	"io"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -112,7 +113,6 @@ func TestObjectSync(t *testing.T) {
 		t.Parallel()
 
 		for _, host := range data.Hosts {
-			host := host
 			t.Run("Verify-"+host.VariantInfoString(), func(t *testing.T) {
 				t.Parallel()
 
@@ -144,7 +144,6 @@ func TestObjectSync(t *testing.T) {
 		t.Parallel()
 
 		for _, service := range data.Services {
-			service := service
 			t.Run("Verify-"+service.VariantInfoString(), func(t *testing.T) {
 				t.Parallel()
 
@@ -169,6 +168,40 @@ func TestObjectSync(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("SlaLifeCycle", func(t *testing.T) {
+		t.Parallel()
+
+		slinfo := &SlaLifecycle{CreateTime: types.UnixMilli(time.Now())}
+
+		t.Run("Hosts", func(t *testing.T) {
+			t.Parallel()
+
+			for hostId, host := range data.Hosts {
+				t.Run("Verify-Host-"+fmt.Sprint(hostId), func(t *testing.T) {
+					t.Parallel()
+
+					eventually.Assert(t, func(t require.TestingT) {
+						verifySlaLifeCycleRow(t, db, slinfo, host.Name, "")
+					}, 20*time.Second, 1*time.Second)
+				})
+			}
+		})
+
+		t.Run("Services", func(t *testing.T) {
+			t.Parallel()
+
+			for serviceId, service := range data.Services {
+				t.Run("Verify-Service-"+fmt.Sprint(serviceId), func(t *testing.T) {
+					t.Parallel()
+
+					eventually.Assert(t, func(t require.TestingT) {
+						verifySlaLifeCycleRow(t, db, slinfo, *service.HostName, service.Name)
+					}, 20*time.Second, 1*time.Second)
+				})
+			}
+		})
 	})
 
 	t.Run("HostGroup", func(t *testing.T) {
@@ -324,8 +357,6 @@ func TestObjectSync(t *testing.T) {
 			t.Parallel()
 
 			for _, service := range makeTestSyncServices(t) {
-				service := service
-
 				t.Run("CreateAndDelete-"+service.VariantInfoString(), func(t *testing.T) {
 					t.Parallel()
 
@@ -416,6 +447,34 @@ func TestObjectSync(t *testing.T) {
 					})
 				}
 			})
+		})
+
+		t.Run("SlaLifeCycle", func(t *testing.T) {
+			t.Parallel()
+
+			for serviceId, service := range makeTestSyncServices(t) {
+				//service.Name += fmt.Sprint(serviceId)
+
+				t.Run("Verify-Service-"+fmt.Sprint(serviceId), func(t *testing.T) {
+					t.Parallel()
+
+					client.CreateObject(t, "services", *service.HostName+"!"+service.Name, map[string]interface{}{
+						"attrs": makeIcinga2ApiAttributes(service, false),
+					})
+
+					slinfo := &SlaLifecycle{CreateTime: types.UnixMilli(time.Now())}
+					eventually.Assert(t, func(t require.TestingT) {
+						verifySlaLifeCycleRow(t, db, slinfo, *service.HostName, service.Name)
+					}, 20*time.Second, 1*time.Second)
+
+					client.DeleteObject(t, "services", *service.HostName+"!"+service.Name, false)
+
+					slinfo.DeleteTime = types.UnixMilli(time.Now())
+					eventually.Assert(t, func(t require.TestingT) {
+						verifySlaLifeCycleRow(t, db, slinfo, "", "")
+					}, 20*time.Second, 1*time.Second)
+				})
+			}
 		})
 
 		t.Run("User", func(t *testing.T) {
@@ -1186,6 +1245,68 @@ func verifyIcingaDbRow(t require.TestingT, db *sqlx.DB, obj interface{}) {
 	}
 
 	require.False(t, rows.Next(), "SQL query should return only one row: %s", query)
+}
+
+func verifySlaLifeCycleRow(t require.TestingT, db *sqlx.DB, slinfo *SlaLifecycle, host string, service string) {
+	query := `SELECT "create_time", "delete_time", "sla_lifecycle"."host_id", "sla_lifecycle"."service_id" FROM "sla_lifecycle"`
+	var args []interface{}
+	if !slinfo.HostID.Valid() {
+		query += ` INNER JOIN "host" ON "host"."id"="sla_lifecycle"."host_id"`
+		where := ` WHERE "host"."name"=?`
+
+		args = append(args, host)
+		if service == "" {
+			where += ` AND "service_id" IS NULL`
+		} else {
+			query += ` INNER JOIN "service" ON "service"."id"="sla_lifecycle"."service_id"`
+			where += ` AND "service"."name"=?`
+			args = append(args, service)
+		}
+
+		query += where + ` AND "delete_time" = 0`
+	} else {
+		query += ` WHERE "host_id"=?`
+		args = []interface{}{slinfo.HostID}
+		if !slinfo.ServiceID.Valid() {
+			query += ` AND "service_id" IS NULL`
+		} else {
+			query += ` AND "service_id"=?`
+			args = append(args, slinfo.ServiceID)
+		}
+	}
+
+	var resultSet []SlaLifecycle
+	err := db.Select(&resultSet, db.Rebind(query), args...)
+	require.NoError(t, err, "querying sla lifecycle should not fail: Query: %q", query)
+
+	require.Len(t, resultSet, 1, "there should be one sla lifecycle entry")
+
+	result := resultSet[0]
+	zerotimestamp := time.Unix(0, 0)
+
+	require.NotEqual(t, zerotimestamp, result.CreateTime.Time())
+	assert.WithinDuration(t, slinfo.CreateTime.Time(), result.CreateTime.Time(), time.Minute)
+
+	if slinfo.DeleteTime.Time().IsZero() {
+		// We can't join on the host/service tables, as the sla lifecycle entries may reference entries that have
+		// already been deleted. So cache the host/service id to use as a filter when asserting the sla lifecycles
+		// delete event.
+		slinfo.HostID = result.HostID
+		slinfo.ServiceID = result.ServiceID
+
+		require.Equal(t, zerotimestamp, result.DeleteTime.Time())
+	} else {
+		require.NotEqual(t, zerotimestamp, result.DeleteTime.Time())
+		require.Less(t, result.CreateTime.Time(), result.DeleteTime.Time())
+		assert.WithinDuration(t, slinfo.DeleteTime.Time(), result.DeleteTime.Time(), time.Minute)
+	}
+}
+
+type SlaLifecycle struct {
+	CreateTime types.UnixMilli `db:"create_time"`
+	DeleteTime types.UnixMilli `db:"delete_time"`
+	HostID     types.Binary    `db:"host_id"`
+	ServiceID  types.Binary    `db:"service_id"`
 }
 
 // newString allocates a new *string and initializes it. This helper function exists as
