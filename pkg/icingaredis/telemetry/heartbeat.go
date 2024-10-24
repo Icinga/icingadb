@@ -3,7 +3,6 @@ package telemetry
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/periodic"
 	"github.com/icinga/icinga-go-library/redis"
@@ -81,7 +80,7 @@ func GetCurrentDbConnErr() (string, int64) {
 var OngoingSyncStartMilli int64
 
 // LastSuccessfulSync is to be updated by the main() function.
-var LastSuccessfulSync com.Atomic[SuccessfulSync]
+var LastSuccessfulSync atomic.Pointer[SuccessfulSync]
 
 var boolToStr = map[bool]string{false: "0", true: "1"}
 var startTime = time.Now().UnixMilli()
@@ -101,7 +100,7 @@ func StartHeartbeat(
 		heartbeat := heartbeat.LastReceived()
 		responsibleTsMilli, responsible, otherResponsible := ha.State()
 		ongoingSyncStart := atomic.LoadInt64(&OngoingSyncStartMilli)
-		sync, _ := LastSuccessfulSync.Load()
+		lastSync := LastSuccessfulSync.Load()
 		dbConnErr, dbConnErrSinceMilli := GetCurrentDbConnErr()
 		now := time.Now()
 
@@ -117,8 +116,8 @@ func StartHeartbeat(
 			"ha-responsible-ts":       strconv.FormatInt(responsibleTsMilli, 10),
 			"ha-other-responsible":    boolToStr[otherResponsible],
 			"sync-ongoing-since":      strconv.FormatInt(ongoingSyncStart, 10),
-			"sync-success-finish":     strconv.FormatInt(sync.FinishMilli, 10),
-			"sync-success-duration":   strconv.FormatInt(sync.DurationMilli, 10),
+			"sync-success-finish":     strconv.FormatInt(lastSync.FinishMilli, 10),
+			"sync-success-duration":   strconv.FormatInt(lastSync.DurationMilli, 10),
 		}
 
 		ctx, cancel := context.WithDeadline(ctx, tick.Time.Add(interval))

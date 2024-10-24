@@ -116,6 +116,7 @@ func run() int {
 		ha = icingadb.NewHA(ctx, db, heartbeat, logs.GetChildLogger("high-availability"))
 
 		telemetryLogger := logs.GetChildLogger("telemetry")
+		telemetry.LastSuccessfulSync.Store(&telemetry.SuccessfulSync{})
 		telemetry.StartHeartbeat(ctx, rc, telemetryLogger, ha, heartbeat)
 		telemetry.WriteStats(ctx, rc, telemetryLogger)
 	}
@@ -250,7 +251,7 @@ func run() int {
 							logger := logs.GetChildLogger("config-sync")
 
 							if synctx.Err() == nil {
-								telemetry.LastSuccessfulSync.Store(telemetry.SuccessfulSync{
+								telemetry.LastSuccessfulSync.Store(&telemetry.SuccessfulSync{
 									FinishMilli:   syncEnd.UnixMilli(),
 									DurationMilli: elapsed.Milliseconds(),
 								})
