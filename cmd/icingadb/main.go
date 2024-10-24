@@ -204,7 +204,7 @@ func run() int {
 						})
 
 						syncStart := time.Now()
-						atomic.StoreInt64(&telemetry.OngoingSyncStartMilli, syncStart.UnixMilli())
+						telemetry.OngoingSyncStartMilli.Store(syncStart.UnixMilli())
 
 						logger.Info("Starting config sync")
 						for _, factory := range v1.ConfigFactories {
@@ -244,7 +244,7 @@ func run() int {
 
 						g.Go(func() error {
 							configInitSync.Wait()
-							atomic.StoreInt64(&telemetry.OngoingSyncStartMilli, 0)
+							telemetry.OngoingSyncStartMilli.Store(0)
 
 							syncEnd := time.Now()
 							elapsed := syncEnd.Sub(syncStart)
