@@ -221,7 +221,7 @@ func (h *HA) controller() {
 
 				// Ensure that updating/inserting the instance row is completed by the current heartbeat's expiry time.
 				realizeCtx, cancelRealizeCtx := context.WithDeadline(h.ctx, m.ExpiryTime())
-				err = h.realize(realizeCtx, s, t, envId, shouldLogRoutineEvents)
+				err = h.realize(realizeCtx, s, envId, shouldLogRoutineEvents)
 				cancelRealizeCtx()
 				if errors.Is(err, context.DeadlineExceeded) {
 					h.signalHandover("instance update/insert deadline exceeded heartbeat expiry time")
@@ -268,10 +268,12 @@ func (h *HA) controller() {
 // realize a HA cycle triggered by a heartbeat event.
 //
 // shouldLogRoutineEvents indicates if recurrent events should be logged.
+//
+// The internal, retryable function always fetches the last received heartbeat's timestamp instead of reusing the one
+// from the calling controller loop. Doing so results in inserting a more accurate timestamp if a retry happens.
 func (h *HA) realize(
 	ctx context.Context,
 	s *icingaredisv1.IcingaStatus,
-	t *types.UnixMilli,
 	envId types.Binary,
 	shouldLogRoutineEvents bool,
 ) error {
@@ -354,7 +356,7 @@ func (h *HA) realize(
 				EnvironmentMeta: v1.EnvironmentMeta{
 					EnvironmentId: envId,
 				},
-				Heartbeat:                         *t,
+				Heartbeat:                         types.UnixMilli(time.UnixMilli(h.heartbeat.LastMessageTime())),
 				Responsible:                       types.Bool{Bool: takeover != "" || h.responsible, Valid: true},
 				EndpointId:                        s.EndpointId,
 				Icinga2Version:                    s.Version,

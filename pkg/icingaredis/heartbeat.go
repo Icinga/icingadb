@@ -25,6 +25,7 @@ type Heartbeat struct {
 	active         bool
 	events         chan *HeartbeatMessage
 	lastReceivedMs atomic.Int64
+	lastMessageMs  atomic.Int64
 	cancelCtx      context.CancelFunc
 	client         *redis.Client
 	done           chan struct{}
@@ -60,6 +61,11 @@ func (h *Heartbeat) Events() <-chan *HeartbeatMessage {
 // LastReceived returns the last heartbeat's receive time in ms.
 func (h *Heartbeat) LastReceived() int64 {
 	return h.lastReceivedMs.Load()
+}
+
+// LastMessageTime returns the last message's time in ms.
+func (h *Heartbeat) LastMessageTime() int64 {
+	return h.lastMessageMs.Load()
 }
 
 // Close stops the heartbeat controller loop, waits for it to finish, and returns an error if any.
@@ -139,6 +145,15 @@ func (h *Heartbeat) controller(ctx context.Context) {
 				}
 
 				h.lastReceivedMs.Store(m.received.UnixMilli())
+
+				statsT, err := m.stats.Time()
+				if err != nil {
+					h.logger.Warnw("Received Icinga heartbeat with invalid stats time", zap.Error(err))
+					h.lastMessageMs.Store(0)
+				} else {
+					h.lastMessageMs.Store(statsT.Time().UnixMilli())
+				}
+
 				h.sendEvent(m)
 			case <-time.After(Timeout):
 				if h.active {
@@ -150,6 +165,7 @@ func (h *Heartbeat) controller(ctx context.Context) {
 				}
 
 				h.lastReceivedMs.Store(0)
+				h.lastMessageMs.Store(0)
 			case <-ctx.Done():
 				return ctx.Err()
 			}
