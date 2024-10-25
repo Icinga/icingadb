@@ -326,7 +326,10 @@ func run() int {
 
 				cancelHactx()
 			case <-hactx.Done():
-				// Nothing to do here, surrounding loop will terminate now.
+				if ctx.Err() != nil {
+					logger.Fatalf("%+v", errors.New("main context closed unexpectedly"))
+				}
+				// Otherwise, there is nothing to do here, surrounding loop will terminate now.
 			case <-ha.Done():
 				if err := ha.Err(); err != nil {
 					logger.Fatalf("%+v", errors.Wrap(err, "HA exited with an error"))
@@ -338,8 +341,6 @@ func run() int {
 				cancelHactx()
 
 				return ExitFailure
-			case <-ctx.Done():
-				logger.Fatalf("%+v", errors.New("main context closed unexpectedly"))
 			case s := <-sig:
 				logger.Infow("Exiting due to signal", zap.String("signal", s.String()))
 				cancelHactx()
