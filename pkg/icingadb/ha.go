@@ -303,6 +303,7 @@ func (h *HA) realize(
 			if errBegin != nil {
 				return errors.Wrap(errBegin, "can't start transaction")
 			}
+			defer func() { _ = tx.Rollback() }()
 
 			query := h.db.Rebind("SELECT id, heartbeat FROM icingadb_instance "+
 				"WHERE environment_id = ? AND responsible = ? AND id <> ?") + selectLock
