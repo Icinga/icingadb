@@ -1,5 +1,4 @@
 <!-- {% if index %} -->
-
 # Installing Icinga DB
 
 The recommended way to install Icinga DB is to use prebuilt packages for
@@ -24,226 +23,13 @@ which ships an up-to-date Redis® open source server version and is pre-configur
     we recommend to install it where the corresponding Icinga 2 node and Redis® server is running to
     keep latency between the components low.
 
+<!-- {% elif not icingaDocs %} -->
+## Installing the Package
+
+If the [repository](https://packages.icinga.com) is not configured yet, please add it first.
+Then use your distribution's package manager to install the `icingadb` package
+or install [from source](02-Installation.md.d/From-Source.md).
 <!-- {% else %} -->
-
-## Adding Icinga Package Repository
-
-The recommended way to install Icinga DB is to use prebuilt packages from our official release repository.
-
-!!! tip
-
-    If you install Icinga DB on a node that has Icinga 2 or Icinga Web installed via packages,
-    proceed to [installing the Icinga DB package](#installing-icinga-db-package) as
-    the repository is already configured.
-
-Here's how to add the official release repository:
-
-<!-- {% if amazon_linux %} -->
-<!-- {% if not icingaDocs %} -->
-
-### Amazon Linux 2 Repository
-
-<!-- {% endif %} -->
-!!! info
-
-    A paid repository subscription is required for Amazon Linux 2 repositories. Get more information on
-    [icinga.com/subscription](https://icinga.com/subscription).
-
-    Don't forget to fill in the username and password section with appropriate credentials in the local .repo file.
-
-```bash
-rpm --import https://packages.icinga.com/icinga.key
-wget https://packages.icinga.com/subscription/amazon/ICINGA-release.repo -O /etc/yum.repos.d/ICINGA-release.repo
-```
-
-<!-- {% endif %} -->
-
-<!-- {% if centos %} -->
-<!-- {% if not icingaDocs %} -->
-
-### CentOS Repository
-
-<!-- {% endif %} -->
-
-```bash
-rpm --import https://packages.icinga.com/icinga.key
-wget https://packages.icinga.com/centos/ICINGA-release.repo -O /etc/yum.repos.d/ICINGA-release.repo
-```
-
-<!-- {% endif %} -->
-
-<!-- {% if debian %} -->
-<!-- {% if not icingaDocs %} -->
-
-### Debian Repository
-
-<!-- {% endif %} -->
-
-```bash
-apt update
-apt -y install apt-transport-https wget
-
-wget -O icinga-archive-keyring.deb "https://packages.icinga.com/icinga-archive-keyring_latest+debian$(
- . /etc/os-release; echo "$VERSION_ID"
-).deb"
-
-apt install ./icinga-archive-keyring.deb
-
-DIST=$(awk -F"[)(]+" '/VERSION=/ {print $2}' /etc/os-release); \
- echo "deb [signed-by=/usr/share/keyrings/icinga-archive-keyring.gpg] https://packages.icinga.com/debian icinga-${DIST} main" > \
- /etc/apt/sources.list.d/${DIST}-icinga.list
- echo "deb-src [signed-by=/usr/share/keyrings/icinga-archive-keyring.gpg] https://packages.icinga.com/debian icinga-${DIST} main" >> \
- /etc/apt/sources.list.d/${DIST}-icinga.list
-
-apt update
-```
-
-<!-- {% endif %} -->
-
-<!-- {% if rhel %} -->
-<!-- {% if not icingaDocs %} -->
-
-### RHEL Repository
-
-<!-- {% endif %} -->
-!!! info
-
-    A paid repository subscription is required for RHEL repositories. Get more information on
-    [icinga.com/subscription](https://icinga.com/subscription).
-
-    Don't forget to fill in the username and password section with appropriate credentials in the local .repo file.
-
-```bash
-rpm --import https://packages.icinga.com/icinga.key
-wget https://packages.icinga.com/subscription/rhel/ICINGA-release.repo -O /etc/yum.repos.d/ICINGA-release.repo
-```
-
-<!-- {% endif %} -->
-
-<!-- {% if sles %} -->
-<!-- {% if not icingaDocs %} -->
-
-### SLES Repository
-
-<!-- {% endif %} -->
-!!! info
-
-    A paid repository subscription is required for SLES repositories. Get more information on
-    [icinga.com/subscription](https://icinga.com/subscription).
-
-    Don't forget to fill in the username and password section with appropriate credentials in the local .repo file.
-
-```bash
-rpm --import https://packages.icinga.com/icinga.key
-
-zypper ar https://packages.icinga.com/subscription/sles/ICINGA-release.repo
-zypper ref
-```
-
-<!-- {% endif %} -->
-
-<!-- {% if ubuntu %} -->
-<!-- {% if not icingaDocs %} -->
-
-### Ubuntu Repository
-
-<!-- {% endif %} -->
-
-```bash
-apt update
-apt -y install apt-transport-https wget
-
-wget -O icinga-archive-keyring.deb "https://packages.icinga.com/icinga-archive-keyring_latest+ubuntu$(
- . /etc/os-release; echo "$VERSION_ID"
-).deb"
-
-apt install ./icinga-archive-keyring.deb
-
-. /etc/os-release; if [ ! -z ${UBUNTU_CODENAME+x} ]; then DIST="${UBUNTU_CODENAME}"; else DIST="$(lsb_release -c| awk '{print $2}')"; fi; \
- echo "deb [signed-by=/usr/share/keyrings/icinga-archive-keyring.gpg] https://packages.icinga.com/ubuntu icinga-${DIST} main" > \
- /etc/apt/sources.list.d/${DIST}-icinga.list
- echo "deb-src [signed-by=/usr/share/keyrings/icinga-archive-keyring.gpg] https://packages.icinga.com/ubuntu icinga-${DIST} main" >> \
- /etc/apt/sources.list.d/${DIST}-icinga.list
-
-apt update
-```
-
-<!-- {% endif %} -->
-
-## Installing Icinga DB Package
-
-Use your distribution's package manager to install the `icingadb` package as follows:
-
-<!-- {% if amazon_linux %} -->
-<!-- {% if not icingaDocs %} -->
-
-#### Amazon Linux 2
-
-<!-- {% endif %} -->
-
-```bash
-yum install icingadb
-```
-
-<!-- {% endif %} -->
-
-<!-- {% if centos %} -->
-<!-- {% if not icingaDocs %} -->
-
-#### CentOS
-
-<!-- {% endif %} -->
-!!! info
-
-    Note that installing Icinga DB is only supported on CentOS 7 as CentOS 8 is EOL.
-
-```bash
-yum install icingadb
-```
-
-<!-- {% endif %} -->
-
-<!-- {% if debian or ubuntu %} -->
-<!-- {% if not icingaDocs %} -->
-
-#### Debian / Ubuntu
-
-<!-- {% endif %} -->
-
-```bash
-apt install icingadb
-```
-
-<!-- {% endif %} -->
-
-<!-- {% if rhel %} -->
-
-#### RHEL 8 or Later
-
-```bash
-dnf install icingadb
-```
-
-#### RHEL 7
-
-```bash
-yum install icingadb
-```
-
-<!-- {% endif %} -->
-
-<!-- {% if sles %} -->
-<!-- {% if not icingaDocs %} -->
-
-#### SLES
-
-<!-- {% endif %} -->
-
-```bash
-zypper install icingadb
-```
-
-<!-- {% endif %} -->
 
 ## Setting up the Database
 
@@ -315,20 +101,32 @@ psql -U icingadb icingadb < /usr/share/icingadb/schema/pgsql/schema.sql
 
 ## Configuring Icinga DB
 
-Icinga DB installs its configuration file to `/etc/icingadb/config.yml`,
-pre-populating most of the settings for a local setup. Before running Icinga DB,
-adjust the Redis® and database credentials and, if necessary, the connection configuration.
+<!-- {% if from_source %} -->
+Create a local `config.yml` file using [the sample configuration](../config.example.yml).
+<!-- {% else %} -->
+The Icinga DB package installs its configuration file to `/etc/icingadb/config.yml`.
+<!-- {% endif %} -->
+Most of the settings are pre-populated for a local setup.
+Before running Icinga DB, adjust the Redis® and database credentials and, if necessary, the connection configuration.
 The configuration file explains general settings.
 All available settings can be found under [Configuration](03-Configuration.md).
 
 ## Running Icinga DB
 
+<!-- {% if from_source %} -->
+You can execute `icingadb` by running it with the locally accessible `config.yml` file:
+
+```bash
+icingadb -config /path/to/config.yml
+```
+<!-- {% else %} -->
 The `icingadb` package automatically installs the necessary systemd unit files to run Icinga DB.
 Please run the following command to enable and start its service:
 
 ```bash
 systemctl enable --now icingadb
 ```
+<!-- {% endif %} -->
 
 ## Installing Icinga DB Web
 
@@ -337,29 +135,37 @@ which connects to both Redis® and the database to display and work with the mon
 
 ![Icinga DB Web](images/icingadb-web.png)
 
-The Icinga DB Web package is also included in the Icinga repository, and since it is already set up,
-you have completed the instructions here and can proceed to
+You have completed the instructions here and can proceed to
 <!-- {% if amazon_linux %} -->
-[installing Icinga DB Web on Amazon Linux](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/01-Amazon-Linux/#installing-icinga-db-web-package),
-<!-- {% endif %} -->
-<!-- {% if centos %} -->
-[installing Icinga DB Web on CentOS](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/02-CentOS/#installing-icinga-db-web-package),
+[installing Icinga DB Web on Amazon Linux](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/Amazon-Linux/#installing-icinga-db-web-package),
 <!-- {% endif %} -->
 <!-- {% if debian %} -->
-[installing Icinga DB Web on Debian](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/03-Debian/#installing-icinga-db-web-package),
+[installing Icinga DB Web on Debian](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/Debian/#installing-icinga-db-web-package),
+<!-- {% endif %} -->
+<!-- {% if fedora %} -->
+[installing Icinga DB Web on Fedora](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/Fedora/#installing-icinga-db-web-package),
 <!-- {% endif %} -->
 <!-- {% if rhel %} -->
-[installing Icinga DB Web on RHEL](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/04-RHEL/#installing-icinga-db-web-package),
+[installing Icinga DB Web on RHEL](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/RHEL/#installing-icinga-db-web-package),
+<!-- {% endif %} -->
+<!-- {% if raspberry_pi_os %} -->
+[installing Icinga DB Web on Raspberry Pi Os](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/Raspberry-Pi-OS/#installing-icinga-db-web-package),
 <!-- {% endif %} -->
 <!-- {% if sles %} -->
-[installing Icinga DB Web on SLES](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/05-SLES/#installing-icinga-db-web-package),
+[installing Icinga DB Web on SLES](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/SLES/#installing-icinga-db-web-package),
 <!-- {% endif %} -->
 <!-- {% if ubuntu %} -->
-[installing Icinga DB Web on Ubuntu](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/06-Ubuntu/#installing-icinga-db-web-package),
+[installing Icinga DB Web on Ubuntu](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/Ubuntu/#installing-icinga-db-web-package),
+<!-- {% endif %} -->
+<!-- {% if opensuse %} -->
+[installing Icinga DB Web on openSUSE](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/openSUSE/#installing-icinga-db-web-package),
+<!-- {% endif %} -->
+<!-- {% if from_source %} -->
+[installing Icinga DB Web From Source](https://icinga.com/docs/icinga-db-web/latest/doc/02-Installation/From-Source),
 <!-- {% endif %} -->
 which will also guide you through the setup of the Icinga Web PHP framework,
 which is required to run the Icinga DB web module.
 Below is a preview of how the interface visualizes monitoring data and also supports dark and light mode:
 
 ![Icinga DB Web](images/icingadb-dashboard.png)
-<!-- {% endif %} --><!-- {# end else if index #} -->
+<!-- {% endif %} -->
