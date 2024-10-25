@@ -267,6 +267,9 @@ func (h *HA) controller() {
 
 // realize a HA cycle triggered by a heartbeat event.
 //
+// The context passed is expected to have a deadline, otherwise the method will panic. This deadline is strictly
+// enforced to abort the realization logic the moment the context expires.
+//
 // shouldLogRoutineEvents indicates if recurrent events should be logged.
 //
 // The internal, retryable function always fetches the last received heartbeat's timestamp instead of reusing the one
@@ -388,8 +391,39 @@ func (h *HA) realize(
 				}
 			}
 
-			if err := tx.Commit(); err != nil {
-				return errors.Wrap(err, "can't commit transaction")
+			// In general, cancellation does not work for COMMIT and ROLLBACK. Some database drivers may support a
+			// context-based abort, but only if the DBMS allows it. This was also discussed in the initial issue about
+			// context support to Go's sql package: https://github.com/golang/go/issues/15123#issuecomment-245882486
+			//
+			// This paragraph is implementation knowledge, not covered by the API specification. Go's sql.Tx.Commit() -
+			// which is not being overridden by sqlx.Tx - performs a preflight check on the context before handing over
+			// to the driver's Commit() method. Drivers may behave differently. For example, the used
+			// github.com/go-sql-driver/mysql package calls its internal exec() method with a COMMIT query, writing and
+			// reading packets without honoring the context.
+			//
+			// In a nutshell, one cannot expect a Tx.Commit() call to be covered by the transaction context. For this
+			// reason, the following Commit() call has been moved to its own goroutine, which communicates back via a
+			// channel selected along with the context. If the context ends before Commit(), this retryable function
+			// returns with a non-retryable error.
+			//
+			// However, while the COMMIT continues in the background, it may still succeed. In this case, the state of
+			// the database does not match the state of Icinga DB, specifically the database says that this instance is
+			// active while this instance thinks otherwise. Fortunately, this mismatch is not critical because when this
+			// function is re-entered, the initial SELECT query would be empty for this Icinga DB node and imply the
+			// presence of another active instance for the other node. Effectively, this could result in a single HA
+			// cycle with no active node. Afterwards, either this instance takes over due to the false impression that
+			// no other node is active, or the other instances does so as the inserted heartbeat has already expired.
+			// Not great, not terrible.
+			commitErrCh := make(chan error, 1)
+			go func() { commitErrCh <- tx.Commit() }()
+
+			select {
+			case err := <-commitErrCh:
+				if err != nil {
+					return errors.Wrap(err, "can't commit transaction")
+				}
+			case <-ctx.Done():
+				return ctx.Err()
 			}
 
 			return nil
