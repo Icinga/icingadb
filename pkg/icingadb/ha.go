@@ -374,9 +374,14 @@ func (h *HA) realize(
 
 			if takeover != "" {
 				stmt := h.db.Rebind("UPDATE icingadb_instance SET responsible = ? WHERE environment_id = ? AND id <> ?")
-				_, err := tx.ExecContext(ctx, stmt, "n", envId, h.instanceId)
+				if _, err := tx.ExecContext(ctx, stmt, "n", envId, h.instanceId); err != nil {
+					return database.CantPerformQuery(err, stmt)
+				}
 
-				if err != nil {
+				// Insert the environment after each heartbeat takeover if it does not already exist in the database
+				// as the environment may have changed, although this is likely to happen very rarely.
+				stmt, _ = h.db.BuildInsertIgnoreStmt(h.environment)
+				if _, err := h.db.NamedExecContext(ctx, stmt, h.environment); err != nil {
 					return database.CantPerformQuery(err, stmt)
 				}
 			}
@@ -424,12 +429,6 @@ func (h *HA) realize(
 	}
 
 	if takeover != "" {
-		// Insert the environment after each heartbeat takeover if it does not already exist in the database
-		// as the environment may have changed, although this is likely to happen very rarely.
-		if err := h.insertEnvironment(); err != nil {
-			return errors.Wrap(err, "can't insert environment")
-		}
-
 		h.signalTakeover(takeover)
 	} else if otherResponsible {
 		if state := h.state.Load(); !state.otherResponsible {
@@ -450,18 +449,6 @@ func (h *HA) realizeLostHeartbeat() {
 	if _, err := h.db.ExecContext(h.ctx, stmt, "n", h.instanceId); err != nil && !utils.IsContextCanceled(err) {
 		h.logger.Warnw("Can't update instance", zap.Error(database.CantPerformQuery(err, stmt)))
 	}
-}
-
-// insertEnvironment inserts the environment from the specified state into the database if it does not already exist.
-func (h *HA) insertEnvironment() error {
-	// Instead of checking whether the environment already exists, use an INSERT statement that does nothing if it does.
-	stmt, _ := h.db.BuildInsertIgnoreStmt(h.environment)
-
-	if _, err := h.db.NamedExecContext(h.ctx, stmt, h.environment); err != nil {
-		return database.CantPerformQuery(err, stmt)
-	}
-
-	return nil
 }
 
 func (h *HA) removeInstance(ctx context.Context) {
