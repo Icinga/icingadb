@@ -173,7 +173,7 @@ func (h *HA) controller() {
 				}
 				tt := t.Time()
 				if tt.After(now.Add(1 * time.Second)) {
-					h.logger.Debugw("Received heartbeat from the future", zap.Time("time", tt))
+					h.logger.Warnw("Received heartbeat from the future", zap.Time("time", tt))
 				}
 				if tt.Before(now.Add(-1 * peerTimeout)) {
 					h.logger.Errorw("Received heartbeat from the past", zap.Time("time", tt))
