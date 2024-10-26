@@ -10,6 +10,7 @@ import (
 	icingadbconfig "github.com/icinga/icingadb/internal/config"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
+	"io/fs"
 	"os"
 	"time"
 )
@@ -37,8 +38,48 @@ func New() *Command {
 		os.Exit(0)
 	}
 
+	// This function supports configuration loading in three scenarios:
+	//
+	// 1. Load configuration solely from YAML files when no relevant environment variables are set.
+	//
+	// 2. Combine YAML file and environment variable configurations, allowing environment variables
+	//    to supplement or override possible incomplete YAML configurations.
+	//
+	// 3. Load entirely from environment variables if the default YAML config file is absent and
+	//    no specific config path is provided by the user.
 	var cfg icingadbconfig.Config
-	if err := config.FromYAMLFile(flags.Config, &cfg); err != nil {
+	var configPath string
+	if flags.Config != "" {
+		configPath = flags.Config
+	} else {
+		configPath = icingadbconfig.DefaultConfigPath
+	}
+
+	if err := config.FromYAMLFile(configPath, &cfg); err != nil {
+		if errors.Is(err, config.ErrInvalidArgument) {
+			panic(err)
+		}
+
+		// Allow continuation with FromEnv by handling:
+		//
+		// - ErrInvalidConfiguration:
+		//   The configuration may be incomplete and will be revalidated in FromEnv.
+		//
+		// - Non-existent file errors:
+		//   If no explicit config path is set, fallback to environment variables is allowed.
+		configIsInvalid := errors.Is(err, config.ErrInvalidConfiguration)
+		defaultConfigFileDoesNotExist := errors.Is(err, fs.ErrNotExist) &&
+			configPath == icingadbconfig.DefaultConfigPath
+		if !(configIsInvalid || defaultConfigFileDoesNotExist) {
+			utils.PrintErrorThenExit(err, 1)
+		}
+	}
+
+	// Call FromEnv regardless of the outcome from FromYAMLFile.
+	// If no environment variables are set, configuration relies entirely on YAML.
+	// Otherwise, environment variables can supplement, override YAML settings, or serve as the sole source.
+	// FromEnv also includes validation, ensuring completeness after considering both sources.
+	if err := config.FromEnv(&cfg, config.EnvOptions{Prefix: "ICINGADB_"}); err != nil {
 		if errors.Is(err, config.ErrInvalidArgument) {
 			panic(err)
 		}
