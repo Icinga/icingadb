@@ -2,6 +2,8 @@ module github.com/icinga/icingadb
 
 go 1.22
 
+replace github.com/icinga/icinga-go-library v0.3.1 => github.com/icinga/icinga-go-library v0.3.2-0.20241026175131-ae4d57c2f11f
+
 require (
 	github.com/creasty/defaults v1.8.0
 	github.com/goccy/go-yaml v1.12.0
@@ -23,6 +25,7 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
+	github.com/caarlos0/env/v11 v11.2.2 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
@@ -33,7 +36,7 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.12 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/redis/go-redis/v9 v9.5.1 // indirect
+	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/ssgreg/journald v1.0.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
