@@ -467,6 +467,11 @@ func (h *HA) realize(
 	if takeover != "" {
 		h.signalTakeover(takeover)
 	} else if otherResponsible {
+		if state := h.state.Load(); state.responsible {
+			h.logger.Error("Other instance is responsible while this node itself is responsible, dropping responsibility")
+			h.signalHandover("other instance is responsible as well")
+			// h.signalHandover will update h.state
+		}
 		if state := h.state.Load(); !state.otherResponsible {
 			// Dereference pointer to create a copy of the value it points to.
 			// Ensures that any modifications do not directly affect the original data unless explicitly stored back.
