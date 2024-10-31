@@ -49,11 +49,34 @@ func (c *Config) Validate() error {
 }
 
 // Flags defines CLI flags.
+//
+// Flags implements the [github.com/icinga/icinga-go-library/config.Flags] interface.
 type Flags struct {
 	// Version decides whether to just print the version and exit.
 	Version bool `long:"version" description:"print version and exit"`
-	// Config is the path to the config file
-	Config string `short:"c" long:"config" description:"path to config file"`
+
+	// Config is the path to the config file. If not provided, it defaults to DefaultConfigPath.
+	Config string `short:"c" long:"config" description:"path to config file (default: /etc/icingadb/config.yml)"`
+	// default must be kept in sync with DefaultConfigPath.
+}
+
+// GetConfigPath retrieves the path to the configuration file.
+// It returns the path specified via the command line, or DefaultConfigPath if none is provided.
+//
+// GetConfigPath implements parts of the [github.com/icinga/icinga-go-library/config.Flags] interface.
+func (f Flags) GetConfigPath() string {
+	if f.Config == "" {
+		return DefaultConfigPath
+	}
+
+	return f.Config
+}
+
+// IsExplicitConfigPath indicates whether the configuration file path was explicitly set.
+//
+// IsExplicitConfigPath implements parts of the [github.com/icinga/icinga-go-library/config.Flags] interface.
+func (f Flags) IsExplicitConfigPath() bool {
+	return f.Config != ""
 }
 
 // RetentionConfig defines configuration for history retention.
