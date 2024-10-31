@@ -56,6 +56,21 @@ type Flags struct {
 	Config string `short:"c" long:"config" description:"path to config file"`
 }
 
+// GetConfigPath retrieves the path to the configuration file.
+// It returns the path specified via the command line, or DefaultConfigPath if none is provided.
+func (f Flags) GetConfigPath() string {
+	if f.Config == "" {
+		return DefaultConfigPath
+	}
+
+	return f.Config
+}
+
+// IsExplicitConfigPath indicates whether the configuration file path was explicitly set.
+func (f Flags) IsExplicitConfigPath() bool {
+	return f.Config != ""
+}
+
 // RetentionConfig defines configuration for history retention.
 type RetentionConfig struct {
 	HistoryDays uint16                   `yaml:"history-days"`
