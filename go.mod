@@ -16,7 +16,7 @@ require (
 	github.com/stretchr/testify v1.9.0
 	github.com/vbauerster/mpb/v6 v6.0.4
 	go.uber.org/zap v1.27.0
-	golang.org/x/sync v0.8.0
+	golang.org/x/sync v0.9.0
 )
 
 require (
