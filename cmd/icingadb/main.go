@@ -180,7 +180,7 @@ func run() int {
 
 						dump := icingadb.NewDumpSignals(rc, logs.GetChildLogger("dump-signals"))
 						g.Go(func() error {
-							logger.Debug("Staring config dump signal handling")
+							logger.Debug("Starting config dump signal handling")
 
 							return dump.Listen(synctx)
 						})
