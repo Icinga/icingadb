@@ -1,10 +1,12 @@
 CREATE TABLE `dependency` (
   `id` binary(20) NOT NULL,
+  `environment_id` binary(20) NOT NULL,
   `name` text NOT NULL,
   `display_name` text NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
+-- TODO
 CREATE TABLE `dependency_state` (
   `id` binary(20) NOT NULL,
   `dependency_id` binary(20) NOT NULL,
@@ -16,11 +18,13 @@ CREATE TABLE `dependency_state` (
 
 CREATE TABLE `redundancy_group` (
   `id` binary(20) NOT NULL,
+  `environment_id` binary(20) NOT NULL,
   `name` text NOT NULL,
   `display_name` text NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
+-- TODO
 CREATE TABLE `redundancy_group_state` (
   `id` binary(20) NOT NULL,
   `redundancy_group_id` binary(20) NOT NULL,
@@ -33,6 +37,7 @@ CREATE TABLE `redundancy_group_state` (
 
 CREATE TABLE `dependency_node` (
   `id` binary(20) NOT NULL,
+  `environment_id` binary(20) NOT NULL,
   `host_id` binary(20) DEFAULT NULL,
   `service_id` binary(20) DEFAULT NULL,
   `redundancy_group_id` binary(20) DEFAULT NULL,
@@ -46,6 +51,7 @@ CREATE TABLE `dependency_node` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE `dependency_edge` (
+  `environment_id` binary(20) NOT NULL,
   `to_node_id` binary(20) NOT NULL,
   `from_node_id` binary(20) NOT NULL,
   `dependency_id` binary(20) DEFAULT NULL,
