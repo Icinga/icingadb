@@ -51,6 +51,10 @@ var ConfigFactories = []database.EntityFactoryFunc{
 	NewUsergroupCustomvar,
 	NewUsergroupMember,
 	NewZone,
+	NewDependency,
+	NewRedundancyGroup,
+	NewDependencyNode,
+	NewDependencyEdge,
 }
 
 // contextKey is an unexported type for context keys defined in this package.

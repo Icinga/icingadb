@@ -1347,7 +1347,9 @@ CREATE TABLE `dependency` (
   `id` binary(20) NOT NULL,
   `environment_id` binary(20) NOT NULL,
   `name` text NOT NULL,
+  `name_checksum` binary(20) NOT NULL COMMENT 'sha1(name)',
   `display_name` text NOT NULL,
+  `redundancy_group_id` binary(20) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
@@ -1365,6 +1367,7 @@ CREATE TABLE `redundancy_group` (
   `id` binary(20) NOT NULL,
   `environment_id` binary(20) NOT NULL,
   `name` text NOT NULL,
+  `name_checksum` binary(20) NOT NULL COMMENT 'sha1(name)',
   `display_name` text NOT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -1396,6 +1399,7 @@ CREATE TABLE `dependency_node` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE `dependency_edge` (
+  `id` binary(20) NOT NULL,
   `environment_id` binary(20) NOT NULL,
   `to_node_id` binary(20) NOT NULL,
   `from_node_id` binary(20) NOT NULL,
