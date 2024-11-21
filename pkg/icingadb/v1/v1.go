@@ -52,7 +52,8 @@ var ConfigFactories = []database.EntityFactoryFunc{
 	NewUsergroupMember,
 	NewZone,
 	NewDependency,
-	NewRedundancyGroup,
+	NewRedundancygroup,
+	NewRedundancygroupState,
 	NewDependencyNode,
 	NewDependencyEdge,
 }
