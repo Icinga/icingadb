@@ -56,3 +56,15 @@ CREATE TABLE `dependency_edge` (
   CONSTRAINT `dependency_edge_dependency_node_id_fk` FOREIGN KEY (`to_node_id`) REFERENCES `dependency_node` (`id`),
   CONSTRAINT `dependency_edge_dependency_node_id_fk_2` FOREIGN KEY (`from_node_id`) REFERENCES `dependency_node` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
+ALTER TABLE host
+    ADD COLUMN affected_children int unsigned DEFAULT NULL AFTER check_retry_interval;
+
+ALTER TABLE host_state
+    ADD COLUMN affects_children enum('n', 'y') NOT NULL DEFAULT 'n' AFTER in_downtime;
+
+ALTER TABLE service
+    ADD COLUMN affected_children int unsigned DEFAULT NULL AFTER check_retry_interval;
+
+ALTER TABLE service_state
+    ADD COLUMN affects_children enum('n', 'y') NOT NULL DEFAULT 'n' AFTER in_downtime;
