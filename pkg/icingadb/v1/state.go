@@ -17,6 +17,7 @@ type State struct {
 	ExecutionTime             float64                            `json:"execution_time"`
 	HardState                 uint8                              `json:"hard_state"`
 	InDowntime                types.Bool                         `json:"in_downtime"`
+	AffectsChildren           types.Bool                         `json:"affects_children"`
 	IsAcknowledged            icingadbTypes.AcknowledgementState `json:"is_acknowledged"`
 	IsFlapping                types.Bool                         `json:"is_flapping"`
 	IsHandled                 types.Bool                         `json:"is_handled"`
