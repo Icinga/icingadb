@@ -15,6 +15,7 @@ type Checkable struct {
 	CheckTimeperiodName   string       `json:"check_timeperiod_name"`
 	CheckTimeperiodId     types.Binary `json:"check_timeperiod_id"`
 	CheckRetryInterval    float64      `json:"check_retry_interval"`
+	TotalChildren         types.Int    `json:"total_children"`
 	CheckTimeout          float64      `json:"check_timeout"`
 	CheckcommandName      string       `json:"checkcommand_name"`
 	CheckcommandId        types.Binary `json:"checkcommand_id"`
