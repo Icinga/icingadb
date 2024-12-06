@@ -8,6 +8,7 @@ COMMENT ON COLUMN notification.properties_checksum IS 'sha1(all properties)';
 ALTER TABLE timeperiod_range ALTER COLUMN range_value TYPE text;
 
 ALTER TABLE checkcommand_argument ALTER COLUMN argument_key TYPE varchar(255);
+ALTER TABLE checkcommand_argument ALTER COLUMN argument_key SET STORAGE PLAIN;
 ALTER TABLE eventcommand_argument ALTER COLUMN argument_key TYPE varchar(255);
 ALTER TABLE notificationcommand_argument ALTER COLUMN argument_key TYPE varchar(255);
 
