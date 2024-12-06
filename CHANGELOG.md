@@ -1,5 +1,28 @@
 # Icinga DB Changelog
 
+## 1.2.1 (2024-12-XX)
+
+This is a maintenance release that addresses HA issues and includes a number of other fixes.
+
+Most prominent, crashes caused by an invalid HA state were investigated and fixed mainly by the following changes.
+
+* Ensure that the crucial HA realization logic is always aborted when its timeout is reached. #800
+* Give up the HA leadership role if it seems another node is also active. #825
+* Reduce database deadlocks in the HA realization domain with exclusive locking. #830
+
+Other notable changes include the following:
+
+* Alter the database schema to allow longer user input. #779, #792, #856
+* Mitigate some NULL values for icingadb-migrate. #767
+* Parts of the code have been moved to our [icinga-go-library](https://github.com/Icinga/icinga-go-library) for use by our other Go daemons. #747
+* Additional tests were written. #771, #777, #803, #806, #807, #808
+* Update dependencies. [25 times](https://github.com/Icinga/icingadb/pulls?q=is%3Apr+milestone%3A1.2.1+label%3Adependencies)
+
+### Schema
+
+A schema upgrade is available that allows longer user input as listed above.
+Please follow the [upgrading documentation](doc/04-Upgrading.md#upgrading-to-icinga-db-v121).
+
 ## 1.2.0 (2024-04-11)
 
 This release addresses multiple issues related to fault recoveries,
