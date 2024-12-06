@@ -1,9 +1,6 @@
 name: Compliance
 on:
-  push:
-    branches:
-      - main
-      - 'support/*'
+  push: { }
   pull_request: {}
 
 jobs:

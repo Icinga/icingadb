@@ -1,10 +1,7 @@
 name: SQL
 
 on:
-  push:
-    branches:
-      - main
-      - 'support/*'
+  push: { }
   pull_request: {}
 
 jobs:

@@ -1,10 +1,7 @@
 name: Integration Tests
 
 on:
-  push:
-    branches:
-      - main
-      - 'support/*'
+  push: { }
   pull_request: {}
   schedule:
     - cron: '57 3 * * *'
