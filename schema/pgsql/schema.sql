@@ -855,7 +855,6 @@ CREATE TABLE checkcommand_argument (
 ALTER TABLE checkcommand_argument ALTER COLUMN id SET STORAGE PLAIN;
 ALTER TABLE checkcommand_argument ALTER COLUMN environment_id SET STORAGE PLAIN;
 ALTER TABLE checkcommand_argument ALTER COLUMN checkcommand_id SET STORAGE PLAIN;
-ALTER TABLE checkcommand_argument ALTER COLUMN argument_key SET STORAGE PLAIN;
 ALTER TABLE checkcommand_argument ALTER COLUMN properties_checksum SET STORAGE PLAIN;
 
 COMMENT ON COLUMN checkcommand_argument.id IS 'sha1(environment.id + checkcommand_id + argument_key)';
