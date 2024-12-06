@@ -11,7 +11,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ macos-latest, ubuntu-latest ]
+        os: [ macos-latest, ubuntu-24.04 ]
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -26,7 +26,7 @@ jobs:
       - run: go test -v -race ./...
 
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -47,7 +47,7 @@ jobs:
           args: -E gosec
 
   vet:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -58,7 +58,7 @@ jobs:
       - run: go vet ./...
 
   fmt:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -73,7 +73,7 @@ jobs:
             test -z "$fmtvar"
 
   modtidy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -90,7 +90,7 @@ jobs:
 
   vendor-diff:
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - uses: actions/setup-go@v5
       with:
