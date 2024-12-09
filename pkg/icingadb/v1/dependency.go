@@ -5,23 +5,13 @@ import (
 	"github.com/icinga/icinga-go-library/types"
 )
 
-type Dependency struct {
-	EntityWithoutChecksum `json:",inline"`
-	EnvironmentMeta       `json:",inline"`
-	NameMeta              `json:",inline"`
-	RedundancyGroupId     types.Binary `json:"redundancy_group_id"`
-}
-
 type Redundancygroup struct {
 	EntityWithoutChecksum `json:",inline"`
 	EnvironmentMeta       `json:",inline"`
-	Name                  string `json:"name"`
 	DisplayName           string `json:"display_name"`
 }
 
 // TableName implements [database.TableNamer].
-//
-// Unless I am missing something, there is no way to change a type's name for the Redis, see common.SyncSubject.Name().
 func (r Redundancygroup) TableName() string {
 	return "redundancy_group"
 }
@@ -31,6 +21,7 @@ type RedundancygroupState struct {
 	EnvironmentMeta       `json:",inline"`
 	RedundancyGroupId     types.Binary    `json:"redundancy_group_id"`
 	Failed                types.Bool      `json:"failed"`
+	IsReachable           types.Bool      `json:"is_reachable"`
 	LastStateChange       types.UnixMilli `json:"last_state_change"`
 }
 
@@ -47,16 +38,19 @@ type DependencyNode struct {
 	RedundancyGroupId     types.Binary `json:"redundancy_group_id"`
 }
 
+type DependencyEdgeState struct {
+	EntityWithoutChecksum `json:",inline"`
+	EnvironmentMeta       `json:",inline"`
+	Failed                types.Bool `json:"failed"`
+}
+
 type DependencyEdge struct {
 	EntityWithoutChecksum `json:",inline"`
 	EnvironmentMeta       `json:",inline"`
 	FromNodeId            types.Binary `json:"from_node_id"`
 	ToNodeId              types.Binary `json:"to_node_id"`
-	DependencyId          types.Binary `json:"dependency_id"`
-}
-
-func NewDependency() database.Entity {
-	return &Dependency{}
+	DependencyEdgeStateId types.Binary `json:"dependency_edge_state_id"`
+	DisplayName           string       `json:"display_name"`
 }
 
 func NewRedundancygroup() database.Entity {
@@ -69,6 +63,10 @@ func NewRedundancygroupState() database.Entity {
 
 func NewDependencyNode() database.Entity {
 	return &DependencyNode{}
+}
+
+func NewDependencyEdgeState() database.Entity {
+	return &DependencyEdgeState{}
 }
 
 func NewDependencyEdge() database.Entity {
