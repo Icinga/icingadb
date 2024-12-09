@@ -188,7 +188,7 @@ CREATE TABLE host (
   check_interval int unsigned NOT NULL,
   check_retry_interval int unsigned NOT NULL,
 
-  affected_children int unsigned DEFAULT NULL,
+  total_children int unsigned DEFAULT NULL,
 
   active_checks_enabled enum('n', 'y') NOT NULL,
   passive_checks_enabled enum('n', 'y') NOT NULL,
@@ -315,7 +315,7 @@ CREATE TABLE host_state (
 
   in_downtime enum('n', 'y') NOT NULL,
 
-  affects_children enum('n', 'y') NOT NULL DEFAULT 'n',
+  affects_children enum('n', 'y') NOT NULL,
 
   execution_time int unsigned DEFAULT NULL,
   latency int unsigned DEFAULT NULL,
@@ -360,7 +360,7 @@ CREATE TABLE service (
   check_interval int unsigned NOT NULL,
   check_retry_interval int unsigned NOT NULL,
 
-  affected_children int unsigned DEFAULT NULL,
+  total_children int unsigned DEFAULT NULL,
 
   active_checks_enabled enum('n', 'y') NOT NULL,
   passive_checks_enabled enum('n', 'y') NOT NULL,
@@ -488,7 +488,7 @@ CREATE TABLE service_state (
 
   in_downtime enum('n', 'y') NOT NULL,
 
-  affects_children enum('n', 'y') NOT NULL DEFAULT 'n',
+  affects_children enum('n', 'y') NOT NULL,
 
   execution_time int unsigned DEFAULT NULL,
   latency int unsigned DEFAULT NULL,
@@ -1342,73 +1342,61 @@ CREATE TABLE sla_history_downtime (
   INDEX idx_sla_history_downtime_env_downtime_end (environment_id, downtime_end) COMMENT 'Filter for sla history retention'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
+CREATE TABLE redundancy_group (
+  id binary(20) NOT NULL COMMENT 'sha1(name + all(member parent_name + timeperiod.name + states + ignore_soft_states))',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  display_name text NOT NULL,
 
-CREATE TABLE `dependency` (
-  `id` binary(20) NOT NULL,
-  `environment_id` binary(20) NOT NULL,
-  `name` text NOT NULL,
-  `name_checksum` binary(20) NOT NULL COMMENT 'sha1(name)',
-  -- `display_name` text NOT NULL,
-  `redundancy_group_id` binary(20) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  CONSTRAINT pk_redundancy_group PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
--- TODO
-CREATE TABLE `dependency_state` (
-  `id` binary(20) NOT NULL,
-  `dependency_id` binary(20) NOT NULL,
-  `failed` enum('n', 'y') NOT NULL,
-  UNIQUE INDEX `dependency_state_dependency_id_uindex` (dependency_id),
-  KEY `dependency_state_dependency_id_fk` (`dependency_id`)
-  -- CONSTRAINT `dependency_state_dependency_id_fk` FOREIGN KEY (`dependency_id`) REFERENCES `dependency` (`id`)
+CREATE TABLE redundancy_group_state (
+  id binary(20) NOT NULL COMMENT 'redundancy_group.id',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  redundancy_group_id binary(20) NOT NULL COMMENT 'redundancy_group.id',
+  failed enum('n', 'y') NOT NULL,
+  is_reachable enum('n', 'y') NOT NULL,
+  last_state_change BIGINT UNSIGNED NOT NULL,
+
+  CONSTRAINT pk_redundancy_group_state PRIMARY KEY (id),
+
+  UNIQUE INDEX idx_redundancy_group_state_redundancy_group_id (redundancy_group_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
-CREATE TABLE `redundancy_group` (
-  `id` binary(20) NOT NULL,
-  `environment_id` binary(20) NOT NULL,
-  `name` text NOT NULL,
-  `display_name` text NOT NULL,
-  PRIMARY KEY (`id`)
+CREATE TABLE dependency_node (
+  id binary(20) NOT NULL COMMENT 'host.id|service.id|redundancy_group.id',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  host_id binary(20) DEFAULT NULL COMMENT 'host.id',
+  service_id binary(20) DEFAULT NULL COMMENT 'service.id',
+  redundancy_group_id binary(20) DEFAULT NULL COMMENT 'redundancy_group.id',
+
+  CONSTRAINT pk_dependency_node PRIMARY KEY (id),
+
+  UNIQUE INDEX idx_dependency_node_host_service_redundancygroup_id (host_id, service_id, redundancy_group_id),
+  CONSTRAINT ck_dependency_node_either_checkable_or_redundancy_group_id CHECK (
+    IF(redundancy_group_id IS NULL, host_id IS NOT NULL, host_id IS NULL AND service_id IS NULL) = 1
+  )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
-CREATE TABLE `redundancy_group_state` (
-  `id` binary(20) NOT NULL,
-  `environment_id` binary(20) NOT NULL,
-  `redundancy_group_id` binary(20) NOT NULL,
-  `failed` enum('n', 'y') NOT NULL,
-  `last_state_change` bigint unsigned NOT NULL,
-  UNIQUE INDEX `redundancy_group_state_redundancy_group_id_uindex` (redundancy_group_id),
-  KEY `redundancy_group_state_redundancy_group_id_fk` (`redundancy_group_id`)
-  -- CONSTRAINT `redundancy_group_state_redundancy_group_id_fk` FOREIGN KEY (`redundancy_group_id`) REFERENCES `redundancy_group` (`id`)
+CREATE TABLE dependency_edge_state (
+  id binary(20) NOT NULL COMMENT 'sha1([dependency_edge.from_node_id|parent_name + timeperiod.name + states + ignore_soft_states] + dependency_edge.to_node_id)',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  failed enum('n', 'y') NOT NULL,
+
+  CONSTRAINT pk_dependency_edge_state PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
-CREATE TABLE `dependency_node` (
-  `id` binary(20) NOT NULL,
-  `environment_id` binary(20) NOT NULL,
-  `host_id` binary(20) DEFAULT NULL,
-  `service_id` binary(20) DEFAULT NULL,
-  `redundancy_group_id` binary(20) DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `dependency_node_host_id_service_id_uindex` (`host_id`,`service_id`),
-  KEY `dependency_node_redundancy_group_id_fk` (`redundancy_group_id`),
-  KEY `dependency_node_service_id_fk` (`service_id`)
-  -- CONSTRAINT `dependency_node_host_id_fk` FOREIGN KEY (`host_id`) REFERENCES `host` (`id`),
-  -- CONSTRAINT `dependency_node_redundancy_group_id_fk` FOREIGN KEY (`redundancy_group_id`) REFERENCES `redundancy_group` (`id`),
-  -- CONSTRAINT `dependency_node_service_id_fk` FOREIGN KEY (`service_id`) REFERENCES `service` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+CREATE TABLE dependency_edge (
+  id binary(20) NOT NULL COMMENT 'sha1(from_node_id + to_node_id)',
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  from_node_id binary(20) NOT NULL COMMENT 'dependency_node.id',
+  to_node_id binary(20) NOT NULL COMMENT 'dependency_node.id',
+  dependency_edge_state_id binary(20) NOT NULL COMMENT 'dependency_edge_state.id',
+  display_name text NOT NULL,
 
-CREATE TABLE `dependency_edge` (
-  `id` binary(20) NOT NULL,
-  `environment_id` binary(20) NOT NULL,
-  `to_node_id` binary(20) NOT NULL,
-  `from_node_id` binary(20) NOT NULL,
-  `dependency_id` binary(20) DEFAULT NULL,
-  UNIQUE KEY `dependency_edge_to_node_id_from_node_id_uindex` (`to_node_id`,`from_node_id`),
-  KEY `dependency_edge_dependency_node_id_fk_2` (`from_node_id`),
-  KEY `dependency_edge_dependency_id_fk` (`dependency_id`)
-  -- CONSTRAINT `dependency_edge_dependency_id_fk` FOREIGN KEY (`dependency_id`) REFERENCES `dependency` (`id`),
-  -- CONSTRAINT `dependency_edge_dependency_node_id_fk` FOREIGN KEY (`to_node_id`) REFERENCES `dependency_node` (`id`),
-  -- CONSTRAINT `dependency_edge_dependency_node_id_fk_2` FOREIGN KEY (`from_node_id`) REFERENCES `dependency_node` (`id`)
+  CONSTRAINT pk_dependency_edge PRIMARY KEY (id),
+
+  UNIQUE INDEX idx_dependency_edge_from_node_to_node_id (from_node_id, to_node_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icingadb_schema (
