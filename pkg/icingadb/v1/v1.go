@@ -4,7 +4,12 @@ import (
 	"github.com/icinga/icinga-go-library/database"
 )
 
-var StateFactories = []database.EntityFactoryFunc{NewHostState, NewServiceState}
+var StateFactories = []database.EntityFactoryFunc{
+	NewHostState,
+	NewServiceState,
+	NewDependencyState,
+	NewRedundancyroupState,
+}
 
 var ConfigFactories = []database.EntityFactoryFunc{
 	NewActionUrl,
@@ -53,7 +58,6 @@ var ConfigFactories = []database.EntityFactoryFunc{
 	NewZone,
 	NewDependency,
 	NewRedundancygroup,
-	NewRedundancygroupState,
 	NewDependencyNode,
 	NewDependencyEdge,
 }

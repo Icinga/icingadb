@@ -3,25 +3,36 @@ package v1
 import (
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
+	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 )
 
 type Dependency struct {
+	EntityWithChecksum   `json:",inline"`
+	EnvironmentMeta      `json:",inline"`
+	NameMeta             `json:",inline"`
+	DisplayName          string                           `json:"display_name"`
+	RedundancyGroupId    types.Binary                     `json:"redundancy_group_id"`
+	TimeperiodId         types.Binary                     `json:"timeperiod_id"`
+	DisableChecks        types.Bool                       `json:"disable_checks"`
+	DisableNotifications types.Bool                       `json:"disable_notifications"`
+	IgnoreSoftStates     types.Bool                       `json:"ignore_soft_states"`
+	States               icingadbTypes.NotificationStates `json:"states"`
+}
+
+type DependencyState struct {
 	EntityWithoutChecksum `json:",inline"`
 	EnvironmentMeta       `json:",inline"`
-	NameMeta              `json:",inline"`
-	RedundancyGroupId     types.Binary `json:"redundancy_group_id"`
+	DependencyId          types.Binary `json:"dependency_id"`
+	Failed                types.Bool   `json:"failed"`
 }
 
 type Redundancygroup struct {
 	EntityWithoutChecksum `json:",inline"`
 	EnvironmentMeta       `json:",inline"`
 	Name                  string `json:"name"`
-	DisplayName           string `json:"display_name"`
 }
 
 // TableName implements [database.TableNamer].
-//
-// Unless I am missing something, there is no way to change a type's name for the Redis, see common.SyncSubject.Name().
 func (r Redundancygroup) TableName() string {
 	return "redundancy_group"
 }
@@ -31,6 +42,7 @@ type RedundancygroupState struct {
 	EnvironmentMeta       `json:",inline"`
 	RedundancyGroupId     types.Binary    `json:"redundancy_group_id"`
 	Failed                types.Bool      `json:"failed"`
+	IsReachable           types.Bool      `json:"is_reachable"`
 	LastStateChange       types.UnixMilli `json:"last_state_change"`
 }
 
@@ -59,11 +71,15 @@ func NewDependency() database.Entity {
 	return &Dependency{}
 }
 
+func NewDependencyState() database.Entity {
+	return &DependencyState{}
+}
+
 func NewRedundancygroup() database.Entity {
 	return &Redundancygroup{}
 }
 
-func NewRedundancygroupState() database.Entity {
+func NewRedundancyroupState() database.Entity {
 	return &RedundancygroupState{}
 }
 
