@@ -215,6 +215,8 @@ CREATE TABLE host (
   check_interval uint NOT NULL,
   check_retry_interval uint NOT NULL,
 
+  total_children uint DEFAULT NULL,
+
   active_checks_enabled boolenum NOT NULL DEFAULT 'n',
   passive_checks_enabled boolenum NOT NULL DEFAULT 'n',
   event_handler_enabled boolenum NOT NULL DEFAULT 'n',
@@ -427,6 +429,8 @@ CREATE TABLE host_state (
 
   in_downtime boolenum NOT NULL DEFAULT 'n',
 
+  affects_children boolenum NOT NULL,
+
   execution_time uint DEFAULT NULL,
   latency uint DEFAULT NULL,
   check_timeout uint DEFAULT NULL,
@@ -488,6 +492,8 @@ CREATE TABLE service (
   check_timeout uint DEFAULT NULL,
   check_interval uint NOT NULL,
   check_retry_interval uint NOT NULL,
+
+  total_children uint DEFAULT NULL,
 
   active_checks_enabled boolenum NOT NULL DEFAULT 'n',
   passive_checks_enabled boolenum NOT NULL DEFAULT 'n',
@@ -696,6 +702,8 @@ CREATE TABLE service_state (
   last_comment_id bytea20 DEFAULT NULL,
 
   in_downtime boolenum NOT NULL DEFAULT 'n',
+
+  affects_children boolenum NOT NULL,
 
   execution_time uint DEFAULT NULL,
   latency uint DEFAULT NULL,
@@ -2169,6 +2177,86 @@ COMMENT ON COLUMN sla_history_downtime.service_id IS 'service.id';
 COMMENT ON COLUMN sla_history_downtime.downtime_id IS 'downtime.id (may reference already deleted rows)';
 COMMENT ON COLUMN sla_history_downtime.downtime_start IS 'start time of the downtime';
 COMMENT ON COLUMN sla_history_downtime.downtime_end IS 'end time of the downtime';
+
+CREATE TABLE redundancy_group (
+  id bytea20 NOT NULL,
+  environment_id bytea20 NOT NULL,
+  display_name text NOT NULL,
+
+  CONSTRAINT pk_redundancy_group PRIMARY KEY (id)
+);
+
+COMMENT ON COLUMN redundancy_group.id IS 'sha1(name + all(member parent_name + timeperiod.name + states + ignore_soft_states))';
+COMMENT ON COLUMN redundancy_group.environment_id IS 'environment.id';
+
+CREATE TABLE redundancy_group_state (
+  id bytea20 NOT NULL,
+  environment_id bytea20 NOT NULL,
+  redundancy_group_id bytea20 NOT NULL,
+  failed boolenum NOT NULL,
+  is_reachable boolenum NOT NULL,
+  last_state_change biguint NOT NULL,
+
+  CONSTRAINT pk_redundancy_group_state PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX idx_redundancy_group_state_redundancy_group_id ON redundancy_group_state(redundancy_group_id);
+
+COMMENT ON COLUMN redundancy_group_state.id IS 'redundancy_group.id';
+COMMENT ON COLUMN redundancy_group_state.environment_id IS 'environment.id';
+COMMENT ON COLUMN redundancy_group_state.redundancy_group_id IS 'redundancy_group.id';
+
+CREATE TABLE dependency_node (
+  id bytea20 NOT NULL,
+  environment_id bytea20 NOT NULL,
+  host_id bytea20 DEFAULT NULL,
+  service_id bytea20 DEFAULT NULL,
+  redundancy_group_id bytea20 DEFAULT NULL,
+
+  CONSTRAINT pk_dependency_node PRIMARY KEY (id),
+
+  CONSTRAINT ck_dependency_node_either_checkable_or_redundancy_group_id CHECK (
+    CASE WHEN redundancy_group_id IS NULL THEN host_id IS NOT NULL ELSE host_id IS NULL AND service_id IS NULL END
+  )
+);
+
+CREATE UNIQUE INDEX idx_dependency_node_host_service_redundancygroup_id ON dependency_node(host_id, service_id, redundancy_group_id);
+
+COMMENT ON COLUMN dependency_node.id IS 'host.id|service.id|redundancy_group.id';
+COMMENT ON COLUMN dependency_node.environment_id IS 'environment.id';
+COMMENT ON COLUMN dependency_node.host_id IS 'host.id';
+COMMENT ON COLUMN dependency_node.service_id IS 'service.id';
+COMMENT ON COLUMN dependency_node.redundancy_group_id IS 'redundancy_group.id';
+
+CREATE TABLE dependency_edge_state (
+  id bytea20 NOT NULL,
+  environment_id bytea20 NOT NULL,
+  failed boolenum NOT NULL,
+
+  CONSTRAINT pk_dependency_edge_state PRIMARY KEY (id)
+);
+
+COMMENT ON COLUMN dependency_edge_state.id IS 'sha1([dependency_edge.from_node_id|parent_name + timeperiod.name + states + ignore_soft_states] + dependency_edge.to_node_id)';
+COMMENT ON COLUMN dependency_edge_state.environment_id IS 'environment.id';
+
+CREATE TABLE dependency_edge (
+  id bytea20 NOT NULL,
+  environment_id bytea20 NOT NULL,
+  from_node_id bytea20 NOT NULL,
+  to_node_id bytea20 NOT NULL,
+  dependency_edge_state_id bytea20 NOT NULL,
+  display_name text NOT NULL,
+
+  CONSTRAINT pk_dependency_edge PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX idx_dependency_edge_from_node_to_node_id ON dependency_edge(from_node_id, to_node_id);
+
+COMMENT ON COLUMN dependency_edge.id IS 'sha1(from_node_id + to_node_id)';
+COMMENT ON COLUMN dependency_edge.environment_id IS 'environment.id';
+COMMENT ON COLUMN dependency_edge.from_node_id IS 'dependency_node.id';
+COMMENT ON COLUMN dependency_edge.to_node_id IS 'dependency_node.id';
+COMMENT ON COLUMN dependency_edge.dependency_edge_state_id IS 'sha1(dependency_edge_state.id)';
 
 CREATE SEQUENCE icingadb_schema_id_seq;
 
