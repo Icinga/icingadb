@@ -295,13 +295,12 @@ func (h *HA) realize(
 			takeover = ""
 			otherResponsible = false
 			isoLvl := sql.LevelSerializable
-			selectLock := ""
 
 			if h.db.DriverName() == database.MySQL {
-				// The RDBMS may actually be a Percona XtraDB Cluster which doesn't
-				// support serializable transactions, but only their following equivalent:
+				// The RDBMS may actually be a Percona XtraDB Cluster which doesn't support serializable
+				// transactions, but only their equivalent SELECT ... LOCK IN SHARE MODE.
+				// See https://dev.mysql.com/doc/refman/8.4/en/innodb-transaction-isolation-levels.html#isolevel_serializable
 				isoLvl = sql.LevelRepeatableRead
-				selectLock = " LOCK IN SHARE MODE"
 			}
 
 			tx, errBegin := h.db.BeginTxx(ctx, &sql.TxOptions{Isolation: isoLvl})
@@ -310,8 +309,15 @@ func (h *HA) realize(
 			}
 			defer func() { _ = tx.Rollback() }()
 
-			query := h.db.Rebind("SELECT id, heartbeat FROM icingadb_instance "+
-				"WHERE environment_id = ? AND responsible = ? AND id <> ?") + selectLock
+			// In order to reduce the deadlocks on both sides, it is necessary to obtain an exclusive lock
+			// on the selected rows. This can be achieved by utilising the SELECT ... FOR UPDATE command.
+			// Nevertheless, deadlocks may still occur, when the "icingadb_instance" table is empty, i.e. when
+			// there's no available row to be locked exclusively.
+			//
+			// Note that even without the ... FOR UPDATE lock clause, this shouldn't cause a deadlock on PostgreSQL.
+			// Instead, it triggers a read/write serialization failure when attempting to commit the transaction.
+			query := h.db.Rebind("SELECT id, heartbeat FROM icingadb_instance " +
+				"WHERE environment_id = ? AND responsible = ? AND id <> ? FOR UPDATE")
 
 			instance := &v1.IcingadbInstance{}
 			errQuery := tx.QueryRowxContext(ctx, query, envId, "y", h.instanceId).StructScan(instance)
