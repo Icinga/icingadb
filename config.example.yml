@@ -69,8 +69,14 @@ redis:
   # Defaults to '6380' as the Redis® open source server provided by the 'icingadb-redis' package listens on that port.
 #  port: 6380
 
-  # Authentication password.
+  # Authentication username, requires a `password` being set as well.
+#  username:
+
+  # Authentication password. May be used alone or together with a `username`.
 #  password:
+
+  # Numerical database identifier, defaults to `0`.
+#  database: 0
 
 # Icinga DB logs its activities at various severity levels and any errors that occur either
 # on the console or in systemd's journal. The latter is used automatically when running under systemd.
