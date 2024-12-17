@@ -15,7 +15,9 @@ therefore a dedicated Icinga DB instance that connects to it.
 |----------|-------------------------------------------------------------------------------------------------------------------------|
 | host     | **Required.** Host name or address, or absolute Unix socket path.                                                       |
 | port     | **Optional.** TCP port. Defaults to `6380` matching the Redis® open source server port in the `icingadb-redis` package. |
-| password | **Optional.** Authentication password.                                                                                  |
+| username | **Optional.** Authentication username, requires a `password` being set as well.                                         |
+| password | **Optional.** Authentication password. May be used alone or together with a `username`.                                 |
+| database | **Optional.** Numerical database identifier, defaults to `0`.                                                           |
 | tls      | **Optional.** Whether to use TLS.                                                                                       |
 | cert     | **Optional.** Path to TLS client certificate.                                                                           |
 | key      | **Optional.** Path to TLS private key.                                                                                  |
