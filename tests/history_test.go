@@ -435,12 +435,12 @@ func testHistory(t *testing.T, numNodes int) {
 
 			assert.Equal(t, expected, got, "downtime history should match expected result")
 		}, 5*time.Second, 200*time.Millisecond) {
-			t.Logf("\n%s", utils.MustT(t).String(utils.PrettySelect(db,
+			t.Logf("\n%s", utils.MustT(t).String(utils.PrettySelect(db, db.Rebind(
 				"SELECT h.event_time, h.event_type FROM history h"+
 					" JOIN host ON host.id = h.host_id"+
 					" LEFT JOIN downtime_history d ON d.downtime_id = h.downtime_history_id"+
 					" WHERE host.name = ?"+
-					" ORDER BY h.event_time", hostname)))
+					" ORDER BY h.event_time"), hostname)))
 		}
 
 		testConsistency(t, stream)
