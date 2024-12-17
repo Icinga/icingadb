@@ -392,7 +392,7 @@ func (h *HA) realize(
 				// Insert the environment after each heartbeat takeover if it does not already exist in the database
 				// as the environment may have changed, although this is likely to happen very rarely.
 				stmt, _ = h.db.BuildInsertIgnoreStmt(h.environment)
-				if _, err := h.db.NamedExecContext(ctx, stmt, h.environment); err != nil {
+				if _, err := tx.NamedExecContext(ctx, stmt, h.environment); err != nil {
 					return database.CantPerformQuery(err, stmt)
 				}
 			}
