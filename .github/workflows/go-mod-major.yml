@@ -1,0 +1,25 @@
+name: Go Module Major Update Check
+on:
+  schedule:
+    - cron: '30 6 * * 1' # at 06:30 every Monday morning
+
+jobs:
+  go_mod_update_issue:
+    name: Go Module Major Update Check and Issue Creation
+    runs-on: ubuntu-latest
+
+    permissions:
+      issues: write
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-go@v5
+      with:
+        go-version: stable
+
+    - run: go install github.com/icholy/gomajor@latest
+
+    - run: .github/workflows/go-mod-major.sh "." "tests"
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_REPO: ${{ github.repository }}
