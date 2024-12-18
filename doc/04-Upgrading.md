@@ -3,6 +3,12 @@
 Specific version upgrades are described below. Please note that version upgrades are incremental.
 If you are upgrading across multiple versions, make sure to follow the steps for each of them.
 
+## Upgrading to Icinga DB v1.2.1
+
+Please apply the `1.2.1.sql` upgrade script to your database. For package installations, you can find this file at
+`/usr/share/icingadb/schema/mysql/upgrades/` or `/usr/share/icingadb/schema/pgsql/upgrades/`, depending on your
+database vendor.
+
 ## Upgrading to Icinga DB v1.2.0
 
 Please apply the `1.2.0.sql` upgrade script to your database. For package installations, you can find this file at
