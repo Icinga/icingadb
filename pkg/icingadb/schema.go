@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	expectedMysqlSchemaVersion    = 6
-	expectedPostgresSchemaVersion = 4
+	expectedMysqlSchemaVersion    = 7
+	expectedPostgresSchemaVersion = 5
 )
 
 // CheckSchema asserts the database schema of the expected version being present.
