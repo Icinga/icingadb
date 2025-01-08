@@ -23,7 +23,7 @@ and each takes over the entire configuration in case the other node or their con
 For each Redis® server you need to set up its own dedicated Icinga DB instance that connects to it,
 but the Icinga DB instances must write to the same database, which of course can be replicated or a cluster.
 So the steps from the standard
-[Icinga DB installation documentation](https://icinga.com/docs/icinga-db/latest/doc/02-installation)
+[Icinga DB installation documentation](https://icinga.com/docs/icinga-db/latest/doc/02-Installation/)
 can be followed. However, as mentioned, the database only needs to be set up once.
 
 All in all, an Icinga DB HA environment involves setting up two Icinga 2 master nodes, two Redis® servers,
