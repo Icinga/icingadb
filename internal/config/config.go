@@ -55,8 +55,8 @@ type Flags struct {
 
 // RetentionConfig defines configuration for history retention.
 type RetentionConfig struct {
-	HistoryDays uint16                   `yaml:"history-days"`
-	SlaDays     uint16                   `yaml:"sla-days"`
+	HistoryDays float32                  `yaml:"history-days"`
+	SlaDays     float32                  `yaml:"sla-days"`
 	Interval    time.Duration            `yaml:"interval" default:"1h"`
 	Count       uint64                   `yaml:"count" default:"5000"`
 	Options     history.RetentionOptions `yaml:"options"`
