@@ -2186,6 +2186,9 @@ CREATE TABLE redundancy_group (
   CONSTRAINT pk_redundancy_group PRIMARY KEY (id)
 );
 
+ALTER TABLE redundancy_group ALTER COLUMN id SET STORAGE PLAIN;
+ALTER TABLE redundancy_group ALTER COLUMN environment_id SET STORAGE PLAIN;
+
 COMMENT ON COLUMN redundancy_group.id IS 'sha1(name + all(member parent_name + timeperiod.name + states + ignore_soft_states))';
 COMMENT ON COLUMN redundancy_group.environment_id IS 'environment.id';
 
@@ -2199,6 +2202,10 @@ CREATE TABLE redundancy_group_state (
 
   CONSTRAINT pk_redundancy_group_state PRIMARY KEY (id)
 );
+
+ALTER TABLE redundancy_group_state ALTER COLUMN id SET STORAGE PLAIN;
+ALTER TABLE redundancy_group_state ALTER COLUMN environment_id SET STORAGE PLAIN;
+ALTER TABLE redundancy_group_state ALTER COLUMN redundancy_group_id SET STORAGE PLAIN;
 
 CREATE UNIQUE INDEX idx_redundancy_group_state_redundancy_group_id ON redundancy_group_state(redundancy_group_id);
 
@@ -2220,6 +2227,12 @@ CREATE TABLE dependency_node (
   )
 );
 
+ALTER TABLE dependency_node ALTER COLUMN id SET STORAGE PLAIN;
+ALTER TABLE dependency_node ALTER COLUMN environment_id SET STORAGE PLAIN;
+ALTER TABLE dependency_node ALTER COLUMN host_id SET STORAGE PLAIN;
+ALTER TABLE dependency_node ALTER COLUMN service_id SET STORAGE PLAIN;
+ALTER TABLE dependency_node ALTER COLUMN redundancy_group_id SET STORAGE PLAIN;
+
 CREATE UNIQUE INDEX idx_dependency_node_host_service_redundancygroup_id ON dependency_node(host_id, service_id, redundancy_group_id);
 
 COMMENT ON COLUMN dependency_node.id IS 'host.id|service.id|redundancy_group.id';
@@ -2236,6 +2249,9 @@ CREATE TABLE dependency_edge_state (
   CONSTRAINT pk_dependency_edge_state PRIMARY KEY (id)
 );
 
+ALTER TABLE dependency_edge_state ALTER COLUMN id SET STORAGE PLAIN;
+ALTER TABLE dependency_edge_state ALTER COLUMN environment_id SET STORAGE PLAIN;
+
 COMMENT ON COLUMN dependency_edge_state.id IS 'sha1([dependency_edge.from_node_id|parent_name + timeperiod.name + states + ignore_soft_states] + dependency_edge.to_node_id)';
 COMMENT ON COLUMN dependency_edge_state.environment_id IS 'environment.id';
 
@@ -2249,6 +2265,12 @@ CREATE TABLE dependency_edge (
 
   CONSTRAINT pk_dependency_edge PRIMARY KEY (id)
 );
+
+ALTER TABLE dependency_edge ALTER COLUMN id SET STORAGE PLAIN;
+ALTER TABLE dependency_edge ALTER COLUMN environment_id SET STORAGE PLAIN;
+ALTER TABLE dependency_edge ALTER COLUMN from_node_id SET STORAGE PLAIN;
+ALTER TABLE dependency_edge ALTER COLUMN to_node_id SET STORAGE PLAIN;
+ALTER TABLE dependency_edge ALTER COLUMN dependency_edge_state_id SET STORAGE PLAIN;
 
 CREATE UNIQUE INDEX idx_dependency_edge_from_node_to_node_id ON dependency_edge(from_node_id, to_node_id);
 
