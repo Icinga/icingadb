@@ -38,7 +38,10 @@ func New() *Command {
 	}
 
 	var cfg icingadbconfig.Config
-	if err := config.FromYAMLFile(flags.Config, &cfg); err != nil {
+	if err := config.Load(&cfg, config.LoadOptions{
+		Flags:      flags,
+		EnvOptions: config.EnvOptions{Prefix: "ICINGADB_"},
+	}); err != nil {
 		if errors.Is(err, config.ErrInvalidArgument) {
 			panic(err)
 		}
