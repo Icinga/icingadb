@@ -27,3 +27,10 @@ func SafeInit(v any) {
 		initer.Init()
 	}
 }
+
+// Equaler is implemented by any entity that can be compared with another entity of the same type.
+// The Equal method should return true if the receiver is equal to the other entity.
+type Equaler interface {
+	// Equal returns whether the receiver is equal to the other entity.
+	Equal(other any) bool
+}
