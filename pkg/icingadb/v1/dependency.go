@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"bytes"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 )
@@ -12,7 +13,7 @@ type Redundancygroup struct {
 }
 
 // TableName implements [database.TableNamer].
-func (r Redundancygroup) TableName() string {
+func (r *Redundancygroup) TableName() string {
 	return "redundancy_group"
 }
 
@@ -26,8 +27,22 @@ type RedundancygroupState struct {
 }
 
 // TableName implements [database.TableNamer].
-func (r RedundancygroupState) TableName() string {
+func (r *RedundancygroupState) TableName() string {
 	return "redundancy_group_state"
+}
+
+// Equal implements the [contracts.Equaler] interface.
+func (r *RedundancygroupState) Equal(other any) bool {
+	if o, ok := other.(*RedundancygroupState); ok {
+		return bytes.Equal(r.Id, o.Id) &&
+			bytes.Equal(r.EnvironmentId, o.EnvironmentId) &&
+			bytes.Equal(r.RedundancyGroupId, o.RedundancyGroupId) &&
+			r.Failed == o.Failed &&
+			r.IsReachable == o.IsReachable &&
+			r.LastStateChange.Time().Equal(o.LastStateChange.Time())
+	}
+
+	return false
 }
 
 type DependencyNode struct {
@@ -42,6 +57,17 @@ type DependencyEdgeState struct {
 	EntityWithoutChecksum `json:",inline"`
 	EnvironmentMeta       `json:",inline"`
 	Failed                types.Bool `json:"failed"`
+}
+
+// Equal implements the [contracts.Equaler] interface.
+func (es *DependencyEdgeState) Equal(other any) bool {
+	if other, ok := other.(*DependencyEdgeState); ok {
+		return bytes.Equal(es.Id, other.Id) &&
+			bytes.Equal(es.EnvironmentId, other.EnvironmentId) &&
+			es.Failed == other.Failed
+	}
+
+	return false
 }
 
 type DependencyEdge struct {
