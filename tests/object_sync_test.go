@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-testing/services"
 	"github.com/icinga/icinga-testing/utils"
 	"github.com/icinga/icinga-testing/utils/eventually"
@@ -353,6 +354,16 @@ func TestObjectSync(t *testing.T) {
 						})
 					}
 
+					var state State
+					err := db.Get(&state, db.Rebind("SELECT host_id, id as service_id FROM service WHERE name = ?"), service.Name)
+					assert.NoErrorf(t, err, "querying service %q should not fail", service.Name)
+					assert.NotNilf(t, state.ServiceId, "service %q does not have an ID", service.Name)
+					assert.NotNilf(t, state.HostId, "service %q should have a host_id set", service.Name)
+
+					eventually.Assert(t, func(t require.TestingT) {
+						verifyState(t, db, state, true)
+					}, 20*time.Second, 100*time.Millisecond)
+
 					client.DeleteObject(t, "services", *service.HostName+"!"+service.Name, false)
 
 					require.Eventuallyf(t, func() bool {
@@ -361,6 +372,10 @@ func TestObjectSync(t *testing.T) {
 						require.NoError(t, err, "querying service count should not fail")
 						return count == 0
 					}, 20*time.Second, 1*time.Second, "service with name=%q should be removed from database", service.Name)
+
+					eventually.Assert(t, func(t require.TestingT) {
+						verifyState(t, db, state, false)
+					}, 20*time.Second, 100*time.Millisecond)
 				})
 			}
 
@@ -647,6 +662,30 @@ func waitForDumpDoneSignal(t *testing.T, r services.RedisServer, wait time.Durat
 
 		return false
 	}, wait, interval, "icinga2 should signal key='*' state='done'")
+}
+
+type State struct {
+	HostId    types.Binary `db:"host_id"`
+	ServiceId types.Binary `db:"service_id"`
+}
+
+func verifyState(t require.TestingT, db *sqlx.DB, state State, shouldExists bool) {
+	var args []interface{}
+	var extraClause string
+	var tableName string
+	if state.ServiceId != nil {
+		tableName = "service_state"
+		args = []interface{}{state.HostId, state.ServiceId}
+		extraClause = "AND service_id = ?"
+	} else {
+		tableName = "host_state"
+		args = []interface{}{state.HostId}
+	}
+
+	var exists bool
+	err := db.Get(&exists, db.Rebind(fmt.Sprintf(`SELECT EXISTS(SELECT 1 FROM "%s" WHERE host_id = ? %s)`, tableName, extraClause)), args...)
+	require.NoErrorf(t, err, "querying %s should not fail", tableName)
+	assert.Equal(t, shouldExists, exists)
 }
 
 type Host struct {
