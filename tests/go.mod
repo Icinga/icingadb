@@ -3,7 +3,7 @@ module github.com/icinga/icingadb/tests
 go 1.22
 
 require (
-	github.com/go-sql-driver/mysql v1.8.1
+	github.com/go-sql-driver/mysql v1.9.0
 	github.com/goccy/go-yaml v1.12.0
 	github.com/google/uuid v1.6.0
 	github.com/icinga/icinga-testing v0.0.0-20240322142451-494ccd6d03e8
