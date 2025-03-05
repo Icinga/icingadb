@@ -1,5 +1,18 @@
 # Icinga DB Changelog
 
+## 1.2.2 (2025-03-XX)
+
+This is a minor maintenance release.
+Most importantly, it adds support for configuring Icinga DB completely via environment variables.
+This feature will prove useful for container setups.
+
+The following changes have been made.
+
+* Support loading configuration from both YAML files and environment variables. #831
+* Resolve SQL errors with reserved names in icingadb-migrate on older PostgreSQL versions. #885
+* Fix a broken link in the documentation. #880
+* Update dependencies. [6 times](https://github.com/Icinga/icingadb/pulls?q=is%3Apr+milestone%3A1.2.2+label%3Adependencies)
+
 ## 1.2.1 (2024-12-18)
 
 This is a maintenance release that addresses HA issues and includes a number of other fixes.
