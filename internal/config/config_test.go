@@ -6,6 +6,7 @@ import (
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/testutils"
+	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
@@ -140,6 +141,31 @@ redis:
 				},
 				Redis: redis.Config{
 					Host: "2001:db8::1",
+				},
+			},
+		},
+		{
+			Name: "Retention options from Env",
+			Data: testutils.ConfigTestData{
+				Yaml: yamlConfig,
+				Env: map[string]string{
+					"ICINGADB_RETENTION_OPTIONS": "comment:31,downtime:365",
+				}},
+			Expected: &Config{
+				Database: database.Config{
+					Host:     "192.0.2.1",
+					Database: "icingadb",
+					User:     "icingadb",
+					Password: "icingadb",
+				},
+				Redis: redis.Config{
+					Host: "2001:db8::1",
+				},
+				Retention: RetentionConfig{
+					Options: history.RetentionOptions{
+						"comment":  31,
+						"downtime": 365,
+					},
 				},
 			},
 		},

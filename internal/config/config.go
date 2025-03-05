@@ -81,11 +81,11 @@ func (f Flags) IsExplicitConfigPath() bool {
 
 // RetentionConfig defines configuration for history retention.
 type RetentionConfig struct {
-	HistoryDays uint16                   `yaml:"history-days"`
-	SlaDays     uint16                   `yaml:"sla-days"`
-	Interval    time.Duration            `yaml:"interval" default:"1h"`
-	Count       uint64                   `yaml:"count" default:"5000"`
-	Options     history.RetentionOptions `yaml:"options"`
+	HistoryDays uint16                   `yaml:"history-days" env:"HISTORY_DAYS"`
+	SlaDays     uint16                   `yaml:"sla-days" env:"SLA_DAYS"`
+	Interval    time.Duration            `yaml:"interval" env:"INTERVAL" default:"1h"`
+	Count       uint64                   `yaml:"count" env:"COUNT" default:"5000"`
+	Options     history.RetentionOptions `yaml:"options" env:"OPTIONS"`
 }
 
 // Validate checks constraints in the supplied retention configuration and
