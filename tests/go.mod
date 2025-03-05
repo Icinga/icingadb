@@ -9,7 +9,7 @@ require (
 	github.com/icinga/icinga-testing v0.0.0-20240322142451-494ccd6d03e8
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
-	github.com/redis/go-redis/v9 v9.7.0
+	github.com/redis/go-redis/v9 v9.7.1
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20221012112151-59b0eab1532e
