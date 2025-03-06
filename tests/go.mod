@@ -1,7 +1,6 @@
 module github.com/icinga/icingadb/tests
 
-go 1.22
-toolchain go1.23.7
+go 1.23.0
 
 require (
 	github.com/go-sql-driver/mysql v1.9.0
