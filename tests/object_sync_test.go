@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"fmt"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-testing/services"
 	"github.com/icinga/icinga-testing/utils"
 	"github.com/icinga/icinga-testing/utils/eventually"
@@ -28,7 +29,7 @@ import (
 
 //go:embed object_sync_test.conf
 var testSyncConfRaw string
-var testSyncConfTemplate = template.Must(template.New("testdata.conf").Parse(testSyncConfRaw))
+var testSyncConfTemplate = template.Must(template.New("testdata.conf").Funcs(template.FuncMap{"NaturalJoin": strings.Join}).Parse(testSyncConfRaw))
 
 var usergroups = []string{
 	"testusergroup1",
@@ -54,6 +55,7 @@ func TestObjectSync(t *testing.T) {
 		Notifications          []Notification
 		NotificationUsers      map[string]map[string]struct{}
 		NotificationUserGroups []string
+		DependencyGroups       []DependencyGroup
 	}
 	data := &Data{
 		// Some name prefixes to loop over in the template to generate multiple instances of objects,
@@ -66,6 +68,7 @@ func TestObjectSync(t *testing.T) {
 		Notifications:          makeTestNotifications(t),
 		NotificationUsers:      users,
 		NotificationUserGroups: usergroups,
+		DependencyGroups:       makeTestDependencyGroups(),
 	}
 
 	r := it.RedisServerT(t)
@@ -93,7 +96,7 @@ func TestObjectSync(t *testing.T) {
 	//logger.Sugar().Infof("config:\n\n%s\n\n", conf.String())
 	i.WriteConfig("etc/icinga2/conf.d/testdata.conf", conf.Bytes())
 	i.EnableIcingaDb(r)
-	i.Reload()
+	require.NoError(t, i.Reload(), "reload Icinga 2 daemon")
 
 	// Wait for Icinga 2 to signal a successful dump before starting
 	// Icinga DB to ensure that we actually test the initial sync.
@@ -309,6 +312,22 @@ func TestObjectSync(t *testing.T) {
 		// TODO(jb): add tests
 
 		t.Skip()
+	})
+
+	t.Run("Dependencies", func(t *testing.T) {
+		t.Parallel()
+
+		t.Cleanup(func() { assertNoDependencyDanglingReferences(t, r, db) })
+
+		for _, dependencyGroup := range data.DependencyGroups {
+			t.Run("Verify-"+dependencyGroup.InfoString(), func(t *testing.T) {
+				t.Parallel()
+
+				eventually.Assert(t, func(t require.TestingT) {
+					dependencyGroup.verify(t, db)
+				}, 20*time.Second, 200*time.Millisecond)
+			})
+		}
 	})
 
 	t.Run("RuntimeUpdates", func(t *testing.T) {
@@ -610,6 +629,83 @@ func TestObjectSync(t *testing.T) {
 
 				client.DeleteObject(t, "notifications", baseNotification.fullName(), false)
 			})
+		})
+
+		t.Run("Dependencies", func(t *testing.T) {
+			t.Parallel()
+
+			// Make sure to check for any dangling references after all the subtests have run, i.e. as part of the
+			// parent test (Dependencies) teardown process. Note, this isn't the same as using plain defer ..., as
+			// all the subtests runs in parallel, and we want to make sure that the check is performed after all of
+			// them have completed and not when this closure returns.
+			t.Cleanup(func() { assertNoDependencyDanglingReferences(t, r, db) })
+
+			for _, dependencyGroup := range makeTestDependencyGroups() {
+				if !dependencyGroup.SendRuntimeUpdates {
+					// This is probably something that should be tested only via the initial sync and not via runtime
+					// updates, without having to build a bunch of special cases here. Instead, we can transform that
+					// group into a completely different one and use it to simulate runtime created redundancy groups.
+					dependencyGroup.Name = utils.RandomString(10)
+					dependencyGroup.SkipVerification = false
+					// We only need to drop the existing children, as we will add new ones down below and make
+					// use of the existing parents.
+					dependencyGroup.Children = []string{}
+				}
+
+				t.Run("CreateAndDelete-"+dependencyGroup.InfoString(), func(t *testing.T) {
+					t.Parallel()
+
+					newChildrenLen := 4
+					if dependencyGroup.SendRuntimeUpdates {
+						newChildrenLen = len(dependencyGroup.Children)
+					}
+
+					var newChildren []string
+					for i := 0; i < newChildrenLen; i++ {
+						child := utils.RandomString(10)
+						newChildren = append(newChildren, child)
+						client.CreateObject(t, "hosts", child, map[string]interface{}{
+							"templates": []string{"dependency-host-template"},
+						})
+
+						for _, parent := range dependencyGroup.Parents {
+							client.CreateObject(t, "dependencies", child+"!"+utils.RandomString(10), map[string]interface{}{
+								"attrs": map[string]interface{}{
+									"parent_host_name":   parent,
+									"child_host_name":    child,
+									"redundancy_group":   dependencyGroup.Name,
+									"ignore_soft_states": dependencyGroup.IgnoreSoftStates,
+									"period":             dependencyGroup.TimePeriod,
+									"states":             dependencyGroup.StatesFilter,
+								},
+							})
+						}
+					}
+					oldChildren := dependencyGroup.Children
+					dependencyGroup.Children = append(oldChildren, newChildren...)
+
+					eventually.Assert(t, func(t require.TestingT) {
+						dependencyGroup.verify(t, db)
+					}, 20*time.Second, 200*time.Millisecond)
+
+					for _, child := range newChildren {
+						client.DeleteObject(t, "hosts", child, true)
+						dependencyGroup.Children = slices.DeleteFunc(dependencyGroup.Children, func(c string) bool {
+							return c == child
+						})
+
+						eventually.Assert(t, func(t require.TestingT) {
+							dependencyGroup.verify(t, db)
+						}, 20*time.Second, 200*time.Millisecond)
+					}
+
+					// Restore the original children and perform a final verification with its original state.
+					dependencyGroup.Children = oldChildren
+					eventually.Assert(t, func(t require.TestingT) {
+						dependencyGroup.verify(t, db)
+					}, 20*time.Second, 200*time.Millisecond)
+				})
+			}
 		})
 
 		// TODO(jb): add tests for remaining config object types
@@ -1047,6 +1143,576 @@ func makeTestNotifications(t *testing.T) []Notification {
 	}
 
 	return notifications
+}
+
+type DependencyGroup struct {
+	Id               types.Binary `db:"id"`
+	Name             string       `db:"display_name"`
+	Parents          []string
+	Children         []string
+	StatesFilter     []string
+	TimePeriod       string
+	IgnoreSoftStates bool
+
+	SkipVerification   bool
+	SendRuntimeUpdates bool
+}
+
+func (g *DependencyGroup) IsRedundancyGroup() bool {
+	return g.Name != ""
+}
+
+func (g *DependencyGroup) InfoString() string {
+	prefix := "Non-Redundant"
+	if g.IsRedundancyGroup() {
+		prefix = g.Name
+	}
+
+	if len(g.Children) == 0 {
+		return prefix + "-" + strings.Join(g.Parents, "-") + "--" + "NoChildren"
+	}
+
+	return prefix + "-" + strings.Join(g.Parents, "-") + "--" + strings.Join(g.Children, "-")
+}
+
+// assertNoDependencyDanglingReferences verifies that there are no dangling references in the dependency_node,
+// dependency_edge and redundancy_group_state tables.
+//
+// Since the dependency group tests are executed in parallel, there is a chance that the database becomes inconsistent
+// for a split second, which can be detected by this function and will cause the test to fail. So, calling this function
+// only once after all tests have finished is sufficient.
+func assertNoDependencyDanglingReferences(t require.TestingT, r services.RedisServer, db *sqlx.DB) {
+	rc := r.Open()
+	defer func() { _ = rc.Close() }()
+
+	redisHGetCheck := func(key, field string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		result, err := rc.HGet(ctx, key, field).Result()
+		if err != nil {
+			assert.Equal(t, redis.Nil, err)
+		}
+		assert.Emptyf(t, result, "%s %q exists in Redis but not in the database", strings.Split(key, ":")[1], field)
+	}
+
+	var nodes []struct {
+		HostID            types.Binary `db:"host_id"`
+		ServiceID         types.Binary `db:"service_id"`
+		RedundancyGroupID types.Binary `db:"redundancy_group_id"`
+	}
+	err := db.Select(&nodes, `SELECT host_id, service_id, redundancy_group_id FROM dependency_node`)
+	require.NoError(t, err, "querying dependency nodes")
+
+	// Check if there are any dangling references in the dependency_node table, i.e. nodes that reference
+	// unknown hosts, services or redundancy groups.
+	for _, node := range nodes {
+		var exists bool
+		if node.HostID != nil {
+			assert.Nilf(t, node.RedundancyGroupID, "node redudancy group ID should be nil if host ID is set")
+
+			err := db.Get(&exists, db.Rebind(`SELECT EXISTS (SELECT 1 FROM host WHERE id = ?)`), node.HostID)
+			assert.NoError(t, err, "querying host existence")
+			assert.Truef(t, exists, "host %q should exist", node.HostID)
+
+			if !exists {
+				redisHGetCheck("icinga:host", node.HostID.String())
+			}
+		}
+
+		if node.ServiceID != nil {
+			assert.NotNil(t, node.HostID, "node host ID should be set if service ID is set")
+			assert.Nilf(t, node.RedundancyGroupID, "node redudancy group ID should be nil if service ID is set")
+
+			err := db.Get(&exists, db.Rebind(`SELECT EXISTS (SELECT 1 FROM service WHERE id = ?)`), node.ServiceID)
+			assert.NoError(t, err, "querying service existence")
+			assert.Truef(t, exists, "service %q should exist", node.ServiceID)
+
+			if !exists {
+				redisHGetCheck("icinga:service", node.ServiceID.String())
+			}
+		}
+
+		if node.RedundancyGroupID != nil {
+			assert.Nilf(t, node.HostID, "node host ID should be nil if redundancy group ID is set")
+			assert.Nilf(t, node.ServiceID, "node service ID should be nil if redundancy group ID is set")
+
+			err := db.Get(&exists, db.Rebind(`SELECT EXISTS (SELECT 1 FROM redundancy_group WHERE id = ?)`), node.RedundancyGroupID)
+			assert.NoError(t, err, "querying redundancy group existence")
+			assert.Truef(t, exists, "redundancy group %q should exist", node.RedundancyGroupID)
+
+			if !exists {
+				redisHGetCheck("icinga:redundancygroup", node.RedundancyGroupID.String())
+			}
+		}
+	}
+
+	var edges []struct {
+		FromNodeID types.Binary `db:"from_node_id"`
+		ToNodeID   types.Binary `db:"to_node_id"`
+		StateID    types.Binary `db:"dependency_edge_state_id"`
+	}
+	err = db.Select(&edges, `SELECT from_node_id, to_node_id, dependency_edge_state_id FROM dependency_edge`)
+	require.NoError(t, err, "querying dependency edges")
+
+	// Check if there are any dangling references in the dependency_edge table, i.e. edges that reference
+	// unknown from/to nodes or dependency edge states.
+	for _, edge := range edges {
+		assert.NotNil(t, edge.FromNodeID, "from node ID should be set")
+		assert.NotNil(t, edge.ToNodeID, "to node ID should be set")
+		assert.NotNil(t, edge.StateID, "dependency edge state ID should be set")
+
+		var exists bool
+		err := db.Get(&exists, db.Rebind(`SELECT EXISTS (SELECT 1 FROM dependency_node WHERE id = ?)`), edge.FromNodeID)
+		assert.NoError(t, err, "querying child/from node existence")
+		assert.Truef(t, exists, "child/from node %q should exist", edge.FromNodeID)
+
+		if !exists {
+			redisHGetCheck("icinga:dependency:node", edge.FromNodeID.String())
+		}
+
+		err = db.Get(&exists, db.Rebind(`SELECT EXISTS (SELECT 1 FROM dependency_node WHERE id = ?)`), edge.ToNodeID)
+		assert.NoError(t, err, "querying parent/to node existence")
+		assert.Truef(t, exists, "parent/to node %q should exist", edge.ToNodeID)
+
+		if !exists {
+			redisHGetCheck("icinga:dependency:node", edge.ToNodeID.String())
+		}
+
+		err = db.Get(&exists, db.Rebind(`SELECT EXISTS (SELECT 1 FROM dependency_edge_state WHERE id = ?)`), edge.StateID)
+		assert.NoError(t, err, "querying dependency edge state existence")
+		assert.Truef(t, exists, "dependency edge state %q should exist", edge.StateID)
+
+		if !exists {
+			redisHGetCheck("icinga:dependency:edge:state", edge.StateID.String())
+		}
+	}
+
+	// TODO: Icinga 2 does send runtime delete event for those two tables, but Icinga DB does not handle them well yet.
+	//  This is because the runtime sync pipeline is set to process upsert/delete events concurrently, which can sometimes
+	//  lead to race conditions where the two events are processed in the wrong order.
+	/*var stateIDs []types.Binary
+	err = db.Select(&stateIDs, `SELECT id FROM dependency_edge_state WHERE id NOT IN (SELECT dependency_edge_state_id FROM dependency_edge)`)
+	assert.NoError(t, err, "querying dangling dependency edge states")
+	assert.Len(t, stateIDs, 0, "all dependency_edge_state IDs should be referenced by a dependency_edge")
+
+	for _, stateID := range stateIDs {
+		// Check if these dangling state IDs are still present in Redis.
+		redisHGetCheck("icinga:dependency:edge:state", stateID.String())
+	}
+
+	stateIDs = nil
+	// Verify that all redundancy group states do reference an existing redundancy group.
+	err = db.Select(&stateIDs, `SELECT id FROM redundancy_group_state WHERE id NOT IN (SELECT id FROM redundancy_group)`)
+	assert.NoError(t, err, "querying dangling redundancy group states")
+	assert.Len(t, stateIDs, 0, "redundancy_group_state referencing unknown redundancy groups")
+
+	for _, stateID := range stateIDs {
+		// Check if these dangling state IDs are still present in Redis.
+		redisHGetCheck("icinga:redundancygroup:state", stateID.String())
+	}*/
+}
+
+// verify performs a series of checks to ensure that the dependency group is correctly represented in the database.
+//
+// The following checks are performed:
+//   - Verify that the redundancy group (if any) is referenced by the children hosts as their parent node.
+//   - Verify that all child and parent Checkables of this group are in the regular Icinga DB tables and the redundancy
+//     group (if any) is in the redundancy_group table as well as having a state in the redundancy_group_state table.
+//   - Verify that the dependency_node and dependency_edge tables are correctly populated with the expected from/to
+//     nodes according to the group's configuration. This includes verifying the connection between the child Checkables
+//     and the redundancy group (if any) and from redundancy group to parent Checkables.
+//
+// To simplify the verification process, dependency groups that have the SkipVerification flag set are not
+// verified, as they are merged into a single edge by Icinga 2, instead we're going to verify their original
+// counterpart (the group they were merged into).
+func (g *DependencyGroup) verify(t require.TestingT, db *sqlx.DB) {
+	if g.SkipVerification {
+		// All duplicated dependency objects get merged into a single edge by Icinga 2, so we don't need to verify
+		// such groups here, as we're going to verify the original group (the one this group was merged into) instead.
+		return
+	}
+
+	if len(g.Children) == 0 {
+		if g.IsRedundancyGroup() {
+			require.NotNilf(t, g.Id, "ID should be set for redundancy group %q", g.InfoString())
+
+			var exists bool
+			err := db.Get(&exists, db.Rebind(`SELECT EXISTS(SELECT 1 FROM redundancy_group WHERE id = ?)`), g.Id)
+			assert.NoErrorf(t, err, "fetching redundancy group %q with ID %q", g.InfoString(), g.Id)
+			assert.Falsef(t, exists, "redundancy group %q with ID %q should not exist", g.InfoString(), g.Id)
+
+			err = db.Get(&exists, db.Rebind(`SELECT EXISTS(SELECT 1 FROM redundancy_group_state WHERE id = ?)`), g.Id)
+			assert.NoErrorf(t, err, "fetching redundancy group state by ID %q", g.Id)
+			assert.Falsef(t, exists, "redundancy group state with ID %q should not exist", g.Id)
+		}
+
+		return
+	}
+
+	// Fetch the redundancy group referenced by the children hosts as their parent node (if any).
+	// If the dependency group is a redundancy group, the redundancy group itself should be the parent node
+	// and if the dependency serialization is correct, we should find only a single redundancy group.
+	query, args, err := sqlx.In(`SELECT rg.id, rg.display_name FROM redundancy_group rg
+		INNER JOIN dependency_node parent ON parent.redundancy_group_id = rg.id
+		INNER JOIN dependency_edge tn ON tn.to_node_id = parent.id
+		INNER JOIN dependency_node child ON child.id = tn.from_node_id
+		INNER JOIN host child_host ON child_host.id = child.host_id
+		INNER JOIN redundancy_group_state rgs ON rgs.redundancy_group_id = rg.id
+		WHERE child_host.name IN (?)`,
+		g.Children,
+	)
+	require.NoError(t, err, "expanding SQL IN clause for redundancy groups query")
+
+	var redundancyGroups []DependencyGroup
+	err = db.Select(&redundancyGroups, db.Rebind(query+` AND rg.display_name = ? GROUP BY rg.id, rg.display_name`), append(args, g.Name)...)
+	require.NoError(t, err, "fetching redundancy groups")
+
+	var redundancyGroup DependencyGroup
+	if g.IsRedundancyGroup() {
+		require.Lenf(t, redundancyGroups, 1, "there should be exactly one redundancy group %q", g.InfoString())
+		redundancyGroup = redundancyGroups[0]
+		g.Id = redundancyGroup.Id
+		assert.Equal(t, g.Name, redundancyGroup.Name, "redundancy group name should match")
+	} else {
+		assert.Lenf(t, redundancyGroups, 0, "there should be no redundancy group %q", g.InfoString())
+	}
+
+	type Checkable struct {
+		NodeId      types.Binary `db:""`
+		EdgeStateId types.Binary `db:"-"`
+		Id          types.Binary `db:"id"`
+		Name        string       `db:"name"`
+	}
+
+	// Perform some basic sanity checks on the hosts and redundancy groups (if any).
+	query, args, err = sqlx.In("SELECT id, name FROM host WHERE name IN (?)", append(append([]string(nil), g.Parents...), g.Children...))
+	require.NoError(t, err, "expanding SQL IN clause for hosts query")
+
+	hostRows, err := db.Queryx(db.Rebind(query), args...)
+	require.NoError(t, err, "querying parent and child hosts")
+	defer hostRows.Close()
+
+	checkables := make(map[string]*Checkable)
+	for hostRows.Next() {
+		var c Checkable
+		require.NoError(t, hostRows.StructScan(&c), "scanning host row")
+		checkables[c.Name] = &c
+
+		// Retrieve the dependency node and dependency edge state ID of the current host.
+		assert.NoError(t, db.Get(&c.NodeId, db.Rebind(`SELECT id FROM dependency_node WHERE host_id = ?`), c.Id))
+		assert.NotNilf(t, c.NodeId, "host %q should have a dependency node", c.Name)
+
+		if slices.Contains(g.Children, c.Name) && g.IsRedundancyGroup() {
+			assert.NoError(t, db.Get(&c.EdgeStateId, db.Rebind(`SELECT dependency_edge_state_id FROM dependency_edge WHERE to_node_id = ?`), redundancyGroup.Id))
+			assert.NotNilf(t, c.EdgeStateId, "host %q should have a dependency edge state", c.Name)
+		}
+	}
+	assert.NoError(t, hostRows.Err(), "scanned host rows should not have errors")
+	assert.Len(t, checkables, len(g.Parents)+len(g.Children), "all hosts should be in the database")
+
+	type Node struct {
+		RedundancyGroupId types.Binary `db:"node_id"`
+		Name              string       `db:"name"`
+		FromNodeId        types.Binary `db:"from_node_id"`
+		ToNodeId          types.Binary `db:"to_node_id"`
+	}
+
+	// Retrieve all parent nodes (including this redundancy group) referenced by the children hosts of this dependency group.
+	query, args, err = sqlx.In(`SELECT rg.id AS node_id, COALESCE(h.name, rg.display_name) AS name, from_node_id, to_node_id
+		FROM dependency_node dn
+			LEFT JOIN host h ON h.id = dn.host_id
+			LEFT JOIN dependency_edge tn ON tn.to_node_id = dn.id
+			LEFT JOIN redundancy_group rg ON rg.id = dn.redundancy_group_id
+		WHERE EXISTS(SELECT 1
+			FROM dependency_edge de
+				INNER JOIN dependency_node parent ON parent.id = de.to_node_id
+				INNER JOIN dependency_node child ON child.id = de.from_node_id
+				LEFT JOIN host ch ON ch.id = child.host_id
+			WHERE ch.name IN (?) AND parent.id = dn.id)`,
+		g.Children,
+	)
+	require.NoError(t, err, "expanding SQL IN clause for parent nodes query")
+
+	parentNodes := make(map[string]Node)
+	dbParentNodes, err := db.Queryx(db.Rebind(query), args...)
+	require.NoError(t, err, "querying parent nodes")
+	defer dbParentNodes.Close()
+
+	childToRedundancyGroupIds := make(map[string]bool)
+	childToParentCheckableIds := make(map[string]map[string]bool)
+	for dbParentNodes.Next() {
+		var node Node
+		require.NoError(t, dbParentNodes.StructScan(&node), "scanning parent node row")
+
+		// The SQL query yields all parent nodes of the children hosts of this dependency group but also those from
+		// any other redundancy group. Thus, we need to filter out all parent nodes that are not part of this group.
+		if g.IsRedundancyGroup() && node.Name == g.Name {
+			parentNodes[node.Name] = node
+			// Cache the from_node_id of these retrieved parent nodes (this redundancy group), as we need to verify
+			// that these IDs represent those of the children hosts of this group.
+			childToRedundancyGroupIds[node.FromNodeId.String()] = true
+		} else if !g.IsRedundancyGroup() && slices.Contains(g.Parents, node.Name) {
+			parentNodes[node.Name] = node
+			// Cache the from_node_id of these retrieved parent nodes (the parent hosts), as we need to
+			// verify that these IDs represent those of the children hosts of this group.
+			if _, ok := childToParentCheckableIds[node.FromNodeId.String()]; !ok {
+				childToParentCheckableIds[node.FromNodeId.String()] = make(map[string]bool)
+			}
+			childToParentCheckableIds[node.FromNodeId.String()][node.ToNodeId.String()] = true
+		}
+	}
+	assert.NoError(t, dbParentNodes.Err(), "scanned parent node rows should not have errors")
+
+	expectedParentCount := len(g.Parents)
+	if g.IsRedundancyGroup() {
+		expectedParentCount = 1 // All the children should have the redundancy group as parent node!
+		assert.Lenf(t, childToRedundancyGroupIds, len(g.Children), "all children %v should have the redundancy group as parent node", g.Children)
+		for _, child := range g.Children {
+			h := checkables[child]
+			require.NotNil(t, h, "child node should be a Checkable")
+			assert.Truef(t, childToRedundancyGroupIds[h.NodeId.String()], "child node %q should have the redundancy group as parent node", child)
+			// The edge state ID of all the children of this redundancy group should be the same as the ID
+			// of the redundancy group ID, i.e. they all share the same edge state. This is just a duplicate check!
+			assert.Equalf(t, redundancyGroup.Id, h.EdgeStateId, "child node %q should have the correct edge state", child)
+		}
+	} else {
+		for _, child := range g.Children {
+			h := checkables[child]
+			require.NotNilf(t, h, "child node %q should be a Checkable", child)
+
+			parents := childToParentCheckableIds[h.NodeId.String()]
+			require.NotNilf(t, parents, "child node %q should have parent nodes", child)
+			assert.Lenf(t, parents, len(g.Parents), "child node %q should reference %d parent nodes", child, len(g.Parents))
+
+			// Verify that the parent nodes of the children hosts are the correct ones.
+			for _, p := range g.Parents {
+				parent := checkables[p]
+				require.NotNilf(t, parent, "parent node %q should be an existing Checkable", p)
+				assert.Truef(t, parents[parent.NodeId.String()], "child node %q should reference parent node %q", child, parent)
+			}
+		}
+	}
+	assert.Lenf(t, parentNodes, expectedParentCount, "all parent nodes '%v' should be in the database", g.Parents)
+
+	for _, node := range parentNodes {
+		assert.NotNilf(t, node.FromNodeId, "parent node %q should have a from_node_id set", node.Name)
+		assert.NotNilf(t, node.ToNodeId, "parent node %q should have a to_node_id set", node.Name)
+
+		if g.IsRedundancyGroup() {
+			assert.Equal(t, node.Name, g.Name, "parent node should be the redundancy group itself")
+			assert.Equal(t, redundancyGroup.Id, node.RedundancyGroupId, "parent node should reference the redundancy group")
+
+			// Verify whether the connection between the current redundancy group and the parent Checkable is correct.
+			query := `SELECT NULL AS node_id, '' AS name, from_node_id, to_node_id FROM dependency_edge WHERE from_node_id = ?`
+			var edges []Node
+			assert.NoError(t, db.Select(&edges, db.Rebind(query), redundancyGroup.Id))
+			assert.GreaterOrEqualf(t, len(edges), len(g.Parents), "redundancy group %q should have at least %d parent nodes", g.Name, len(g.Parents))
+
+			// Due to different group registrations in makeTestDependencyGroups(), we might have more parent nodes
+			// than those within this specific group. Thus, we just need to make sure that all our parent nodes are
+			// referenced by this redundancy group.
+			for _, parent := range g.Parents {
+				h := checkables[parent]
+				require.NotNil(t, h, "parent node should be an existing Checkable")
+				assert.Truef(t, slices.ContainsFunc(edges, func(edge Node) bool {
+					return bytes.Equal(h.NodeId, edge.ToNodeId)
+				}), "redundancy group %q should reference parent node %q", g.Name, parent)
+			}
+		} else {
+			assert.Falsef(t, node.RedundancyGroupId.Valid(), "non-redundant parent node %q should not reference a redundancy group", node.Name)
+			assert.Contains(t, g.Parents, node.Name, "parent node should be in the parents list")
+			assert.NotContains(t, g.Children, node.Name, "parent node should not be in the children list")
+
+			parent := checkables[node.Name]
+			require.NotNil(t, parent, "parent node should be an existing Checkable")
+			assert.Equal(t, parent.Id, node.ToNodeId, "parent node should reference the correct Checkable")
+		}
+	}
+}
+
+// makeTestDependencyGroups generates a set of dependency groups that can be used for testing the dependency sync.
+//
+// All the parent and child Checkables used within this function are defined in the object_sync_test.conf file.
+// Therefore, if you want to add some more dependency groups with new Checkables, you need to add them to the
+// object_sync_test.conf file as well.
+func makeTestDependencyGroups() []DependencyGroup {
+	return []DependencyGroup{
+		{
+			Name:               "DNS",
+			Parents:            []string{"HostA", "HostB"},
+			Children:           []string{"HostC", "HostD", "HostE"},
+			StatesFilter:       []string{"Up", "Down"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+		},
+		// This is an exact duplicate of the first dependency group but only for child HostE and should
+		// be merged into the above from HostE -> DNS dependency edge, i.e. no duplicates in the database.
+		{
+			Name:               "DNS",
+			Parents:            []string{"HostA", "HostB"},
+			Children:           []string{"HostE"},
+			StatesFilter:       []string{"Up", "Down"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+			// Skip the verification of this group, as it's going to have more children and parents in it after merging.
+			SkipVerification: true,
+		},
+		{
+			Name:               "",
+			Parents:            []string{"HostA"},
+			Children:           []string{"HostF", "HostG", "HostH"},
+			StatesFilter:       []string{"Up"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+		},
+		// This is an exact duplicate of the above dependency group but only for child HostF and should
+		// be merged into the above from HostF -> HostA dependency edge, i.e. no duplicates in the database.
+		{
+			Name:               "",
+			Parents:            []string{"HostA"},
+			Children:           []string{"HostF"},
+			StatesFilter:       []string{"Up"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+			// Not easy to verify this one, as it gets merged into the above one with more children and parents in it.
+			SkipVerification: true,
+		},
+		{
+			Name:               "",
+			Parents:            []string{"HostB"},
+			Children:           []string{"HostF"},
+			StatesFilter:       []string{"Down"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+		},
+		// This is also an exact duplicate of the above one, but we want to register them separately to ease the
+		// verification, i.e., we will create another HostG -> HostB dependency edge but with different config, so
+		// that HostG gets an exclusive dependency edge to HostB.
+		{ //... Start of the HostG -> HostB duplicates...
+			Name:               "",
+			Parents:            []string{"HostB"},
+			Children:           []string{"HostG"},
+			StatesFilter:       []string{"Down"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+		},
+		//... and that's the aforementioned duplicated dependency edge for HostG -> HostB with ignore soft states set to false.
+		{
+			Name:               "",
+			Parents:            []string{"HostB"},
+			Children:           []string{"HostG"},
+			StatesFilter:       []string{"Down"},
+			IgnoreSoftStates:   false,
+			SendRuntimeUpdates: true,
+		},
+		//... and another one with different states filter as the two groups from above.
+		{
+			Name:               "",
+			Parents:            []string{"HostB"},
+			Children:           []string{"HostG"},
+			StatesFilter:       []string{"Up"},
+			IgnoreSoftStates:   false,
+			SendRuntimeUpdates: true,
+		},
+		//... and another one with different states filter as the two groups from above.
+		{
+			Name:               "",
+			Parents:            []string{"HostB"},
+			Children:           []string{"HostG"},
+			StatesFilter:       []string{"Up", "Down"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+		},
+		//... and another one with completely different states filter and configured time period.
+		{
+			Name:               "",
+			Parents:            []string{"HostB"},
+			Children:           []string{"HostG"},
+			StatesFilter:       []string{"Up", "Down"},
+			IgnoreSoftStates:   true,
+			TimePeriod:         "never-ever",
+			SendRuntimeUpdates: true,
+		}, //... End of the HostG -> HostB duplicates.
+		{
+			Name:               "",
+			Parents:            []string{"HostB"},
+			Children:           []string{"HostH"},
+			StatesFilter:       []string{"Up", "Down"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+		},
+		{
+			Name:               "LDAP",
+			Parents:            []string{"HostC", "HostD", "HostE"},
+			Children:           []string{"HostF", "HostG", "HostH"},
+			StatesFilter:       []string{"Up", "Down"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+		},
+		{
+			Name:             "LDAP",
+			Parents:          []string{"HostC"},
+			Children:         []string{"HostI", "HostJ"},
+			StatesFilter:     []string{"Up", "Down"},
+			IgnoreSoftStates: true,
+		},
+		{
+			Name:             "LDAP",
+			Parents:          []string{"HostD"},
+			Children:         []string{"HostI", "HostJ"},
+			StatesFilter:     []string{"Up", "Down"},
+			IgnoreSoftStates: false,
+		},
+		{
+			Name:             "LDAP",
+			Parents:          []string{"HostE"},
+			Children:         []string{"HostI", "HostJ"},
+			StatesFilter:     []string{"Down"},
+			IgnoreSoftStates: true,
+			TimePeriod:       "never-ever",
+		},
+		{
+			Name:             "SQL Servers",
+			Parents:          []string{"HostF"},
+			Children:         []string{"HostI"},
+			StatesFilter:     []string{"Up"},
+			IgnoreSoftStates: false,
+			TimePeriod:       "never-ever",
+		},
+		{
+			Name:             "SQL Servers",
+			Parents:          []string{"HostF"},
+			Children:         []string{"HostJ"},
+			StatesFilter:     []string{"Up"},
+			IgnoreSoftStates: true,
+			TimePeriod:       "never-ever",
+		},
+		{
+			Name:         "Web Servers",
+			Parents:      []string{"HostC", "HostD"},
+			Children:     []string{"HostK", "HostL", "HostM", "HostN"},
+			StatesFilter: []string{"Up", "Down"},
+			TimePeriod:   "workhours",
+		},
+		// This will be merged into the above group but since both have same children, the verification
+		// result will be the same as the above group.
+		{
+			Name:             "Web Servers",
+			Parents:          []string{"HostC", "HostD"},
+			Children:         []string{"HostK", "HostL", "HostM", "HostN"},
+			StatesFilter:     []string{"Up", "Down"},
+			IgnoreSoftStates: true,
+			TimePeriod:       "never-ever",
+		},
+		{
+			Name:               "Mail Servers",
+			Parents:            []string{"HostE", "HostF", "HostG"},
+			Children:           []string{"HostK", "HostL", "HostM", "HostN"},
+			StatesFilter:       []string{"Down"},
+			IgnoreSoftStates:   true,
+			SendRuntimeUpdates: true,
+		},
+	}
 }
 
 // writeIcinga2ConfigObjects emits config objects as icinga2 DSL to a writer
