@@ -4,7 +4,12 @@ import (
 	"github.com/icinga/icinga-go-library/database"
 )
 
-var StateFactories = []database.EntityFactoryFunc{NewHostState, NewServiceState}
+var StateFactories = []database.EntityFactoryFunc{
+	NewHostState,
+	NewServiceState,
+	NewDependencyEdgeState,
+	NewRedundancygroupState,
+}
 
 var ConfigFactories = []database.EntityFactoryFunc{
 	NewActionUrl,
@@ -51,6 +56,9 @@ var ConfigFactories = []database.EntityFactoryFunc{
 	NewUsergroupCustomvar,
 	NewUsergroupMember,
 	NewZone,
+	NewRedundancygroup,
+	NewDependencyNode,
+	NewDependencyEdge,
 }
 
 // contextKey is an unexported type for context keys defined in this package.

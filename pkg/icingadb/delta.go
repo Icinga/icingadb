@@ -53,7 +53,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 	desired := EntitiesById{} // only read from desiredCh (so far)
 
 	var update EntitiesById
-	if delta.Subject.WithChecksum() {
+	if _, ok := delta.Subject.Entity().(contracts.Equaler); ok || delta.Subject.WithChecksum() {
 		update = EntitiesById{} // read from actualCh and desiredCh with mismatching checksums
 	}
 
@@ -70,7 +70,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 			id := actualValue.ID().String()
 			if desiredValue, ok := desired[id]; ok {
 				delete(desired, id)
-				if update != nil && !checksumsMatch(actualValue, desiredValue) {
+				if update != nil && !entitiesEqual(actualValue, desiredValue) {
 					update[id] = desiredValue
 				}
 			} else {
@@ -88,7 +88,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 			id := desiredValue.ID().String()
 			if actualValue, ok := actual[id]; ok {
 				delete(actual, id)
-				if update != nil && !checksumsMatch(actualValue, desiredValue) {
+				if update != nil && !entitiesEqual(actualValue, desiredValue) {
 					update[id] = desiredValue
 				}
 			} else {
@@ -117,8 +117,14 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 		zap.Int("delete", len(delta.Delete)))
 }
 
-// checksumsMatch returns whether the checksums of two entities are the same.
-// Both entities must implement contracts.Checksumer.
-func checksumsMatch(a, b database.Entity) bool {
-	return cmp.Equal(a.(contracts.Checksumer).Checksum(), b.(contracts.Checksumer).Checksum())
+// entitiesEqual returns whether the two entities are equal either based on their checksum or by comparing them.
+//
+// Both entities must either implement contracts.Checksumer or contracts.Equaler for this to work. If neither
+// interface is implemented nor if both entities don't implement the same interface, this function will panic.
+func entitiesEqual(a, b database.Entity) bool {
+	if _, ok := a.(contracts.Checksumer); ok {
+		return cmp.Equal(a.(contracts.Checksumer).Checksum(), b.(contracts.Checksumer).Checksum())
+	}
+
+	return a.(contracts.Equaler).Equal(b)
 }
