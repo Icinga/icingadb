@@ -4,10 +4,12 @@ import (
 	"github.com/creasty/defaults"
 	"github.com/icinga/icinga-go-library/config"
 	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/testutils"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zapcore"
 	"os"
 	"testing"
 )
@@ -44,7 +46,17 @@ redis:
 		{
 			Name: "Load from YAML only",
 			Data: testutils.ConfigTestData{
-				Yaml: yamlConfig,
+				Yaml: yamlConfig + `
+logging:
+  options:
+    database: debug
+    redis: debug
+
+retention:
+  options:
+    comment: 31
+    downtime: 365
+`,
 			},
 			Expected: &Config{
 				Database: database.Config{
@@ -55,6 +67,18 @@ redis:
 				},
 				Redis: redis.Config{
 					Host: "2001:db8::1",
+				},
+				Logging: logging.Config{
+					Options: logging.Options{
+						"database": zapcore.DebugLevel,
+						"redis":    zapcore.DebugLevel,
+					},
+				},
+				Retention: RetentionConfig{
+					Options: history.RetentionOptions{
+						"comment":  31,
+						"downtime": 365,
+					},
 				},
 			},
 		},
@@ -67,6 +91,8 @@ redis:
 					"ICINGADB_DATABASE_USER":     "icingadb",
 					"ICINGADB_DATABASE_PASSWORD": "icingadb",
 					"ICINGADB_REDIS_HOST":        "2001:db8::1",
+					"ICINGADB_LOGGING_OPTIONS":   "database:debug,redis:debug",
+					"ICINGADB_RETENTION_OPTIONS": "comment:31,downtime:365",
 				},
 			},
 			Expected: &Config{
@@ -78,6 +104,18 @@ redis:
 				},
 				Redis: redis.Config{
 					Host: "2001:db8::1",
+				},
+				Logging: logging.Config{
+					Options: logging.Options{
+						"database": zapcore.DebugLevel,
+						"redis":    zapcore.DebugLevel,
+					},
+				},
+				Retention: RetentionConfig{
+					Options: history.RetentionOptions{
+						"comment":  31,
+						"downtime": 365,
+					},
 				},
 			},
 		},
@@ -141,31 +179,6 @@ redis:
 				},
 				Redis: redis.Config{
 					Host: "2001:db8::1",
-				},
-			},
-		},
-		{
-			Name: "Retention options from Env",
-			Data: testutils.ConfigTestData{
-				Yaml: yamlConfig,
-				Env: map[string]string{
-					"ICINGADB_RETENTION_OPTIONS": "comment:31,downtime:365",
-				}},
-			Expected: &Config{
-				Database: database.Config{
-					Host:     "192.0.2.1",
-					Database: "icingadb",
-					User:     "icingadb",
-					Password: "icingadb",
-				},
-				Redis: redis.Config{
-					Host: "2001:db8::1",
-				},
-				Retention: RetentionConfig{
-					Options: history.RetentionOptions{
-						"comment":  31,
-						"downtime": 365,
-					},
 				},
 			},
 		},
