@@ -49,8 +49,17 @@ func (c *Config) Validate() error {
 type Flags struct {
 	// Version decides whether to just print the version and exit.
 	Version bool `long:"version" description:"print version and exit"`
+
 	// Config is the path to the config file
 	Config string `short:"c" long:"config" description:"path to config file" required:"true" default:"/etc/icingadb/config.yml"`
+
+	// DatabaseAutoImport results in an initial schema check and update; mostly for containerized setups.
+	DatabaseAutoImport bool `long:"database-auto-import" description:"import database schema on startup if database is empty"`
+
+	// DatabaseSchemaDir is the root directory for schema files to be used when DatabaseAutoImport is requested.
+	//
+	// The directory structure must mimic the git repo's schema dir, containing ./mysql/schema.sql and ./pgsql/schema.sql.
+	DatabaseSchemaDir string `long:"database-schema-dir" description:"directory for --database-auto-import, expects ./{my,pg}sql/schema.sql files" default:"./schema/"`
 }
 
 // RetentionConfig defines configuration for history retention.
