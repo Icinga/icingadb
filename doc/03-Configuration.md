@@ -1,35 +1,27 @@
 # Configuration
 
-For package installations, the configuration is stored in `/etc/icingadb/config.yml`.
+Icinga DB can be configured using a YAML configuration file, environment variables, or both.
+Environment variables take precedence and override previously defined values from the configuration file.
+
+For package installations, the configuration file is stored in `/etc/icingadb/config.yml`.
 See [config.example.yml](../config.example.yml) for an example configuration.
 
-## Redis® Configuration
-
-Connection configuration for the Redis® server where Icinga 2 writes its configuration, state and history items.
-This is the same connection as configured in the
-[Icinga DB feature](https://icinga.com/docs/icinga-2/latest/doc/14-features/#icinga-db) of
-the corresponding Icinga 2 node. High availability setups require a dedicated Redis® server per Icinga 2 node and
-therefore a dedicated Icinga DB instance that connects to it.
-
-| Option   | Description                                                                                                             |
-|----------|-------------------------------------------------------------------------------------------------------------------------|
-| host     | **Required.** Host name or address, or absolute Unix socket path.                                                       |
-| port     | **Optional.** TCP port. Defaults to `6380` matching the Redis® open source server port in the `icingadb-redis` package. |
-| username | **Optional.** Authentication username, requires a `password` being set as well.                                         |
-| password | **Optional.** Authentication password. May be used alone or together with a `username`.                                 |
-| database | **Optional.** Numerical database identifier, defaults to `0`.                                                           |
-| tls      | **Optional.** Whether to use TLS.                                                                                       |
-| cert     | **Optional.** Path to TLS client certificate.                                                                           |
-| key      | **Optional.** Path to TLS private key.                                                                                  |
-| ca       | **Optional.** Path to TLS CA certificate.                                                                               |
-| insecure | **Optional.** Whether not to verify the peer.                                                                           |
+The following subsections describe the configurations of the various modules.
+For the YAML configuration file, each option is written in lowercase, as shown in the tables.
+When using environment variables, the variable name is constructed by concatenating `ICINGADB_`, the module name in uppercase followed by an underscore, and the option name in uppercase.
+The hyphens in the names are to be replaced by underscores.
+For example, to set the database host, the `ICINGADB_DATABASE_HOST` environment variable is used.
 
 ## Database Configuration
 
-Connection configuration for the database to which Icinga DB synchronizes monitoring data.
+Connection configuration for the SQL database to which Icinga DB synchronizes monitoring data.
 This is also the database used in
 [Icinga DB Web](https://icinga.com/docs/icinga-db-web) to view and work with the data.
-In high availability setups, all Icinga DB instances must write to the same database.
+
+In [high availability setups](05-Distributed-Setups.md), all Icinga DB instances must write to the same database.
+
+For YAML configuration, the options are part of the `database` dictionary.
+For environment variables, each option is prefixed with`ICINGADB_DATABASE_`.
 
 | Option   | Description                                                                                                                                    |
 |----------|------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -40,9 +32,9 @@ In high availability setups, all Icinga DB instances must write to the same data
 | user     | **Required.** Database username.                                                                                                               |
 | password | **Optional.** Database password.                                                                                                               |
 | tls      | **Optional.** Whether to use TLS.                                                                                                              |
-| cert     | **Optional.** Path to TLS client certificate.                                                                                                  |
-| key      | **Optional.** Path to TLS private key.                                                                                                         |
-| ca       | **Optional.** Path to TLS CA certificate.                                                                                                      |
+| cert     | **Optional.** TLS client certificate, either file path or PEM-encoded multiline string.                                                        |
+| key      | **Optional.** TLS client private key, either file path or PEM-encoded multiline string.                                                        |
+| ca       | **Optional.** TLS CA certificate, either file path or PEM-encoded multiline string.                                                            |
 | insecure | **Optional.** Whether not to verify the peer.                                                                                                  |
 | options  | **Optional.** List of low-level [database options](#database-options) that can be set to influence some Icinga DB internal default behaviours. |
 
@@ -55,7 +47,10 @@ do not need any manual adjustments.
 
 !!! important
 
-    Do not change the defaults if you do not have to!
+    Do not change the defaults unless you have to!
+
+For YAML configuration, the options are part of the `database.options` dictionary.
+For environment variables, each option is prefixed with `ICINGADB_DATABASE_OPTIONS_`.
 
 | Option                         | Description                                                                                                                                      |
 |--------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -65,11 +60,39 @@ do not need any manual adjustments.
 | max_rows_per_transaction       | **Optional.** Maximum number of rows Icinga DB is allowed to `SELECT`,`DELETE`,`UPDATE` or `INSERT` in a single transaction. Defaults to `8192`. |
 | wsrep_sync_wait                | **Optional.** Enforce [Galera cluster](#galera-cluster) nodes to perform strict cluster-wide causality checks. Defaults to `7`.                  |
 
+## Redis® Configuration
+
+Connection configuration for the Redis® server where Icinga 2 writes its configuration, state and history items.
+This is the same connection as configured in the
+[Icinga DB feature](https://icinga.com/docs/icinga-2/latest/doc/14-features/#icinga-db) of
+the corresponding Icinga 2 node.
+
+High availability setups require a dedicated Redis® server per Icinga 2 node and therefore a dedicated Icinga DB instance that connects to it.
+
+For YAML configuration, the options are part of the `redis` dictionary.
+For environment variables, each option is prefixed with `ICINGADB_REDIS_`.
+
+| Option   | Description                                                                                                             |
+|----------|-------------------------------------------------------------------------------------------------------------------------|
+| host     | **Required.** Host name or address, or absolute Unix socket path.                                                       |
+| port     | **Optional.** TCP port. Defaults to `6380` matching the Redis® open source server port in the `icingadb-redis` package. |
+| username | **Optional.** Authentication username, requires a `password` being set as well.                                         |
+| password | **Optional.** Authentication password. May be used alone or together with a `username`.                                 |
+| database | **Optional.** Numerical database identifier, defaults to `0`.                                                           |
+| tls      | **Optional.** Whether to use TLS.                                                                                       |
+| cert     | **Optional.** TLS client certificate, either file path or PEM-encoded multiline string.                                 |
+| key      | **Optional.** TLS client private key, either file path or PEM-encoded multiline string.                                 |
+| ca       | **Optional.** TLS CA certificate, either file path or PEM-encoded multiline string.                                     |
+| insecure | **Optional.** Whether not to verify the peer.                                                                           |
+
 ## Logging Configuration
 
 Configuration of the logging component used by Icinga DB.
 
-| Option   | Description                                                                                                                                                                                              |
+For YAML configuration, the options are part of the `logging` dictionary.
+For environment variables, each option is prefixed with `ICINGADB_LOGGING_`.
+
+| Option   | Description                                                                                                                                                                                                                                           |
 |----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | level    | **Optional.** Specifies the default logging level. Can be set to `fatal`, `error`, `warn`, `info` or `debug`. Defaults to `info`.                                                                                                                     |
 | output   | **Optional.** Configures the logging output. Can be set to `console` (stderr) or `systemd-journald`. Defaults to systemd-journald when running under systemd, otherwise to console. See notes below for [systemd-journald](#systemd-journald-fields). |
@@ -77,6 +100,32 @@ Configuration of the logging component used by Icinga DB.
 | options  | **Optional.** Map of component name to logging level in order to set a different logging level for each component instead of the default one. See [logging components](#logging-components) for details.                                              |
 
 ### Logging Components
+
+The independent components of Icinga DB produce log entries.
+Each log entry is linked to its component and a log level.
+
+By default, any log message will be displayed if its log level is at or above the `level` configured above.
+However, it is possible to override the log level for each component individually to show more or less information.
+
+For YAML configuration, the options are part of the `logging.options` dictionary.
+For environment variables, `ICINGADB_LOGGING_OPTIONS` expects a single string of `component:level` pairs joined with `,`.
+
+The following example would log everything with at least info level, except database and high availability entries, where the level is one time raised and one time lowered.
+
+```yaml
+# YAML Configuration File
+logging:
+  level: info
+  options:
+    database: error
+    high-availability: debug
+```
+
+```
+# Environment Variables
+ICINGADB_LOGGING_LEVEL=error
+ICINGADB_LOGGING_OPTIONS=database:error,high-availability:debug
+```
 
 | Component         | Description                                                                     |
 |-------------------|---------------------------------------------------------------------------------|
@@ -101,13 +150,24 @@ There are separate options for the full history tables used to display history i
 SLA tables which store the minimal information required for SLA reporting,
 allowing to keep this information for longer with a smaller storage footprint.
 
+For YAML configuration, the options are part of the `retention` dictionary.
+For environment variables, each option is prefixed with `ICINGADB_RETENTION_`.
+
+When using environment variables, the Retention `options` are formatted similar to the [logging components](#logging-components) from above.
+
+```
+# Environment Variables
+ICINGADB_RETENTION_HISTORY_DAYS=14
+ICINGADB_RETENTION_OPTIONS=comment:356
+```
+
 | Option       | Description                                                                                                                                                                                                   |
 |--------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | history-days | **Optional.** Number of days to retain historical data for all history categories. Use `options` in order to enable retention only for specific categories or to override the retention days configured here. |
 | sla-days     | **Optional.** Number of days to retain historical data for SLA reporting.                                                                                                                                     |
 | interval     | **Optional.** Interval for periodically cleaning up the historical data, defined as [duration string](#duration-string). Defaults to `"1h"`.                                                                  |
 | count        | **Optional.** Number of old historical data a single query can delete in a `"DELETE FROM ... LIMIT count"` manner. Defaults to `5000`.                                                                        |
-| options      | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification`, `sla` and `state`.                 |
+| options      | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification` and `state`.                        |
 
 ## Appendix
 
