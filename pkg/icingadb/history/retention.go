@@ -11,6 +11,8 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -97,9 +99,49 @@ var RetentionStatements = []retentionStatement{{
 // RetentionOptions defines the non-default mapping of history categories with their retention period in days.
 type RetentionOptions map[string]uint16
 
+// UnmarshalText implements [encoding.TextUnmarshaler] to allow RetentionOptions to be parsed by env.
+//
+// This custom TextUnmarshaler is necessary as - for the moment - env does not support map[T]encoding.TextUnmarshaler.
+// After <https://github.com/caarlos0/env/pull/323> got merged and a new env release was drafted, this method can be
+// removed.
+func (o *RetentionOptions) UnmarshalText(text []byte) error {
+	optionsMap := make(map[string]uint16)
+
+	for _, pair := range strings.Split(string(text), ",") {
+		key, value, found := strings.Cut(pair, ":")
+		if !found {
+			return fmt.Errorf("entry %q cannot be unmarshalled as a history-category:retention-period pair", pair)
+		}
+
+		days, err := strconv.ParseUint(value, 10, 16)
+		if err != nil {
+			return fmt.Errorf("failed to parse %q as a uint16 retention period in days: %v", value, err)
+		}
+
+		optionsMap[key] = uint16(days)
+	}
+
+	*o = optionsMap
+
+	return nil
+}
+
+// UnmarshalYAML implements yaml.InterfaceUnmarshaler to allow RetentionOptions to be parsed go-yaml.
+func (o *RetentionOptions) UnmarshalYAML(unmarshal func(any) error) error {
+	optionsMap := make(map[string]uint16)
+
+	if err := unmarshal(&optionsMap); err != nil {
+		return err
+	}
+
+	*o = optionsMap
+
+	return nil
+}
+
 // Validate checks constraints in the supplied retention options and
 // returns an error if they are violated.
-func (o RetentionOptions) Validate() error {
+func (o *RetentionOptions) Validate() error {
 	allowedCategories := make(map[string]struct{})
 	for _, stmt := range RetentionStatements {
 		if stmt.RetentionType == RetentionHistory {
@@ -107,7 +149,7 @@ func (o RetentionOptions) Validate() error {
 		}
 	}
 
-	for category := range o {
+	for category := range *o {
 		if _, ok := allowedCategories[category]; !ok {
 			return errors.Errorf("invalid key %s for history retention", category)
 		}
