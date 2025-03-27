@@ -11,6 +11,7 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -97,7 +98,7 @@ var RetentionStatements = []retentionStatement{{
 }}
 
 // RetentionOptions defines the non-default mapping of history categories with their retention period in days.
-type RetentionOptions map[string]uint16
+type RetentionOptions map[string]float64
 
 // UnmarshalText implements [encoding.TextUnmarshaler] to allow RetentionOptions to be parsed by env.
 //
@@ -162,8 +163,8 @@ func (o *RetentionOptions) Validate() error {
 type Retention struct {
 	db          *database.DB
 	logger      *logging.Logger
-	historyDays uint16
-	slaDays     uint16
+	historyDays float64
+	slaDays     float64
 	interval    time.Duration
 	count       uint64
 	options     RetentionOptions
@@ -171,7 +172,7 @@ type Retention struct {
 
 // NewRetention returns a new Retention.
 func NewRetention(
-	db *database.DB, historyDays, slaDays uint16, interval time.Duration,
+	db *database.DB, historyDays, slaDays float64, interval time.Duration,
 	count uint64, options RetentionOptions, logger *logging.Logger,
 ) *Retention {
 	return &Retention{
@@ -198,7 +199,7 @@ func (r *Retention) Start(ctx context.Context) error {
 	errs := make(chan error, 1)
 
 	for _, stmt := range RetentionStatements {
-		var days uint16
+		var days float64
 		switch stmt.RetentionType {
 		case RetentionHistory:
 			if d, ok := r.options[stmt.Category]; ok {
@@ -210,7 +211,7 @@ func (r *Retention) Start(ctx context.Context) error {
 			days = r.slaDays
 		}
 
-		if days < 1 {
+		if days <= 0 {
 			r.logger.Debugf("Skipping history retention for category %s", stmt.Category)
 			continue
 		}
@@ -219,12 +220,21 @@ func (r *Retention) Start(ctx context.Context) error {
 			fmt.Sprintf("Starting history retention for category %s", stmt.Category),
 			zap.Uint64("count", r.count),
 			zap.Duration("interval", r.interval),
-			zap.Uint16("retention-days", days),
+			zap.Float64("retention-days", days),
 		)
 
 		stmt := stmt
 		periodic.Start(ctx, r.interval, func(tick periodic.Tick) {
-			olderThan := tick.Time.AddDate(0, 0, -int(days))
+			olderThan := tick.Time
+			wholeDays, dayFraction := math.Modf(float64(days))
+
+			if wholeDays > 0 {
+				olderThan = olderThan.AddDate(0, 0, -int(wholeDays))
+			}
+
+			if dayFraction > 0 {
+				olderThan = olderThan.Add(-time.Duration(dayFraction * float64(24*time.Hour)))
+			}
 
 			r.logger.Debugf("Cleaning up historical data for category %s from table %s older than %s",
 				stmt.Category, stmt.Table, olderThan)
