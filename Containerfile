@@ -25,6 +25,9 @@ COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 COPY --from=build /icingadb /icingadb
 
+COPY ./schema/mysql/schema.sql /schema/mysql/schema.sql
+COPY ./schema/pgsql/schema.sql /schema/pgsql/schema.sql
+
 # addgroup -g 1001 icinga
 COPY <<EOF /etc/group
 icinga:x:1001:
@@ -37,4 +40,4 @@ EOF
 
 USER icinga
 
-CMD ["/icingadb"]
+CMD ["/icingadb", "--database-auto-import"]
