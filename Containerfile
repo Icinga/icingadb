@@ -22,6 +22,8 @@ RUN --mount=target=. \
 
 FROM scratch
 
+COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
 COPY --from=build /icingadb /icingadb
 
 # addgroup -g 1001 icinga
