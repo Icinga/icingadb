@@ -58,6 +58,9 @@ jobs:
             org.opencontainers.image.vendor=Icinga GmbH
           tags: |
             type=edge
+            # Update the `latest` tag only on the default branch to ensure it represents the most current release when
+            # releasing from multiple branches.
+            type=raw,value=latest,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
