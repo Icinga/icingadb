@@ -54,6 +54,7 @@ jobs:
             # Docker Hub
             ${{ env.IMAGE_NAME }}
           labels: |
+            org.opencontainers.image.documentation=https://icinga.com/docs/icinga-db
             org.opencontainers.image.vendor=Icinga GmbH
           tags: |
             type=edge
