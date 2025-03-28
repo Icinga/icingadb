@@ -37,11 +37,6 @@ jobs:
       attestations: write
       id-token: write
 
-    # TODO (el): This is a temporary setup; see the details in the "Build and push Container image" section.
-    strategy:
-      matrix:
-        platform: [linux/amd64, linux/arm64]
-
     steps:
       - name: Extract metadata (tags, labels)
         id: meta
@@ -89,23 +84,8 @@ jobs:
         with:
           file: ./Containerfile
           labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
-          # TODO (el): The use of load and matrix.platform is a temporary setup for
-          # testing signed build provenance attestations for containers.
-          # Since attestations are only required when images are actually pushed,
-          # both can be removed once we add `if: ${{ github.event_name != 'pull_request' }}` and
-          # `push-to-registry: true` to the relevant steps.
-          #
-          # The docker/setup-buildx-action@v3 uses the docker-container driver by default,
-          # which keeps the build result only in the build cache unless it is pushed to a registry.
-          # To generate signed build provenance attestations for containers,
-          # the subsequent steps require access to the image digest,
-          # which is in this case available only if the image is explicitly loaded:
-          # https://github.com/docker/build-push-action/issues/906#issuecomment-1674567311
-          load: ${{ github.event_name == 'pull_request' }}
-          # matrix.platform is required when load is true; otherwise, specifying platforms as a comma-separated string
-          # causes buildx to fail with: ERROR: docker exporter does not currently support exporting manifest lists
-          platforms: ${{ matrix.platform }}
           # The tags generated in the metadata step include tags for both Docker Hub and GHCR image names,
           # allowing the build and push action to build and push images to both registries.
           tags: ${{ steps.meta.outputs.tags }}
@@ -115,13 +95,15 @@ jobs:
             BUILDKIT_CONTEXT_KEEP_GIT_DIR=1
 
       - name: Generate artifact attestation for GitHub Container Registry
+        if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ghcr.io/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
-          push-to-registry: false
+          push-to-registry: true
 
       - name: Generate artifact attestation for Docker Hub
+        if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@v2
         with:
           # According to the documentation [^1],
@@ -130,4 +112,4 @@ jobs:
           # [^1]: https://github.com/actions/attest-build-provenance?tab=readme-ov-file#container-image
           subject-name: index.docker.io/${{ env.IMAGE_NAME}}
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
-          push-to-registry: false
+          push-to-registry: true
