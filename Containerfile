@@ -22,6 +22,8 @@ RUN --mount=target=. \
 
 FROM scratch
 
+COPY --from=build /icingadb /icingadb
+
 # addgroup -g 1001 icinga
 COPY <<EOF /etc/group
 icinga:x:1001:
