@@ -67,7 +67,18 @@ func run() int {
 		}
 	}
 
-	if err := icingadb.CheckSchema(context.Background(), db); err != nil {
+	switch err := icingadb.CheckSchema(context.Background(), db); {
+	case errors.Is(err, icingadb.ErrSchemaNotExists):
+		if !cmd.Flags.DatabaseAutoImport {
+			logger.Fatal("The database schema is missing")
+		}
+
+		logger.Info("Starting database schema auto import")
+		if err := icingadb.ImportSchema(context.Background(), db, cmd.Flags.DatabaseSchemaDir); err != nil {
+			logger.Fatalf("%+v", errors.Wrap(err, "can't import database schema"))
+		}
+		logger.Info("The database schema was successfully imported")
+	case err != nil:
 		logger.Fatalf("%+v", err)
 	}
 

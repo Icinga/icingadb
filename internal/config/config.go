@@ -58,6 +58,14 @@ type Flags struct {
 	// Config is the path to the config file. If not provided, it defaults to DefaultConfigPath.
 	Config string `short:"c" long:"config" description:"path to config file (default: /etc/icingadb/config.yml)"`
 	// default must be kept in sync with DefaultConfigPath.
+
+	// DatabaseAutoImport results in an initial schema check and update; mostly for containerized setups.
+	DatabaseAutoImport bool `long:"database-auto-import" description:"import database schema on startup if database is empty"`
+
+	// DatabaseSchemaDir is the root directory for schema files to be used when DatabaseAutoImport is requested.
+	//
+	// The directory structure must mimic the git repo's schema dir, containing ./mysql/schema.sql and ./pgsql/schema.sql.
+	DatabaseSchemaDir string `long:"database-schema-dir" description:"directory for --database-auto-import, expects ./{my,pg}sql/schema.sql files" default:"./schema/"`
 }
 
 // GetConfigPath retrieves the path to the configuration file.
