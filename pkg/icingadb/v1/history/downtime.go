@@ -1,11 +1,14 @@
 package history
 
 import (
+	"context"
 	"database/sql/driver"
 	"fmt"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"golang.org/x/sync/errgroup"
+	"time"
 )
 
 type DowntimeHistoryEntity struct {
@@ -161,6 +164,47 @@ func (et SlaDowntimeEndTime) Value() (driver.Value, error) {
 	} else {
 		return et.History.EndTime.Value()
 	}
+}
+
+// SyncDowntimeHistoryEndEvent updates the downtime history records with the given downtime IDs to mark them as cancelled.
+//
+// This function is used to mark downtimes as cancelled when the downtime configuration is removed from
+// the configuration files. In such cases, Icinga 2 won't send the corresponding downtime end/removed events,
+// so we need to mark the downtimes as cancelled manually.
+func SyncDowntimeHistoryEndEvent(ctx context.Context, db *database.DB, downtimeIds []any) error {
+	downtimes := make(chan database.Entity, len(downtimeIds))
+	g, ctx := errgroup.WithContext(ctx)
+	g.Go(func() error {
+		defer close(downtimes)
+
+		// Transform the downtime IDs into DowntimeHistory entities with the necessary fields
+		// and stream them into the downtimes channel.
+		for _, id := range downtimeIds {
+			// The downtimes channel is buffered, so this will never block, and we can just keep sending.
+			downtimes <- &DowntimeHistory{
+				DowntimeHistoryEntity: DowntimeHistoryEntity{DowntimeId: id.(types.Binary)},
+				DowntimeHistoryUpserter: DowntimeHistoryUpserter{
+					CancelledBy:      types.MakeString("Downtime Config Removed"),
+					HasBeenCancelled: types.Bool{Bool: true, Valid: true},
+					CancelTime:       types.UnixMilli(time.Now()),
+				},
+			}
+		}
+
+		return nil
+	})
+
+	g.Go(func() error {
+		// Each downtime removed in this manner should never have been cancelled before, so we
+		// don't need extra where clauses in the update statement other than the downtime ID.
+		stmt := `UPDATE downtime_history SET cancel_time = :cancel_time, has_been_cancelled = :has_been_cancelled, cancelled_by = :cancelled_by WHERE downtime_id = :downtime_id`
+
+		return db.NamedBulkExecTx(ctx, stmt, db.Options.MaxRowsPerTransaction, db.GetSemaphoreForTable("downtime_history"), downtimes)
+	})
+
+	// TODO: Fake the downtime end event in the regular history and SLA downtime history tables.
+
+	return g.Wait()
 }
 
 // Assert interface compliance.
