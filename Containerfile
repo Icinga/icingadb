@@ -1,5 +1,5 @@
-# TODO(el): Introduce GO_VERSION build argument.
-FROM golang AS base
+ARG GO_VERSION=1.23
+FROM golang:${GO_VERSION} AS base
 
 # Cache dependencies:
 # The go mod download command uses a cache mount,
@@ -10,16 +10,28 @@ COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod \
     go mod download
 
-# Mount source code and build:
-# The --mount=target=. option mounts the source code into the build stage without creating an image layer.
-# The go build command uses the dependency cache and a dedicated mount to cache build artifacts,
-# speeding up future builds.
 FROM base AS build
+
+# Mount source code and build:
+# The --mount=target=. option mounts the source code without adding an extra image layer, unlike `COPY . .`.
+# The go build command uses the dependency cache and a dedicated mount to cache build artifacts for future builds.
 RUN --mount=target=. \
     --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags '-s -w' -o /icingadb cmd/icingadb/main.go
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags '-s -w' -o /icingadb ./cmd/icingadb/main.go
 
 FROM scratch
-COPY --from=build /icingadb /icingadb
+
+# addgroup -g 1001 icinga
+COPY <<EOF /etc/group
+icinga:x:1001:
+EOF
+
+# adduser -u 1001 --no-create-home -h /var/empty -s /sbin/nologin --disabled-password -G icinga icinga
+COPY <<EOF /etc/passwd
+icinga:x:1001:1001::/var/empty:/sbin/nologin
+EOF
+
+USER 1001:1001
+
 CMD ["/icingadb"]
