@@ -21,13 +21,6 @@ RUN --mount=target=. \
 
 FROM scratch
 
-COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-
-COPY --from=build /icingadb /icingadb
-
-COPY ./schema/mysql/schema.sql /schema/mysql/schema.sql
-COPY ./schema/pgsql/schema.sql /schema/pgsql/schema.sql
-
 # addgroup -g 1001 icinga
 COPY <<EOF /etc/group
 icinga:x:1001:
@@ -37,6 +30,13 @@ EOF
 COPY <<EOF /etc/passwd
 icinga:x:1001:1001::/var/empty:/sbin/nologin
 EOF
+
+COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+
+COPY ./schema/mysql/schema.sql /schema/mysql/schema.sql
+COPY ./schema/pgsql/schema.sql /schema/pgsql/schema.sql
+
+COPY --from=build /icingadb /icingadb
 
 USER icinga
 
