@@ -52,7 +52,7 @@ func run() int {
 	logger := logs.GetLogger()
 	defer func() { _ = logger.Sync() }()
 
-	logger.Infof("Starting Icinga DB daemon (%s)", internal.Version.Version)
+	logger.WithOptions(logs.ForceLog()).Infof("Starting Icinga DB daemon (%s)", internal.Version.Version)
 
 	db, err := cmd.Database(logs.GetChildLogger("database"))
 	if err != nil {
@@ -172,7 +172,7 @@ func run() int {
 		for hactx.Err() == nil {
 			select {
 			case takeoverReason := <-ha.Takeover():
-				logger.Infow("Taking over", zap.String("reason", takeoverReason))
+				logger.WithOptions(logs.ForceLog()).Infow("Taking over", zap.String("reason", takeoverReason))
 
 				go func() {
 					for hactx.Err() == nil {
@@ -334,7 +334,7 @@ func run() int {
 					}
 				}()
 			case handoverReason := <-ha.Handover():
-				logger.Warnw("Handing over", zap.String("reason", handoverReason))
+				logger.WithOptions(logs.ForceLog()).Warnw("Handing over", zap.String("reason", handoverReason))
 
 				cancelHactx()
 			case <-hactx.Done():
