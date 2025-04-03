@@ -40,4 +40,5 @@ COPY --from=build /icingadb /icingadb
 
 USER icinga
 
-CMD ["/icingadb", "--database-auto-import"]
+ENV PATH=/
+CMD ["icingadb", "--database-auto-import"]
