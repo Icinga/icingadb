@@ -1,5 +1,26 @@
 # Icinga DB Changelog
 
+## 1.3.0 (2025-04-03)
+
+This is a maintenance release, integrating the container setup directly into Icinga DB.
+
+Most importantly, first-class support for configuring Icinga DB completely via environment variables has been added alongside YAML.
+In addition, an optional automatic database schema import has been added, allowing an empty SQL database to be populated.
+With these two features, the [docker-icingadb](https://github.com/Icinga/docker-icingadb) repository can now be sunsetted, integrating the `Containerfile` directly into the main repository.
+
+For Docker users of Icinga DB, the following has changed.
+
+- Container images are now pushed to both the [GitHub Container Registry (GHCR)](https://github.com/icinga/icingadb/pkgs/container/icingadb) and [Docker Hub](https://hub.docker.com/r/icinga/icingadb).
+- Development images built from the `main` branch are no longer tagged as `main`, but now as `edge`.
+
+The changes are as follows.
+
+* Support loading configuration from both YAML files and environment variables. #831
+* Allow database schema import via command line argument flag. #901
+* Create and publish container images from the icingadb repository. #912
+* Log essential HA events and the startup message regardless of the log level. #920
+* Resolve SQL errors with reserved names in `icingadb-migrate` on older PostgreSQL versions. #885
+
 ## 1.2.1 (2024-12-18)
 
 This is a maintenance release that addresses HA issues and includes a number of other fixes.
