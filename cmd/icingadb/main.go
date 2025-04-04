@@ -30,7 +30,7 @@ import (
 const (
 	ExitSuccess                = 0
 	ExitFailure                = 1
-	expectedRedisSchemaVersion = "5"
+	expectedRedisSchemaVersion = "6"
 )
 
 func main() {

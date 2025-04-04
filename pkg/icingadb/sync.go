@@ -148,9 +148,18 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 		entitiesWithoutChecksum, errs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, runtime.NumCPU())
 		// Let errors from CreateEntities cancel our group.
 		com.ErrgroupReceive(g, errs)
-		entities, errs := icingaredis.SetChecksums(ctx, entitiesWithoutChecksum, delta.Update, runtime.NumCPU())
-		// Let errors from SetChecksums cancel our group.
-		com.ErrgroupReceive(g, errs)
+
+		var entities <-chan database.Entity
+		// Apply the checksums only if the sync subject supports it, i.e, it implements contracts.Checksumer.
+		// This is necessary because not only entities that implement contracts.Checksumer can be updated, but
+		// also entities that implement contracts.Equaler interface.
+		if delta.Subject.WithChecksum() {
+			entities, errs = icingaredis.SetChecksums(ctx, entitiesWithoutChecksum, delta.Update, runtime.NumCPU())
+			// Let errors from SetChecksums cancel our group.
+			com.ErrgroupReceive(g, errs)
+		} else {
+			entities = entitiesWithoutChecksum
+		}
 
 		g.Go(func() error {
 			// Using upsert here on purpose as this is the fastest way to do bulk updates.

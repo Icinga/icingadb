@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"github.com/go-sql-driver/mysql"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/stretchr/testify/assert"
@@ -366,27 +367,29 @@ func (c *CurrentState) WriteSlaEventToDatabase(db *sqlx.DB, m *SlaHistoryMeta) e
 	type values struct {
 		*SlaHistoryMeta
 		State              uint8         `db:"state"`
+		AffectsChildren    types.Bool    `db:"affects_children"`
 		PropertiesChecksum NullableBytes `db:"properties_checksum"`
 	}
 
 	v := values{
 		SlaHistoryMeta:     m,
 		State:              c.State,
+		AffectsChildren:    types.Bool{Bool: false, Valid: true},
 		PropertiesChecksum: make([]byte, 20),
 	}
 
 	if len(m.ServiceId) == 0 {
 		_, err := db.NamedExec("INSERT INTO host_state"+
 			" (id, host_id, environment_id, properties_checksum, soft_state, previous_soft_state,"+
-			" hard_state, previous_hard_state, check_attempt, severity, last_state_change, next_check, next_update)"+
-			" VALUES (:host_id, :host_id, :environment_id, :properties_checksum, :state, :state, :state, :state, 0, 0, 0, 0, 0)",
+			" hard_state, previous_hard_state, affects_children, check_attempt, severity, last_state_change, next_check, next_update)"+
+			" VALUES (:host_id, :host_id, :environment_id, :properties_checksum, :state, :state, :state, :state, :affects_children, 0, 0, 0, 0, 0)",
 			&v)
 		return err
 	} else {
 		_, err := db.NamedExec("INSERT INTO service_state"+
 			" (id, host_id, service_id, environment_id, properties_checksum, soft_state, previous_soft_state,"+
-			" hard_state, previous_hard_state, check_attempt, severity, last_state_change, next_check, next_update)"+
-			" VALUES (:service_id, :host_id, :service_id, :environment_id, :properties_checksum, :state, :state, :state, :state, 0, 0, 0, 0, 0)",
+			" hard_state, previous_hard_state, affects_children, check_attempt, severity, last_state_change, next_check, next_update)"+
+			" VALUES (:service_id, :host_id, :service_id, :environment_id, :properties_checksum, :state, :state, :state, :state, :affects_children, 0, 0, 0, 0, 0)",
 			&v)
 		return err
 	}
