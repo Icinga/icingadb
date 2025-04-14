@@ -71,17 +71,17 @@ mysql -u root -p icingadb </usr/share/icingadb/schema/mysql/schema.sql
 
 ### Setting up a PostgreSQL Database
 
-Set up a PostgreSQL database for Icinga DB:
+This section walks you through configuring PostgreSQL to work with Icinga DB.
+
+Icinga DB requires the `citext` extension which is provided by the `postgresql-contrib` package on certain operating systems.
+Please check if it is available for your OS and if so, install it.
+
+Allow authenticated sessions for the `icingadb` database user from anywhere by modifying the `pg_hba.conf` file.
+The location of this file is operating system specific, but can be queried.
 
 ```
-# su -l postgres
-
-createuser -P icingadb
-createdb -E UTF8 --locale en_US.UTF-8 -T template0 -O icingadb icingadb
-psql icingadb <<<'CREATE EXTENSION IF NOT EXISTS citext;'
+su postgres -c "psql -c 'show hba_file;'"
 ```
-
-The `CREATE EXTENSION` command requires the `postgresql-contrib` package.
 
 Edit `pg_hba.conf`, insert the following before everything else:
 
@@ -91,7 +91,28 @@ host  all icingadb 0.0.0.0/0 md5
 host  all icingadb      ::/0 md5
 ```
 
-To apply these changes, run `systemctl reload postgresql`.
+If using PostgreSQL version 10 or later, you may want to use `scram-sha-256` as the `auth-method` instead of `md5`.
+Also, if requests are only to be expected from certain subnets, please tighten the network masks given above.
+
+The database uses the `en_US.UTF-8` locale, which requires an appropriate locale on your system.
+Please verify with `locale -a` that something like `en_US.UTF-8` or `en_US.utf8` exists.
+If not, please add it using your operating system specific method.
+
+To apply all these changes, restart PostgreSQL.
+
+```
+systemctl restart postgresql
+```
+
+Now proceed with actually creating both user and database.
+
+```
+# su -l postgres
+
+createuser -P icingadb
+createdb -E UTF8 --locale en_US.UTF-8 -T template0 -O icingadb icingadb
+psql -c 'CREATE EXTENSION IF NOT EXISTS citext;' icingadb
+```
 
 After creating the database, import the Icinga DB schema using the following command:
 
