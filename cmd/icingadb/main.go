@@ -56,14 +56,14 @@ func run() int {
 
 	db, err := cmd.Database(logs.GetChildLogger("database"))
 	if err != nil {
-		logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
+		logger.Fatalw("Can't create database connection pool from config", zap.Error(err))
 	}
 	defer func() { _ = db.Close() }()
 	{
 		logger.Infof("Connecting to database at '%s'", db.GetAddr())
 		err := db.Ping()
 		if err != nil {
-			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
+			logger.Fatalw("Can't connect to database", zap.Error(err))
 		}
 	}
 
@@ -75,7 +75,7 @@ func run() int {
 
 		logger.Info("Starting database schema auto import")
 		if err := icingadb.ImportSchema(context.Background(), db, cmd.Flags.DatabaseSchemaDir); err != nil {
-			logger.Fatalf("%+v", errors.Wrap(err, "can't import database schema"))
+			logger.Fatalw("Can't import database schema", zap.Error(err))
 		}
 		logger.Info("The database schema was successfully imported")
 	case err != nil:
@@ -84,13 +84,13 @@ func run() int {
 
 	rc, err := cmd.Redis(logs.GetChildLogger("redis"))
 	if err != nil {
-		logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
+		logger.Fatalw("Can't create Redis client from config", zap.Error(err))
 	}
 	{
 		logger.Infof("Connecting to Redis at '%s'", rc.GetAddr())
 		_, err := rc.Ping(context.Background()).Result()
 		if err != nil {
-			logger.Fatalf("%+v", errors.Wrap(err, "can't connect to Redis"))
+			logger.Fatalw("Can't create Redis client from config", zap.Error(err))
 		}
 	}
 
@@ -116,13 +116,13 @@ func run() int {
 	{
 		rc, err := cmd.Redis(logs.GetChildLogger("redis"))
 		if err != nil {
-			logger.Fatalf("%+v", errors.Wrap(err, "can't create Redis client from config"))
+			logger.Fatalw("Can't connect to Redis", zap.Error(err))
 		}
 		heartbeat = icingaredis.NewHeartbeat(ctx, rc, logs.GetChildLogger("heartbeat"))
 
 		db, err := cmd.Database(logs.GetChildLogger("database"))
 		if err != nil {
-			logger.Fatalf("%+v", errors.Wrap(err, "can't create database connection pool from config"))
+			logger.Fatalw("Can't create database connection pool from config", zap.Error(err))
 		}
 		defer func() { _ = db.Close() }()
 		db.SetMaxOpenConns(1)
@@ -339,16 +339,16 @@ func run() int {
 				cancelHactx()
 			case <-hactx.Done():
 				if ctx.Err() != nil {
-					logger.Fatalf("%+v", errors.New("main context closed unexpectedly"))
+					logger.Fatalw("Main context closed unexpectedly", zap.Error(ctx.Err()))
 				}
 				// Otherwise, there is nothing to do here, surrounding loop will terminate now.
 			case <-ha.Done():
 				if err := ha.Err(); err != nil {
-					logger.Fatalf("%+v", errors.Wrap(err, "HA exited with an error"))
+					logger.Fatalw("HA exited with an error", zap.Error(err))
 				} else if ctx.Err() == nil {
 					// ha is created as a single instance once. It should only exit if the main context is cancelled,
 					// otherwise there is no way to get Icinga DB back into a working state.
-					logger.Fatalf("%+v", errors.New("HA exited without an error but main context isn't cancelled"))
+					logger.Fatal("HA exited without an error but main context isn't cancelled")
 				}
 				cancelHactx()
 
