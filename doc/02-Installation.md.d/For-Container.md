@@ -89,3 +89,6 @@ git clone https://github.com/Icinga/icingadb.git
 [Icinga DB]: https://github.com/Icinga/icingadb
 [Docker]: https://www.docker.com
 [Icinga DB configuration documentation]: https://icinga.com/docs/icingadb/latest/doc/03-Configuration/
+
+<!-- {% set from_source = True %} -->
+<!-- {% include "02-Installation.md" %} -->

@@ -18,4 +18,4 @@ jobs:
           username: icingaadmin
           password: '${{ secrets.DOCKER_HUB_PERSONAL_TOKEN }}'
           repository: icinga/icingadb
-          readme: ./For-Container.md
+          readme: doc/02-Installation.md.d/For-Container.md
