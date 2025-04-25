@@ -1,6 +1,6 @@
-# Installing Icinga DB from 
+# Installing Icinga DB in Containers
 
-This image integrates [Icinga DB] into your [Docker] environment.
+This image integrates [Icinga DB] into your containerized environment.
 
 ## Usage
 
@@ -22,7 +22,7 @@ docker run --rm -d \
 	mariadb
 
 docker run -d \
-	--network icinga \
+    --network icinga \
 	--restart always \
 	--name icingadb \
 	-e ICINGADB_REDIS_HOST=redis-icingadb \
@@ -36,26 +36,22 @@ docker run -d \
 	icinga/icingadb
 ```
 
-The container doesn't need any volumes and
-takes the environment variables shown above.
+The container doesn't need any volumes and takes the environment variables.
 
-Each environment variable corresponds to a configuration option of Icinga DB.
-E.g. `ICINGADB_REDIS_HOST=redis-icingadb` means:
-
-```yaml
-redis:
-  host: redis-icingadb
+### Environment Variables
+The environment variables consists of the key 'ICINGADB_DATABASE_' and the configuration option name like 'HOST' in uppercase. Host, database and user are mandatory.
+```php
+ICINGADB_DATABASE_HOST='mariadb-icingadb'
 ```
-
-Consult the [Icinga DB configuration documentation] on what options there are.
+For more options, see the [Icinga DB configuration documentation].
 
 ### Connect via TLS
 
 ```bash
 docker run -d \
-	--network icinga \
-	--restart always \
-	--name icingadb \
+    --network icinga \
+    --restart always \
+    --name icingadb \
 	-e ICINGADB_REDIS_HOST=redis-icingadb \
 	-e ICINGADB_REDIS_PORT=6379 \
 	-e ICINGADB_REDIS_PASSWORD=123456 \
@@ -79,16 +75,10 @@ docker run -d \
 
 ```bash
 git clone https://github.com/Icinga/icingadb.git
-#pushd icingadb
-#git checkout v1.0.0
-#popd
 
-./build.bash ./icingadb
+$ docker build -t icingadb --file Containerfile .
 ```
 
 [Icinga DB]: https://github.com/Icinga/icingadb
 [Docker]: https://www.docker.com
 [Icinga DB configuration documentation]: https://icinga.com/docs/icingadb/latest/doc/03-Configuration/
-
-<!-- {% set from_source = True %} -->
-<!-- {% include "02-Installation.md" %} -->
