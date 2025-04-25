@@ -99,6 +99,11 @@ For environment variables, each option is prefixed with `ICINGADB_LOGGING_`.
 | interval | **Optional.** Interval for periodic logging defined as [duration string](#duration-string). Defaults to `"20s"`.                                                                                                                                      |
 | options  | **Optional.** Map of component name to logging level in order to set a different logging level for each component instead of the default one. See [logging components](#logging-components) for details.                                              |
 
+!!! info
+
+    There are a few log messages that are logged regardless of the configured log level.
+    For example, the startup message is always shown.
+
 ### Logging Components
 
 The independent components of Icinga DB produce log entries.
