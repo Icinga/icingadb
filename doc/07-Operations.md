@@ -36,6 +36,40 @@ There are only two things to back up in Icinga DB.
     use the [`--single-transaction` command line argument flag](https://dev.mysql.com/doc/refman/8.4/en/mysqldump.html#option_mysqldump_single-transaction)
     to not lock the whole database while the backup is running.
 
+## Automatic Restart
+
+<!-- NOTE: Would be obsolete after https://git.icinga.com/packages/icingadb/-/merge_requests/10 -->
+
+The retry logic of the Icinga DB daemon will retry certain errors for up to five minutes before giving up and stopping the daemon.
+While an error persisting for five minutes in most cases indicates a critical error,
+in some environments this happens occasionally and continuing is a valid solution.
+
+In this case, the `icingadb.service` unit can be modified to include a [`Restart` option](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html#Restart=).
+
+!!! warning
+
+    Making systemd retry fatal Icinga DB errors may help in some cases, but it usually hides the symptom of a deeper problem.
+    Please do not use this as a silver bullet and try to understand the error, search for already [reported issues](https://github.com/Icinga/icingadb/issues) or report one yourself.
+
+```shell
+systemctl edit icingadb.service
+```
+
+Add a `[Service]` block like the following.
+
+```ini
+[Service]
+Restart=on-failure
+RestartSec=60
+```
+
+This will create an additional `/etc/systemd/system/icingadb.service.d/override.conf` file that overrides the defaults.
+A final unit restart is required for the changes to take effect.
+
+```shell
+systemctl restart icingadb.service
+```
+
 ## Third-Party Configuration
 
 Icinga DB relies on external components to work.
