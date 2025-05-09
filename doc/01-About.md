@@ -12,7 +12,27 @@ visualizing monitoring data in the Icinga ecosystem, consisting of:
   [Icinga DB Web](https://icinga.com/docs/icinga-db-web) module enabled,
   which connects to both Redis® and the database to display and work with the most up-to-date data
 
+## Big Picture
+
 ![Icinga DB Architecture](images/icingadb-architecture.png)
+
+Icinga DB consists of several components in an Icinga setup.
+This section tries to help understanding how these components relate, following the architecture diagram shown above.
+
+First things first, Icinga DB is not a database itself, but consumes and passes data from Icinga 2 to be displayed in Icinga DB Web and persisted in a relational database.
+
+Let's start with Icinga 2.
+With the Icinga DB feature enabled, Icinga 2 synchronizes its state to a Redis® server that can be queried by both the Icinga DB daemon and Icinga DB Web.
+
+The Icinga DB daemon reads all the information from Redis®, transforms it, and finally inserts it into a relational database such as MySQL, MariaDB, or PostgreSQL.
+Doing so removes load from Icinga 2 and lets Icinga DB do the more time-consuming database operations in bulk.
+In addition, the Icinga DB daemon does some bookkeeping, such as removing old history entries if a retention is configured.
+
+To display information in Icinga Web 2, the Icinga DB Web module fetches the latest service and host state information from Redis®.
+Additional monitoring data and history information is retrieved from the relational database.
+Icinga DB Web also connects to the Icinga 2 API with its Command Transport to acknowledge problems, trigger check executions, and so on.
+
+These are the components of Icinga DB embedded into an Icinga setup with Icinga 2 and Icinga Web 2.
 
 ## Installation
 
