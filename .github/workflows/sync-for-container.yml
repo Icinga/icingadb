@@ -1,0 +1,21 @@
+name: Sync For-Container.md to Docker Hub
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout HEAD
+        uses: actions/checkout@v1
+
+      - name: Sync For-Container.md
+        uses: ms-jpq/sync-dockerhub-readme@e2991ea1ba48832e73555cdbd5b82f5a2e91ee9b # v1
+
+        with:
+          username: icingaadmin
+          password: '${{ secrets.DOCKER_HUB_PERSONAL_TOKEN }}'
+          repository: icinga/icingadb
+          readme: doc/02-Installation.md.d/For-Container.md
