@@ -151,19 +151,8 @@ func (h *HA) controller() {
 	defer routineLogTicker.Stop()
 	infoLogRoutineEvents := true
 
-	// The retry logic in HA is twofold:
-	//
-	// 1) Updating or inserting the instance row based on the current heartbeat must be done within the heartbeat's
-	//    expiration time. Therefore, we use a deadline ctx to retry.WithBackoff() in realize() which expires earlier
-	//    than our default timeout.
-	// 2) Since we do not want to exit before our default timeout expires, we have to repeat step 1 until it does.
-	retryTimeout := time.NewTimer(retry.DefaultTimeout)
-	defer retryTimeout.Stop()
-
 	for {
 		select {
-		case <-retryTimeout.C:
-			h.abort(errors.New("retry deadline exceeded"))
 		case m := <-h.heartbeat.Events():
 			if m != nil {
 				now := time.Now()
@@ -180,9 +169,6 @@ func (h *HA) controller() {
 
 					h.signalHandover("received heartbeat from the past")
 					h.realizeLostHeartbeat()
-
-					// Reset retry timeout so that the next iterations have the full amount of time available again.
-					retry.ResetTimeout(retryTimeout, retry.DefaultTimeout)
 
 					continue
 				}
@@ -224,12 +210,11 @@ func (h *HA) controller() {
 				err = h.realize(realizeCtx, s, envId, infoLogRoutineEvents)
 				cancelRealizeCtx()
 				if errors.Is(err, context.DeadlineExceeded) {
+					h.logger.Warnw("Instance update/insert exceeded heartbeat expiration time", zap.Error(err))
 					h.signalHandover("instance update/insert deadline exceeded heartbeat expiry time")
 
 					// Instance insert/update was not completed by the expiration time of the current heartbeat.
-					// Pass control back to the loop to try again with the next heartbeat,
-					// or exit the loop when the retry timeout has expired. Therefore,
-					// retry timeout is **not** reset here so that retries continue until the timeout has expired.
+					// Pass control back to the loop to try again with the next heartbeat.
 					continue
 				}
 				if err != nil {
@@ -247,14 +232,6 @@ func (h *HA) controller() {
 				h.signalHandover("lost heartbeat")
 				h.realizeLostHeartbeat()
 			}
-
-			// Reset retry timeout so that the next iterations have the full amount of time available again.
-			// Don't be surprised by the location of the code,
-			// as it is obvious that the timer is also reset after an error that ends the loop anyway.
-			// But this is the best place to catch all scenarios where the timeout needs to be reset.
-			// And since HA needs quite a bit of refactoring anyway to e.g. return immediately after calling h.abort(),
-			// it's fine to have it here for now.
-			retry.ResetTimeout(retryTimeout, retry.DefaultTimeout)
 		case <-h.heartbeat.Done():
 			if err := h.heartbeat.Err(); err != nil {
 				h.abort(err)
