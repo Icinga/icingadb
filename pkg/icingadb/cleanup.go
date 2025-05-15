@@ -80,11 +80,11 @@ func (stmt *CleanupStmt) CleanupOlderThan(
 func (stmt *CleanupStmt) build(driverName string, limit uint64) string {
 	switch driverName {
 	case database.MySQL:
-		return fmt.Sprintf(`DELETE FROM %[1]s WHERE environment_id = :environment_id AND %[2]s < :time
-ORDER BY %[2]s LIMIT %[3]d`, stmt.Table, stmt.Column, limit)
+		return fmt.Sprintf(`DELETE FROM %[1]s WHERE environment_id = :environment_id AND %[2]s < :time LIMIT %[3]d`,
+			stmt.Table, stmt.Column, limit)
 	case database.PostgreSQL:
 		return fmt.Sprintf(`WITH rows AS (
-SELECT %[1]s FROM %[2]s WHERE environment_id = :environment_id AND %[3]s < :time ORDER BY %[3]s LIMIT %[4]d
+SELECT %[1]s FROM %[2]s WHERE environment_id = :environment_id AND %[3]s < :time LIMIT %[4]d
 )
 DELETE FROM %[2]s WHERE %[1]s IN (SELECT %[1]s FROM rows)`, stmt.PK, stmt.Table, stmt.Column, limit)
 	default:
