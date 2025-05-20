@@ -547,6 +547,8 @@ CREATE TABLE icingadb_instance (
   icinga2_flap_detection_enabled enum('n', 'y') NOT NULL,
   icinga2_performance_data_enabled enum('n', 'y') NOT NULL,
 
+  icingadb_version varchar(255) NOT NULL,
+
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
