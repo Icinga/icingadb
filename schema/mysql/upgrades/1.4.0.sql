@@ -63,5 +63,8 @@ CREATE TABLE dependency_edge (
   UNIQUE INDEX idx_dependency_edge_from_node_to_node_id (from_node_id, to_node_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
+ALTER TABLE icingadb_instance ADD COLUMN icingadb_version varchar(255) NOT NULL DEFAULT 'unknown' AFTER icinga2_performance_data_enabled;
+ALTER TABLE icingadb_instance MODIFY COLUMN icingadb_version varchar(255) NOT NULL;
+
 INSERT INTO icingadb_schema (version, timestamp)
   VALUES (7, UNIX_TIMESTAMP() * 1000);
