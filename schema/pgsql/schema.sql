@@ -14,7 +14,6 @@ CREATE DOMAIN smalluint AS int CONSTRAINT between_0_and_65535 CHECK ( VALUE IS N
 CREATE DOMAIN tinyuint AS smallint CONSTRAINT between_0_and_255 CHECK ( VALUE IS NULL OR VALUE BETWEEN 0 AND 255 );
 
 CREATE TYPE boolenum AS ENUM ( 'n', 'y' );
-CREATE TYPE acked AS ENUM ( 'n', 'y', 'sticky' );
 CREATE TYPE state_type AS ENUM ( 'hard', 'soft' );
 CREATE TYPE checkable_type AS ENUM ( 'host', 'service' );
 CREATE TYPE comment_type AS ENUM ( 'comment', 'ack' );
@@ -423,7 +422,8 @@ CREATE TABLE host_state (
   is_flapping boolenum NOT NULL DEFAULT 'n',
   is_overdue boolenum NOT NULL DEFAULT 'n',
 
-  is_acknowledged acked NOT NULL DEFAULT 'n',
+  is_acknowledged boolenum NOT NULL DEFAULT 'n',
+  is_sticky_acknowledgement boolenum NOT NULL DEFAULT 'n',
   acknowledgement_comment_id bytea20 DEFAULT NULL,
   last_comment_id bytea20 DEFAULT NULL,
 
@@ -697,7 +697,8 @@ CREATE TABLE service_state (
   is_flapping boolenum NOT NULL DEFAULT 'n',
   is_overdue boolenum NOT NULL DEFAULT 'n',
 
-  is_acknowledged acked NOT NULL DEFAULT 'n',
+  is_acknowledged boolenum NOT NULL DEFAULT 'n',
+  is_sticky_acknowledgement boolenum NOT NULL DEFAULT 'n',
   acknowledgement_comment_id bytea20 DEFAULT NULL,
   last_comment_id bytea20 DEFAULT NULL,
 
