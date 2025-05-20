@@ -7,6 +7,7 @@ import (
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
+	"github.com/icinga/icingadb/pkg/common"
 	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
@@ -729,6 +730,19 @@ func convertNotificationType(notificationReason, state uint8) icingadbTypes.Noti
 	}
 }
 
+// convertStateType maps IDO state_type values to either [common.SoftState] or [common.HardState] accordingly.
+// The rule of thumb is: 0 = soft, 1 = hard, if anything else is provided, this function panics.
+func convertStateType(state uint8) string {
+	switch state {
+	case 0:
+		return common.SoftState
+	case 1:
+		return common.HardState
+	default: // Should never happen but just in case.
+		panic(fmt.Sprintf("unknown state %d provided", state))
+	}
+}
+
 type stateRow = struct {
 	StatehistoryId      uint64
 	StateTime           sql.NullInt64
@@ -811,7 +825,7 @@ func convertStateRows(
 		}
 
 		hardState := row.LastHardState // in case of soft state, the "current" hard state is the last one
-		if icingadbTypes.StateType(row.StateType) == icingadbTypes.StateHard {
+		if convertStateType(row.StateType) == common.HardState {
 			hardState = row.State
 		}
 
@@ -828,7 +842,7 @@ func convertStateRows(
 				ServiceId:     serviceId,
 			},
 			EventTime:         ts,
-			StateType:         icingadbTypes.StateType(row.StateType),
+			StateType:         history.StateType(convertStateType(row.StateType)),
 			SoftState:         row.State,
 			HardState:         hardState,
 			PreviousSoftState: row.LastState,
@@ -853,7 +867,7 @@ func convertStateRows(
 			EventTime:      ts,
 		})
 
-		if icingadbTypes.StateType(row.StateType) == icingadbTypes.StateHard {
+		if convertStateType(row.StateType) == common.HardState {
 			// only hard state changes are relevant for SLA history, discard all others
 
 			sla = append(sla, &history.SlaHistoryState{
@@ -869,7 +883,7 @@ func convertStateRows(
 					ServiceId:     serviceId,
 				},
 				EventTime:         ts,
-				StateType:         icingadbTypes.StateType(row.StateType),
+				StateType:         history.StateType(convertStateType(row.StateType)),
 				HardState:         hardState,
 				PreviousHardState: previousHardState,
 			})
