@@ -146,10 +146,10 @@ func (h *HA) controller() {
 
 	oldInstancesRemoved := false
 
-	// Suppress recurring log messages in the realize method to be only logged this often.
+	// Suppress recurring log messages in the realize method to be logged at INFO level every time.
 	routineLogTicker := time.NewTicker(5 * time.Minute)
 	defer routineLogTicker.Stop()
-	shouldLogRoutineEvents := true
+	infoLogRoutineEvents := true
 
 	// The retry logic in HA is twofold:
 	//
@@ -215,13 +215,13 @@ func (h *HA) controller() {
 
 				select {
 				case <-routineLogTicker.C:
-					shouldLogRoutineEvents = true
+					infoLogRoutineEvents = true
 				default:
 				}
 
 				// Ensure that updating/inserting the instance row is completed by the current heartbeat's expiry time.
 				realizeCtx, cancelRealizeCtx := context.WithDeadline(h.ctx, m.ExpiryTime())
-				err = h.realize(realizeCtx, s, envId, shouldLogRoutineEvents)
+				err = h.realize(realizeCtx, s, envId, infoLogRoutineEvents)
 				cancelRealizeCtx()
 				if errors.Is(err, context.DeadlineExceeded) {
 					h.signalHandover("instance update/insert deadline exceeded heartbeat expiry time")
@@ -241,7 +241,7 @@ func (h *HA) controller() {
 					oldInstancesRemoved = true
 				}
 
-				shouldLogRoutineEvents = false
+				infoLogRoutineEvents = false
 			} else {
 				h.logger.Error("Lost heartbeat")
 				h.signalHandover("lost heartbeat")
@@ -270,7 +270,7 @@ func (h *HA) controller() {
 // The context passed is expected to have a deadline, otherwise the method will panic. This deadline is strictly
 // enforced to abort the realization logic the moment the context expires.
 //
-// shouldLogRoutineEvents indicates if recurrent events should be logged.
+// infoLogRoutineEvents indicates if recurring events should be logged at "info" or "debug" level.
 //
 // The internal, retryable function always fetches the last received heartbeat's timestamp instead of reusing the one
 // from the calling controller loop. Doing so results in inserting a more accurate timestamp if a retry happens.
@@ -278,7 +278,7 @@ func (h *HA) realize(
 	ctx context.Context,
 	s *icingaredisv1.IcingaStatus,
 	envId types.Binary,
-	shouldLogRoutineEvents bool,
+	infoLogRoutineEvents bool,
 ) error {
 	var (
 		takeover         string
@@ -287,6 +287,11 @@ func (h *HA) realize(
 
 	if _, ok := ctx.Deadline(); !ok {
 		panic("can't use context w/o deadline in realize()")
+	}
+
+	routineEventsLogLevel := zap.DebugLevel
+	if infoLogRoutineEvents {
+		routineEventsLogLevel = zap.InfoLevel
 	}
 
 	err := retry.WithBackoff(
@@ -322,6 +327,9 @@ func (h *HA) realize(
 			instance := &v1.IcingadbInstance{}
 			errQuery := tx.QueryRowxContext(ctx, query, envId, "y", h.instanceId).StructScan(instance)
 
+			// For future changes, please make sure that every branch and sub-branch within this switch creates at least
+			// one debug log event or returns with an error. This makes it easier to read the logs, since each time this
+			// function is called, it leaves a trace.
 			switch {
 			case errQuery == nil:
 				fields := []any{
@@ -336,9 +344,7 @@ func (h *HA) realize(
 					h.logger.Debugw("Preparing to take over HA as other instance's heartbeat has expired", fields...)
 				} else {
 					otherResponsible = true
-					if shouldLogRoutineEvents {
-						h.logger.Infow("Another instance is active", fields...)
-					}
+					h.logger.Logw(routineEventsLogLevel, "Another instance is active", fields...)
 				}
 
 			case errors.Is(errQuery, sql.ErrNoRows):
@@ -348,8 +354,8 @@ func (h *HA) realize(
 				if !h.responsible {
 					takeover = "no other instance is active"
 					h.logger.Debugw("Preparing to take over HA as no instance is active", fields...)
-				} else if h.responsible && shouldLogRoutineEvents {
-					h.logger.Debugw("Continuing being the active instance", fields...)
+				} else {
+					h.logger.Logw(routineEventsLogLevel, "Continuing being the active instance", fields...)
 				}
 
 			default:
