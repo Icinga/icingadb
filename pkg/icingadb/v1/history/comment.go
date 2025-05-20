@@ -5,7 +5,6 @@ import (
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 )
 
 type CommentHistoryEntity struct {
@@ -42,13 +41,13 @@ type CommentHistory struct {
 	CommentHistoryEntity   `json:",inline"`
 	HistoryTableMeta       `json:",inline"`
 	CommentHistoryUpserter `json:",inline"`
-	EntryTime              types.UnixMilli           `json:"entry_time"`
-	Author                 string                    `json:"author"`
-	Comment                string                    `json:"comment"`
-	EntryType              icingadbTypes.CommentType `json:"entry_type"`
-	IsPersistent           types.Bool                `json:"is_persistent"`
-	IsSticky               types.Bool                `json:"is_sticky"`
-	ExpireTime             types.UnixMilli           `json:"expire_time"`
+	EntryTime              types.UnixMilli `json:"entry_time"`
+	Author                 string          `json:"author"`
+	Comment                string          `json:"comment"`
+	EntryType              string          `json:"entry_type"`
+	IsPersistent           types.Bool      `json:"is_persistent"`
+	IsSticky               types.Bool      `json:"is_sticky"`
+	ExpireTime             types.UnixMilli `json:"expire_time"`
 }
 
 // Init implements the contracts.Initer interface.
