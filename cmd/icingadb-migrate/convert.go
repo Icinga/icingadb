@@ -790,6 +790,11 @@ func convertStateRows(
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
 
+		hardState := row.LastHardState // in case of soft state, the "current" hard state is the last one
+		if icingadbTypes.StateType(row.StateType) == icingadbTypes.StateHard {
+			hardState = row.State
+		}
+
 		stateHistory = append(stateHistory, &history.StateHistory{
 			HistoryTableEntity: history.HistoryTableEntity{
 				EntityWithoutChecksum: v1.EntityWithoutChecksum{
@@ -805,7 +810,7 @@ func convertStateRows(
 			EventTime:         ts,
 			StateType:         icingadbTypes.StateType(row.StateType),
 			SoftState:         row.State,
-			HardState:         row.LastHardState,
+			HardState:         hardState,
 			PreviousSoftState: row.LastState,
 			PreviousHardState: previousHardState,
 			CheckAttempt:      row.CurrentCheckAttempt,
@@ -845,7 +850,7 @@ func convertStateRows(
 				},
 				EventTime:         ts,
 				StateType:         icingadbTypes.StateType(row.StateType),
-				HardState:         row.LastHardState,
+				HardState:         hardState,
 				PreviousHardState: previousHardState,
 			})
 		}
