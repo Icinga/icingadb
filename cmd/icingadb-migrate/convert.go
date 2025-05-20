@@ -90,7 +90,7 @@ func convertCommentRows(
 				EntryTime:    entryTime,
 				Author:       row.AuthorName,
 				Comment:      row.CommentData,
-				EntryType:    icingadbTypes.CommentType(row.EntryType),
+				EntryType:    "comment",
 				IsPersistent: types.Bool{Bool: row.IsPersistent != 0, Valid: true},
 				IsSticky:     types.Bool{Bool: false, Valid: true},
 				ExpireTime:   expireTime,
