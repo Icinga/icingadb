@@ -108,5 +108,8 @@ COMMENT ON COLUMN dependency_edge.from_node_id IS 'dependency_node.id';
 COMMENT ON COLUMN dependency_edge.to_node_id IS 'dependency_node.id';
 COMMENT ON COLUMN dependency_edge.dependency_edge_state_id IS 'sha1(dependency_edge_state.id)';
 
+ALTER TABLE icingadb_instance ADD COLUMN icingadb_version varchar(255) NOT NULL DEFAULT 'unknown';
+ALTER TABLE icingadb_instance ALTER COLUMN icingadb_version DROP DEFAULT;
+
 INSERT INTO icingadb_schema (version, timestamp)
   VALUES (5, extract(epoch from now()) * 1000);

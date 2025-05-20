@@ -12,6 +12,7 @@ import (
 	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
+	"github.com/icinga/icingadb/internal"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
@@ -376,6 +377,7 @@ func (h *HA) realize(
 				Icinga2EventHandlersEnabled:       s.EventHandlersEnabled,
 				Icinga2FlapDetectionEnabled:       s.FlapDetectionEnabled,
 				Icinga2PerformanceDataEnabled:     s.PerformanceDataEnabled,
+				IcingadbVersion:                   internal.Version.Version,
 			}
 
 			stmt, _ := h.db.BuildUpsertStmt(i)
