@@ -4,21 +4,20 @@ import (
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 )
 
 type User struct {
 	EntityWithChecksum   `json:",inline"`
 	EnvironmentMeta      `json:",inline"`
 	NameCiMeta           `json:",inline"`
-	DisplayName          string                           `json:"display_name"`
-	Email                string                           `json:"email"`
-	Pager                string                           `json:"pager"`
-	NotificationsEnabled types.Bool                       `json:"notifications_enabled"`
-	TimeperiodId         types.Binary                     `json:"timeperiod_id"`
-	States               icingadbTypes.NotificationStates `json:"states"`
-	Types                icingadbTypes.NotificationTypes  `json:"types"`
-	ZoneId               types.Binary                     `json:"zone_id"`
+	DisplayName          string       `json:"display_name"`
+	Email                string       `json:"email"`
+	Pager                string       `json:"pager"`
+	NotificationsEnabled types.Bool   `json:"notifications_enabled"`
+	TimeperiodId         types.Binary `json:"timeperiod_id"`
+	States               uint8        `json:"states"`
+	Types                uint16       `json:"types"`
+	ZoneId               types.Binary `json:"zone_id"`
 }
 
 type UserCustomvar struct {
