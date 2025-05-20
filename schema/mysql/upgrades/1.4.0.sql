@@ -2,9 +2,19 @@ ALTER TABLE host ADD COLUMN total_children int unsigned DEFAULT NULL AFTER check
 ALTER TABLE host_state ADD COLUMN affects_children enum('n', 'y') NOT NULL DEFAULT 'n' AFTER in_downtime;
 ALTER TABLE host_state MODIFY COLUMN affects_children enum('n', 'y') NOT NULL;
 
+ALTER TABLE host_state ADD COLUMN is_sticky_acknowledgement enum('n', 'y') NOT NULL DEFAULT 'n' AFTER is_acknowledged;
+ALTER TABLE host_state MODIFY COLUMN is_sticky_acknowledgement enum('n', 'y') NOT NULL;
+UPDATE host_state SET is_sticky_acknowledgement = 'y', is_acknowledged = 'y' WHERE is_acknowledged = 'sticky';
+ALTER TABLE host_state MODIFY COLUMN is_acknowledged enum('n', 'y') NOT NULL;
+
 ALTER TABLE service ADD COLUMN total_children int unsigned DEFAULT NULL AFTER check_retry_interval;
 ALTER TABLE service_state ADD COLUMN affects_children enum('n', 'y') NOT NULL DEFAULT 'n' AFTER in_downtime;
 ALTER TABLE service_state MODIFY COLUMN affects_children enum('n', 'y') NOT NULL;
+
+ALTER TABLE service_state ADD COLUMN is_sticky_acknowledgement enum('n', 'y') NOT NULL DEFAULT 'n' AFTER is_acknowledged;
+ALTER TABLE service_state MODIFY COLUMN is_sticky_acknowledgement enum('n', 'y') NOT NULL;
+UPDATE service_state SET is_sticky_acknowledgement = 'y', is_acknowledged = 'y' WHERE is_acknowledged = 'sticky';
+ALTER TABLE service_state MODIFY COLUMN is_acknowledged enum('n', 'y') NOT NULL;
 
 CREATE TABLE redundancy_group (
   id binary(20) NOT NULL COMMENT 'sha1(name + all(member parent_name + timeperiod.name + states + ignore_soft_states))',

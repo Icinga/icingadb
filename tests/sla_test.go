@@ -49,7 +49,7 @@ func TestSla(t *testing.T) {
 
 		var stateChanges []StateChange
 
-		processCheckResult := func(exitStatus int, isHard bool) *ObjectsHostsResponse {
+		processCheckResult := func(exitStatus int, isHard bool) *ObjectsCheckablesResponse {
 			time.Sleep(10 * time.Millisecond) // ensure there is a bit of difference in ms resolution
 
 			output := utils.UniqueName(t, "output")
@@ -69,7 +69,7 @@ func TestSla(t *testing.T) {
 			require.NoError(t, err, "get host: request")
 			require.Equal(t, 200, response.StatusCode, "get host: request")
 
-			var hosts ObjectsHostsResponse
+			var hosts ObjectsCheckablesResponse
 			err = json.NewDecoder(response.Body).Decode(&hosts)
 			require.NoError(t, err, "get host: parse response")
 
@@ -183,7 +183,7 @@ func TestSla(t *testing.T) {
 				require.NoError(t, err, "get host: request")
 				require.Equal(t, 200, response.StatusCode, "get host: request")
 
-				var hosts ObjectsHostsResponse
+				var hosts ObjectsCheckablesResponse
 				err = json.NewDecoder(response.Body).Decode(&hosts)
 				require.NoError(t, err, "get host: parse response")
 

@@ -2,6 +2,35 @@ ALTER TABLE host ADD COLUMN total_children uint DEFAULT NULL;
 ALTER TABLE host_state ADD COLUMN affects_children boolenum NOT NULL DEFAULT 'n';
 ALTER TABLE host_state ALTER COLUMN affects_children DROP DEFAULT;
 
+ALTER TABLE host_state ADD COLUMN is_sticky_acknowledgement boolenum NOT NULL DEFAULT 'n';
+UPDATE host_state SET is_sticky_acknowledgement = 'y' WHERE is_acknowledged = 'sticky';
+-- The USING clause used below to typecast is_acknowledged to boolenum doesn't apply to default value [^1]
+-- of a column, so we need to drop the DEFAULT constraint and then recreate it after the typecast.
+-- [^1]: https://www.postgresql.org/docs/9.6/sql-altertable.html#notes
+ALTER TABLE host_state ALTER COLUMN is_acknowledged DROP DEFAULT;
+ALTER TABLE host_state ALTER COLUMN is_acknowledged TYPE boolenum USING (
+  CASE is_acknowledged
+    WHEN 'y' THEN 'y'::boolenum
+    WHEN 'sticky' THEN 'y'::boolenum
+    ELSE 'n'::boolenum
+  END
+);
+ALTER TABLE host_state ALTER COLUMN is_acknowledged SET DEFAULT 'n';
+
+ALTER TABLE service_state ADD COLUMN is_sticky_acknowledgement boolenum NOT NULL DEFAULT 'n';
+UPDATE service_state SET is_sticky_acknowledgement = 'y' WHERE is_acknowledged = 'sticky';
+ALTER TABLE service_state ALTER COLUMN is_acknowledged DROP DEFAULT; -- Same as above for host_state!
+ALTER TABLE service_state ALTER COLUMN is_acknowledged TYPE boolenum USING (
+  CASE is_acknowledged
+    WHEN 'y' THEN 'y'::boolenum
+    WHEN 'sticky' THEN 'y'::boolenum
+    ELSE 'n'::boolenum
+  END
+);
+ALTER TABLE service_state ALTER COLUMN is_acknowledged SET DEFAULT 'n';
+
+DROP TYPE acked;
+
 ALTER TABLE service ADD COLUMN total_children uint DEFAULT NULL;
 ALTER TABLE service_state ADD COLUMN affects_children boolenum NOT NULL DEFAULT 'n';
 ALTER TABLE service_state ALTER COLUMN affects_children DROP DEFAULT;
