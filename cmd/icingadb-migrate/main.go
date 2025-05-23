@@ -20,7 +20,6 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v6"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"math"
 	"os"
@@ -195,17 +194,19 @@ func connectAll(c *Config) (ido, idb *database.DB) {
 
 // connect connects to which DB as cfg specifies. (On non-recoverable errors the whole program exits.)
 func connect(which string, cfg *database.Config) *database.DB {
+	connectLog := log.With("backend", which)
+
 	db, err := database.NewDbFromConfig(
 		cfg,
-		logging.NewLogger(zap.NewNop().Sugar(), 20*time.Second),
+		logging.NewLogger(connectLog, 20*time.Second),
 		database.RetryConnectorCallbacks{},
 	)
 	if err != nil {
-		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
+		connectLog.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
 	}
 
 	if err := db.Ping(); err != nil {
-		log.With("backend", which).Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
+		connectLog.Fatalf("%+v", errors.Wrap(err, "can't connect to database"))
 	}
 
 	return db
