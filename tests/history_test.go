@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -161,7 +162,7 @@ func testHistory(t *testing.T, numNodes int) {
 			},
 		})
 
-		processCheckResult(t, client, hostname, 1)
+		processCheckResult(t, client, hostname, 1, true)
 
 		author := utils.RandomString(8)
 		comment := utils.RandomString(8)
@@ -465,11 +466,11 @@ func testHistory(t *testing.T, numNodes int) {
 
 		timeBefore := time.Now()
 		for i := 0; i < 10; i++ {
-			processCheckResult(t, client, hostname, 0)
-			processCheckResult(t, client, hostname, 1)
+			processCheckResult(t, client, hostname, 0, true)
+			processCheckResult(t, client, hostname, 1, true)
 		}
 		for i := 0; i < 20; i++ {
-			processCheckResult(t, client, hostname, 0)
+			processCheckResult(t, client, hostname, 0, true)
 		}
 		timeAfter := time.Now()
 
@@ -541,11 +542,11 @@ func testHistory(t *testing.T, numNodes int) {
 		var expected []Notification
 
 		timeBefore := time.Now()
-		processCheckResult(t, client, hostname, 1)
+		processCheckResult(t, client, hostname, 1, true)
 		for _, u := range users {
 			expected = append(expected, Notification{Type: "problem", User: u})
 		}
-		processCheckResult(t, client, hostname, 0)
+		processCheckResult(t, client, hostname, 0, true)
 		for _, u := range users {
 			expected = append(expected, Notification{Type: "recovery", User: u})
 		}
@@ -595,25 +596,25 @@ func testHistory(t *testing.T, numNodes int) {
 		var expected []State
 
 		timeBefore := time.Now()
-		processCheckResult(t, client, hostname, 0) // UNKNOWN -> UP (hard)
+		processCheckResult(t, client, hostname, 0, true) // UNKNOWN -> UP (hard)
 		expected = append(expected, State{Type: "hard", Soft: 0, Hard: 0})
-		processCheckResult(t, client, hostname, 1) // -> DOWN (soft)
+		processCheckResult(t, client, hostname, 1, true) // -> DOWN (soft)
 		expected = append(expected, State{Type: "soft", Soft: 1, Hard: 0})
-		processCheckResult(t, client, hostname, 1) // -> DOWN (hard)
+		processCheckResult(t, client, hostname, 1, true) // -> DOWN (hard)
 		expected = append(expected, State{Type: "hard", Soft: 1, Hard: 1})
-		processCheckResult(t, client, hostname, 1) // -> DOWN
-		processCheckResult(t, client, hostname, 0) // -> UP (hard)
+		processCheckResult(t, client, hostname, 1, true) // -> DOWN
+		processCheckResult(t, client, hostname, 0, true) // -> UP (hard)
 		expected = append(expected, State{Type: "hard", Soft: 0, Hard: 0})
-		processCheckResult(t, client, hostname, 1) // -> DOWN (soft)
+		processCheckResult(t, client, hostname, 1, true) // -> DOWN (soft)
 		expected = append(expected, State{Type: "soft", Soft: 1, Hard: 0})
-		processCheckResult(t, client, hostname, 0) // -> UP (hard)
+		processCheckResult(t, client, hostname, 0, true) // -> UP (hard)
 		expected = append(expected, State{Type: "hard", Soft: 0, Hard: 0})
-		processCheckResult(t, client, hostname, 0) // -> UP
-		processCheckResult(t, client, hostname, 1) // -> down (soft)
+		processCheckResult(t, client, hostname, 0, true) // -> UP
+		processCheckResult(t, client, hostname, 1, true) // -> down (soft)
 		expected = append(expected, State{Type: "soft", Soft: 1, Hard: 0})
-		processCheckResult(t, client, hostname, 1) // -> DOWN (hard)
+		processCheckResult(t, client, hostname, 1, true) // -> DOWN (hard)
 		expected = append(expected, State{Type: "hard", Soft: 1, Hard: 1})
-		processCheckResult(t, client, hostname, 0) // -> UP (hard)
+		processCheckResult(t, client, hostname, 0, true) // -> UP (hard)
 		expected = append(expected, State{Type: "hard", Soft: 0, Hard: 0})
 		timeAfter := time.Now()
 
@@ -702,14 +703,30 @@ func assertStreamConsistency(t testing.TB, clients []*redis.Client, stream strin
 	}
 }
 
-func processCheckResult(t *testing.T, client *utils.Icinga2Client, hostname string, status int) time.Time {
+// processCheckResult sends a passive check result to the Icinga2 API and returns the time of the check result.
+// The provided hostOrServiceName must be either a host name or a service name in the format "host!service".
+func processCheckResult(t *testing.T, client *utils.Icinga2Client, hostOrServiceName string, status int, isHost bool) time.Time {
 	// Ensure that check results have distinct timestamps in millisecond resolution.
 	time.Sleep(10 * time.Millisecond)
 
+	var (
+		filter  string
+		objType string
+	)
+
+	if isHost {
+		objType = "Host"
+		filter = fmt.Sprintf(`host.name==%q`, hostOrServiceName)
+	} else {
+		objType = "Service"
+		parts := strings.Split(hostOrServiceName, "!")
+		filter = fmt.Sprintf(`service.name==%q&&host.name==%q`, parts[1], parts[0])
+	}
+
 	output := utils.RandomString(8)
 	reqBody, err := json.Marshal(ActionsProcessCheckResultRequest{
-		Type:         "Host",
-		Filter:       fmt.Sprintf(`host.name==%q`, hostname),
+		Type:         objType,
+		Filter:       filter,
 		ExitStatus:   status,
 		PluginOutput: output,
 	})
@@ -723,21 +740,21 @@ func processCheckResult(t *testing.T, client *utils.Icinga2Client, hostname stri
 		t.FailNow()
 	}
 
-	response, err = client.GetJson("/v1/objects/hosts/" + hostname)
-	require.NoError(t, err, "get host: request")
-	require.Equal(t, 200, response.StatusCode, "get host: request")
+	response, err = client.GetJson(fmt.Sprintf("/v1/objects/%ss/%s", strings.ToLower(objType), hostOrServiceName))
+	require.NoErrorf(t, err, "get %s: request", objType)
+	require.Equalf(t, 200, response.StatusCode, "get %s: request", objType)
 
-	var hosts ObjectsHostsResponse
-	err = json.NewDecoder(response.Body).Decode(&hosts)
-	require.NoError(t, err, "get host: parse response")
+	var checkables ObjectsCheckablesResponse
+	err = json.NewDecoder(response.Body).Decode(&checkables)
+	require.NoErrorf(t, err, "get %s: parse response", objType)
 
-	require.Equal(t, 1, len(hosts.Results), "there must be one host in the response")
-	host := hosts.Results[0]
-	require.Equal(t, output, host.Attrs.LastCheckResult.Output,
-		"last check result should be visible in host object")
-	require.Equal(t, status, host.Attrs.State, "state should match check result")
+	require.Equalf(t, 1, len(checkables.Results), "there must be one %s in the response", objType)
+	checkable := checkables.Results[0]
+	require.Equalf(t, output, checkable.Attrs.LastCheckResult.Output,
+		"last check result should be visible in %s object", objType)
+	require.Equal(t, status, checkable.Attrs.State, "state should match check result")
 
-	sec, nsec := math.Modf(host.Attrs.LastCheckResult.ExecutionEnd)
+	sec, nsec := math.Modf(checkable.Attrs.LastCheckResult.ExecutionEnd)
 	return time.Unix(int64(sec), int64(nsec*1e9))
 }
 
@@ -746,6 +763,7 @@ type ActionsAcknowledgeProblemRequest struct {
 	Filter  string `json:"filter"`
 	Author  string `json:"author"`
 	Comment string `json:"comment"`
+	Sticky  bool   `json:"sticky"`
 }
 
 type ActionsAcknowledgeProblemResponse struct {
@@ -808,7 +826,7 @@ type ActionsScheduleDowntimeResponse struct {
 	} `json:"results"`
 }
 
-type ObjectsHostsResponse struct {
+type ObjectsCheckablesResponse struct {
 	Results []struct {
 		Attrs struct {
 			State           int `json:"state"`
