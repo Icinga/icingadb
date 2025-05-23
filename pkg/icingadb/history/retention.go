@@ -222,7 +222,6 @@ func (r *Retention) Start(ctx context.Context) error {
 			zap.Uint16("retention-days", days),
 		)
 
-		stmt := stmt
 		periodic.Start(ctx, r.interval, func(tick periodic.Tick) {
 			olderThan := tick.Time.AddDate(0, 0, -int(days))
 
@@ -242,9 +241,11 @@ func (r *Retention) Start(ctx context.Context) error {
 				return
 			}
 
+			level := zap.DebugLevel
 			if deleted > 0 {
-				r.logger.Infof("Removed %d old %s history items", deleted, stmt.Category)
+				level = zap.InfoLevel
 			}
+			r.logger.Logf(level, "Removed %d old %s history items", deleted, stmt.Category)
 		}, periodic.Immediate())
 	}
 
