@@ -444,15 +444,15 @@ func (h *HA) realize(
 		backoff.NewExponentialWithJitter(256*time.Millisecond, 3*time.Second),
 		retry.Settings{
 			// Intentionally no timeout is set, as we use a context with a deadline.
-			OnRetryableError: func(_ time.Duration, attempt uint64, err, lastErr error) {
-				if lastErr == nil || err.Error() != lastErr.Error() {
-					log := h.logger.Debugw
-					if attempt > 3 {
-						log = h.logger.Infow
-					}
-
-					log("Can't update or insert instance. Retrying", zap.Error(err))
+			OnRetryableError: func(elapsed time.Duration, attempt uint64, err, lastErr error) {
+				level := zap.DebugLevel
+				if attempt > 3 {
+					level = zap.WarnLevel
 				}
+				h.logger.Logw(level, "Can't update or insert instance. Retrying",
+					zap.Error(err),
+					zap.Duration("after", elapsed),
+					zap.Uint64("attempt", attempt))
 			},
 			OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
 				if attempt > 1 {
