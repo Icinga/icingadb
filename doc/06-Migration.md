@@ -41,6 +41,12 @@ sections of the configuration.
 Both the IDO and Icinga DB support MySQL and PostgreSQL. You can migrate from
 and to both types, including from one type to the other.
 
+The fields of the `ido` and `icingadb` sections follow the Icinga DB
+[database configuration format](03-Configuration.md#database-configuration),
+except for `to` and `from` in `ido`, which are described in the following
+documentation section. The `icingadb` section should be identical to the
+`database` section of the Icinga DB configuration for most users.
+
 #### Input Time Range
 
 The migration tool allows you to restrict the time range of the history events
