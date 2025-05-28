@@ -53,7 +53,7 @@ func (stmt *CleanupStmt) CleanupOlderThan(
 				return err
 			},
 			retry.Retryable,
-			backoff.NewExponentialWithJitter(1*time.Millisecond, 1*time.Second),
+			backoff.DefaultBackoff,
 			db.GetDefaultRetrySettings(),
 		)
 		if err != nil {
