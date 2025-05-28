@@ -11,7 +11,6 @@ import (
 	"github.com/pkg/errors"
 	"os"
 	"path"
-	"time"
 )
 
 const (
@@ -60,7 +59,7 @@ func CheckSchema(ctx context.Context, db *database.DB) error {
 			return nil
 		},
 		retry.Retryable,
-		backoff.NewExponentialWithJitter(128*time.Millisecond, 1*time.Minute),
+		backoff.DefaultBackoff,
 		db.GetDefaultRetrySettings())
 	if err != nil {
 		return errors.Wrap(err, "can't check database schema version")
