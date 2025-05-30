@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"sort"
 	"strconv"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -702,17 +703,24 @@ func assertStreamConsistency(t testing.TB, clients []*redis.Client, stream strin
 	}
 }
 
-func processCheckResult(t *testing.T, client *utils.Icinga2Client, hostname string, status int) time.Time {
+// processCheckResult sends a passive check result to the Icinga2 API and returns the time of the check result.
+// The provided hostOrServiceName must be either a host name or a service name in the format "host!service".
+func processCheckResult(t *testing.T, client *utils.Icinga2Client, hostOrServiceName string, status int) time.Time {
 	// Ensure that check results have distinct timestamps in millisecond resolution.
 	time.Sleep(10 * time.Millisecond)
 
 	output := utils.RandomString(8)
-	reqBody, err := json.Marshal(ActionsProcessCheckResultRequest{
-		Type:         "Host",
-		Filter:       fmt.Sprintf(`host.name==%q`, hostname),
-		ExitStatus:   status,
-		PluginOutput: output,
-	})
+	req := ActionsProcessCheckResultRequest{ExitStatus: status, PluginOutput: output}
+
+	if strings.ContainsRune(hostOrServiceName, '!') {
+		req.Type = "Service"
+		req.Service = hostOrServiceName
+	} else {
+		req.Type = "Host"
+		req.Host = hostOrServiceName
+	}
+
+	reqBody, err := json.Marshal(req)
 	require.NoError(t, err, "marshal request")
 	response, err := client.PostJson("/v1/actions/process-check-result", bytes.NewBuffer(reqBody))
 	require.NoError(t, err, "process-check-result")
@@ -723,29 +731,35 @@ func processCheckResult(t *testing.T, client *utils.Icinga2Client, hostname stri
 		t.FailNow()
 	}
 
-	response, err = client.GetJson("/v1/objects/hosts/" + hostname)
-	require.NoError(t, err, "get host: request")
-	require.Equal(t, 200, response.StatusCode, "get host: request")
+	response, err = client.GetJson(fmt.Sprintf("/v1/objects/%ss/%s", strings.ToLower(req.Type), hostOrServiceName))
+	require.NoErrorf(t, err, "get %s: request", req.Type)
+	require.Equalf(t, 200, response.StatusCode, "get %s: request", req.Type)
 
-	var hosts ObjectsHostsResponse
-	err = json.NewDecoder(response.Body).Decode(&hosts)
-	require.NoError(t, err, "get host: parse response")
+	var checkables ObjectsCheckablesResponse
+	err = json.NewDecoder(response.Body).Decode(&checkables)
+	require.NoErrorf(t, err, "get %s: parse response", req.Type)
 
-	require.Equal(t, 1, len(hosts.Results), "there must be one host in the response")
-	host := hosts.Results[0]
-	require.Equal(t, output, host.Attrs.LastCheckResult.Output,
-		"last check result should be visible in host object")
-	require.Equal(t, status, host.Attrs.State, "state should match check result")
+	require.Equalf(t, 1, len(checkables.Results), "there must be one %s in the response", req.Type)
+	checkable := checkables.Results[0]
+	require.Equalf(t, output, checkable.Attrs.LastCheckResult.Output,
+		"last check result should be visible in %s object", req.Type)
+	require.Equal(t, status, checkable.Attrs.State, "state should match check result")
 
-	sec, nsec := math.Modf(host.Attrs.LastCheckResult.ExecutionEnd)
+	sec, nsec := math.Modf(checkable.Attrs.LastCheckResult.ExecutionEnd)
 	return time.Unix(int64(sec), int64(nsec*1e9))
 }
 
 type ActionsAcknowledgeProblemRequest struct {
-	Type    string `json:"type"`
-	Filter  string `json:"filter"`
+	Type string `json:"type"`
+	// Set either Host or Service, depending on the type of the check result
+	// or just the Filter, i.e. exactly one of Host, Service or Filter must be set.
+	Host    string `json:"host,omitempty"`
+	Service string `json:"service,omitempty"`
+	Filter  string `json:"filter,omitempty"`
+
 	Author  string `json:"author"`
 	Comment string `json:"comment"`
+	Sticky  bool   `json:"sticky"`
 }
 
 type ActionsAcknowledgeProblemResponse struct {
@@ -778,8 +792,13 @@ type ActionsRemoveCommentRequest struct {
 }
 
 type ActionsProcessCheckResultRequest struct {
-	Type         string `json:"type"`
-	Filter       string `json:"filter"`
+	Type string `json:"type"`
+	// Set either Host or Service, depending on the type of the check result
+	// or just the Filter, i.e. exactly one of Host, Service or Filter must be set.
+	Host    string `json:"host,omitempty"`
+	Service string `json:"service,omitempty"`
+	Filter  string `json:"filter,omitempty"`
+
 	ExitStatus   int    `json:"exit_status"`
 	PluginOutput string `json:"plugin_output"`
 }
@@ -808,7 +827,7 @@ type ActionsScheduleDowntimeResponse struct {
 	} `json:"results"`
 }
 
-type ObjectsHostsResponse struct {
+type ObjectsCheckablesResponse struct {
 	Results []struct {
 		Attrs struct {
 			State           int `json:"state"`
