@@ -799,6 +799,8 @@ CREATE TABLE icingadb_instance (
   icinga2_flap_detection_enabled boolenum NOT NULL DEFAULT 'n',
   icinga2_performance_data_enabled boolenum NOT NULL DEFAULT 'n',
 
+  icingadb_version varchar(255) NOT NULL,
+
   CONSTRAINT pk_icingadb_instance PRIMARY KEY (id)
 );
 
