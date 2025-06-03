@@ -420,6 +420,7 @@ func (h *HA) realize(
 			return nil
 		},
 		retry.Retryable,
+		// Keep the maximum backoff time small and not use backoff.DefaultBackoff here.
 		backoff.NewExponentialWithJitter(256*time.Millisecond, 3*time.Second),
 		retry.Settings{
 			// Intentionally no timeout is set, as we use a context with a deadline.
