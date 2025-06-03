@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	_ "embed"
+	"fmt"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
@@ -789,6 +790,25 @@ func convertStateRows(
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
+
+		// Valid host states are UP, DOWN and PENDING (0, 1, 99) and valid service states are OK, WARNING, CRITICAL,
+		// UNKNOWN and PENDING (0-3, 99). Fall back to DOWN (1) or UNKNOWN (3) for host or service states, respectively.
+		var stateUpperBound uint8
+		switch typ {
+		case "host":
+			stateUpperBound = 1
+		case "service":
+			stateUpperBound = 3
+		default:
+			// Should not happen since objectType is an unchanged Go map.
+			panic(fmt.Sprintf("unknown object type %s", typ))
+		}
+
+		for _, field := range []*uint8{&row.State, &row.LastState, &row.LastHardState} {
+			if *field > stateUpperBound && *field != 99 {
+				*field = stateUpperBound
+			}
+		}
 
 		hardState := row.LastHardState // in case of soft state, the "current" hard state is the last one
 		if icingadbTypes.StateType(row.StateType) == icingadbTypes.StateHard {
