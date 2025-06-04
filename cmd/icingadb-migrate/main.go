@@ -229,7 +229,7 @@ func startIdoTx(ido *database.DB) {
 // (On non-recoverable errors the whole program exits.)
 func computeIdRange(c *Config) {
 	typesToMigrate.forEach(func(ht *historyType) {
-		getBorderId := func(id *uint64, timeColumns []string, compOperator string, borderTime int32, sortOrder string) {
+		getBorderId := func(id *uint64, timeColumns []string, compOperator string, borderTime, fallbackTime int32, sortOrder string) {
 			deZeroFied := make([]string, 0, len(timeColumns))
 			for _, column := range timeColumns {
 				deZeroFied = append(deZeroFied, fmt.Sprintf(
@@ -246,10 +246,10 @@ func computeIdRange(c *Config) {
 
 			query := ht.snapshot.Rebind(
 				"SELECT " + ht.idoIdColumn + " FROM " + ht.idoTable + " WHERE " + timeExpr + " " + compOperator +
-					" FROM_UNIXTIME(?) ORDER BY " + ht.idoIdColumn + " " + sortOrder + " LIMIT 1",
+					" COALESCE(FROM_UNIXTIME(?), FROM_UNIXTIME(?)) ORDER BY " + ht.idoIdColumn + " " + sortOrder + " LIMIT 1",
 			)
 
-			switch err := ht.snapshot.Get(id, query, borderTime); err {
+			switch err := ht.snapshot.Get(id, query, borderTime, fallbackTime); err {
 			case nil, sql.ErrNoRows:
 			default:
 				log.With("backend", "IDO", "query", query, "args", []any{borderTime}).
@@ -259,8 +259,8 @@ func computeIdRange(c *Config) {
 
 		ht.fromId = math.MaxInt64
 
-		getBorderId(&ht.fromId, ht.idoEndColumns, ">=", c.IDO.From, "ASC")
-		getBorderId(&ht.toId, ht.idoStartColumns, "<=", c.IDO.To, "DESC")
+		getBorderId(&ht.fromId, ht.idoEndColumns, ">=", c.IDO.From, 1, "ASC")
+		getBorderId(&ht.toId, ht.idoStartColumns, "<=", c.IDO.To, math.MaxInt32, "DESC")
 	})
 }
 
