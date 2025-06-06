@@ -3,6 +3,27 @@
 Specific version upgrades are described below. Please note that version upgrades are incremental.
 If you are upgrading across multiple versions, make sure to follow the steps for each of them.
 
+## Upgrading to Icinga DB v1.4.0
+
+### Requirements
+
+Version 1.4.0 of Icinga DB is released alongside Icinga 2.15.0 and Icinga DB Web 1.2.0. An internal Redis® schema update
+requires that these updates be applied together. To put it simply, Icinga DB 1.4.0 needs Icinga 2.15.0 or later.
+
+The minimum required versions of the MySQL/MariaDB server is increased to support Recursive Common Table Expressions.
+Technical information is available in [#947](https://github.com/Icinga/icingadb/issues/947).
+
+* MySQL must be version 8.0 or later.
+* MariaDB must be version 10.2.2 or later.
+
+Do not upgrade Icinga DB unless these new requirements are met.
+
+### Schema
+
+Please apply the `1.4.0.sql` upgrade script to your database. For package installations, you can find this file at
+`/usr/share/icingadb/schema/mysql/upgrades/` or `/usr/share/icingadb/schema/pgsql/upgrades/`, depending on your
+database vendor.
+
 ## Upgrading to Icinga DB v1.2.1
 
 Please apply the `1.2.1.sql` upgrade script to your database. For package installations, you can find this file at
