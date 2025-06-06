@@ -1,7 +1,44 @@
 # Upgrading Icinga DB
 
-Specific version upgrades are described below. Please note that version upgrades are incremental.
-If you are upgrading across multiple versions, make sure to follow the steps for each of them.
+Some Icinga DB upgrades require manual intervention, others do not. If you need to intervene, the release notes will
+point you to the specific upgrade section on this page.
+
+Please note that version upgrades are incremental. If you are upgrading across multiple versions, make sure to follow
+the steps for each of them.
+
+## Database Schema Upgrades
+
+Certain Icinga DB version upgrades require a database schema upgrade. If the upgrade section of the specific Icinga DB
+release mentions a schema upgrade, this section will guide you through the process of applying the schema upgrade.
+
+First, stop the Icinga DB daemon. If you have an HA setup, stop all Icinga DB instances.
+
+```
+systemctl stop icingadb
+```
+
+Locate the required schema upgrade files in `/usr/share/icingadb/schema/mysql/upgrades/` for MySQL/MariaDB or in
+`/usr/share/icingadb/schema/pgsql/upgrades/` for PostgreSQL. The schema upgrade files are named after the new Icinga DB
+release and are mentioned in the specific section below. If you have skipped multiple Icinga DB releases, apply all
+schema versions in their order, starting with the earliest release.
+
+The following commands would apply a sample version 1.2.3 schema upgrade to the `icingadb` database as the `icingadb`
+user. Please modify them for your setup and the schema upgrade you want to apply.
+
+* MySQL/MariaDB:
+  ```
+  mysql -u icingadb -p icingadb < /usr/share/icingadb/schema/mysql/upgrades/1.2.3.sql
+  ```
+* PostgreSQL:
+  ```
+  psql -U icingadb icingadb < /usr/share/icingadb/schema/pgsql/upgrades/1.2.3.sql
+  ```
+
+Afterwards, restart Icinga DB. If you have an HA setup, restart all Icinga DB instances.
+
+```
+systemctl start icingadb
+```
 
 ## Upgrading to Icinga DB v1.2.1
 
