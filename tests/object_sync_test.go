@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-testing/services"
@@ -19,6 +20,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/exp/slices"
 	"io"
+	"net/http"
 	"reflect"
 	"sort"
 	"strings"
@@ -437,6 +439,79 @@ func TestObjectSync(t *testing.T) {
 					})
 				}
 			})
+		})
+
+		t.Run("State", func(t *testing.T) {
+			t.Parallel()
+
+			for index := range 3 {
+				host := Host{
+					Name:                fmt.Sprintf("ack-test-host-%d", index),
+					CheckCommandName:    "default-checkcommand",
+					EnableActiveChecks:  false,
+					EnablePassiveChecks: true,
+					MaxCheckAttempts:    1,
+					CheckInterval:       300,
+					RetryInterval:       60,
+				}
+				host.DisplayName = host.Name
+
+				t.Run("Verify-"+host.Name, func(t *testing.T) {
+					t.Parallel()
+
+					client.CreateObject(t, "hosts", host.Name, map[string]interface{}{
+						"attrs": makeIcinga2ApiAttributes(host, false),
+					})
+
+					eventually.Assert(t, func(t require.TestingT) {
+						verifyIcingaDbRow(t, db, host)
+					}, 20*time.Second, 1*time.Second)
+
+					processCheckResult(t, client, host.Name, 1)
+
+					isAcknowledged := index > 0
+					sticky := index == 1
+					if isAcknowledged {
+						req, err := json.Marshal(ActionsAcknowledgeProblemRequest{
+							Type:    "Host",
+							Host:    host.Name,
+							Author:  utils.RandomString(8),
+							Comment: utils.RandomString(8),
+							Sticky:  sticky,
+						})
+						require.NoError(t, err, "marshalling request body")
+						response, err := client.PostJson("/v1/actions/acknowledge-problem", bytes.NewBuffer(req))
+						require.NoError(t, err, "acknowledge problem request")
+						require.Equal(t, http.StatusOK, response.StatusCode, "acknowledge problem request")
+
+						var ackResponse ActionsAcknowledgeProblemResponse
+						err = json.NewDecoder(response.Body).Decode(&ackResponse)
+						_ = response.Body.Close()
+
+						require.NoError(t, err, "decode acknowledge problem response")
+						require.Equal(t, 1, len(ackResponse.Results), "acknowledge problem response should've 1 result")
+						require.Equal(t, http.StatusOK, ackResponse.Results[0].Code, "acknowledge problem should've been successful")
+					}
+
+					eventually.Assert(t, func(t require.TestingT) {
+						type Row struct {
+							IsAcknowledged          types.Bool `db:"is_acknowledged"`
+							IsStickyAcknowledgement types.Bool `db:"is_sticky_acknowledgement"`
+							StateType               string     `db:"state_type"`
+						}
+						var row Row
+						err = db.Get(&row, `SELECT is_acknowledged, is_sticky_acknowledgement, state_type
+							FROM host_state
+							  INNER JOIN host ON host_state.host_id = host.id
+							WHERE host.name = ?`, host.Name,
+						)
+						require.NoError(t, err, "querying host state should not fail")
+						require.Equal(t, types.Bool{Bool: isAcknowledged, Valid: true}, row.IsAcknowledged, "host should be acknowledged")
+						require.Equal(t, types.Bool{Bool: sticky, Valid: true}, row.IsStickyAcknowledgement, "acknowledgement should be sticky")
+						require.Equal(t, "hard", row.StateType, "host should be in hard state")
+					}, 20*time.Second, 200*time.Millisecond)
+				})
+			}
 		})
 
 		t.Run("User", func(t *testing.T) {

@@ -65,7 +65,7 @@ func benchmarkHistory(b *testing.B, numComments int64) {
 				"entry_time":     strconv.FormatInt(baseTime.Add(time.Duration(i)*time.Second).UnixMilli(), 10),
 				"author":         utils.RandomString(8),
 				"comment":        utils.RandomString(8),
-				"entry_type":     "1",
+				"entry_type":     "comment",
 				"is_persistent":  "0",
 				"is_sticky":      "0",
 				"event_id":       uuid.New().String(),

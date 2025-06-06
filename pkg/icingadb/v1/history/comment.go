@@ -2,10 +2,10 @@ package history
 
 import (
 	"database/sql/driver"
+	"encoding"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
-	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
 )
 
 type CommentHistoryEntity struct {
@@ -42,13 +42,13 @@ type CommentHistory struct {
 	CommentHistoryEntity   `json:",inline"`
 	HistoryTableMeta       `json:",inline"`
 	CommentHistoryUpserter `json:",inline"`
-	EntryTime              types.UnixMilli           `json:"entry_time"`
-	Author                 string                    `json:"author"`
-	Comment                string                    `json:"comment"`
-	EntryType              icingadbTypes.CommentType `json:"entry_type"`
-	IsPersistent           types.Bool                `json:"is_persistent"`
-	IsSticky               types.Bool                `json:"is_sticky"`
-	ExpireTime             types.UnixMilli           `json:"expire_time"`
+	EntryTime              types.UnixMilli  `json:"entry_time"`
+	Author                 string           `json:"author"`
+	Comment                string           `json:"comment"`
+	EntryType              CommentEntryType `json:"entry_type"`
+	IsPersistent           types.Bool       `json:"is_persistent"`
+	IsSticky               types.Bool       `json:"is_sticky"`
+	ExpireTime             types.UnixMilli  `json:"expire_time"`
 }
 
 // Init implements the contracts.Initer interface.
@@ -109,14 +109,40 @@ func (et CommentEventTime) Value() (driver.Value, error) {
 	}
 }
 
+// CommentEntryType represents the type of a comment in the history.
+//
+// Starting with Icinga 2 2.15, the comment entry type will always be written to Redis as a string.
+// For compatibility reasons with older history entries within Redis, it supports also uint8 values.
+type CommentEntryType string
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+// It supports both string values ("comment", "ack") and old uint8 values (1, 4).
+func (ct *CommentEntryType) UnmarshalText(text []byte) error {
+	switch entry := string(text); entry {
+	case "1":
+		*ct = "comment"
+	case "4":
+		*ct = "ack"
+	default:
+		*ct = CommentEntryType(entry)
+	}
+
+	return nil
+}
+
+// Value implements the driver.Valuer interface.
+func (ct CommentEntryType) Value() (driver.Value, error) { return string(ct), nil }
+
 // Assert interface compliance.
 var (
-	_ database.Entity     = (*CommentHistoryEntity)(nil)
-	_ database.Upserter   = (*CommentHistoryUpserter)(nil)
-	_ contracts.Initer    = (*CommentHistory)(nil)
-	_ UpserterEntity      = (*CommentHistory)(nil)
-	_ contracts.Initer    = (*HistoryComment)(nil)
-	_ database.TableNamer = (*HistoryComment)(nil)
-	_ UpserterEntity      = (*HistoryComment)(nil)
-	_ driver.Valuer       = CommentEventTime{}
+	_ database.Entity          = (*CommentHistoryEntity)(nil)
+	_ database.Upserter        = (*CommentHistoryUpserter)(nil)
+	_ contracts.Initer         = (*CommentHistory)(nil)
+	_ UpserterEntity           = (*CommentHistory)(nil)
+	_ contracts.Initer         = (*HistoryComment)(nil)
+	_ database.TableNamer      = (*HistoryComment)(nil)
+	_ UpserterEntity           = (*HistoryComment)(nil)
+	_ driver.Valuer            = CommentEventTime{}
+	_ encoding.TextUnmarshaler = (*CommentEntryType)(nil)
+	_ driver.Valuer            = CommentEntryType("")
 )
