@@ -309,7 +309,8 @@ CREATE TABLE host_state (
   is_flapping enum('n', 'y') NOT NULL,
   is_overdue enum('n', 'y') NOT NULL,
 
-  is_acknowledged enum('n', 'y', 'sticky') NOT NULL,
+  is_acknowledged enum('n', 'y') NOT NULL,
+  is_sticky_acknowledgement enum('n', 'y') NOT NULL,
   acknowledgement_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
   last_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
 
@@ -482,7 +483,8 @@ CREATE TABLE service_state (
   is_flapping enum('n', 'y') NOT NULL,
   is_overdue enum('n', 'y') NOT NULL,
 
-  is_acknowledged enum('n', 'y', 'sticky') NOT NULL,
+  is_acknowledged enum('n', 'y') NOT NULL,
+  is_sticky_acknowledgement enum('n', 'y') NOT NULL,
   acknowledgement_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
   last_comment_id binary(20) DEFAULT NULL COMMENT 'comment.id',
 

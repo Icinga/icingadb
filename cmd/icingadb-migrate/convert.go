@@ -7,7 +7,7 @@ import (
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
-	icingadbTypes "github.com/icinga/icingadb/pkg/icingadb/types"
+	"github.com/icinga/icingadb/pkg/common"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/jmoiron/sqlx"
@@ -89,7 +89,7 @@ func convertCommentRows(
 				EntryTime:    entryTime,
 				Author:       row.AuthorName,
 				Comment:      row.CommentData,
-				EntryType:    icingadbTypes.CommentType(row.EntryType),
+				EntryType:    "comment",
 				IsPersistent: types.Bool{Bool: row.IsPersistent != 0, Valid: true},
 				IsSticky:     types.Bool{Bool: false, Valid: true},
 				ExpireTime:   expireTime,
@@ -620,17 +620,16 @@ func convertNotificationRows(
 		// migrated data itself via the history ID as object name, i.e. one "virtual object" per sent notification.
 		name := strconv.FormatUint(row.NotificationId, 10)
 
-		nt := convertNotificationType(row.NotificationReason, row.State)
-
-		ntEnum, err := nt.Value()
+		notificationType, err := convertNotificationType(row.NotificationReason, row.State)
 		if err != nil {
+			log.With("notification_reason", row.NotificationReason, "state", row.State).Errorf("%+v", err)
 			continue
 		}
 
 		ts := convertTime(row.EndTime.Int64, row.EndTimeUsec)
 		tsMilli := float64(ts.Time().UnixMilli())
-		notificationHistoryId := hashAny([]interface{}{env, name, ntEnum, tsMilli})
-		id := hashAny([]interface{}{env, "notification", name, ntEnum, tsMilli})
+		notificationHistoryId := hashAny([]interface{}{env, name, notificationType, tsMilli})
+		id := hashAny([]interface{}{env, "notification", name, notificationType, tsMilli})
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
@@ -653,7 +652,7 @@ func convertNotificationRows(
 				ServiceId:     serviceId,
 			},
 			NotificationId:    calcObjectId(env, name),
-			Type:              nt,
+			Type:              history.NotificationType(notificationType),
 			SendTime:          ts,
 			State:             row.State,
 			PreviousHardState: previousHardState,
@@ -698,34 +697,47 @@ func convertNotificationRows(
 	return
 }
 
-// convertNotificationType maps IDO values[1] to Icinga DB ones[2].
+// convertNotificationType maps IDO values [^1] to their Icinga DB counterparts [^2].
 //
-// [1]: https://github.com/Icinga/icinga2/blob/32c7f7730db154ba0dff5856a8985d125791c/lib/db_ido/dbevents.cpp#L1507-L1524
-// [2]: https://github.com/Icinga/icingadb/blob/8f31ac143875498797725adb9bfacf3d4/pkg/types/notification_type.go#L53-L61
-func convertNotificationType(notificationReason, state uint8) icingadbTypes.NotificationType {
+// [^1]: https://github.com/Icinga/icinga2/blob/32c7f7730db154ba0dff5856a8985d125791c/lib/db_ido/dbevents.cpp#L1507-L1524
+// [^2]: https://github.com/Icinga/icinga2/blob/32c7f7730db154ba0dff5856a8985d125791c73e/lib/icingadb/icingadb-utility.cpp#L157-L176
+func convertNotificationType(notificationReason, state uint8) (string, error) {
 	switch notificationReason {
 	case 0: // state
 		if state == 0 {
-			return 64 // recovery
+			return "recovery", nil
 		} else {
-			return 32 // problem
+			return "problem", nil
 		}
-	case 1: // acknowledgement
-		return 16
-	case 2: // flapping start
-		return 128
-	case 3: // flapping end
-		return 256
-	case 5: // downtime start
-		return 1
-	case 6: // downtime end
-		return 2
-	case 7: // downtime removed
-		return 4
-	case 8: // custom
-		return 8
-	default: // bad notification type
-		return 0
+	case 1:
+		return "acknowledgement", nil
+	case 2:
+		return "flapping_start", nil
+	case 3:
+		return "flapping_end", nil
+	case 5:
+		return "downtime_start", nil
+	case 6:
+		return "downtime_end", nil
+	case 7:
+		return "downtime_removed", nil
+	case 8:
+		return "custom", nil
+	default:
+		return "", fmt.Errorf("bad notification type: %d", notificationReason)
+	}
+}
+
+// convertStateType maps IDO state_type values to either [common.SoftState] or [common.HardState] accordingly.
+// The rule of thumb is: 0 = soft, 1 = hard, if anything else is provided, this function panics.
+func convertStateType(state uint8) string {
+	switch state {
+	case 0:
+		return common.SoftState
+	case 1:
+		return common.HardState
+	default: // Should never happen but just in case.
+		panic(fmt.Sprintf("unknown state %d provided", state))
 	}
 }
 
@@ -811,7 +823,7 @@ func convertStateRows(
 		}
 
 		hardState := row.LastHardState // in case of soft state, the "current" hard state is the last one
-		if icingadbTypes.StateType(row.StateType) == icingadbTypes.StateHard {
+		if convertStateType(row.StateType) == common.HardState {
 			hardState = row.State
 		}
 
@@ -828,7 +840,7 @@ func convertStateRows(
 				ServiceId:     serviceId,
 			},
 			EventTime:         ts,
-			StateType:         icingadbTypes.StateType(row.StateType),
+			StateType:         history.StateType(convertStateType(row.StateType)),
 			SoftState:         row.State,
 			HardState:         hardState,
 			PreviousSoftState: row.LastState,
@@ -853,7 +865,7 @@ func convertStateRows(
 			EventTime:      ts,
 		})
 
-		if icingadbTypes.StateType(row.StateType) == icingadbTypes.StateHard {
+		if convertStateType(row.StateType) == common.HardState {
 			// only hard state changes are relevant for SLA history, discard all others
 
 			sla = append(sla, &history.SlaHistoryState{
@@ -869,7 +881,7 @@ func convertStateRows(
 					ServiceId:     serviceId,
 				},
 				EventTime:         ts,
-				StateType:         icingadbTypes.StateType(row.StateType),
+				StateType:         history.StateType(convertStateType(row.StateType)),
 				HardState:         hardState,
 				PreviousHardState: previousHardState,
 			})

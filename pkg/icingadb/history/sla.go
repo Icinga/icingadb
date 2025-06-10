@@ -3,8 +3,8 @@ package history
 import (
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/structify"
+	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
-	"github.com/icinga/icingadb/pkg/icingadb/types"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"reflect"
 )
@@ -21,7 +21,7 @@ func stateHistoryToSlaEntity(entry redis.XMessage) ([]history.UpserterEntity, er
 	}
 	slaState := slaStateInterface.(*history.SlaHistoryState)
 
-	if slaState.StateType != types.StateHard {
+	if slaState.StateType != common.HardState {
 		// only hard state changes are relevant for SLA history, discard all others
 		return nil, nil
 	}
