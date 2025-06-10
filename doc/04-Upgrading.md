@@ -40,6 +40,26 @@ Afterwards, restart Icinga DB. If you have an HA setup, restart all Icinga DB in
 systemctl start icingadb
 ```
 
+## Upgrading to Icinga DB v1.4.0
+
+### Requirements
+
+Version 1.4.0 of Icinga DB is released alongside Icinga 2.15.0 and Icinga DB Web 1.2.0. A change to the internal
+communication API requires these updates to be applied together. To put it simply, Icinga DB 1.4.0 needs Icinga 2.15.0
+or later.
+
+The minimum required versions of the MySQL/MariaDB server is increased to support Recursive Common Table Expressions.
+Technical information is available in [#947](https://github.com/Icinga/icingadb/issues/947).
+
+* MySQL must be version 8.0 or later.
+* MariaDB must be version 10.2.2 or later.
+
+Ensure that the new requirements are met before updating Icinga DB.
+
+### Schema
+
+The upgrade script `1.4.0.sql` must be applied as described in the [schema upgrade section](#database-schema-upgrades).
+
 ## Upgrading to Icinga DB v1.2.1
 
 Please apply the `1.2.1.sql` upgrade script to your database. For package installations, you can find this file at
