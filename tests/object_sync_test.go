@@ -500,10 +500,10 @@ func TestObjectSync(t *testing.T) {
 							StateType               string     `db:"state_type"`
 						}
 						var row Row
-						err = db.Get(&row, `SELECT is_acknowledged, is_sticky_acknowledgement, state_type
+						err = db.Get(&row, db.Rebind(`SELECT is_acknowledged, is_sticky_acknowledgement, state_type
 							FROM host_state
 							  INNER JOIN host ON host_state.host_id = host.id
-							WHERE host.name = ?`, host.Name,
+							WHERE host.name = ?`), host.Name,
 						)
 						require.NoError(t, err, "querying host state should not fail")
 						require.Equal(t, types.Bool{Bool: isAcknowledged, Valid: true}, row.IsAcknowledged, "host should be acknowledged")
