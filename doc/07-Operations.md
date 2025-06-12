@@ -80,6 +80,8 @@ decrease the values of `max_placeholders_per_statement` and `max_rows_per_transa
 
 ### Redis®
 
+#### Redis requires memory overcommit on Linux
+
 On Linux, enable [memory overcommitting](https://www.kernel.org/doc/Documentation/vm/overcommit-accounting).
 
 ```shell
@@ -94,5 +96,16 @@ If your distribution uses systemd, a configuration file under `/etc/sysctl.d/` i
 ```
 vm.overcommit_memory = 1
 ```
+
+#### Huge memory footprint and IO usage in large setups
+
+For large setups the default Redis configuration is slightly problematic, since Redis will try to perpetually save its state
+to the filesystem, a process that gets triggered often enough to make the save process and persistent companion.
+This will increase the memory usage by a factor of two and also cause a troublesome amount of IO.
+
+As an improvement Redis can be configured to produce the dump less often or not at all with the `save` setting in the
+configuration. Be warned here, that in case of a crash (of Redis or the whole machine) all the data after the last dump
+is lost, meaning that all the events which were not already persistet by `icingadb` or persisted by Redis are lost then.
+ 
 
 In addition, the official [Redis® administration documentation](https://redis.io/docs/latest/operate/oss_and_stack/management/admin/) is quite useful.
