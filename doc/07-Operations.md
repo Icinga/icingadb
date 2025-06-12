@@ -105,7 +105,7 @@ This will increase the memory usage by a factor of two and also cause a troubles
 
 As an improvement Redis can be configured to produce the dump less often or not at all with the `save` setting in the
 configuration. Be warned here, that in case of a crash (of Redis or the whole machine) all the data after the last dump
-is lost, meaning that all the events which were not already persistet by `icingadb` or persisted by Redis are lost then.
+is lost, meaning that all the events which were not already persisted by Icinga DB or persisted by Redis are lost then.
  
 
 In addition, the official [Redis® administration documentation](https://redis.io/docs/latest/operate/oss_and_stack/management/admin/) is quite useful.
