@@ -39,7 +39,7 @@ or install [from source](02-Installation.md.d/From-Source.md).
 
 ## Setting up the Database
 
-A MySQL (≥5.5), MariaDB (≥10.1), or PostgreSQL (≥9.6) database is required to run Icinga DB.
+A MySQL (≥8.0), MariaDB (≥10.2.2), or PostgreSQL (≥9.6) database is required to run Icinga DB.
 Please follow the steps listed for your target database,
 which guide you through setting up the database and user and importing the schema.
 
@@ -50,14 +50,6 @@ which guide you through setting up the database and user and importing the schem
     In high availability setups, all Icinga DB instances must write to the same database.
 
 ### Setting up a MySQL or MariaDB Database
-
-If you use a version of MySQL < 5.7 or MariaDB < 10.2, the following server options must be set:
-
-```
-innodb_file_format=barracuda
-innodb_file_per_table=1
-innodb_large_prefix=1
-```
 
 Set up a MySQL database for Icinga DB:
 
