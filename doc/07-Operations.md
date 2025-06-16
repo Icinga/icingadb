@@ -79,6 +79,11 @@ decrease the values of `max_placeholders_per_statement` and `max_rows_per_transa
 [Database Options](https://icinga.com/docs/icinga-db/latest/doc/03-Configuration/#database-options).
 
 ### Redis®
+The official [Redis® administration documentation](https://redis.io/docs/latest/operate/oss_and_stack/management/admin/) is quite useful
+regarding the operation of Redis® and is the recommendation for this topic in general.
+Below, we will address topics specific to Icinga setups.
+
+#### Redis® requires memory overcommit on Linux
 
 On Linux, enable [memory overcommitting](https://www.kernel.org/doc/Documentation/vm/overcommit-accounting).
 
@@ -95,4 +100,28 @@ If your distribution uses systemd, a configuration file under `/etc/sysctl.d/` i
 vm.overcommit_memory = 1
 ```
 
-In addition, the official [Redis® administration documentation](https://redis.io/docs/latest/operate/oss_and_stack/management/admin/) is quite useful.
+#### Huge memory footprint and IO usage in large setups
+
+For large setups, the default Redis® configuration is slightly problematic, since Redis® will try to perpetually save its state
+to the filesystem, a process that gets triggered often enough to make the save process a permanent companion.
+This will increase the memory usage by a factor of two and also cause a troublesome amount of IO.
+
+As an improvement, Redis® can be [configured to produce the dump less often or not at all with the `save` setting](https://redis.io/docs/latest/operate/oss_and_stack/management/persistence) in the
+configuration. Be warned here, that in case of a crash (of Redis® or the whole machine) all the data after the last dump
+is lost, meaning that all the events which were not already persisted by Icinga DB or persisted by Redis® are lost then.
+
+To completely disable retention, the `save` setting must be given an empty argument:
+
+```
+save ""
+```
+
+Alternatively, to reduce the occurrences of dumps, something similar to
+
+```
+save 3600 1 900 100000
+```
+
+can be used.
+In this example, a dump is performed every hour (3600s) if at least on changes occurred in that time frame
+and every fifteen minutes (900s) if at least 100,000 changes occurred.
