@@ -1,5 +1,44 @@
 # Icinga DB Changelog
 
+## 1.4.0 (2025-06-18)
+
+This Icinga DB release introduces support for Icinga 2 dependencies, continues to retry certain long-persisting errors, and tweaks the logging.
+
+Other changes and bug fixes were made as well.
+The most notable changes are as follows.
+
+* Synchronize Icinga 2 dependencies to Icinga DB for visualization in Icinga DB Web. #889
+* Do not time out when reconnecting to the database or Redis®[\*](doc/TRADEMARKS.md#redis) if a connection was previously established. #960, icinga-go-library#131
+* Instead of a stack trace, abort `icingadb` on expected fatal errors with a descriptive log message. #944
+* When logging to journald, include errors in the log message as well as in the journald fields. icinga-go-library#126
+* Rework log levels and include more context for debugging. #940, #944, icinga-go-library#124
+* Ensure consistency between data written to Redis® and the database by getting rid of unnecessary value mapping. #964
+* Fix bugs in the `icingadb-migrate` utility and ensure compatibility with MariaDB ≥11.7. #957, #959, #975, #976
+* Improve the documentation, including new sections on container installation and operations. #939, #942, #948, #950, #951, #981, #983
+
+### Requirements
+
+Version 1.4.0 of Icinga DB is released alongside Icinga 2.15.0 and Icinga DB Web 1.2.0.
+Since this Icinga DB release requires Icinga 2.15.0 or later, please install these updates together.
+
+The required minimum versions of the MySQL/MariaDB server has increased:
+
+* MySQL must be version 8.0 or later.
+* MariaDB must be version 10.2.2 or later.
+
+More information is available in the [upgrading documentation](doc/04-Upgrading.md#upgrading-to-icinga-db-v140).
+
+### Schema
+
+The `1.4.0.sql` schema upgrade is available and must be applied.
+Please follow the [schema upgrade documentation](doc/04-Upgrading.md#database-schema-upgrades).
+
+### SELinux Packages
+
+With this Icinga DB release, two new SELinux packages are now available for Amazon Linux, Fedora, RHEL, OpenSUSE, and SLES.
+The new `icingadb-selinux` and `icingadb-redis-selinux` packages contain SELinux policies to be used for Icinga DB and Icinga DB Redis®, respectively.
+If you are using SELinux with one of the listed distributions, please consider installing these packages.
+
 ## 1.3.0 (2025-04-03)
 
 This is a maintenance release, integrating the container setup directly into Icinga DB.
@@ -10,8 +49,8 @@ With these two features, the [docker-icingadb](https://github.com/Icinga/docker-
 
 For Docker users of Icinga DB, the following has changed.
 
-- Container images are now pushed to both the [GitHub Container Registry (GHCR)](https://github.com/icinga/icingadb/pkgs/container/icingadb) and [Docker Hub](https://hub.docker.com/r/icinga/icingadb).
-- Development images built from the `main` branch are no longer tagged as `main`, but now as `edge`.
+* Container images are now pushed to both the [GitHub Container Registry (GHCR)](https://github.com/icinga/icingadb/pkgs/container/icingadb) and [Docker Hub](https://hub.docker.com/r/icinga/icingadb).
+* Development images built from the `main` branch are no longer tagged as `main`, but now as `edge`.
 
 The changes are as follows.
 
