@@ -31,6 +31,12 @@ Then use your distribution's package manager to install the `icingadb` package
 or install [from source](02-Installation.md.d/From-Source.md).
 <!-- {% else %} -->
 
+<!-- {% if amazon_linux or fedora or rhel or opensuse or sles%} -->
+!!! tip
+
+    If you have SELinux enabled, the package `icingadb-selinux` is also required.
+<!-- {% endif %} -->
+
 ## Setting up the Database
 
 A MySQL (≥5.5), MariaDB (≥10.1), or PostgreSQL (≥9.6) database is required to run Icinga DB.
