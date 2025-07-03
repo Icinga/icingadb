@@ -25,6 +25,27 @@ schema versions in their order, starting with the earliest release.
 The following commands would apply a sample version 1.2.3 schema upgrade to the `icingadb` database as the `icingadb`
 user. Please modify them for your setup and the schema upgrade you want to apply.
 
+!!! important
+
+    For PostgreSQL, the schema upgrade must be applied by the `icingadb` PostgreSQL user, since this user owns the
+    current tables and would own any new table created by the schema upgrade.
+    If you are unsure whether your PostgreSQL user is named `icingadb`, as stated in the installation section,
+    you can list the _Owner_ for each table in the `icingadb` database via `\d` in `psql`.
+
+    ```
+    $ psql -U postgres icingadb -c '\d'
+                          List of relations
+     Schema |             Name              |   Type   |  Owner
+    --------+-------------------------------+----------+----------
+     public | acknowledgement_history       | table    | icingadb
+     public | action_url                    | table    | icingadb
+     public | checkcommand                  | table    | icingadb
+    [ . . . ]
+    ```
+
+    This shortened output shows that `icingadb` is the _Owner_ and needs to be set as `-U icingadb` in the following
+    upgrade command.
+
 * MySQL/MariaDB:
   ```
   mysql -u icingadb -p icingadb < /usr/share/icingadb/schema/mysql/upgrades/1.2.3.sql
