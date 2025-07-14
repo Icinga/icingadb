@@ -11,6 +11,7 @@ import (
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/common"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
+	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
@@ -171,9 +172,32 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	// Delete
 	if len(delta.Delete) > 0 {
 		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), strcase.Delimited(types.Name(delta.Subject.Entity()), ' '))
-		g.Go(func() error {
-			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), database.OnSuccessIncrement[any](stat))
-		})
+
+		ids := delta.Delete.IDs()
+		if _, ok := delta.Subject.Entity().(*v1.Downtime); ok {
+			// Those downtimes are probably removed from the configuration files, i.e. Icinga 2 won't send
+			// the corresponding downtime end/removed events for them. So try to mark them as cancelled manually,
+			// so that they don't show up as if they were still active in the UI.
+			//
+			// The reason why we don't perform this in a separate goroutine like the other ones is that we don't
+			// want to delete the downtimes until we've successfully updated the downtime history records. So,
+			// if we fail to update the downtime history records, for whatever reason, forward the error to the
+			// config sync group and abort the config sync.
+			if err := history.SyncDowntimeHistoryEndEvent(ctx, s.db, ids); err != nil {
+				errCh := make(chan error, 1)
+				errCh <- err
+				close(errCh)
+				com.ErrgroupReceive(g, errCh)
+			}
+		}
+
+		// Start the deletion process only if we haven't aborted the config sync
+		// due to an error in the downtime history update above.
+		if ctx.Err() == nil {
+			g.Go(func() error {
+				return s.db.Delete(ctx, delta.Subject.Entity(), ids, database.OnSuccessIncrement[any](stat))
+			})
+		}
 	}
 
 	return g.Wait()
