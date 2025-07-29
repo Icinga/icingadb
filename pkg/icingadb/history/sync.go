@@ -2,6 +2,7 @@ package history
 
 import (
 	"context"
+	"fmt"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
@@ -37,7 +38,10 @@ func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync
 }
 
 // Sync synchronizes Redis history streams from s.redis to s.db and deletes the original data on success.
-func (s Sync) Sync(ctx context.Context) error {
+//
+// If not nil, the callback function is appended to each synchronization pipeline and called before the entry is deleted
+// from Redis.
+func (s Sync) Sync(ctx context.Context, callback func(database.Entity)) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for key, pipeline := range syncPipelines {
@@ -62,6 +66,10 @@ func (s Sync) Sync(ctx context.Context) error {
 		// it has processed it, even if the stage itself does not do anything with this specific entry. It should only
 		// forward the entry after it has completed its own sync so that later stages can rely on previous stages being
 		// executed successfully.
+
+		if callback != nil {
+			pipeline = append(pipeline, makeCallbackStageFunc(callback))
+		}
 
 		ch := make([]chan redis.XMessage, len(pipeline)+1)
 		for i := range ch {
@@ -359,6 +367,64 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 
 		return userNotifications, nil
 	})(ctx, s, key, in, out)
+}
+
+// makeCallbackStageFunc creates a new stageFunc calling the given callback function for each message.
+//
+// The callback call is blocking and the message will be forwarded to the out channel after the function has returned.
+// Thus, please ensure this function does not block too long.
+func makeCallbackStageFunc(callback func(database.Entity)) stageFunc {
+	return func(ctx context.Context, _ Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
+		defer close(out)
+
+		var structPtr database.Entity
+		switch key { // keep in sync with syncPipelines below
+		case "notification":
+			structPtr = (*v1.NotificationHistory)(nil)
+		case "state":
+			structPtr = (*v1.StateHistory)(nil)
+		case "downtime":
+			structPtr = (*v1.DowntimeHistory)(nil)
+		case "comment":
+			structPtr = (*v1.CommentHistory)(nil)
+		case "flapping":
+			structPtr = (*v1.FlappingHistory)(nil)
+		case "acknowledgement":
+			structPtr = (*v1.AcknowledgementHistory)(nil)
+		default:
+			return fmt.Errorf("unsupported key %q", key)
+		}
+
+		structifier := structify.MakeMapStructifier(
+			reflect.TypeOf(structPtr).Elem(),
+			"json",
+			contracts.SafeInit)
+
+		for {
+			select {
+			case msg, ok := <-in:
+				if !ok {
+					return nil
+				}
+
+				val, err := structifier(msg.Values)
+				if err != nil {
+					return errors.Wrapf(err, "can't structify values %#v for %s", msg.Values, key)
+				}
+
+				entity, ok := val.(database.Entity)
+				if !ok {
+					return fmt.Errorf("structifier returned %T, expected %T", val, structPtr)
+				}
+				callback(entity)
+
+				out <- msg
+
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
 }
 
 var syncPipelines = map[string][]stageFunc{
