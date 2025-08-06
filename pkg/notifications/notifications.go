@@ -8,12 +8,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/notifications"
 	"github.com/icinga/icinga-go-library/notifications/event"
-	"github.com/icinga/icinga-go-library/retry"
+	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/pkg/common"
@@ -41,6 +40,7 @@ type Source struct {
 	ctxCancel context.CancelFunc
 
 	notificationsClient *notifications.Client // The Icinga Notifications client used to interact with the API.
+	redisClient         *redis.Client         // redisClient is the Redis client used to fetch host and service names for events.
 }
 
 // NewNotificationsSource creates a new Source connected to an existing database and logger.
@@ -49,6 +49,7 @@ type Source struct {
 func NewNotificationsSource(
 	ctx context.Context,
 	db *database.DB,
+	rc *redis.Client,
 	logger *logging.Logger,
 	cfg notifications.Config,
 ) *Source {
@@ -61,7 +62,8 @@ func NewNotificationsSource(
 		db:      db,
 		logger:  logger,
 
-		rules: &notifications.SourceRulesInfo{Version: notifications.EmptyRulesVersion},
+		rules:       &notifications.SourceRulesInfo{Version: notifications.EmptyRulesVersion},
+		redisClient: rc,
 
 		ctx:       ctx,
 		ctxCancel: ctxCancel,
@@ -136,63 +138,36 @@ func (s *Source) evaluateRulesForObject(ctx context.Context, entity database.Ent
 	return outRuleIds[:len(outRuleIds):len(outRuleIds)], nil
 }
 
-// fetchHostServiceName for a host ID and a potential service ID from the Icinga DB relational database.
-func (s *Source) fetchHostServiceName(ctx context.Context, hostId, serviceId, envId types.Binary) (host, service string, err error) {
-	err = retry.WithBackoff(
-		ctx,
-		func(ctx context.Context) error {
-			queryHost := s.db.Rebind("SELECT name FROM host WHERE id = ? AND environment_id = ?")
-			err := s.db.QueryRowxContext(ctx, queryHost, hostId, envId).Scan(&host)
-			if err != nil {
-				return errors.Wrap(err, "cannot select host")
-			}
-
-			if serviceId != nil {
-				queryService := s.db.Rebind("SELECT name FROM service WHERE id = ? AND environment_id = ?")
-				err := s.db.QueryRowxContext(ctx, queryService, serviceId, envId).Scan(&service)
-				if err != nil {
-					return errors.Wrap(err, "cannot select service")
-				}
-			}
-
-			return nil
-		},
-		retry.Retryable,
-		backoff.DefaultBackoff,
-		retry.Settings{Timeout: retry.DefaultTimeout})
-	return
-}
-
 // buildCommonEvent creates an event.Event based on Host and (optional) Service names.
 //
 // This function is used by all event builders to create a common event structure that includes the host and service
 // names, the absolute URL to the Icinga Web 2 Icinga DB page for the host or service, and the tags for the event.
 // Any event type-specific information (like severity, message, etc.) is added by the specific event builders.
-func (s *Source) buildCommonEvent(host, service string) (*event.Event, error) {
+func (s *Source) buildCommonEvent(rlr *redisLookupResult) (*event.Event, error) {
 	var (
 		eventName string
 		eventUrl  *url.URL
 		eventTags map[string]string
 	)
 
-	if service != "" {
-		eventName = host + "!" + service
+	if rlr.ServiceName != "" {
+		eventName = rlr.HostName + "!" + rlr.ServiceName
 
 		eventUrl = s.notificationsClient.JoinIcingaWeb2Path("/icingadb/service")
-		eventUrl.RawQuery = "name=" + utils.RawUrlEncode(service) + "&host.name=" + utils.RawUrlEncode(host)
+		eventUrl.RawQuery = "name=" + utils.RawUrlEncode(rlr.ServiceName) + "&host.name=" + utils.RawUrlEncode(rlr.HostName)
 
 		eventTags = map[string]string{
-			"host":    host,
-			"service": service,
+			"host":    rlr.HostName,
+			"service": rlr.ServiceName,
 		}
 	} else {
-		eventName = host
+		eventName = rlr.HostName
 
 		eventUrl = s.notificationsClient.JoinIcingaWeb2Path("/icingadb/host")
-		eventUrl.RawQuery = "name=" + utils.RawUrlEncode(host)
+		eventUrl.RawQuery = "name=" + utils.RawUrlEncode(rlr.HostName)
 
 		eventTags = map[string]string{
-			"host": host,
+			"host": rlr.HostName,
 		}
 	}
 
@@ -208,19 +183,19 @@ func (s *Source) buildCommonEvent(host, service string) (*event.Event, error) {
 // The resulted event will have all the necessary information for a state change event, and must
 // not be further modified by the caller.
 func (s *Source) buildStateHistoryEvent(ctx context.Context, h *v1history.StateHistory) (*event.Event, error) {
-	hostName, serviceName, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId, h.EnvironmentId)
+	res, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot fetch host/service information")
+		return nil, err
 	}
 
-	ev, err := s.buildCommonEvent(hostName, serviceName)
+	ev, err := s.buildCommonEvent(res)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostName, serviceName)
+		return nil, errors.Wrapf(err, "cannot build event for %q,%q", res.HostName, res.ServiceName)
 	}
 
 	ev.Type = event.TypeState
 
-	if serviceName != "" {
+	if res.ServiceName != "" {
 		switch h.HardState {
 		case 0:
 			ev.Severity = event.SeverityOK
@@ -256,14 +231,14 @@ func (s *Source) buildStateHistoryEvent(ctx context.Context, h *v1history.StateH
 
 // buildDowntimeHistoryEvent from a downtime history entry.
 func (s *Source) buildDowntimeHistoryEvent(ctx context.Context, h *v1history.DowntimeHistory) (*event.Event, error) {
-	hostName, serviceName, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId, h.EnvironmentId)
+	res, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot fetch host/service information")
+		return nil, err
 	}
 
-	ev, err := s.buildCommonEvent(hostName, serviceName)
+	ev, err := s.buildCommonEvent(res)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostName, serviceName)
+		return nil, errors.Wrapf(err, "cannot build event for %q,%q", res.HostName, res.ServiceName)
 	}
 
 	if h.HasBeenCancelled.Valid && h.HasBeenCancelled.Bool {
@@ -289,14 +264,14 @@ func (s *Source) buildDowntimeHistoryEvent(ctx context.Context, h *v1history.Dow
 
 // buildFlappingHistoryEvent from a flapping history entry.
 func (s *Source) buildFlappingHistoryEvent(ctx context.Context, h *v1history.FlappingHistory) (*event.Event, error) {
-	hostName, serviceName, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId, h.EnvironmentId)
+	res, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot fetch host/service information")
+		return nil, err
 	}
 
-	ev, err := s.buildCommonEvent(hostName, serviceName)
+	ev, err := s.buildCommonEvent(res)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostName, serviceName)
+		return nil, errors.Wrapf(err, "cannot build event for %q,%q", res.HostName, res.ServiceName)
 	}
 
 	if h.PercentStateChangeEnd.Valid {
@@ -320,14 +295,14 @@ func (s *Source) buildFlappingHistoryEvent(ctx context.Context, h *v1history.Fla
 
 // buildAcknowledgementHistoryEvent from an acknowledgment history entry.
 func (s *Source) buildAcknowledgementHistoryEvent(ctx context.Context, h *v1history.AcknowledgementHistory) (*event.Event, error) {
-	hostName, serviceName, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId, h.EnvironmentId)
+	res, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot fetch host/service information")
+		return nil, err
 	}
 
-	ev, err := s.buildCommonEvent(hostName, serviceName)
+	ev, err := s.buildCommonEvent(res)
 	if err != nil {
-		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostName, serviceName)
+		return nil, errors.Wrapf(err, "cannot build event for %q,%q", res.HostName, res.ServiceName)
 	}
 
 	if !h.ClearTime.Time().IsZero() {
