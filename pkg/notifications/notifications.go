@@ -84,25 +84,20 @@ func NewNotificationsSource(
 // query returns at least one line, the rule will match. Rules with an empty ObjectFilterExpr are a special case and
 // will always match.
 //
-// For the queries, the following mapping is performed:
-//   - :host_id <- hostId
-//   - :service_id <- serviceId
-//   - :environment_id <- environmentId
+// The provided entity is passed as param to the queries, thus they are allowed to use all fields of that specific
+// entity. Cross-table column references are not supported unless the provided entity provides the fields in one way
+// or another.
 //
 // This allows a query like the following:
 //
 //	> select * from host where id = :host_id and environment_id = :environment_id and name like 'prefix_%'
-func (s *Source) evaluateRulesForObject(ctx context.Context, hostId, serviceId, environmentId types.Binary) ([]int64, error) {
+//
+// The :host_id and :environment_id parameters will be bound to the entity's ID and EnvironmentId fields, respectively.
+func (s *Source) evaluateRulesForObject(ctx context.Context, entity database.Entity) ([]int64, error) {
 	s.rulesMutex.RLock()
 	defer s.rulesMutex.RUnlock()
 
 	outRuleIds := make([]int64, 0, len(s.rules.Rules))
-
-	namedParams := map[string]any{
-		"host_id":        hostId,
-		"service_id":     serviceId,
-		"environment_id": environmentId,
-	}
 
 	for rule := range s.rules.Iter() {
 		if rule.ObjectFilterExpr == "" {
@@ -110,32 +105,26 @@ func (s *Source) evaluateRulesForObject(ctx context.Context, hostId, serviceId, 
 			continue
 		}
 
-		err := retry.WithBackoff(
-			ctx,
-			func(ctx context.Context) error {
-				// The raw SQL query in the database is URL-encoded (mostly the space character is replaced by %20).
-				// So, we need to unescape it before passing it to the database.
-				query, err := url.QueryUnescape(rule.ObjectFilterExpr)
-				if err != nil {
-					return errors.Wrapf(err, "cannot unescape rule %d object filter expression %q", rule.Id, rule.ObjectFilterExpr)
-				}
-				rows, err := s.db.NamedQueryContext(ctx, s.db.Rebind(query), namedParams)
-				if err != nil {
-					return err
-				}
-				defer func() { _ = rows.Close() }()
+		run := func() error {
+			// The raw SQL query in the database is URL-encoded (mostly the space character is replaced by %20).
+			// So, we need to unescape it before passing it to the database.
+			query, err := url.QueryUnescape(rule.ObjectFilterExpr)
+			if err != nil {
+				return errors.Wrapf(err, "cannot unescape rule %d object filter expression %q", rule.Id, rule.ObjectFilterExpr)
+			}
+			rows, err := s.db.NamedQueryContext(ctx, s.db.Rebind(query), entity)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = rows.Close() }()
 
-				if !rows.Next() {
-					return sql.ErrNoRows
-				}
-				return nil
-			},
-			func(_ error) bool { return false }, // Never retry an error, otherwise we'll block the worker unnecessarily.
-			backoff.DefaultBackoff,
-			s.db.GetDefaultRetrySettings(),
-		)
+			if !rows.Next() {
+				return sql.ErrNoRows
+			}
+			return nil
+		}
 
-		if err == nil {
+		if err := run(); err == nil {
 			outRuleIds = append(outRuleIds, rule.Id)
 		} else if errors.Is(err, sql.ErrNoRows) {
 			continue
@@ -376,12 +365,14 @@ func (s *Source) worker() {
 		case <-s.ctx.Done():
 			return
 
-		case entity := <-s.inputCh:
-			var (
-				ev          *event.Event
-				eventErr    error
-				metaHistory v1history.HistoryTableMeta
-			)
+		case entity, more := <-s.inputCh:
+			if !more { // Should never happen, but just in case.
+				s.logger.Debug("Input channel closed, stopping worker")
+				return
+			}
+
+			var ev *event.Event
+			var eventErr error
 
 			// Keep the type switch in sync with syncPipelines from pkg/icingadb/history/sync.go
 			switch h := entity.(type) {
@@ -395,11 +386,9 @@ func (s *Source) worker() {
 				}
 
 				ev, eventErr = s.buildStateHistoryEvent(s.ctx, h)
-				metaHistory = h.HistoryTableMeta
 
 			case *v1history.DowntimeHistory:
 				ev, eventErr = s.buildDowntimeHistoryEvent(s.ctx, h)
-				metaHistory = h.HistoryTableMeta
 
 			case *v1history.CommentHistory:
 				// Ignore for the moment.
@@ -407,11 +396,9 @@ func (s *Source) worker() {
 
 			case *v1history.FlappingHistory:
 				ev, eventErr = s.buildFlappingHistoryEvent(s.ctx, h)
-				metaHistory = h.HistoryTableMeta
 
 			case *v1history.AcknowledgementHistory:
 				ev, eventErr = s.buildAcknowledgementHistoryEvent(s.ctx, h)
-				metaHistory = h.HistoryTableMeta
 
 			default:
 				s.logger.Error("Cannot process unsupported type",
@@ -439,11 +426,7 @@ func (s *Source) worker() {
 				}),
 			))
 
-			eventRuleIds, err := s.evaluateRulesForObject(
-				s.ctx,
-				metaHistory.HostId,
-				metaHistory.ServiceId,
-				metaHistory.EnvironmentId)
+			eventRuleIds, err := s.evaluateRulesForObject(s.ctx, entity)
 			if err != nil {
 				eventLogger.Errorw("Cannot evaluate rules for event", zap.Error(err))
 				continue
