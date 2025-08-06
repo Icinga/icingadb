@@ -426,13 +426,12 @@ func (s *Source) worker() {
 				}),
 			))
 
+		reevaluateRules:
 			eventRuleIds, err := s.evaluateRulesForObject(s.ctx, entity)
 			if err != nil {
 				eventLogger.Errorw("Cannot evaluate rules for event", zap.Error(err))
 				continue
 			}
-
-			eventLogger = eventLogger.With(zap.Any("rules", eventRuleIds))
 
 			s.rulesMutex.RLock()
 			ruleVersion := s.rules.Version
@@ -444,15 +443,19 @@ func (s *Source) worker() {
 				s.rules = newEventRules
 				s.rulesMutex.Unlock()
 
-				go s.Submit(entity)
+				eventLogger.Debugw("Re-evaluating rules for event after fetching new rules", zap.String("rules_version", s.rules.Version))
 
-				continue
+				// Re-evaluate the just fetched rules for the current event.
+				goto reevaluateRules
 			} else if err != nil {
-				eventLogger.Errorw("Cannot submit event to Icinga Notifications", zap.Error(err))
+				eventLogger.Errorw("Cannot submit event to Icinga Notifications",
+					zap.String("rules_version", s.rules.Version),
+					zap.Any("rules", eventRuleIds),
+					zap.Error(err))
 				continue
 			}
 
-			eventLogger.Info("Submitted event to Icinga Notifications")
+			eventLogger.Debugw("Successfully submitted event to Icinga Notifications", zap.Any("rules", eventRuleIds))
 		}
 	}
 }
