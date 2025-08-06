@@ -147,10 +147,10 @@ redis:
 #   api-base-url: http://localhost:5680
 #
 #   # Source or username to authenticate against the /process-event API.
-#   user: source-2
+#   username: source-2
 #
 #   # Password for the defined user.
-#   password: 1234567812345678
+#   password: insecureinsecure
 #
 #   # URL to the Icinga Web 2 to craft event URLs.
-#   icinga-web2-base-url: http://localhost/icingaweb2
+#   icingaweb2-base-url: http://localhost/icingaweb2
