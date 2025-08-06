@@ -177,6 +177,7 @@ func run() int {
 		notificationsSource := notifications.NewNotificationsSource(
 			ctx,
 			db,
+			rc,
 			logs.GetChildLogger("notifications-source"),
 			cfg)
 		notificationsSourceCallback = notificationsSource.Submit
