@@ -1,115 +1,47 @@
 package notifications
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
+	"net/url"
+	"sync"
+	"time"
+
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/notifications"
+	"github.com/icinga/icinga-go-library/notifications/event"
 	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icinga-go-library/types"
-	"github.com/icinga/icingadb/internal/config"
+	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/pkg/common"
 	v1history "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"io"
-	"net/http"
-	"net/url"
-	"strings"
-	"sync"
-	"time"
 )
-
-// IcingaNotificationsEvent represents an event to be processed by Icinga Notifications.
-//
-// https://github.com/Icinga/icinga-notifications/blob/v0.1.1/internal/event/event.go#L27
-type IcingaNotificationsEvent struct {
-	Name string            `json:"name"`
-	URL  string            `json:"url"`
-	Tags map[string]string `json:"tags"`
-
-	Type     string `json:"type"`
-	Severity string `json:"severity,omitempty"`
-	Username string `json:"username"`
-	Message  string `json:"message"`
-
-	Mute       bool   `json:"mute,omitempty"`
-	MuteReason string `json:"mute_reason,omitempty"`
-}
-
-// MarshalLogObject implements the zapcore.ObjectMarshaler interface.
-func (event IcingaNotificationsEvent) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
-	encoder.AddString("name", event.Name)
-	encoder.AddString("type", event.Type)
-	return nil
-}
-
-// List of IcingaNotificationsEvent.Type defined by Icinga Notifications.
-//
-// https://github.com/Icinga/icinga-notifications/blob/v0.1.1/internal/event/event.go#L49-L62
-const (
-	TypeAcknowledgementCleared = "acknowledgement-cleared"
-	TypeAcknowledgementSet     = "acknowledgement-set"
-	TypeCustom                 = "custom"
-	TypeDowntimeEnd            = "downtime-end"
-	TypeDowntimeRemoved        = "downtime-removed"
-	TypeDowntimeStart          = "downtime-start"
-	TypeFlappingEnd            = "flapping-end"
-	TypeFlappingStart          = "flapping-start"
-	TypeIncidentAge            = "incident-age"
-	TypeMute                   = "mute"
-	TypeState                  = "state"
-	TypeUnmute                 = "unmute"
-)
-
-// Severities inspired by Icinga Notifications.
-//
-// https://github.com/Icinga/icinga-notifications/blob/v0.1.1/internal/event/severity.go#L9
-const (
-	SeverityOK      = "ok"
-	SeverityDebug   = "debug"
-	SeverityInfo    = "info"
-	SeverityNotice  = "notice"
-	SeverityWarning = "warning"
-	SeverityErr     = "err"
-	SeverityCrit    = "crit"
-	SeverityAlert   = "alert"
-	SeverityEmerg   = "emerg"
-)
-
-// RuleResp describes a rule response object from Icinga Notifications /event-rules API.
-type RuleResp struct {
-	Id               int64
-	Name             string
-	ObjectFilterExpr string
-}
 
 // Source is an Icinga Notifications compatible source implementation to push events to Icinga Notifications.
 //
 // A new Source should be created by the NewNotificationsSource function. New history entries can be submitted by
-// calling the Source.Submit method.
+// calling the Source.Submit method. The Source will then process the history entries in a background worker goroutine.
 type Source struct {
-	config.NotificationsConfig
+	notifications.Config
 
 	inputCh chan database.Entity // inputCh is a buffered channel used to submit history entries to the worker.
 	db      *database.DB
 	logger  *logging.Logger
 
-	rules       map[int64]RuleResp
-	ruleVersion string
-	rulesMutex  sync.RWMutex
+	rules      *notifications.SourceRulesInfo // rules holds the latest rules fetched from Icinga Notifications.
+	rulesMutex sync.RWMutex                   // rulesMutex protects access to the rules field.
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
-}
 
-// ErrRulesOutdated implies that the rule version between Icinga DB and Icinga Notifications mismatches.
-var ErrRulesOutdated = fmt.Errorf("rule version is outdated")
+	notificationsClient *notifications.Client // The Icinga Notifications client used to interact with the API.
+}
 
 // NewNotificationsSource creates a new Source connected to an existing database and logger.
 //
@@ -118,70 +50,32 @@ func NewNotificationsSource(
 	ctx context.Context,
 	db *database.DB,
 	logger *logging.Logger,
-	cfg config.NotificationsConfig,
+	cfg notifications.Config,
 ) *Source {
 	ctx, ctxCancel := context.WithCancel(ctx)
 
 	source := &Source{
-		NotificationsConfig: cfg,
+		Config: cfg,
 
 		inputCh: make(chan database.Entity, 1<<10), // chosen by fair dice roll
 		db:      db,
 		logger:  logger,
 
+		rules: &notifications.SourceRulesInfo{Version: notifications.EmptyRulesVersion},
+
 		ctx:       ctx,
 		ctxCancel: ctxCancel,
 	}
+
+	client, err := notifications.NewClient(source.Config, "Icinga DB")
+	if err != nil {
+		logger.Fatalw("Cannot create Icinga Notifications client", zap.Error(err))
+	}
+	source.notificationsClient = client
+
 	go source.worker()
 
 	return source
-}
-
-// fetchRules from Icinga Notifications /event-rules API endpoint and store both the new rules and the latest rule
-// version in the Source struct.
-func (s *Source) fetchRules(ctx context.Context, client *http.Client) error {
-	apiUrl, err := url.JoinPath(s.ApiBaseUrl, "/event-rules")
-	if err != nil {
-		return errors.Wrap(err, "cannot join API URL")
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiUrl, nil)
-	if err != nil {
-		return errors.Wrap(err, "cannot create HTTP request")
-	}
-	req.SetBasicAuth(s.User, s.Password)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "cannot GET rules from Icinga Notifications")
-	}
-
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code %q (%d) for rules", resp.Status, resp.StatusCode)
-	}
-
-	type Response struct {
-		Version string
-		Rules   map[int64]RuleResp
-	}
-	var r Response
-
-	dec := json.NewDecoder(resp.Body)
-	if err := dec.Decode(&r); err != nil {
-		return errors.Wrap(err, "cannot decode rules from Icinga Notifications")
-	}
-
-	s.rulesMutex.Lock()
-	s.rules = r.Rules
-	s.ruleVersion = r.Version
-	s.rulesMutex.Unlock()
-
-	return nil
 }
 
 // evaluateRulesForObject returns the rule IDs for each matching query.
@@ -202,7 +96,7 @@ func (s *Source) evaluateRulesForObject(ctx context.Context, hostId, serviceId, 
 	s.rulesMutex.RLock()
 	defer s.rulesMutex.RUnlock()
 
-	outRuleIds := make([]int64, 0, len(s.rules))
+	outRuleIds := make([]int64, 0, len(s.rules.Rules))
 
 	namedParams := map[string]any{
 		"host_id":        hostId,
@@ -210,7 +104,7 @@ func (s *Source) evaluateRulesForObject(ctx context.Context, hostId, serviceId, 
 		"environment_id": environmentId,
 	}
 
-	for _, rule := range s.rules {
+	for rule := range s.rules.Iter() {
 		if rule.ObjectFilterExpr == "" {
 			outRuleIds = append(outRuleIds, rule.Id)
 			continue
@@ -219,8 +113,13 @@ func (s *Source) evaluateRulesForObject(ctx context.Context, hostId, serviceId, 
 		err := retry.WithBackoff(
 			ctx,
 			func(ctx context.Context) error {
-				query := s.db.Rebind(rule.ObjectFilterExpr)
-				rows, err := s.db.NamedQueryContext(ctx, query, namedParams)
+				// The raw SQL query in the database is URL-encoded (mostly the space character is replaced by %20).
+				// So, we need to unescape it before passing it to the database.
+				query, err := url.QueryUnescape(rule.ObjectFilterExpr)
+				if err != nil {
+					return errors.Wrapf(err, "cannot unescape rule %d object filter expression %q", rule.Id, rule.ObjectFilterExpr)
+				}
+				rows, err := s.db.NamedQueryContext(ctx, s.db.Rebind(query), namedParams)
 				if err != nil {
 					return err
 				}
@@ -231,9 +130,10 @@ func (s *Source) evaluateRulesForObject(ctx context.Context, hostId, serviceId, 
 				}
 				return nil
 			},
-			retry.Retryable,
+			func(_ error) bool { return false }, // Never retry an error, otherwise we'll block the worker unnecessarily.
 			backoff.DefaultBackoff,
-			retry.Settings{Timeout: retry.DefaultTimeout})
+			s.db.GetDefaultRetrySettings(),
+		)
 
 		if err == nil {
 			outRuleIds = append(outRuleIds, rule.Id)
@@ -274,45 +174,23 @@ func (s *Source) fetchHostServiceName(ctx context.Context, hostId, serviceId, en
 	return
 }
 
-// rawurlencode mimics PHP's rawurlencode to be used for parameter encoding.
+// buildCommonEvent creates an event.Event based on Host and (optional) Service names.
 //
-// Icinga Web uses rawurldecode instead of urldecode, which, as its main difference, does not honor the plus char ('+')
-// as a valid substitution for space (' '). Unfortunately, Go's url.QueryEscape does this very substitution and
-// url.PathEscape does a bit too less and has a misleading name on top.
-//
-//   - https://www.php.net/manual/en/function.rawurlencode.php
-//   - https://github.com/php/php-src/blob/php-8.2.12/ext/standard/url.c#L538
-func rawurlencode(s string) string {
-	return strings.ReplaceAll(url.QueryEscape(s), "+", "%20")
-}
-
-// buildCommonEvent creates an event.Event based on Host and (optional) Service attributes to be specified later.
-//
-// The new Event's Time will be the current timestamp.
-//
-// The following fields will NOT be populated and might be altered later:
-//   - Type
-//   - Severity
-//   - Username
-//   - Message
-//   - ID
-func (s *Source) buildCommonEvent(host, service string) (*IcingaNotificationsEvent, error) {
+// This function is used by all event builders to create a common event structure that includes the host and service
+// names, the absolute URL to the Icinga Web 2 Icinga DB page for the host or service, and the tags for the event.
+// Any event type-specific information (like severity, message, etc.) is added by the specific event builders.
+func (s *Source) buildCommonEvent(host, service string) (*event.Event, error) {
 	var (
 		eventName string
 		eventUrl  *url.URL
 		eventTags map[string]string
 	)
 
-	eventUrl, err := url.Parse(s.IcingaWeb2BaseUrl)
-	if err != nil {
-		return nil, err
-	}
-
 	if service != "" {
 		eventName = host + "!" + service
 
-		eventUrl = eventUrl.JoinPath("/icingadb/service")
-		eventUrl.RawQuery = "name=" + rawurlencode(service) + "&host.name=" + rawurlencode(host)
+		eventUrl = s.notificationsClient.JoinIcingaWeb2Path("/icingadb/service")
+		eventUrl.RawQuery = "name=" + utils.RawUrlEncode(service) + "&host.name=" + utils.RawUrlEncode(host)
 
 		eventTags = map[string]string{
 			"host":    host,
@@ -321,268 +199,177 @@ func (s *Source) buildCommonEvent(host, service string) (*IcingaNotificationsEve
 	} else {
 		eventName = host
 
-		eventUrl = eventUrl.JoinPath("/icingadb/host")
-		eventUrl.RawQuery = "name=" + rawurlencode(host)
+		eventUrl = s.notificationsClient.JoinIcingaWeb2Path("/icingadb/host")
+		eventUrl.RawQuery = "name=" + utils.RawUrlEncode(host)
 
 		eventTags = map[string]string{
 			"host": host,
 		}
 	}
 
-	return &IcingaNotificationsEvent{
+	return &event.Event{
 		Name: eventName,
 		URL:  eventUrl.String(),
 		Tags: eventTags,
 	}, nil
 }
 
-// buildStateHistoryEvent from a state history entry.
-func (s *Source) buildStateHistoryEvent(ctx context.Context, h *v1history.StateHistory) (*IcingaNotificationsEvent, error) {
+// buildStateHistoryEvent builds a fully initialized event.Event from a state history entry.
+//
+// The resulted event will have all the necessary information for a state change event, and must
+// not be further modified by the caller.
+func (s *Source) buildStateHistoryEvent(ctx context.Context, h *v1history.StateHistory) (*event.Event, error) {
 	hostName, serviceName, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId, h.EnvironmentId)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot fetch host/service information")
 	}
 
-	event, err := s.buildCommonEvent(hostName, serviceName)
+	ev, err := s.buildCommonEvent(hostName, serviceName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostName, serviceName)
 	}
 
-	event.Type = TypeState
+	ev.Type = event.TypeState
 
 	if serviceName != "" {
 		switch h.HardState {
 		case 0:
-			event.Severity = SeverityOK
+			ev.Severity = event.SeverityOK
 		case 1:
-			event.Severity = SeverityWarning
+			ev.Severity = event.SeverityWarning
 		case 2:
-			event.Severity = SeverityCrit
+			ev.Severity = event.SeverityCrit
 		case 3:
-			event.Severity = SeverityErr
+			ev.Severity = event.SeverityErr
 		default:
 			return nil, fmt.Errorf("unexpected service state %d", h.HardState)
 		}
 	} else {
 		switch h.HardState {
 		case 0:
-			event.Severity = SeverityOK
+			ev.Severity = event.SeverityOK
 		case 1:
-			event.Severity = SeverityCrit
+			ev.Severity = event.SeverityCrit
 		default:
 			return nil, fmt.Errorf("unexpected host state %d", h.HardState)
 		}
 	}
 
 	if h.Output.Valid {
-		event.Message = h.Output.String
+		ev.Message = h.Output.String
 	}
 	if h.LongOutput.Valid {
-		event.Message += "\n" + h.LongOutput.String
+		ev.Message += "\n" + h.LongOutput.String
 	}
 
-	return event, nil
+	return ev, nil
 }
 
 // buildDowntimeHistoryEvent from a downtime history entry.
-func (s *Source) buildDowntimeHistoryEvent(ctx context.Context, h *v1history.DowntimeHistory) (*IcingaNotificationsEvent, error) {
+func (s *Source) buildDowntimeHistoryEvent(ctx context.Context, h *v1history.DowntimeHistory) (*event.Event, error) {
 	hostName, serviceName, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId, h.EnvironmentId)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot fetch host/service information")
 	}
 
-	event, err := s.buildCommonEvent(hostName, serviceName)
+	ev, err := s.buildCommonEvent(hostName, serviceName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostName, serviceName)
 	}
 
 	if h.HasBeenCancelled.Valid && h.HasBeenCancelled.Bool {
-		event.Type = TypeDowntimeRemoved
-		event.Message = "Downtime was cancelled"
+		ev.Type = event.TypeDowntimeRemoved
+		ev.Message = "Downtime was cancelled"
 
 		if h.CancelledBy.Valid {
-			event.Username = h.CancelledBy.String
+			ev.Username = h.CancelledBy.String
 		}
 	} else if h.EndTime.Time().Compare(time.Now()) <= 0 {
-		event.Type = TypeDowntimeEnd
-		event.Message = "Downtime expired"
+		ev.Type = event.TypeDowntimeEnd
+		ev.Message = "Downtime expired"
 	} else {
-		event.Type = TypeDowntimeStart
-		event.Username = h.Author
-		event.Message = h.Comment
-		event.Mute = true
-		event.MuteReason = "Checkable is in downtime"
+		ev.Type = event.TypeDowntimeStart
+		ev.Username = h.Author
+		ev.Message = h.Comment
+		ev.Mute = types.MakeBool(true)
+		ev.MuteReason = "Checkable is in downtime"
 	}
 
-	return event, nil
+	return ev, nil
 }
 
 // buildFlappingHistoryEvent from a flapping history entry.
-func (s *Source) buildFlappingHistoryEvent(ctx context.Context, h *v1history.FlappingHistory) (*IcingaNotificationsEvent, error) {
+func (s *Source) buildFlappingHistoryEvent(ctx context.Context, h *v1history.FlappingHistory) (*event.Event, error) {
 	hostName, serviceName, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId, h.EnvironmentId)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot fetch host/service information")
 	}
 
-	event, err := s.buildCommonEvent(hostName, serviceName)
+	ev, err := s.buildCommonEvent(hostName, serviceName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostName, serviceName)
 	}
 
 	if h.PercentStateChangeEnd.Valid {
-		event.Type = TypeFlappingEnd
-		event.Message = fmt.Sprintf(
+		ev.Type = event.TypeFlappingEnd
+		ev.Message = fmt.Sprintf(
 			"Checkable stopped flapping (Current flapping value %.2f%% < low threshold %.2f%%)",
 			h.PercentStateChangeEnd.Float64, h.FlappingThresholdLow)
 	} else if h.PercentStateChangeStart.Valid {
-		event.Type = TypeFlappingStart
-		event.Message = fmt.Sprintf(
+		ev.Type = event.TypeFlappingStart
+		ev.Message = fmt.Sprintf(
 			"Checkable started flapping (Current flapping value %.2f%% > high threshold %.2f%%)",
 			h.PercentStateChangeStart.Float64, h.FlappingThresholdHigh)
-		event.Mute = true
-		event.MuteReason = "Checkable is flapping"
+		ev.Mute = types.MakeBool(true)
+		ev.MuteReason = "Checkable is flapping"
 	} else {
 		return nil, errors.New("flapping history entry has neither percent_state_change_start nor percent_state_change_end")
 	}
 
-	return event, nil
+	return ev, nil
 }
 
-// buildAcknowledgementHistoryEvent from an acknowledgement history entry.
-func (s *Source) buildAcknowledgementHistoryEvent(ctx context.Context, h *v1history.AcknowledgementHistory) (*IcingaNotificationsEvent, error) {
+// buildAcknowledgementHistoryEvent from an acknowledgment history entry.
+func (s *Source) buildAcknowledgementHistoryEvent(ctx context.Context, h *v1history.AcknowledgementHistory) (*event.Event, error) {
 	hostName, serviceName, err := s.fetchHostServiceName(ctx, h.HostId, h.ServiceId, h.EnvironmentId)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot fetch host/service information")
 	}
 
-	event, err := s.buildCommonEvent(hostName, serviceName)
+	ev, err := s.buildCommonEvent(hostName, serviceName)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostName, serviceName)
 	}
 
 	if !h.ClearTime.Time().IsZero() {
-		event.Type = TypeAcknowledgementCleared
-		event.Message = "Checkable was cleared"
+		ev.Type = event.TypeAcknowledgementCleared
+		ev.Message = "Checkable was cleared"
 
 		if h.ClearedBy.Valid {
-			event.Username = h.ClearedBy.String
+			ev.Username = h.ClearedBy.String
 		}
 	} else if !h.SetTime.Time().IsZero() {
-		event.Type = TypeAcknowledgementSet
+		ev.Type = event.TypeAcknowledgementSet
 
 		if h.Comment.Valid {
-			event.Message = h.Comment.String
+			ev.Message = h.Comment.String
 		} else {
-			event.Message = "Checkable was acknowledged"
+			ev.Message = "Checkable was acknowledged"
 		}
 
 		if h.Author.Valid {
-			event.Username = h.Author.String
+			ev.Username = h.Author.String
 		}
 	} else {
 		return nil, errors.New("acknowledgment history entry has neither a set_time nor a clear_time")
 	}
 
-	return event, nil
-}
-
-// submitEvent to the Icinga Notifications /process-event API endpoint.
-//
-// The event will be passed together with the Source.ruleVersion and all evaluated ruleIds to the endpoint. Even if no
-// rules were evaluated, this method should be called. Thus, Icinga Notifications can dismiss the event, but Icinga DB
-// would still be informed in case of a rule change. Otherwise, events might be dropped here which are now required.
-//
-// This method may return an ErrRulesOutdated error, implying that the Source.ruleVersion mismatches the version stored
-// at Icinga Notifications. In this case, the rules must be refetched and the event requires another evaluation.
-func (s *Source) submitEvent(ctx context.Context, client *http.Client, event *IcingaNotificationsEvent, ruleIds []int64) error {
-	jsonBody, err := json.Marshal(event)
-	if err != nil {
-		return errors.Wrap(err, "cannot encode event to JSON")
-	}
-
-	apiUrl, err := url.JoinPath(s.ApiBaseUrl, "/process-event")
-	if err != nil {
-		return errors.Wrap(err, "cannot join API URL")
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiUrl, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return errors.Wrap(err, "cannot create HTTP request")
-	}
-	req.SetBasicAuth(s.User, s.Password)
-
-	s.rulesMutex.RLock()
-	ruleVersion := s.ruleVersion
-	s.rulesMutex.RUnlock()
-
-	ruleIdsStrArr := make([]string, 0, len(ruleIds))
-	for _, idInt := range ruleIds {
-		ruleIdsStrArr = append(ruleIdsStrArr, fmt.Sprintf("%d", idInt))
-	}
-	ruleIdsStr := strings.Join(ruleIdsStrArr, ",")
-
-	req.Header.Set("X-Rule-Ids", ruleIdsStr)
-	req.Header.Set("X-Rule-Version", ruleVersion)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return errors.Wrap(err, "cannot POST HTTP request to Icinga Notifications")
-	}
-
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	// Refetching rules required.
-	if resp.StatusCode == http.StatusFailedDependency {
-		return ErrRulesOutdated
-	}
-
-	// 200s are acceptable.
-	if 200 <= resp.StatusCode && resp.StatusCode <= 299 {
-		return nil
-	}
-
-	// Ignoring superfluous state change.
-	if resp.StatusCode == http.StatusNotAcceptable {
-		return nil
-	}
-
-	var buff bytes.Buffer
-	_, _ = io.Copy(&buff, &io.LimitedReader{
-		R: resp.Body,
-		N: 1 << 20, // Limit the error message's length against memory exhaustion
-	})
-	return fmt.Errorf("unexpected response from Icinga Notificatios, status %q (%d): %q",
-		resp.Status, resp.StatusCode, strings.TrimSpace(buff.String()))
+	return ev, nil
 }
 
 // worker is the background worker launched by NewNotificationsSource.
 func (s *Source) worker() {
 	defer s.ctxCancel()
-
-	client := &http.Client{}
-
-	if err := retry.WithBackoff(
-		s.ctx,
-		func(ctx context.Context) error { return s.fetchRules(s.ctx, client) },
-		func(_ error) bool { return true }, // For the moment, retry every potential error.
-		backoff.DefaultBackoff,
-		retry.Settings{
-			Timeout: retry.DefaultTimeout,
-			OnRetryableError: func(elapsed time.Duration, attempt uint64, err, lastErr error) {
-				s.logger.Errorw("Cannot fetch rules from Icinga Notifications",
-					zap.Duration("elapsed", elapsed),
-					zap.Uint64("attempt", attempt),
-					zap.Error(err))
-			},
-			OnSuccess: func(_ time.Duration, attempt uint64, _ error) {
-				s.logger.Infow("Fetched rules from Icinga Notifications", zap.Uint64("attempt", attempt))
-			},
-		},
-	); err != nil {
-		s.logger.Fatalw("Cannot fetch rules from Icinga Notifications", zap.Error(err))
-	}
 
 	for {
 		select {
@@ -591,7 +378,7 @@ func (s *Source) worker() {
 
 		case entity := <-s.inputCh:
 			var (
-				event       *IcingaNotificationsEvent
+				ev          *event.Event
 				eventErr    error
 				metaHistory v1history.HistoryTableMeta
 			)
@@ -607,11 +394,11 @@ func (s *Source) worker() {
 					continue
 				}
 
-				event, eventErr = s.buildStateHistoryEvent(s.ctx, h)
+				ev, eventErr = s.buildStateHistoryEvent(s.ctx, h)
 				metaHistory = h.HistoryTableMeta
 
 			case *v1history.DowntimeHistory:
-				event, eventErr = s.buildDowntimeHistoryEvent(s.ctx, h)
+				ev, eventErr = s.buildDowntimeHistoryEvent(s.ctx, h)
 				metaHistory = h.HistoryTableMeta
 
 			case *v1history.CommentHistory:
@@ -619,11 +406,11 @@ func (s *Source) worker() {
 				continue
 
 			case *v1history.FlappingHistory:
-				event, eventErr = s.buildFlappingHistoryEvent(s.ctx, h)
+				ev, eventErr = s.buildFlappingHistoryEvent(s.ctx, h)
 				metaHistory = h.HistoryTableMeta
 
 			case *v1history.AcknowledgementHistory:
-				event, eventErr = s.buildAcknowledgementHistoryEvent(s.ctx, h)
+				ev, eventErr = s.buildAcknowledgementHistoryEvent(s.ctx, h)
 				metaHistory = h.HistoryTableMeta
 
 			default:
@@ -638,12 +425,19 @@ func (s *Source) worker() {
 					zap.Error(eventErr))
 				continue
 			}
-			if event == nil {
+			if ev == nil {
 				s.logger.Error("No event was fetched, but no error was reported. This REALLY SHOULD NOT happen.")
 				continue
 			}
 
-			eventLogger := s.logger.With(zap.Object("event", event))
+			eventLogger := s.logger.With(zap.Object(
+				"event",
+				zapcore.ObjectMarshalerFunc(func(encoder zapcore.ObjectEncoder) error {
+					encoder.AddString("name", ev.Name)
+					encoder.AddString("type", ev.Type.String())
+					return nil
+				}),
+			))
 
 			eventRuleIds, err := s.evaluateRulesForObject(
 				s.ctx,
@@ -657,13 +451,16 @@ func (s *Source) worker() {
 
 			eventLogger = eventLogger.With(zap.Any("rules", eventRuleIds))
 
-			err = s.submitEvent(s.ctx, client, event, eventRuleIds)
-			if errors.Is(err, ErrRulesOutdated) {
-				s.logger.Info("Icinga Notification rules were updated, triggering resync")
+			s.rulesMutex.RLock()
+			ruleVersion := s.rules.Version
+			s.rulesMutex.RUnlock()
 
-				if err := s.fetchRules(s.ctx, client); err != nil {
-					s.logger.Errorw("Cannot fetch rules from Icinga Notifications", zap.Error(err))
-				}
+			newEventRules, err := s.notificationsClient.ProcessEvent(s.ctx, ev, ruleVersion, eventRuleIds...)
+			if errors.Is(err, notifications.ErrRulesOutdated) {
+				s.rulesMutex.Lock()
+				s.rules = newEventRules
+				s.rulesMutex.Unlock()
+
 				go s.Submit(entity)
 
 				continue

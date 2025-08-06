@@ -4,6 +4,7 @@ import (
 	"github.com/creasty/defaults"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/notifications"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/pkg/errors"
@@ -15,11 +16,11 @@ const DefaultConfigPath = "/etc/icingadb/config.yml"
 
 // Config defines Icinga DB config.
 type Config struct {
-	Database            database.Config     `yaml:"database" envPrefix:"DATABASE_"`
-	Redis               redis.Config        `yaml:"redis" envPrefix:"REDIS_"`
-	Logging             logging.Config      `yaml:"logging" envPrefix:"LOGGING_"`
-	Retention           RetentionConfig     `yaml:"retention" envPrefix:"RETENTION_"`
-	NotificationsSource NotificationsConfig `yaml:"notifications-source" envPrefix:"NOTIFICATIONS_SOURCE_"`
+	Database            database.Config      `yaml:"database" envPrefix:"DATABASE_"`
+	Redis               redis.Config         `yaml:"redis" envPrefix:"REDIS_"`
+	Logging             logging.Config       `yaml:"logging" envPrefix:"LOGGING_"`
+	Retention           RetentionConfig      `yaml:"retention" envPrefix:"RETENTION_"`
+	NotificationsSource notifications.Config `yaml:"notifications-source" envPrefix:"NOTIFICATIONS_SOURCE_"`
 }
 
 func (c *Config) SetDefaults() {
@@ -109,12 +110,4 @@ func (r *RetentionConfig) Validate() error {
 	}
 
 	return r.Options.Validate()
-}
-
-// NotificationsConfig defines Icinga DB as an Icinga Notifications source.
-type NotificationsConfig struct {
-	ApiBaseUrl        string `yaml:"api-base-url" env:"API_BASE_URL"`
-	User              string `yaml:"user" env:"USER"`
-	Password          string `yaml:"password" env:"PASSWORD,unset"`
-	IcingaWeb2BaseUrl string `yaml:"icinga-web2-base-url" env:"ICINGA_WEB2_BASE_URL"`
 }
