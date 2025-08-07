@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	"net/url"
-	"sync"
 	"time"
 
 	"github.com/icinga/icinga-go-library/database"
@@ -33,8 +32,7 @@ type Source struct {
 	db      *database.DB
 	logger  *logging.Logger
 
-	rules      *notifications.SourceRulesInfo // rules holds the latest rules fetched from Icinga Notifications.
-	rulesMutex sync.RWMutex                   // rulesMutex protects access to the rules field.
+	rules *notifications.SourceRulesInfo // rules holds the latest rules fetched from Icinga Notifications.
 
 	ctx       context.Context
 	ctxCancel context.CancelFunc
@@ -96,9 +94,6 @@ func NewNotificationsSource(
 //
 // The :host_id and :environment_id parameters will be bound to the entity's ID and EnvironmentId fields, respectively.
 func (s *Source) evaluateRulesForObject(ctx context.Context, entity database.Entity) ([]int64, error) {
-	s.rulesMutex.RLock()
-	defer s.rulesMutex.RUnlock()
-
 	outRuleIds := make([]int64, 0, len(s.rules.Rules))
 
 	for rule := range s.rules.Iter() {
@@ -408,15 +403,9 @@ func (s *Source) worker() {
 				continue
 			}
 
-			s.rulesMutex.RLock()
-			ruleVersion := s.rules.Version
-			s.rulesMutex.RUnlock()
-
-			newEventRules, err := s.notificationsClient.ProcessEvent(s.ctx, ev, ruleVersion, eventRuleIds...)
+			newEventRules, err := s.notificationsClient.ProcessEvent(s.ctx, ev, s.rules.Version, eventRuleIds...)
 			if errors.Is(err, notifications.ErrRulesOutdated) {
-				s.rulesMutex.Lock()
 				s.rules = newEventRules
-				s.rulesMutex.Unlock()
 
 				eventLogger.Debugw("Re-evaluating rules for event after fetching new rules", zap.String("rules_version", s.rules.Version))
 
