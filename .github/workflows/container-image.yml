@@ -49,7 +49,7 @@ jobs:
       # Explicitly using the checkout action (instead of relying on docker/build-push-action to do it implicitly)
       # because we need to fetch all tags.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           # Switch to fetch-tags: true once https://github.com/actions/checkout/issues/1467 is fixed.
           fetch-depth: 0
