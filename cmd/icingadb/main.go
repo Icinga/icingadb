@@ -74,9 +74,19 @@ func run() int {
 		}
 
 		logger.Info("Starting database schema auto import")
+
+		db, err := cmd.Database(logs.GetChildLogger("database"))
+		if err != nil {
+			logger.Fatalw("Can't create database connection pool from config", zap.Error(err))
+		}
+		db.SetMaxOpenConns(1)
+
 		if err := icingadb.ImportSchema(context.Background(), db, cmd.Flags.DatabaseSchemaDir); err != nil {
 			logger.Fatalw("Can't import database schema", zap.Error(err))
 		}
+
+		_ = db.Close()
+
 		logger.Info("The database schema was successfully imported")
 	case err != nil:
 		logger.Fatalf("%+v", err)
