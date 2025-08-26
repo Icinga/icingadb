@@ -177,7 +177,7 @@ type stageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMe
 // writeOneEntityStage creates a stageFunc from a pointer to a struct implementing the v1.UpserterEntity interface.
 // For each history event it receives, it parses that event into a new instance of that entity type and writes it to
 // the database. It writes exactly one entity to the database for each history event.
-func writeOneEntityStage(structPtr interface{}) stageFunc {
+func writeOneEntityStage(structPtr any) stageFunc {
 	structifier := structify.MakeMapStructifier(
 		reflect.TypeOf(structPtr).Elem(),
 		"json",

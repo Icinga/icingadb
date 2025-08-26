@@ -19,7 +19,7 @@ type HistoryTableEntity struct {
 
 // Upsert implements the contracts.Upserter interface.
 // Update only the Id (effectively nothing).
-func (hte HistoryTableEntity) Upsert() interface{} {
+func (hte HistoryTableEntity) Upsert() any {
 	return hte
 }
 
@@ -45,7 +45,7 @@ func (he *HistoryEntity) SetID(id database.ID) {
 
 // Upsert implements the contracts.Upserter interface.
 // Update only the Id (effectively nothing).
-func (he HistoryEntity) Upsert() interface{} {
+func (he HistoryEntity) Upsert() any {
 	return he
 }
 

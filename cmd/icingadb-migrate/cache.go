@@ -52,7 +52,7 @@ func buildEventTimeCache(ht *historyType, idoColumns []string) {
 				ht.idoIdColumn+" <= :toid AND xh."+
 				ht.idoIdColumn+" > :checkpoint ORDER BY xh."+ht.idoIdColumn+" LIMIT :bulk",
 			nil, checkpoint.MaxId.Int64, // ... since we were interrupted:
-			func(idoRows []row) (checkpoint interface{}) {
+			func(idoRows []row) (checkpoint any) {
 				for _, idoRow := range idoRows {
 					if idoRow.EventIsStart == 0 {
 						// Ack/flapping end event. Get the start event time:
@@ -163,7 +163,7 @@ func buildPreviousHardStateCache(ht *historyType, idoColumns []string) {
 				ht.idoIdColumn+" <= :toid AND xh."+
 				ht.idoIdColumn+" < :checkpoint ORDER BY xh."+ht.idoIdColumn+" DESC LIMIT :bulk",
 			nil, checkpoint, // ... since we were interrupted:
-			func(idoRows []row) (checkpoint interface{}) {
+			func(idoRows []row) (checkpoint any) {
 				for _, idoRow := range idoRows {
 					var nhs []struct{ NextHardState uint8 }
 					cacheSelect(*tx, &nhs, "SELECT next_hard_state FROM next_hard_state WHERE object_id=?", idoRow.ObjectId)
@@ -274,8 +274,8 @@ func chunkCacheTx(cache *sqlx.DB, do func(tx **sqlx.Tx, commitPeriodically func(
 
 // cacheGet does cache.Get(dest, query, args...). (On non-recoverable errors the whole program exits.)
 func cacheGet(cache interface {
-	Get(dest interface{}, query string, args ...interface{}) error
-}, dest interface{}, query string, args ...interface{}) {
+	Get(dest any, query string, args ...any) error
+}, dest any, query string, args ...any) {
 	if err := cache.Get(dest, query, args...); err != nil {
 		log.With("backend", "cache", "query", query, "args", args).
 			Fatalf("%+v", errors.Wrap(err, "can't perform query"))
@@ -283,7 +283,7 @@ func cacheGet(cache interface {
 }
 
 // cacheSelect does cacheTx.Select(dest, query, args...). (On non-recoverable errors the whole program exits.)
-func cacheSelect(cacheTx *sqlx.Tx, dest interface{}, query string, args ...interface{}) {
+func cacheSelect(cacheTx *sqlx.Tx, dest any, query string, args ...any) {
 	if err := cacheTx.Select(dest, query, args...); err != nil {
 		log.With("backend", "cache", "query", query, "args", args).
 			Fatalf("%+v", errors.Wrap(err, "can't perform query"))
@@ -291,7 +291,7 @@ func cacheSelect(cacheTx *sqlx.Tx, dest interface{}, query string, args ...inter
 }
 
 // cacheExec does cacheTx.Exec(dml, args...). On non-recoverable errors the whole program exits.
-func cacheExec(cacheTx *sqlx.Tx, dml string, args ...interface{}) {
+func cacheExec(cacheTx *sqlx.Tx, dml string, args ...any) {
 	if _, err := cacheTx.Exec(dml, args...); err != nil {
 		log.With("backend", "cache", "dml", dml, "args", args).Fatalf("%+v", errors.Wrap(err, "can't perform DML"))
 	}

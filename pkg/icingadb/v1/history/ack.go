@@ -14,7 +14,7 @@ type AckHistoryUpserter struct {
 }
 
 // Upsert implements the contracts.Upserter interface.
-func (ahu *AckHistoryUpserter) Upsert() interface{} {
+func (ahu *AckHistoryUpserter) Upsert() any {
 	return ahu
 }
 

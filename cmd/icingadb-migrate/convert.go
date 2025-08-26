@@ -52,7 +52,7 @@ type commentRow = struct {
 
 func convertCommentRows(
 	env string, envId types.Binary,
-	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []commentRow,
+	_ func(any, string, ...any), _ *sqlx.Tx, idoRows []commentRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
 	var commentHistory, acknowledgementHistory, allHistoryComment, allHistoryAck []database.Entity
 
@@ -238,7 +238,7 @@ type downtimeRow = struct {
 
 func convertDowntimeRows(
 	env string, envId types.Binary,
-	_ func(interface{}, string, ...interface{}), _ *sqlx.Tx, idoRows []downtimeRow,
+	_ func(any, string, ...any), _ *sqlx.Tx, idoRows []downtimeRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
 	var downtimeHistory, allHistory, sla []database.Entity
 
@@ -395,7 +395,7 @@ type flappingRow = struct {
 
 func convertFlappingRows(
 	env string, envId types.Binary,
-	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []flappingRow,
+	selectCache func(dest any, query string, args ...any), _ *sqlx.Tx, idoRows []flappingRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
@@ -449,7 +449,7 @@ func convertFlappingRows(
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
 		startTime := float64(start.Time().UnixMilli())
-		flappingHistoryId := hashAny([]interface{}{env, name, startTime})
+		flappingHistoryId := hashAny([]any{env, name, startTime})
 
 		if row.EventType == 1001 { // end
 			// The start counterpart should already have been inserted.
@@ -475,7 +475,7 @@ func convertFlappingRows(
 			h := &history.HistoryFlapping{
 				HistoryMeta: history.HistoryMeta{
 					HistoryEntity: history.HistoryEntity{
-						Id: hashAny([]interface{}{env, "flapping_end", name, startTime}),
+						Id: hashAny([]any{env, "flapping_end", name, startTime}),
 					},
 					EnvironmentId: envId,
 					ObjectType:    typ,
@@ -512,7 +512,7 @@ func convertFlappingRows(
 			h := &history.HistoryFlapping{
 				HistoryMeta: history.HistoryMeta{
 					HistoryEntity: history.HistoryEntity{
-						Id: hashAny([]interface{}{env, "flapping_start", name, startTime}),
+						Id: hashAny([]any{env, "flapping_start", name, startTime}),
 					},
 					EnvironmentId: envId,
 					ObjectType:    typ,
@@ -553,7 +553,7 @@ type notificationRow = struct {
 
 func convertNotificationRows(
 	env string, envId types.Binary,
-	selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx, idoRows []notificationRow,
+	selectCache func(dest any, query string, args ...any), ido *sqlx.Tx, idoRows []notificationRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
@@ -628,8 +628,8 @@ func convertNotificationRows(
 
 		ts := convertTime(row.EndTime.Int64, row.EndTimeUsec)
 		tsMilli := float64(ts.Time().UnixMilli())
-		notificationHistoryId := hashAny([]interface{}{env, name, notificationType, tsMilli})
-		id := hashAny([]interface{}{env, "notification", name, notificationType, tsMilli})
+		notificationHistoryId := hashAny([]any{env, name, notificationType, tsMilli})
+		id := hashAny([]any{env, "notification", name, notificationType, tsMilli})
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)
@@ -761,7 +761,7 @@ type stateRow = struct {
 
 func convertStateRows(
 	env string, envId types.Binary,
-	selectCache func(dest interface{}, query string, args ...interface{}), _ *sqlx.Tx, idoRows []stateRow,
+	selectCache func(dest any, query string, args ...any), _ *sqlx.Tx, idoRows []stateRow,
 ) (stages []icingaDbOutputStage, checkpoint any) {
 	if len(idoRows) < 1 {
 		return
@@ -797,8 +797,8 @@ func convertStateRows(
 		name := strings.Join([]string{row.Name1, row.Name2}, "!")
 		ts := convertTime(row.StateTime.Int64, row.StateTimeUsec)
 		tsMilli := float64(ts.Time().UnixMilli())
-		stateHistoryId := hashAny([]interface{}{env, name, tsMilli})
-		id := hashAny([]interface{}{env, "state_change", name, tsMilli})
+		stateHistoryId := hashAny([]any{env, name, tsMilli})
+		id := hashAny([]any{env, "state_change", name, tsMilli})
 		typ := objectTypes[row.ObjecttypeId]
 		hostId := calcObjectId(env, row.Name1)
 		serviceId := calcServiceId(env, row.Name1, row.Name2)

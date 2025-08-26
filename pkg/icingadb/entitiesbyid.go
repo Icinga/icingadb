@@ -19,8 +19,8 @@ func (ebi EntitiesById) Keys() []string {
 }
 
 // IDs returns the contracts.ID of the entities.
-func (ebi EntitiesById) IDs() []interface{} {
-	ids := make([]interface{}, 0, len(ebi))
+func (ebi EntitiesById) IDs() []any {
+	ids := make([]any, 0, len(ebi))
 	for _, v := range ebi {
 		ids = append(ids, v.(database.IDer).ID())
 	}

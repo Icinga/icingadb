@@ -9,11 +9,11 @@ import (
 // enclosed entity type must satisfy in order to be SELECTed.
 type ScopedEntity struct {
 	database.Entity
-	scope interface{}
+	scope any
 }
 
 // Scope implements the contracts.Scoper interface.
-func (e ScopedEntity) Scope() interface{} {
+func (e ScopedEntity) Scope() any {
 	return e.scope
 }
 
@@ -23,7 +23,7 @@ func (e ScopedEntity) TableName() string {
 }
 
 // NewScopedEntity returns a new ScopedEntity.
-func NewScopedEntity(entity database.Entity, scope interface{}) *ScopedEntity {
+func NewScopedEntity(entity database.Entity, scope any) *ScopedEntity {
 	return &ScopedEntity{
 		Entity: entity,
 		scope:  scope,

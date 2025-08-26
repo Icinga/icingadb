@@ -376,7 +376,7 @@ func migrate(c *Config, idb *database.DB, envId []byte) {
 func migrateOneType[IdoRow any](
 	c *Config, idb *database.DB, envId []byte, ht *historyType,
 	convertRows func(env string, envId types.Binary,
-		selectCache func(dest interface{}, query string, args ...interface{}), ido *sqlx.Tx,
+		selectCache func(dest any, query string, args ...any), ido *sqlx.Tx,
 		idoRows []IdoRow) (stages []icingaDbOutputStage, checkpoint any),
 ) {
 	var lastQuery string
@@ -388,7 +388,7 @@ func migrateOneType[IdoRow any](
 		}
 	}()
 
-	selectCache := func(dest interface{}, query string, args ...interface{}) {
+	selectCache := func(dest any, query string, args ...any) {
 		// Prepare new one, if old one doesn't fit anymore.
 		if query != lastQuery {
 			if lastStmt != nil {
@@ -412,14 +412,14 @@ func migrateOneType[IdoRow any](
 		}
 	}
 
-	var args map[string]interface{}
+	var args map[string]any
 
 	// For the case that the cache was older that the IDO,
 	// but ht.cacheFiller couldn't update it, limit (WHERE) our source data set.
 	if ht.cacheLimitQuery != "" {
 		var limit sql.NullInt64
 		cacheGet(ht.cache, &limit, ht.cacheLimitQuery)
-		args = map[string]interface{}{"cache_limit": limit.Int64}
+		args = map[string]any{"cache_limit": limit.Int64}
 	}
 
 	upsertProgress, _ := idb.BuildUpsertStmt(&IdoMigrationProgress{})
@@ -430,7 +430,7 @@ func migrateOneType[IdoRow any](
 	// Stream IDO rows, ...
 	sliceIdoHistory(
 		ht, ht.migrationQuery, args, ht.lastId,
-		func(idoRows []IdoRow) (checkpoint interface{}) {
+		func(idoRows []IdoRow) (checkpoint any) {
 			// ... convert them, ...
 			stages, lastIdoId := convertRows(c.Icinga2.Env, envId, selectCache, ht.snapshot, idoRows)
 
@@ -457,7 +457,7 @@ func migrateOneType[IdoRow any](
 			}
 
 			if lastIdoId != nil {
-				args := map[string]interface{}{"history_type": ht.name, "last_ido_id": lastIdoId}
+				args := map[string]any{"history_type": ht.name, "last_ido_id": lastIdoId}
 
 				_, err := idb.NamedExec(upsertProgress, &IdoMigrationProgress{
 					IdoMigrationProgressUpserter{lastIdoId}, envIdHex, ht.name, c.IDO.From, c.IDO.To,

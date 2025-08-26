@@ -73,16 +73,16 @@ func (r *RuntimeUpdates) Sync(
 
 		updateMessages := make(chan redis.XMessage, r.redis.Options.XReadCount)
 		upsertEntities := make(chan database.Entity, r.redis.Options.XReadCount)
-		deleteIds := make(chan interface{}, r.redis.Options.XReadCount)
+		deleteIds := make(chan any, r.redis.Options.XReadCount)
 
 		var upsertedFifo chan database.Entity
-		var deletedFifo chan interface{}
+		var deletedFifo chan any
 		var upsertCount int
 		var deleteCount int
 		upsertStmt, upsertPlaceholders := r.db.BuildUpsertStmt(s.Entity())
 		if !allowParallel {
 			upsertedFifo = make(chan database.Entity, 1)
-			deletedFifo = make(chan interface{}, 1)
+			deletedFifo = make(chan any, 1)
 			upsertCount = 1
 			deleteCount = 1
 		} else {
@@ -148,7 +148,7 @@ func (r *RuntimeUpdates) Sync(
 	{
 		updateMessages := make(chan redis.XMessage, r.redis.Options.XReadCount)
 		upsertEntities := make(chan database.Entity, r.redis.Options.XReadCount)
-		deleteIds := make(chan interface{}, r.redis.Options.XReadCount)
+		deleteIds := make(chan any, r.redis.Options.XReadCount)
 
 		cv := common.NewSyncSubject(v1.NewCustomvar)
 		cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
