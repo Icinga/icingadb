@@ -129,9 +129,7 @@ func TestDelta(t *testing.T) {
 		nextId := uint64(1)
 		var wg sync.WaitGroup
 		for _, test := range tests {
-			test := test
 			for _, sendOrder := range sendOrders {
-				sendOrder := sendOrder
 				id := nextId
 				nextId++
 				// Log ID mapping to allow easier debugging in case of failures.

@@ -41,9 +41,6 @@ func (s Sync) Sync(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for key, pipeline := range syncPipelines {
-		key := key
-		pipeline := pipeline
-
 		s.logger.Debugf("Starting %s history sync", key)
 
 		// The pipeline consists of n+2 stages connected sequentially using n+1 channels of type chan redis.XMessage,
@@ -82,9 +79,6 @@ func (s Sync) Sync(ctx context.Context) error {
 		})
 
 		for i, stage := range pipeline {
-			i := i
-			stage := stage
-
 			g.Go(func() error {
 				return stage(ctx, s, key, ch[i], ch[i+1])
 			})

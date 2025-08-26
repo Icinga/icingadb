@@ -225,7 +225,6 @@ type historyTypes []*historyType
 func (hts historyTypes) forEach(f func(*historyType)) {
 	eg, _ := errgroup.WithContext(context.Background())
 	for _, ht := range hts {
-		ht := ht
 		eg.Go(func() error {
 			f(ht)
 			return nil
