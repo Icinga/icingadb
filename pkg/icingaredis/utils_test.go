@@ -1,7 +1,6 @@
 package icingaredis
 
 import (
-	"context"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
@@ -73,8 +72,7 @@ func TestCreateEntities(t *testing.T) {
 		t.Run(st.name, func(t *testing.T) {
 			for _, l := range latencies {
 				t.Run(l.name, func(t *testing.T) {
-					ctx, cancel := context.WithCancel(context.Background())
-					defer cancel()
+					ctx := t.Context()
 
 					input := make(chan redis.HPair, 1)
 					go func() {
