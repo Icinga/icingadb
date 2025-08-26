@@ -26,7 +26,7 @@ func CreateEntities(ctx context.Context, factoryFunc database.EntityFactoryFunc,
 
 		g, ctx := errgroup.WithContext(ctx)
 
-		for i := 0; i < concurrent; i++ {
+		for range concurrent {
 			g.Go(func() error {
 				for {
 					select {
@@ -77,7 +77,7 @@ func SetChecksums(ctx context.Context, entities <-chan database.Entity, checksum
 
 		g, ctx := errgroup.WithContext(ctx)
 
-		for i := 0; i < concurrent; i++ {
+		for range concurrent {
 			g.Go(func() error {
 				for {
 					select {

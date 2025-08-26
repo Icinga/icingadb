@@ -229,7 +229,7 @@ func benchmarkDelta(b *testing.B, numEntities uint64) {
 		binary.BigEndian.PutUint64(e.PropertiesChecksum, checksum)
 		return e
 	}
-	for i := uint64(0); i < numEntities; i++ {
+	for i := range numEntities {
 		// each iteration writes exactly one entity to each channel
 		var eActual, eDesired database.Entity
 		switch i % 3 {
