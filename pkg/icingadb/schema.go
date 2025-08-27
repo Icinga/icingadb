@@ -80,6 +80,9 @@ func CheckSchema(ctx context.Context, db *database.DB) error {
 // ImportSchema performs an initial schema import in the db.
 //
 // This function assumes that no schema exists. So it should only be called after a prior CheckSchema call.
+//
+// Note: Running a schema file may have side effects, such as altering SQL system variables. Unless you are certain that
+// the schema update will not interfere with future queries, consider using a dedicated database connection.
 func ImportSchema(
 	ctx context.Context,
 	db *database.DB,
