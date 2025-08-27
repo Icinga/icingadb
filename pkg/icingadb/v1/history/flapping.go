@@ -16,7 +16,7 @@ type FlappingHistoryUpserter struct {
 }
 
 // Upsert implements the contracts.Upserter interface.
-func (fhu *FlappingHistoryUpserter) Upsert() interface{} {
+func (fhu *FlappingHistoryUpserter) Upsert() any {
 	return fhu
 }
 

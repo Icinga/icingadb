@@ -34,7 +34,7 @@ type CommentHistoryUpserter struct {
 }
 
 // Upsert implements the contracts.Upserter interface.
-func (chu *CommentHistoryUpserter) Upsert() interface{} {
+func (chu *CommentHistoryUpserter) Upsert() any {
 	return chu
 }
 

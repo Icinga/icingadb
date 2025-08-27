@@ -28,7 +28,7 @@ type UserNotificationHistory struct {
 	UserId                   types.Binary `json:"user_id"`
 }
 
-func (u *UserNotificationHistory) Upsert() interface{} {
+func (u *UserNotificationHistory) Upsert() any {
 	return u
 }
 

@@ -33,7 +33,7 @@ type DowntimeHistoryUpserter struct {
 }
 
 // Upsert implements the contracts.Upserter interface.
-func (dhu *DowntimeHistoryUpserter) Upsert() interface{} {
+func (dhu *DowntimeHistoryUpserter) Upsert() any {
 	return dhu
 }
 
@@ -101,7 +101,7 @@ type SlaHistoryDowntimeUpserter struct {
 }
 
 // Upsert implements the contracts.Upserter interface.
-func (h *SlaHistoryDowntimeUpserter) Upsert() interface{} {
+func (h *SlaHistoryDowntimeUpserter) Upsert() any {
 	return h
 }
 

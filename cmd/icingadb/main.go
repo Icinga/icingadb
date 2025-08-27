@@ -220,8 +220,6 @@ func run() int {
 
 						logger.Info("Starting config sync")
 						for _, factory := range v1.ConfigFactories {
-							factory := factory
-
 							configInitSync.Add(1)
 							g.Go(func() error {
 								defer configInitSync.Done()
@@ -231,8 +229,6 @@ func run() int {
 						}
 						logger.Info("Starting initial state sync")
 						for _, factory := range v1.StateFactories {
-							factory := factory
-
 							stateInitSync.Add(1)
 							g.Go(func() error {
 								defer stateInitSync.Done()

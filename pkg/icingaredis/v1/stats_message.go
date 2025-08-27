@@ -6,10 +6,10 @@ import (
 )
 
 // StatsMessage represents a message from the Redis stream icinga:stats.
-type StatsMessage map[string]interface{}
+type StatsMessage map[string]any
 
 // Raw returns the key-value pairs of the message.
-func (m StatsMessage) Raw() map[string]interface{} {
+func (m StatsMessage) Raw() map[string]any {
 	return m
 }
 

@@ -107,7 +107,7 @@ type RetentionOptions map[string]uint16
 func (o *RetentionOptions) UnmarshalText(text []byte) error {
 	optionsMap := make(map[string]uint16)
 
-	for _, pair := range strings.Split(string(text), ",") {
+	for pair := range strings.SplitSeq(string(text), ",") {
 		key, value, found := strings.Cut(pair, ":")
 		if !found {
 			return fmt.Errorf("entry %q cannot be unmarshalled as a history-category:retention-period pair", pair)

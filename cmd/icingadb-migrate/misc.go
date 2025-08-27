@@ -21,7 +21,7 @@ type IdoMigrationProgressUpserter struct {
 }
 
 // Upsert implements the contracts.Upserter interface.
-func (impu *IdoMigrationProgressUpserter) Upsert() interface{} {
+func (impu *IdoMigrationProgressUpserter) Upsert() any {
 	return impu
 }
 
@@ -53,7 +53,7 @@ var log = func() *zap.SugaredLogger {
 var objectTypes = map[uint8]string{1: "host", 2: "service"}
 
 // hashAny combines objectpacker.PackAny and SHA1 hashing.
-func hashAny(in interface{}) []byte {
+func hashAny(in any) []byte {
 	hash := sha1.New() // #nosec G401 -- used as a non-cryptographic hash function to hash IDs
 	if err := objectpacker.PackAny(in, hash); err != nil {
 		panic(err)
@@ -97,10 +97,10 @@ func calcServiceId(env, name1, name2 string) []byte {
 // (On non-recoverable errors the whole program exits.)
 func sliceIdoHistory[Row any](
 	ht *historyType, query string, args map[string]any,
-	checkpoint interface{}, onRows func([]Row) (checkpoint interface{}),
+	checkpoint any, onRows func([]Row) (checkpoint any),
 ) {
 	if args == nil {
-		args = map[string]interface{}{}
+		args = map[string]any{}
 	}
 
 	args["fromid"] = ht.fromId
@@ -225,7 +225,6 @@ type historyTypes []*historyType
 func (hts historyTypes) forEach(f func(*historyType)) {
 	eg, _ := errgroup.WithContext(context.Background())
 	for _, ht := range hts {
-		ht := ht
 		eg.Go(func() error {
 			f(ht)
 			return nil

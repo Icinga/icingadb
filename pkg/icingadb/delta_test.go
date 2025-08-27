@@ -129,9 +129,7 @@ func TestDelta(t *testing.T) {
 		nextId := uint64(1)
 		var wg sync.WaitGroup
 		for _, test := range tests {
-			test := test
 			for _, sendOrder := range sendOrders {
-				sendOrder := sendOrder
 				id := nextId
 				nextId++
 				// Log ID mapping to allow easier debugging in case of failures.
@@ -231,7 +229,7 @@ func benchmarkDelta(b *testing.B, numEntities uint64) {
 		binary.BigEndian.PutUint64(e.PropertiesChecksum, checksum)
 		return e
 	}
-	for i := uint64(0); i < numEntities; i++ {
+	for i := range numEntities {
 		// each iteration writes exactly one entity to each channel
 		var eActual, eDesired database.Entity
 		switch i % 3 {

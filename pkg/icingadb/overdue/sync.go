@@ -93,7 +93,7 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 		key := "icingadb:overdue:" + objectType
 		pipe.Del(ctx, key)
 
-		var ids []interface{}
+		var ids []any
 		for _, row := range rows {
 			ids = append(ids, row.Id.String())
 			if len(ids) == 100 {
@@ -164,15 +164,15 @@ func (s Sync) sync(ctx context.Context, objectType string, factory factory, coun
 				return errors.Wrap(err, "can't execute Redis script")
 			}
 
-			root := overdues.([]interface{})
+			root := overdues.([]any)
 			g, ctx := errgroup.WithContext(ctx)
 
 			g.Go(func() error {
-				return s.updateOverdue(ctx, objectType, factory, counter, root[0].([]interface{}), true)
+				return s.updateOverdue(ctx, objectType, factory, counter, root[0].([]any), true)
 			})
 
 			g.Go(func() error {
-				return s.updateOverdue(ctx, objectType, factory, counter, root[1].([]interface{}), false)
+				return s.updateOverdue(ctx, objectType, factory, counter, root[1].([]any), false)
 			})
 
 			if err := g.Wait(); err != nil {
@@ -193,7 +193,7 @@ func (s Sync) sync(ctx context.Context, objectType string, factory factory, coun
 // updateOverdue sets objectType_state#is_overdue for ids to overdue
 // and updates icingadb:overdue:objectType respectively.
 func (s Sync) updateOverdue(
-	ctx context.Context, objectType string, factory factory, counter *com.Counter, ids []interface{}, overdue bool,
+	ctx context.Context, objectType string, factory factory, counter *com.Counter, ids []any, overdue bool,
 ) error {
 	if len(ids) < 1 {
 		return nil
@@ -206,7 +206,7 @@ func (s Sync) updateOverdue(
 	counter.Add(uint64(len(ids)))
 	telemetry.Stats.Overdue.Add(uint64(len(ids)))
 
-	var op func(ctx context.Context, key string, members ...interface{}) *redis.IntCmd
+	var op func(ctx context.Context, key string, members ...any) *redis.IntCmd
 	if overdue {
 		op = s.redis.SAdd
 	} else {
@@ -218,7 +218,7 @@ func (s Sync) updateOverdue(
 }
 
 // updateDb sets objectType_state#is_overdue for ids to overdue.
-func (s Sync) updateDb(ctx context.Context, factory factory, ids []interface{}, overdue bool) error {
+func (s Sync) updateDb(ctx context.Context, factory factory, ids []any, overdue bool) error {
 	g, ctx := errgroup.WithContext(ctx)
 	ch := make(chan database.Entity, 1<<10)
 

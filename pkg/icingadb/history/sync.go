@@ -41,9 +41,6 @@ func (s Sync) Sync(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for key, pipeline := range syncPipelines {
-		key := key
-		pipeline := pipeline
-
 		s.logger.Debugf("Starting %s history sync", key)
 
 		// The pipeline consists of n+2 stages connected sequentially using n+1 channels of type chan redis.XMessage,
@@ -82,9 +79,6 @@ func (s Sync) Sync(ctx context.Context) error {
 		})
 
 		for i, stage := range pipeline {
-			i := i
-			stage := stage
-
 			g.Go(func() error {
 				return stage(ctx, s, key, ch[i], ch[i+1])
 			})
@@ -177,7 +171,7 @@ type stageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMe
 // writeOneEntityStage creates a stageFunc from a pointer to a struct implementing the v1.UpserterEntity interface.
 // For each history event it receives, it parses that event into a new instance of that entity type and writes it to
 // the database. It writes exactly one entity to the database for each history event.
-func writeOneEntityStage(structPtr interface{}) stageFunc {
+func writeOneEntityStage(structPtr any) stageFunc {
 	structifier := structify.MakeMapStructifier(
 		reflect.TypeOf(structPtr).Elem(),
 		"json",

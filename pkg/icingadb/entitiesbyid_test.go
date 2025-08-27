@@ -96,8 +96,7 @@ func TestEntitiesById_Entities(t *testing.T) {
 
 	for _, st := range subtests {
 		t.Run(st.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			expected := make([]database.Entity, 0, len(st.io))
 			actual := make([]database.Entity, 0, len(st.io))

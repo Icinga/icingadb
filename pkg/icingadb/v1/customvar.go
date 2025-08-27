@@ -106,7 +106,7 @@ func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan databa
 		for i := 0; i < runtime.NumCPU(); i++ {
 			g.Go(func() error {
 				for entity := range cvs {
-					var value interface{}
+					var value any
 					customvar := entity.(*Customvar)
 					if err := types.UnmarshalJSON([]byte(customvar.Value), &value); err != nil {
 						return err
@@ -115,7 +115,7 @@ func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan databa
 					flattened := flatten.Flatten(value, customvar.Name)
 
 					for flatname, flatvalue := range flattened {
-						var fv interface{}
+						var fv any
 						if flatvalue.Valid {
 							fv = flatvalue.String
 						}
