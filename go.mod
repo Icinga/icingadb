@@ -13,7 +13,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.11.0
+	github.com/stretchr/testify v1.11.1
 	github.com/vbauerster/mpb/v6 v6.0.4
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.16.0
