@@ -149,7 +149,7 @@ jobs:
 
       - name: Generate artifact attestation for GitHub Container Registry
         if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           subject-name: ghcr.io/${{ env.IMAGE_NAME }}
           subject-digest: ${{ steps.build-and-push.outputs.digest }}
@@ -157,7 +157,7 @@ jobs:
 
       - name: Generate artifact attestation for Docker Hub
         if: github.event_name != 'pull_request'
-        uses: actions/attest-build-provenance@v2
+        uses: actions/attest-build-provenance@v3
         with:
           # According to the documentation [^1],
           # "index.docker.io" should be used as the registry portion of the image name when pushing to Docker Hub.
