@@ -2,6 +2,7 @@ package history
 
 import (
 	"context"
+	"fmt"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
@@ -37,7 +38,16 @@ func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync
 }
 
 // Sync synchronizes Redis history streams from s.redis to s.db and deletes the original data on success.
-func (s Sync) Sync(ctx context.Context) error {
+//
+// An optional callback and callbackKeyStructPtr might be given. Both most either be nil or not nil.
+//
+// The callbackKeyStructPtr says which pipeline keys should be mapped to which type, identified by a struct pointer. If
+// a key is missing from the map, it will not be used for the callback. The callback function itself shall not block.
+func (s Sync) Sync(ctx context.Context, callbackKeyStructPtr map[string]any, callback func(database.Entity)) error {
+	if (callbackKeyStructPtr == nil) != (callback == nil) {
+		return fmt.Errorf("either both callbackKeyStructPtr and callback must be nil or none")
+	}
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	for key, pipeline := range syncPipelines {
@@ -62,6 +72,15 @@ func (s Sync) Sync(ctx context.Context) error {
 		// it has processed it, even if the stage itself does not do anything with this specific entry. It should only
 		// forward the entry after it has completed its own sync so that later stages can rely on previous stages being
 		// executed successfully.
+
+		// Shadowed variable to allow appending custom callbacks.
+		pipeline := pipeline
+		if callbackKeyStructPtr != nil {
+			_, ok := callbackKeyStructPtr[key]
+			if ok {
+				pipeline = append(pipeline, makeCallbackStageFunc(callbackKeyStructPtr, callback))
+			}
+		}
 
 		ch := make([]chan redis.XMessage, len(pipeline)+1)
 		for i := range ch {
@@ -354,32 +373,88 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 	})(ctx, s, key, in, out)
 }
 
+// makeCallbackStageFunc creates a new stageFunc calling the given callback function for each message.
+//
+// The keyStructPtrs map decides what kind of database.Entity type will be used for the input data based on the key.
+//
+// The callback call is blocking and the message will be forwarded to the out channel after the function has returned.
+// Thus, please ensure this function does not block too long.
+func makeCallbackStageFunc(keyStructPtrs map[string]any, callback func(database.Entity)) stageFunc {
+	return func(ctx context.Context, _ Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
+		defer close(out)
+
+		structPtr, ok := keyStructPtrs[key]
+		if !ok {
+			return fmt.Errorf("can't lookup struct pointer for key %q", key)
+		}
+
+		structifier := structify.MakeMapStructifier(
+			reflect.TypeOf(structPtr).Elem(),
+			"json",
+			contracts.SafeInit)
+
+		for {
+			select {
+			case msg, ok := <-in:
+				if !ok {
+					return nil
+				}
+
+				val, err := structifier(msg.Values)
+				if err != nil {
+					return errors.Wrapf(err, "can't structify values %#v for %q", msg.Values, key)
+				}
+
+				entity, ok := val.(database.Entity)
+				if !ok {
+					return fmt.Errorf("structifier returned %T, expected %T", val, structPtr)
+				}
+				callback(entity)
+
+				out <- msg
+
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
+}
+
+const (
+	SyncPipelineAcknowledgement = "acknowledgement"
+	SyncPipelineComment         = "comment"
+	SyncPipelineDowntime        = "downtime"
+	SyncPipelineFlapping        = "flapping"
+	SyncPipelineNotification    = "notification"
+	SyncPipelineState           = "state"
+)
+
 var syncPipelines = map[string][]stageFunc{
-	"notification": {
-		writeOneEntityStage((*v1.NotificationHistory)(nil)), // notification_history
-		userNotificationStage,                               // user_notification_history (depends on notification_history)
-		writeOneEntityStage((*v1.HistoryNotification)(nil)), // history (depends on notification_history)
+	SyncPipelineAcknowledgement: {
+		writeOneEntityStage((*v1.AcknowledgementHistory)(nil)), // acknowledgement_history
+		writeOneEntityStage((*v1.HistoryAck)(nil)),             // history (depends on acknowledgement_history)
 	},
-	"state": {
-		writeOneEntityStage((*v1.StateHistory)(nil)),   // state_history
-		writeOneEntityStage((*v1.HistoryState)(nil)),   // history (depends on state_history)
-		writeMultiEntityStage(stateHistoryToSlaEntity), // sla_history_state
+	SyncPipelineComment: {
+		writeOneEntityStage((*v1.CommentHistory)(nil)), // comment_history
+		writeOneEntityStage((*v1.HistoryComment)(nil)), // history (depends on comment_history)
 	},
-	"downtime": {
+	SyncPipelineDowntime: {
 		writeOneEntityStage((*v1.DowntimeHistory)(nil)),    // downtime_history
 		writeOneEntityStage((*v1.HistoryDowntime)(nil)),    // history (depends on downtime_history)
 		writeOneEntityStage((*v1.SlaHistoryDowntime)(nil)), // sla_history_downtime
 	},
-	"comment": {
-		writeOneEntityStage((*v1.CommentHistory)(nil)), // comment_history
-		writeOneEntityStage((*v1.HistoryComment)(nil)), // history (depends on comment_history)
-	},
-	"flapping": {
+	SyncPipelineFlapping: {
 		writeOneEntityStage((*v1.FlappingHistory)(nil)), // flapping_history
 		writeOneEntityStage((*v1.HistoryFlapping)(nil)), // history (depends on flapping_history)
 	},
-	"acknowledgement": {
-		writeOneEntityStage((*v1.AcknowledgementHistory)(nil)), // acknowledgement_history
-		writeOneEntityStage((*v1.HistoryAck)(nil)),             // history (depends on acknowledgement_history)
+	SyncPipelineNotification: {
+		writeOneEntityStage((*v1.NotificationHistory)(nil)), // notification_history
+		userNotificationStage,                               // user_notification_history (depends on notification_history)
+		writeOneEntityStage((*v1.HistoryNotification)(nil)), // history (depends on notification_history)
+	},
+	SyncPipelineState: {
+		writeOneEntityStage((*v1.StateHistory)(nil)),   // state_history
+		writeOneEntityStage((*v1.HistoryState)(nil)),   // history (depends on state_history)
+		writeMultiEntityStage(stateHistoryToSlaEntity), // sla_history_state
 	},
 }
