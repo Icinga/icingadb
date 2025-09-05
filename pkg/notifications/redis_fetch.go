@@ -23,7 +23,7 @@ import (
 // If this operation couldn't be completed within a reasonable time (a hard coded 5 seconds), it will cancel the
 // request and return an error indicating that the operation timed out. In case of the serviceId being set, the
 // maximum execution time of the Redis HGet commands is 10s (5s for each HGet call).
-func (s *Source) fetchHostServiceName(ctx context.Context, hostId, serviceId types.Binary) (*redisLookupResult, error) {
+func (s *Client) fetchHostServiceName(ctx context.Context, hostId, serviceId types.Binary) (*redisLookupResult, error) {
 	redisHGet := func(typ, field string, out *redisLookupResult) error {
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
@@ -69,14 +69,14 @@ type redisLookupResult struct {
 	ServiceName string `json:"-"` // Name of the service (only set in service context).
 
 	// Name is used to retrieve the host or service name from Redis.
-	// It should not be used for any other purpose apart from within the [Source.fetchHostServiceName] function.
+	// It should not be used for any other purpose apart from within the [Client.fetchHostServiceName] function.
 	Name string `json:"name"`
 }
 
 // UnmarshalBinary implements the [encoding.BinaryUnmarshaler] interface for redisLookupResult.
 //
 // It unmarshals the binary data of the Redis HGet result into the redisLookupResult struct.
-// This is required for the HGet().Scan() usage in the [Source.fetchHostServiceName] function to work correctly.
+// This is required for the HGet().Scan() usage in the [Client.fetchHostServiceName] function to work correctly.
 func (rlr *redisLookupResult) UnmarshalBinary(data []byte) error {
 	if len(data) == 0 {
 		return errors.New("empty data received for redisLookupResult")
