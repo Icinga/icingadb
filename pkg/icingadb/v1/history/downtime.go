@@ -88,6 +88,12 @@ func (*HistoryDowntime) TableName() string {
 	return "history"
 }
 
+type DowntimeHistoryMeta struct {
+	DowntimeHistoryEntity `json:",inline"`
+	DowntimeHistory       `json:",inline"`
+	HistoryMeta           `json:",inline"`
+}
+
 type SlaHistoryDowntime struct {
 	DowntimeHistoryEntity      `json:",inline"`
 	HistoryTableMeta           `json:",inline"`
