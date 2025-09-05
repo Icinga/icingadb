@@ -7,14 +7,14 @@ require (
 	github.com/goccy/go-yaml v1.13.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/icinga/icinga-go-library v0.7.3-0.20250807134650-55c038b220d8
+	github.com/icinga/icinga-go-library v0.7.3-0.20250904130608-5032573a325e
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pkg/errors v0.9.1
+	github.com/redis/go-redis/v9 v9.13.0
 	github.com/stretchr/testify v1.11.1
-	github.com/redis/go-redis/v9 v9.11.0
 	github.com/vbauerster/mpb/v6 v6.0.4
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.17.0
