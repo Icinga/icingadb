@@ -23,14 +23,14 @@ import (
 // If this operation couldn't be completed within a reasonable time (a hard coded 5 seconds), it will cancel the
 // request and return an error indicating that the operation timed out. In case of the serviceId being set, the
 // maximum execution time of the Redis HGet commands is 10s (5s for each HGet call).
-func (s *Client) fetchHostServiceName(ctx context.Context, hostId, serviceId types.Binary) (*redisLookupResult, error) {
+func (client *Client) fetchHostServiceName(ctx context.Context, hostId, serviceId types.Binary) (*redisLookupResult, error) {
 	redisHGet := func(typ, field string, out *redisLookupResult) error {
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
 		err := retry.WithBackoff(
 			ctx,
-			func(ctx context.Context) error { return s.redisClient.HGet(ctx, "icinga:"+typ, field).Scan(out) },
+			func(ctx context.Context) error { return client.redisClient.HGet(ctx, "icinga:"+typ, field).Scan(out) },
 			retry.Retryable,
 			backoff.DefaultBackoff,
 			retry.Settings{},
