@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/utils"
@@ -15,6 +16,7 @@ import (
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
+	"github.com/icinga/icingadb/pkg/notifications"
 	"github.com/okzk/sdnotify"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -169,9 +171,25 @@ func run() int {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	go func() {
+		var callback func(database.Entity)
+		var callbackKeyStructPtr map[string]any
+
+		if cfg := cmd.Config.NotificationsSource; cfg.ApiBaseUrl != "" {
+			logger.Info("Starting Icinga Notifications source")
+
+			notificationsSource := notifications.NewNotificationsClient(
+				ctx,
+				db,
+				rc,
+				logs.GetChildLogger("notifications-source"),
+				cfg)
+			callback = notificationsSource.Submit
+			callbackKeyStructPtr = notifications.SyncKeyStructPtrs
+		}
+
 		logger.Info("Starting history sync")
 
-		if err := hs.Sync(ctx); err != nil && !utils.IsContextCanceled(err) {
+		if err := hs.Sync(ctx, callbackKeyStructPtr, callback); err != nil && !utils.IsContextCanceled(err) {
 			logger.Fatalf("%+v", err)
 		}
 	}()
