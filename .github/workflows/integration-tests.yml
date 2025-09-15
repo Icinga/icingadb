@@ -18,12 +18,22 @@ jobs:
           - name: MySQL
             type: MYSQL
             image: mysql:latest
+          - name: MySQL (minimum required version)
+            type: MYSQL
+            image: mysql:8.0.0
           - name: MariaDB
             type: MYSQL
             image: mariadb:latest
+          - name: MariaDB (minimum required version)
+            type: MYSQL
+            # Actually we support v10.2.2+, but Docker Hub doesn't.
+            image: mariadb:10.2.5
           - name: PostgreSQL
             type: PGSQL
             image: postgres:latest
+          - name: PostgreSQL (minimum required version)
+            type: PGSQL
+            image: postgres:9.6.0
 
     name: ${{ matrix.database.name }}
     runs-on: ubuntu-latest
