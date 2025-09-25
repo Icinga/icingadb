@@ -14,7 +14,12 @@ import (
 
 var Stats struct {
 	// Config & co. are to be increased by the T sync once for every T object synced.
-	Config, State, History, Overdue, HistoryCleanup com.Counter
+	Config         com.Counter
+	State          com.Counter
+	History        com.Counter
+	Callback       com.Counter
+	Overdue        com.Counter
+	HistoryCleanup com.Counter
 }
 
 // WriteStats periodically forwards Stats to Redis for being monitored by Icinga 2.
@@ -23,6 +28,7 @@ func WriteStats(ctx context.Context, client *redis.Client, logger *logging.Logge
 		"config_sync":     &Stats.Config,
 		"state_sync":      &Stats.State,
 		"history_sync":    &Stats.History,
+		"callback_sync":   &Stats.Callback,
 		"overdue_sync":    &Stats.Overdue,
 		"history_cleanup": &Stats.HistoryCleanup,
 	}

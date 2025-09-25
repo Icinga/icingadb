@@ -3,9 +3,6 @@ package notifications
 import (
 	"context"
 	"fmt"
-	"net/url"
-	"time"
-
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/notifications/event"
@@ -19,70 +16,31 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"slices"
-	"strings"
+	"net/url"
+	"sync"
 )
-
-// submission of a [database.Entity] to the Client.
-type submission struct {
-	entity database.Entity
-	traces map[string]time.Time
-}
-
-// MarshalLogObject implements [zapcore.ObjectMarshaler] to print a debug trace.
-func (sub submission) MarshalLogObject(encoder zapcore.ObjectEncoder) error {
-	encoder.AddString("type", fmt.Sprintf("%T", sub.entity))
-
-	if len(sub.traces) < 1 {
-		return nil
-	}
-
-	tracesKeys := slices.SortedFunc(func(yield func(string) bool) {
-		for key := range sub.traces {
-			if !yield(key) {
-				return
-			}
-		}
-	}, func(a string, b string) int {
-		return sub.traces[a].Compare(sub.traces[b])
-	})
-
-	relTraces := make([]string, 0, len(tracesKeys)-1)
-	for i := 1; i < len(tracesKeys); i++ {
-		relTraces = append(relTraces, fmt.Sprintf("%s: %v",
-			tracesKeys[i],
-			sub.traces[tracesKeys[i]].Sub(sub.traces[tracesKeys[i-1]])))
-	}
-
-	encoder.AddDuration("processing_time", sub.traces[tracesKeys[len(tracesKeys)-1]].Sub(sub.traces[tracesKeys[0]]))
-	encoder.AddString("trace", strings.Join(relTraces, ", "))
-
-	return nil
-}
 
 // Client is an Icinga Notifications compatible client implementation to push events to Icinga Notifications.
 //
 // A new Client should be created by the NewNotificationsClient function. New history entries can be submitted by
-// calling the Source.Submit method. The Client will then process the history entries in a background worker goroutine.
+// calling the Client.Submit method.
 type Client struct {
 	source.Config
 
-	inputCh chan submission // inputCh is a buffered channel used to submit history entries to the worker.
-	db      *database.DB
-	logger  *logging.Logger
+	db     *database.DB
+	logger *logging.Logger
 
 	rules *source.RulesInfo // rules holds the latest rules fetched from Icinga Notifications.
 
-	ctx       context.Context
-	ctxCancel context.CancelFunc
+	ctx context.Context
 
 	notificationsClient *source.Client // The Icinga Notifications client used to interact with the API.
 	redisClient         *redis.Client  // redisClient is the Redis client used to fetch host and service names for events.
+
+	submissionMutex sync.Mutex
 }
 
 // NewNotificationsClient creates a new Client connected to an existing database and logger.
-//
-// This function starts a worker goroutine in the background which can be stopped by ending the provided context.
 func NewNotificationsClient(
 	ctx context.Context,
 	db *database.DB,
@@ -90,20 +48,16 @@ func NewNotificationsClient(
 	logger *logging.Logger,
 	cfg source.Config,
 ) *Client {
-	ctx, ctxCancel := context.WithCancel(ctx)
-
 	client := &Client{
 		Config: cfg,
 
-		inputCh: make(chan submission, 1<<10), // chosen by fair dice roll
-		db:      db,
-		logger:  logger,
+		db:     db,
+		logger: logger,
 
 		rules:       &source.RulesInfo{Version: source.EmptyRulesVersion},
 		redisClient: rc,
 
-		ctx:       ctx,
-		ctxCancel: ctxCancel,
+		ctx: ctx,
 	}
 
 	notificationsClient, err := source.NewClient(client.Config, "Icinga DB")
@@ -111,8 +65,6 @@ func NewNotificationsClient(
 		logger.Fatalw("Cannot create Icinga Notifications client", zap.Error(err))
 	}
 	client.notificationsClient = notificationsClient
-
-	go client.worker()
 
 	return client
 }
@@ -370,140 +322,98 @@ func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v
 	return ev, nil
 }
 
-// worker is the background worker launched by NewNotificationsClient.
-func (client *Client) worker() {
-	defer client.ctxCancel()
-
-	for {
-		select {
-		case <-client.ctx.Done():
-			return
-
-		case sub, more := <-client.inputCh:
-			if !more { // Should never happen, but just in case.
-				client.logger.Debug("Input channel closed, stopping worker")
-				return
-			}
-
-			sub.traces["worker_start"] = time.Now()
-
-			var ev *event.Event
-			var eventErr error
-
-			// Keep the type switch in sync with syncPipelines from pkg/icingadb/history/sync.go
-			switch h := sub.entity.(type) {
-			case *v1history.AcknowledgementHistory:
-				ev, eventErr = client.buildAcknowledgementHistoryEvent(client.ctx, h)
-
-			case *v1history.DowntimeHistoryMeta:
-				ev, eventErr = client.buildDowntimeHistoryMetaEvent(client.ctx, h)
-
-			case *v1history.FlappingHistory:
-				ev, eventErr = client.buildFlappingHistoryEvent(client.ctx, h)
-
-			case *v1history.StateHistory:
-				if h.StateType != common.HardState {
-					continue
-				}
-				ev, eventErr = client.buildStateHistoryEvent(client.ctx, h)
-
-			default:
-				client.logger.Error("Cannot process unsupported type",
-					zap.Object("submission", sub),
-					zap.String("type", fmt.Sprintf("%T", h)))
-				continue
-			}
-
-			if eventErr != nil {
-				client.logger.Errorw("Cannot build event from history entry",
-					zap.Object("submission", sub),
-					zap.String("type", fmt.Sprintf("%T", sub.entity)),
-					zap.Error(eventErr))
-				continue
-			} else if ev == nil {
-				// This really should not happen.
-				client.logger.Errorw("No event was fetched, but no error was reported.", zap.Object("submission", sub))
-				continue
-			}
-
-			eventLogger := client.logger.With(zap.Object(
-				"event",
-				zapcore.ObjectMarshalerFunc(func(encoder zapcore.ObjectEncoder) error {
-					encoder.AddString("name", ev.Name)
-					encoder.AddString("type", ev.Type.String())
-					return nil
-				}),
-			))
-
-			sub.traces["evaluate_jump_pre"] = time.Now()
-		reevaluateRules:
-			sub.traces["evaluate_jump_last"] = time.Now()
-			eventRuleIds, err := client.evaluateRulesForObject(client.ctx, sub.entity)
-			if err != nil {
-				eventLogger.Errorw("Cannot evaluate rules for event",
-					zap.Object("submission", sub),
-					zap.Error(err))
-				continue
-			}
-
-			ev.RulesVersion = client.rules.Version
-			ev.RuleIds = eventRuleIds
-
-			sub.traces["process_last"] = time.Now()
-			newEventRules, err := client.notificationsClient.ProcessEvent(client.ctx, ev)
-			if errors.Is(err, source.ErrRulesOutdated) {
-				client.rules = newEventRules
-
-				eventLogger.Infow("Re-evaluating rules for event after fetching new rules",
-					zap.Object("submission", sub),
-					zap.String("rules_version", client.rules.Version))
-
-				// Re-evaluate the just fetched rules for the current event.
-				goto reevaluateRules
-			} else if err != nil {
-				eventLogger.Errorw("Cannot submit event to Icinga Notifications",
-					zap.Object("submission", sub),
-					zap.String("rules_version", client.rules.Version),
-					zap.Any("rules", eventRuleIds),
-					zap.Error(err))
-				continue
-			}
-
-			sub.traces["worker_fin"] = time.Now()
-			eventLogger.Debugw("Successfully submitted event to Icinga Notifications",
-				zap.Object("submission", sub),
-				zap.Any("rules", eventRuleIds))
-		}
-	}
-}
-
-// Submit a history entry to be processed by the Client's internal worker loop.
+// Submit this [database.Entity] to the Icinga Notifications API.
 //
-// Internally, a buffered channel is used for delivery. So this function should not block. Otherwise, it will abort
-// after a second and an error is logged.
-func (client *Client) Submit(entity database.Entity) {
-	sub := submission{
-		entity: entity,
-		traces: map[string]time.Time{
-			"submit": time.Now(),
-		},
+// Based on the entity's type, a different kind of event will be constructed. The event will be sent to the API in a
+// blocking fashion.
+//
+// Returns true if this entity was processed or cannot be processed any further. Returns false if this entity should be
+// retried later.
+//
+// This method usees the Client's logger.
+func (client *Client) Submit(entity database.Entity) bool {
+	client.submissionMutex.Lock()
+	defer client.submissionMutex.Unlock()
+
+	if client.ctx.Err() != nil {
+		client.logger.Error("Cannot process submitted entity as client context is done")
+		return true
 	}
 
-	select {
-	case <-client.ctx.Done():
-		client.logger.Errorw("Client context is done, rejecting submission",
-			zap.Object("submission", sub),
-			zap.Error(client.ctx.Err()))
-		return
+	var ev *event.Event
+	var eventErr error
 
-	case client.inputCh <- sub:
-		return
+	// Keep the type switch in sync with syncPipelines from pkg/icingadb/history/sync.go
+	switch h := entity.(type) {
+	case *v1history.AcknowledgementHistory:
+		ev, eventErr = client.buildAcknowledgementHistoryEvent(client.ctx, h)
 
-	case <-time.After(time.Second):
-		client.logger.Error("Client submission channel is blocking, rejecting submission",
-			zap.Object("submission", sub))
-		return
+	case *v1history.DowntimeHistoryMeta:
+		ev, eventErr = client.buildDowntimeHistoryMetaEvent(client.ctx, h)
+
+	case *v1history.FlappingHistory:
+		ev, eventErr = client.buildFlappingHistoryEvent(client.ctx, h)
+
+	case *v1history.StateHistory:
+		if h.StateType != common.HardState {
+			return true
+		}
+		ev, eventErr = client.buildStateHistoryEvent(client.ctx, h)
+
+	default:
+		client.logger.Error("Cannot process unsupported type", zap.String("type", fmt.Sprintf("%T", h)))
+		return true
 	}
+
+	if eventErr != nil {
+		client.logger.Errorw("Cannot build event from history entry",
+			zap.String("type", fmt.Sprintf("%T", entity)),
+			zap.Error(eventErr))
+		return true
+	} else if ev == nil {
+		// This really should not happen.
+		client.logger.Errorw("No event was built, but no error was reported",
+			zap.String("type", fmt.Sprintf("%T", entity)))
+		return true
+	}
+
+	eventLogger := client.logger.With(zap.Object(
+		"event",
+		zapcore.ObjectMarshalerFunc(func(encoder zapcore.ObjectEncoder) error {
+			encoder.AddString("name", ev.Name)
+			encoder.AddString("type", ev.Type.String())
+			return nil
+		}),
+	))
+
+	eventRuleIds, err := client.evaluateRulesForObject(client.ctx, entity)
+	if err != nil {
+		eventLogger.Errorw("Cannot evaluate rules for event, will be retried", zap.Error(err))
+		return false
+	}
+
+	ev.RulesVersion = client.rules.Version
+	ev.RuleIds = eventRuleIds
+
+	newEventRules, err := client.notificationsClient.ProcessEvent(client.ctx, ev)
+	if errors.Is(err, source.ErrRulesOutdated) {
+		eventLogger.Infow("Cannot submit event to Icinga Notifications due to rule changes, will be retried",
+			zap.String("old_rules_version", client.rules.Version),
+			zap.String("new_rules_version", newEventRules.Version))
+
+		client.rules = newEventRules
+
+		return false
+	} else if err != nil {
+		eventLogger.Errorw("Cannot submit event to Icinga Notifications, will be retried",
+			zap.String("rules_version", client.rules.Version),
+			zap.Any("rules", eventRuleIds),
+			zap.Error(err))
+		return false
+	}
+
+	eventLogger.Debugw("Successfully submitted event to Icinga Notifications", zap.Any("rules", eventRuleIds))
+	return true
 }
 
 var SyncKeyStructPtrs = map[string]any{
