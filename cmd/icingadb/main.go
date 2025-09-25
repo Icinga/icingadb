@@ -171,7 +171,7 @@ func run() int {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	go func() {
-		var callback func(database.Entity)
+		var callback func(database.Entity) bool
 		var callbackKeyStructPtr map[string]any
 
 		if cfg := cmd.Config.NotificationsSource; cfg.ApiBaseUrl != "" {
