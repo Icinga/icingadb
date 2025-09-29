@@ -151,6 +151,3 @@ redis:
 #
 #   # Password for the defined user.
 #   password: insecureinsecure
-#
-#   # URL to the Icinga Web 2 to craft event URLs.
-#   icingaweb2-base-url: http://localhost/icingaweb2

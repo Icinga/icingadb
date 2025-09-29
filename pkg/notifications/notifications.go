@@ -10,6 +10,7 @@ import (
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
+	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	v1history "github.com/icinga/icingadb/pkg/icingadb/v1/history"
@@ -54,13 +55,13 @@ func NewNotificationsClient(
 		db:     db,
 		logger: logger,
 
-		rules:       &source.RulesInfo{Version: source.EmptyRulesVersion},
+		rules:       &source.RulesInfo{},
 		redisClient: rc,
 
 		ctx: ctx,
 	}
 
-	notificationsClient, err := source.NewClient(client.Config, "Icinga DB")
+	notificationsClient, err := source.NewClient(client.Config, fmt.Sprintf("Icinga DB %s", internal.Version.Version))
 	if err != nil {
 		logger.Fatalw("Cannot create Icinga Notifications client", zap.Error(err))
 	}
@@ -84,8 +85,8 @@ func NewNotificationsClient(
 //	> select * from host where id = :host_id and environment_id = :environment_id and name like 'prefix_%'
 //
 // The :host_id and :environment_id parameters will be bound to the entity's ID and EnvironmentId fields, respectively.
-func (client *Client) evaluateRulesForObject(ctx context.Context, entity database.Entity) ([]int64, error) {
-	outRuleIds := make([]int64, 0, len(client.rules.Rules))
+func (client *Client) evaluateRulesForObject(ctx context.Context, entity database.Entity) ([]string, error) {
+	outRuleIds := make([]string, 0, len(client.rules.Rules))
 
 	for rule := range client.rules.Iter() {
 		if rule.ObjectFilterExpr == "" {
@@ -98,7 +99,7 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, entity databas
 			// So, we need to unescape it before passing it to the database.
 			query, err := url.QueryUnescape(rule.ObjectFilterExpr)
 			if err != nil {
-				return false, errors.Wrapf(err, "cannot unescape rule %d object filter expression %q", rule.Id, rule.ObjectFilterExpr)
+				return false, errors.Wrapf(err, "cannot unescape rule %q object filter expression %q", rule.Id, rule.ObjectFilterExpr)
 			}
 			rows, err := client.db.NamedQueryContext(ctx, client.db.Rebind(query), entity)
 			if err != nil {
@@ -112,7 +113,7 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, entity databas
 			return true, nil
 		}()
 		if err != nil {
-			return nil, errors.Wrapf(err, "cannot fetch rule %d from %q", rule.Id, rule.ObjectFilterExpr)
+			return nil, errors.Wrapf(err, "cannot fetch rule %q from %q", rule.Id, rule.ObjectFilterExpr)
 		} else if !evaluates {
 			continue
 		}
@@ -130,14 +131,14 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, entity databas
 func (client *Client) buildCommonEvent(rlr *redisLookupResult) (*event.Event, error) {
 	var (
 		objectName string
-		objectUrl  *url.URL
+		objectUrl  url.URL
 		objectTags map[string]string
 	)
 
 	if rlr.ServiceName != "" {
 		objectName = rlr.HostName + "!" + rlr.ServiceName
 
-		objectUrl = client.notificationsClient.JoinIcingaWeb2Path("/icingadb/service")
+		objectUrl.Path = "/icingadb/service"
 		objectUrl.RawQuery = "name=" + utils.RawUrlEncode(rlr.ServiceName) + "&host.name=" + utils.RawUrlEncode(rlr.HostName)
 
 		objectTags = map[string]string{
@@ -147,7 +148,7 @@ func (client *Client) buildCommonEvent(rlr *redisLookupResult) (*event.Event, er
 	} else {
 		objectName = rlr.HostName
 
-		objectUrl = client.notificationsClient.JoinIcingaWeb2Path("/icingadb/host")
+		objectUrl.Path = "/icingadb/host"
 		objectUrl.RawQuery = "name=" + utils.RawUrlEncode(rlr.HostName)
 
 		objectTags = map[string]string{
