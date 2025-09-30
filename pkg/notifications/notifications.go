@@ -337,7 +337,7 @@ func (client *Client) Submit(entity database.Entity) bool {
 	defer client.submissionMutex.Unlock()
 
 	if client.ctx.Err() != nil {
-		client.logger.Error("Cannot process submitted entity as client context is done")
+		client.logger.Errorw("Cannot process submitted entity as client context is done", zap.Error(client.ctx.Err()))
 		return true
 	}
 
@@ -389,8 +389,10 @@ func (client *Client) Submit(entity database.Entity) bool {
 
 	eventRuleIds, err := client.evaluateRulesForObject(client.ctx, entity)
 	if err != nil {
-		eventLogger.Errorw("Cannot evaluate rules for event, will be retried", zap.Error(err))
-		return false
+		// While returning false would be more correct, this would result in never being able to refetch new rule
+		// versions. Consider an invalid object filter expression, which is now impossible to get rid of.
+		eventLogger.Errorw("Cannot evaluate rules for event, assuming no rule matched", zap.Error(err))
+		eventRuleIds = []string{}
 	}
 
 	ev.RulesVersion = client.rules.Version
