@@ -3,6 +3,9 @@ package notifications
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"sync"
+
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/notifications/event"
@@ -17,8 +20,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"net/url"
-	"sync"
 )
 
 // Client is an Icinga Notifications compatible client implementation to push events to Icinga Notifications.
@@ -31,7 +32,7 @@ type Client struct {
 	db     *database.DB
 	logger *logging.Logger
 
-	rules *source.RulesInfo // rules holds the latest rules fetched from Icinga Notifications.
+	rulesInfo *source.RulesInfo // rulesInfo holds the latest rulesInfo fetched from Icinga Notifications.
 
 	ctx context.Context
 
@@ -55,7 +56,7 @@ func NewNotificationsClient(
 		db:     db,
 		logger: logger,
 
-		rules:       &source.RulesInfo{},
+		rulesInfo:   &source.RulesInfo{},
 		redisClient: rc,
 
 		ctx: ctx,
@@ -72,8 +73,8 @@ func NewNotificationsClient(
 
 // evaluateRulesForObject returns the rule IDs for each matching query.
 //
-// At the moment, each RuleResp.ObjectFilterExpr is executed as a SQL query after the parameters are being bound. If the
-// query returns at least one line, the rule will match. Rules with an empty ObjectFilterExpr are a special case and
+// At the moment, each rule filter expression is executed as a SQL query after the parameters are being bound. If the
+// query returns at least one line, the rule will match. Rules with an empty filter expression are a special case and
 // will always match.
 //
 // The provided entity is passed as param to the queries, thus they are allowed to use all fields of that specific
@@ -86,20 +87,20 @@ func NewNotificationsClient(
 //
 // The :host_id and :environment_id parameters will be bound to the entity's ID and EnvironmentId fields, respectively.
 func (client *Client) evaluateRulesForObject(ctx context.Context, entity database.Entity) ([]string, error) {
-	outRuleIds := make([]string, 0, len(client.rules.Rules))
+	outRuleIds := make([]string, 0, len(client.rulesInfo.Rules))
 
-	for rule := range client.rules.Iter() {
-		if rule.ObjectFilterExpr == "" {
-			outRuleIds = append(outRuleIds, rule.Id)
+	for id, filterExpr := range client.rulesInfo.Rules {
+		if filterExpr == "" {
+			outRuleIds = append(outRuleIds, id)
 			continue
 		}
 
 		evaluates, err := func() (bool, error) {
 			// The raw SQL query in the database is URL-encoded (mostly the space character is replaced by %20).
 			// So, we need to unescape it before passing it to the database.
-			query, err := url.QueryUnescape(rule.ObjectFilterExpr)
+			query, err := url.QueryUnescape(filterExpr)
 			if err != nil {
-				return false, errors.Wrapf(err, "cannot unescape rule %q object filter expression %q", rule.Id, rule.ObjectFilterExpr)
+				return false, errors.Wrapf(err, "cannot unescape rule %q object filter expression %q", id, filterExpr)
 			}
 			rows, err := client.db.NamedQueryContext(ctx, client.db.Rebind(query), entity)
 			if err != nil {
@@ -113,11 +114,11 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, entity databas
 			return true, nil
 		}()
 		if err != nil {
-			return nil, errors.Wrapf(err, "cannot fetch rule %q from %q", rule.Id, rule.ObjectFilterExpr)
+			return nil, errors.Wrapf(err, "cannot fetch rule %q from %q", id, filterExpr)
 		} else if !evaluates {
 			continue
 		}
-		outRuleIds = append(outRuleIds, rule.Id)
+		outRuleIds = append(outRuleIds, id)
 	}
 
 	return outRuleIds, nil
@@ -395,21 +396,21 @@ func (client *Client) Submit(entity database.Entity) bool {
 		eventRuleIds = []string{}
 	}
 
-	ev.RulesVersion = client.rules.Version
+	ev.RulesVersion = client.rulesInfo.Version
 	ev.RuleIds = eventRuleIds
 
 	newEventRules, err := client.notificationsClient.ProcessEvent(client.ctx, ev)
 	if errors.Is(err, source.ErrRulesOutdated) {
 		eventLogger.Infow("Cannot submit event to Icinga Notifications due to rule changes, will be retried",
-			zap.String("old_rules_version", client.rules.Version),
+			zap.String("old_rules_version", client.rulesInfo.Version),
 			zap.String("new_rules_version", newEventRules.Version))
 
-		client.rules = newEventRules
+		client.rulesInfo = newEventRules
 
 		return false
 	} else if err != nil {
 		eventLogger.Errorw("Cannot submit event to Icinga Notifications, will be retried",
-			zap.String("rules_version", client.rules.Version),
+			zap.String("rules_version", client.rulesInfo.Version),
 			zap.Any("rules", eventRuleIds),
 			zap.Error(err))
 		return false
