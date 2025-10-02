@@ -7,7 +7,7 @@ require (
 	github.com/goccy/go-yaml v1.13.0
 	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
-	github.com/icinga/icinga-go-library v0.7.3-0.20250929125610-2d45c2002dfa
+	github.com/icinga/icinga-go-library v0.7.3-0.20251002071510-577e857e2417
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.32
