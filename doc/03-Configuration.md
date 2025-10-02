@@ -146,7 +146,7 @@ ICINGADB_LOGGING_OPTIONS=database:error,high-availability:debug
 | runtime-updates   | Runtime updates of config objects after the initial config synchronization.     |
 | telemetry         | Reporting of Icinga DB status to Icinga 2 via Redis® (for monitoring purposes). |
 
-## Retention
+## Retention Configuration
 
 By default, no historical data is deleted, which means that the longer the data is retained,
 the more disk space is required to store it. History retention is an optional feature that allows to
@@ -173,6 +173,20 @@ ICINGADB_RETENTION_OPTIONS=comment:356
 | interval     | **Optional.** Interval for periodically cleaning up the historical data, defined as [duration string](#duration-string). Defaults to `"1h"`.                                                                  |
 | count        | **Optional.** Number of old historical data a single query can delete in a `"DELETE FROM ... LIMIT count"` manner. Defaults to `5000`.                                                                        |
 | options      | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification` and `state`.                        |
+
+## Notifications Source Configuration
+
+Icinga DB can act as an event source for [Icinga Notifications](https://icinga.com/docs/icinga-notifications/).
+If configured, Icinga DB will submit events to the Icinga Notifications API.
+
+For YAML configuration, the options are part of the `notifications-source` dictionary.
+For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_SOURCE_`.
+
+| Option       | Description                                                                       |
+|--------------|-----------------------------------------------------------------------------------|
+| api-base-url | **Optional.** Icinga Notifications API base URL, such as `http://localhost:5680`. |
+| username     | **Optional.** Icinga Notifications API user for this source.                      |
+| password     | **Optional.** Icinga Notifications API user password.                             |
 
 ## Appendix
 

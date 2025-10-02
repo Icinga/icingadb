@@ -146,8 +146,8 @@ redis:
 #   # URL to the API root.
 #   api-base-url: http://localhost:5680
 #
-#   # Source or username to authenticate against the /process-event API.
-#   username: source-2
+#   Username to authenticate against the Icinga Notifications API.
+#   username: icingadb
 #
 #   # Password for the defined user.
 #   password: insecureinsecure

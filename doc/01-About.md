@@ -34,6 +34,10 @@ Icinga DB Web also connects to the Icinga 2 API with its Command Transport to ac
 
 These are the components of Icinga DB embedded into an Icinga setup with Icinga 2 and Icinga Web 2.
 
+Since the Icinga DB daemon always receives the latest information from Redis®, it is an ideal candidate to distribute information further.
+In addition to inserting data into a relational database, Icinga DB can also forward events to [Icinga Notifications](https://icinga.com/docs/icinga-notifications/),
+as described in the [configuration section](03-Configuration.md#notifications-source-configuration).
+
 ## Installation
 
 To install Icinga DB see [Installation](02-Installation.md).
