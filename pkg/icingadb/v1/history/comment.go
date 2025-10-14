@@ -3,6 +3,7 @@ package history
 import (
 	"database/sql/driver"
 	"encoding"
+	"fmt"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -23,8 +24,14 @@ func (che CommentHistoryEntity) ID() database.ID {
 }
 
 // SetID implements part of the contracts.Entity interface.
+//
+// The id must be of type types.Binary. Otherwise, the method will panic.
 func (che *CommentHistoryEntity) SetID(id database.ID) {
-	che.CommentId = id.(types.Binary)
+	idBinary, ok := id.(types.Binary)
+	if !ok {
+		panic(fmt.Sprintf("expects types.Binary, got %T", id))
+	}
+	che.CommentId = idBinary
 }
 
 type CommentHistoryUpserter struct {

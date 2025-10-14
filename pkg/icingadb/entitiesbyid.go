@@ -22,7 +22,7 @@ func (ebi EntitiesById) Keys() []string {
 func (ebi EntitiesById) IDs() []any {
 	ids := make([]any, 0, len(ebi))
 	for _, v := range ebi {
-		ids = append(ids, v.(database.IDer).ID())
+		ids = append(ids, v.ID())
 	}
 
 	return ids

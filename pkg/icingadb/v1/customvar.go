@@ -8,6 +8,7 @@ import (
 	"github.com/icinga/icinga-go-library/objectpacker"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
+	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"runtime"
 )
@@ -107,7 +108,10 @@ func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan databa
 			g.Go(func() error {
 				for entity := range cvs {
 					var value any
-					customvar := entity.(*Customvar)
+					customvar, ok := entity.(*Customvar)
+					if !ok {
+						return errors.New("entity does not implement Customvar")
+					}
 					if err := types.UnmarshalJSON([]byte(customvar.Value), &value); err != nil {
 						return err
 					}

@@ -182,7 +182,11 @@ func writeOneEntityStage(structPtr any) stageFunc {
 		if err != nil {
 			return nil, errors.Wrapf(err, "can't structify values %#v", entry.Values)
 		}
-		return []v1.UpserterEntity{ptr.(v1.UpserterEntity)}, nil
+		ptrUpserterEntity, ok := ptr.(v1.UpserterEntity)
+		if !ok {
+			return nil, errors.New("ptr does not implement UpserterEntity")
+		}
+		return []v1.UpserterEntity{ptrUpserterEntity}, nil
 	})
 }
 
@@ -321,7 +325,10 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 		if err != nil {
 			return nil, err
 		}
-		notificationHistory := rawNotificationHistory.(*NotificationHistory)
+		notificationHistory, ok := rawNotificationHistory.(*NotificationHistory)
+		if !ok {
+			return nil, errors.New("rawNotificationHistory does not implement NotificationHistory")
+		}
 
 		if !notificationHistory.UserIds.Valid {
 			return nil, nil
