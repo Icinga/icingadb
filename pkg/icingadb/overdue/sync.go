@@ -219,7 +219,7 @@ func (s Sync) updateOverdue(
 	}
 
 	counter.Add(uint64(len(ids)))
-	telemetry.Stats.Overdue.Add(uint64(len(ids)))
+	telemetry.Stats.Get(telemetry.StatOverdue).Add(uint64(len(ids)))
 
 	var op func(ctx context.Context, key string, members ...any) *redis.IntCmd
 	if overdue {
