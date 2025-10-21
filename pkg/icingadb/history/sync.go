@@ -41,13 +41,23 @@ func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync
 
 // Sync synchronizes Redis history streams from s.redis to s.db and deletes the original data on success.
 //
-// An optional callback and callbackKeyStructPtr might be given. Both most either be nil or not nil.
+// It is possible to enable a callback functionality, e.g., for the Icinga Notifications integration. To do so, the
+// optional callbackFn and callbackKeyStructPtr must be set. Both must either be nil or not nil. If set, the additional
+// callbackName must also be set, to be used in [telemetry.Stats].
 //
 // The callbackKeyStructPtr says which pipeline keys should be mapped to which type, identified by a struct pointer. If
-// a key is missing from the map, it will not be used for the callback. The callback function itself shall not block.
-func (s Sync) Sync(ctx context.Context, callbackKeyStructPtr map[string]any, callback func(database.Entity) bool) error {
-	if (callbackKeyStructPtr == nil) != (callback == nil) {
-		return fmt.Errorf("either both callbackKeyStructPtr and callback must be nil or none")
+// a key is missing from the map, it will not be used for the callback. The callbackFn function shall not block.
+func (s Sync) Sync(
+	ctx context.Context,
+	callbackName string,
+	callbackKeyStructPtr map[string]any,
+	callbackFn func(database.Entity) bool,
+) error {
+	if (callbackKeyStructPtr == nil) != (callbackFn == nil) {
+		return fmt.Errorf("either both callbackKeyStructPtr and callbackFn must be nil or none")
+	}
+	if (callbackKeyStructPtr != nil) && (callbackName == "") {
+		return fmt.Errorf("if callbackKeyStructPtr and callbackFn are set, a callbackName is required")
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -87,7 +97,7 @@ func (s Sync) Sync(ctx context.Context, callbackKeyStructPtr map[string]any, cal
 		// Shadowed variable to allow appending custom callbacks.
 		pipeline := pipeline
 		if hasCallbackStage {
-			pipeline = append(pipeline, makeCallbackStageFunc(callbackKeyStructPtr, callback))
+			pipeline = append(pipeline, makeCallbackStageFunc(callbackName, callbackKeyStructPtr, callbackFn))
 		}
 
 		ch := make([]chan redis.XMessage, len(pipeline)+1)
@@ -402,7 +412,7 @@ func countElementStage(ctx context.Context, _ Sync, _ string, in <-chan redis.XM
 				return nil
 			}
 
-			telemetry.Stats.History.Add(1)
+			telemetry.Stats.Get(telemetry.StatHistory).Add(1)
 			out <- msg
 
 		case <-ctx.Done():
@@ -423,9 +433,13 @@ func countElementStage(ctx context.Context, _ Sync, _ string, in <-chan redis.XM
 // callback method, it will be forwarded to the out channel. Thus, this stage might "block" or "hold back" certain
 // messages during unhappy callback times.
 //
-// For each successfully submitted message, [telemetry.State.Callback] is incremented. Thus, a delta between
-// [telemetry.State.History] and [telemetry.State.Callback] indicates blocking callbacks.
-func makeCallbackStageFunc(keyStructPtrs map[string]any, callback func(database.Entity) bool) stageFunc {
+// For each successfully submitted message, the telemetry stat named after this callback is incremented. Thus, a delta
+// between [telemetry.StatHistory] and this stat indicates blocking callbacks.
+func makeCallbackStageFunc(
+	name string,
+	keyStructPtrs map[string]any,
+	fn func(database.Entity) bool,
+) stageFunc {
 	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
 		defer close(out)
 
@@ -479,9 +493,9 @@ func makeCallbackStageFunc(keyStructPtrs map[string]any, callback func(database.
 					return err
 				}
 
-				if callback(entity) {
+				if fn(entity) {
 					out <- msg
-					telemetry.Stats.Callback.Add(1)
+					telemetry.Stats.Get(name).Add(1)
 					backlogLastId = ""
 				} else {
 					backlogLastId = msg.ID
@@ -521,10 +535,10 @@ func makeCallbackStageFunc(keyStructPtrs map[string]any, callback func(database.
 					return errors.Wrapf(err, "can't structify backlog value %q for %q", backlogLastId, key)
 				}
 
-				if callback(entity) {
+				if fn(entity) {
 					out <- msg
 					backlogMsgCounter++
-					telemetry.Stats.Callback.Add(1)
+					telemetry.Stats.Get(name).Add(1)
 
 					if len(msgs) == 1 {
 						backlogLastId = ""
