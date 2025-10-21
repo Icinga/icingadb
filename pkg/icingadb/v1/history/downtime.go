@@ -2,6 +2,7 @@ package history
 
 import (
 	"database/sql/driver"
+	"fmt"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -22,8 +23,14 @@ func (dhe DowntimeHistoryEntity) ID() database.ID {
 }
 
 // SetID implements part of the contracts.Entity interface.
+//
+// The id must be of type types.Binary. Otherwise, the method will panic.
 func (dhe *DowntimeHistoryEntity) SetID(id database.ID) {
-	dhe.DowntimeId = id.(types.Binary)
+	idBinary, ok := id.(types.Binary)
+	if !ok {
+		panic(fmt.Sprintf("expects types.Binary, got %T", id))
+	}
+	dhe.DowntimeId = idBinary
 }
 
 type DowntimeHistoryUpserter struct {

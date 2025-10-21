@@ -124,7 +124,7 @@ func sliceIdoHistory[Row any](
 			log.With("query", query).Fatalf("%+v", errors.Wrap(err, "can't perform query"))
 		}
 
-		_ = stmt.Close()
+		_ = stmt.Close() //nolint:sqlclosecheck // no function exit between stmt creation and here, no reason for deferred close
 
 		if len(rows) < 1 {
 			break

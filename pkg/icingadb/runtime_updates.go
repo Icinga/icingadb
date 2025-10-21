@@ -258,12 +258,12 @@ func (r *RuntimeUpdates) xRead(ctx context.Context, updateMessagesByKey map[stri
 				for _, message := range stream.Messages {
 					id = message.ID
 
-					redisKey := message.Values["redis_key"]
-					if redisKey == nil {
-						return errors.Errorf("stream message missing 'redis_key' key: %v", message.Values)
+					redisKey, ok := message.Values["redis_key"].(string)
+					if !ok {
+						return errors.Errorf("redis_key stream message key is %T, not string", message.Values["redis_key"])
 					}
 
-					updateMessages := updateMessagesByKey[redisKey.(string)]
+					updateMessages := updateMessagesByKey[redisKey]
 					if updateMessages == nil {
 						return errors.Errorf("no object type for redis key %s found", redisKey)
 					}
@@ -339,7 +339,10 @@ func structifyStream(
 					return errors.Wrapf(err, "can't structify values %#v", message.Values)
 				}
 
-				entity := ptr.(database.Entity)
+				entity, ok := ptr.(database.Entity)
+				if !ok {
+					return errors.New("ptr does not implement database.Entity")
+				}
 
 				runtimeType := message.Values["runtime_type"]
 				if runtimeType == nil {

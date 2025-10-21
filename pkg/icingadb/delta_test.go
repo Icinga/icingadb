@@ -194,8 +194,9 @@ func testDeltaVerifyResult(t *testing.T, name string, expected map[uint64]uint64
 		idKey := testDeltaMakeIdOrChecksum(id).String()
 		if assert.Containsf(t, got, idKey, "%s: should contain %s", name, idKey) {
 			expectedChecksum := testDeltaMakeIdOrChecksum(checksum).String()
-			gotChecksum := got[idKey].(contracts.Checksumer).Checksum().String()
-			assert.Equalf(t, expectedChecksum, gotChecksum, "%s: %s should match checksum", name, idKey)
+			gotChecksum, ok := got[idKey].(contracts.Checksumer)
+			assert.True(t, ok, "got[idKey] does not implement contracts.Checksummer")
+			assert.Equalf(t, expectedChecksum, gotChecksum.Checksum().String(), "%s: %s should match checksum", name, idKey)
 			delete(got, idKey)
 		}
 	}

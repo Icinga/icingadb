@@ -1,0 +1,31 @@
+version: "2"
+
+linters:
+  default: standard
+
+  enable:
+    - bidichk # dangerous Unicode chars
+    - bodyclose # HTTP response body is closed
+    - exptostd # functions from golang.org/x/exp/ that can be replaced by std functions
+    - forcetypeassert # forced type assertions
+    - gosec # security problems
+    - loggercheck # key value pairs for common logger libraries (including zap)
+    - misspell # commonly misspelled English words
+    - nosprintfhostport # misuse of Sprintf to construct a host with port in a URL
+    - rowserrcheck # Rows.Err of rows is checked
+    - sqlclosecheck # sql.Rows, sql.Stmt, sqlx.NamedStmt, pgx.Query are closed
+
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - '-QF1001' # don't suggest De Morgan's law for boolean expressions
+        - '-QF1003' # ignore could use tagged switch
+        - '-QF1008' # ignore could remove embedded field
+        - '-ST1000' # ignore missing package comments
+        - '-ST1003' # ignore capitalization in camel case names
+        - '-ST1005' # ignore capitalized error strings
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

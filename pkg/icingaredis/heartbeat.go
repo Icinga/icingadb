@@ -222,8 +222,13 @@ func (m *HeartbeatMessage) Stats() *v1.StatsMessage {
 
 // EnvironmentID returns the Icinga DB environment ID stored in the heartbeat message.
 func (m *HeartbeatMessage) EnvironmentID() (types.Binary, error) {
+	env, ok := m.stats["icingadb_environment"].(string)
+	if !ok {
+		return nil, errors.Errorf("icingadb_environment stats is %T, not string", m.stats["icingadb_environment"])
+	}
+
 	var id types.Binary
-	err := types.UnmarshalJSON([]byte(m.stats["icingadb_environment"].(string)), &id)
+	err := types.UnmarshalJSON([]byte(env), &id)
 	if err != nil {
 		return nil, err
 	}

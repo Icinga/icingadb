@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"fmt"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/contracts"
@@ -17,8 +18,14 @@ func (m ChecksumMeta) Checksum() contracts.Checksum {
 }
 
 // SetChecksum implements part of the contracts.Checksumer interface.
+//
+// The checksum must be of type types.Binary. Otherwise, the method will panic.
 func (m *ChecksumMeta) SetChecksum(checksum contracts.Checksum) {
-	m.PropertiesChecksum = checksum.(types.Binary)
+	checksumBinary, ok := checksum.(types.Binary)
+	if !ok {
+		panic(fmt.Sprintf("expects types.Binary, got %T", checksum))
+	}
+	m.PropertiesChecksum = checksumBinary
 }
 
 // EnvironmentMeta is embedded by every type which belongs to an environment.
@@ -37,8 +44,14 @@ func (m IdMeta) ID() database.ID {
 }
 
 // SetID implements part of the contracts.IDer interface.
+//
+// The id must be of type types.Binary. Otherwise, the method will panic.
 func (m *IdMeta) SetID(id database.ID) {
-	m.Id = id.(types.Binary)
+	idBinary, ok := id.(types.Binary)
+	if !ok {
+		panic(fmt.Sprintf("expects types.Binary, got %T", id))
+	}
+	m.Id = idBinary
 }
 
 // NameMeta is embedded by every type with a name.

@@ -397,7 +397,7 @@ func migrateOneType[IdoRow any](
 
 			var err error
 
-			lastStmt, err = ht.cache.Preparex(query)
+			lastStmt, err = ht.cache.Preparex(query) //nolint:sqlclosecheck // either closed in the if block above or in the defer func
 			if err != nil {
 				log.With("backend", "cache", "query", query).
 					Fatalf("%+v", errors.Wrap(err, "can't prepare query"))
