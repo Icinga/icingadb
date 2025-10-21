@@ -184,7 +184,7 @@ func (r *RuntimeUpdates) Sync(
 			return r.db.NamedBulkExec(
 				ctx, cvStmt, cvCount, sem, customvars, database.SplitOnDupId[database.Entity],
 				database.OnSuccessIncrement[database.Entity](&counter),
-				database.OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
+				database.OnSuccessIncrement[database.Entity](telemetry.Stats.Get(telemetry.StatConfig)),
 			)
 		})
 
@@ -204,7 +204,7 @@ func (r *RuntimeUpdates) Sync(
 			return r.db.NamedBulkExec(
 				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars,
 				database.SplitOnDupId[database.Entity], database.OnSuccessIncrement[database.Entity](&counter),
-				database.OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
+				database.OnSuccessIncrement[database.Entity](telemetry.Stats.Get(telemetry.StatConfig)),
 			)
 		})
 

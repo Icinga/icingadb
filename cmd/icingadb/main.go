@@ -171,8 +171,11 @@ func run() int {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	go func() {
-		var callback func(database.Entity) bool
-		var callbackKeyStructPtr map[string]any
+		var (
+			callbackName         string
+			callbackKeyStructPtr map[string]any
+			callbackFn           func(database.Entity) bool
+		)
 
 		if cfg := cmd.Config.NotificationsSource; cfg.ApiBaseUrl != "" {
 			logger.Info("Starting Icinga Notifications source")
@@ -183,13 +186,20 @@ func run() int {
 				rc,
 				logs.GetChildLogger("notifications-source"),
 				cfg)
-			callback = notificationsSource.Submit
+
+			callbackName = "notifications_sync"
 			callbackKeyStructPtr = notifications.SyncKeyStructPtrs
+			callbackFn = notificationsSource.Submit
 		}
 
 		logger.Info("Starting history sync")
 
-		if err := hs.Sync(ctx, callbackKeyStructPtr, callback); err != nil && !utils.IsContextCanceled(err) {
+		if err := hs.Sync(
+			ctx,
+			callbackName,
+			callbackKeyStructPtr,
+			callbackFn,
+		); err != nil && !utils.IsContextCanceled(err) {
 			logger.Fatalf("%+v", err)
 		}
 	}()
