@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 )
@@ -97,7 +98,7 @@ func (s Sync) Sync(
 		// Shadowed variable to allow appending custom callbacks.
 		pipeline := pipeline
 		if hasCallbackStage {
-			pipeline = append(pipeline, makeCallbackStageFunc(callbackName, callbackKeyStructPtr, callbackFn))
+			pipeline = append(slices.Clip(pipeline), makeCallbackStageFunc(callbackName, callbackKeyStructPtr, callbackFn))
 		}
 
 		ch := make([]chan redis.XMessage, len(pipeline)+1)
@@ -470,7 +471,7 @@ func makeCallbackStageFunc(
 		backlogLastId := ""
 		backlogMsgCounter := 0
 
-		const backlogTimerMinInterval, backlogTimerMaxInterval = 10 * time.Millisecond, time.Minute
+		const backlogTimerMinInterval, backlogTimerMaxInterval = time.Millisecond, time.Minute
 		backlogTimerInterval := backlogTimerMinInterval
 		backlogTimer := time.NewTimer(backlogTimerInterval)
 		_ = backlogTimer.Stop()

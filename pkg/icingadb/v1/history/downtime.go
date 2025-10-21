@@ -88,6 +88,9 @@ func (*HistoryDowntime) TableName() string {
 	return "history"
 }
 
+// DowntimeHistoryMeta is a combined HistoryMeta struct of DowntimeHistoryEntity and DowntimeHistory.
+//
+// It is used in the notifications package and became necessary as values of both structs were required.
 type DowntimeHistoryMeta struct {
 	DowntimeHistoryEntity `json:",inline"`
 	DowntimeHistory       `json:",inline"`
