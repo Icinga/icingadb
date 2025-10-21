@@ -24,40 +24,52 @@ import (
 // request and return an error indicating that the operation timed out. In case of the serviceId being set, the
 // maximum execution time of the Redis HGet commands is 10s (5s for each HGet call).
 func (client *Client) fetchHostServiceName(ctx context.Context, hostId, serviceId types.Binary) (*redisLookupResult, error) {
-	redisHGet := func(typ, field string, out *redisLookupResult) error {
+	getNameFromRedis := func(typ, id string) (string, error) {
 		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 
+		var data string
 		err := retry.WithBackoff(
 			ctx,
-			func(ctx context.Context) error { return client.redisClient.HGet(ctx, "icinga:"+typ, field).Scan(out) },
+			func(ctx context.Context) (err error) {
+				data, err = client.redisClient.HGet(ctx, "icinga:"+typ, id).Result()
+				return
+			},
 			retry.Retryable,
 			backoff.DefaultBackoff,
 			retry.Settings{},
 		)
 		if err != nil {
 			if errors.Is(err, redis.Nil) {
-				return fmt.Errorf("%s with ID %s not found in Redis", typ, hostId)
+				return "", fmt.Errorf("%s with ID %s not found in Redis", typ, hostId)
 			}
-			return fmt.Errorf("failed to fetch %s with ID %s from Redis: %w", typ, field, err)
+			return "", fmt.Errorf("failed to fetch %s with ID %s from Redis: %w", typ, id, err)
 		}
-		return nil
+
+		var result struct {
+			Name string `json:"name"`
+		}
+
+		if err := json.Unmarshal([]byte(data), &result); err != nil {
+			return "", fmt.Errorf("failed to unmarshal redis result: %w", err)
+		}
+
+		return result.Name, nil
 	}
 
 	var result redisLookupResult
-	if err := redisHGet("host", hostId.String(), &result); err != nil {
+	var err error
+
+	result.HostName, err = getNameFromRedis("host", hostId.String())
+	if err != nil {
 		return nil, err
 	}
 
-	result.HostName = result.Name
-	result.Name = "" // Clear the name field for the host, as we will fetch the service name next.
-
 	if serviceId != nil {
-		if err := redisHGet("service", serviceId.String(), &result); err != nil {
+		result.ServiceName, err = getNameFromRedis("service", serviceId.String())
+		if err != nil {
 			return nil, err
 		}
-		result.ServiceName = result.Name
-		result.Name = "" // It's not needed anymore, clear it!
 	}
 
 	return &result, nil
@@ -67,23 +79,4 @@ func (client *Client) fetchHostServiceName(ctx context.Context, hostId, serviceI
 type redisLookupResult struct {
 	HostName    string `json:"-"` // Name of the host (never empty).
 	ServiceName string `json:"-"` // Name of the service (only set in service context).
-
-	// Name is used to retrieve the host or service name from Redis.
-	// It should not be used for any other purpose apart from within the [Client.fetchHostServiceName] function.
-	Name string `json:"name"`
-}
-
-// UnmarshalBinary implements the [encoding.BinaryUnmarshaler] interface for redisLookupResult.
-//
-// It unmarshals the binary data of the Redis HGet result into the redisLookupResult struct.
-// This is required for the HGet().Scan() usage in the [Client.fetchHostServiceName] function to work correctly.
-func (rlr *redisLookupResult) UnmarshalBinary(data []byte) error {
-	if len(data) == 0 {
-		return errors.New("empty data received for redisLookupResult")
-	}
-
-	if err := json.Unmarshal(data, rlr); err != nil {
-		return fmt.Errorf("failed to unmarshal redis result: %w", err)
-	}
-	return nil
 }
