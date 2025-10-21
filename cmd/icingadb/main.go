@@ -170,7 +170,7 @@ func run() int {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
-	go func() {
+	{
 		var (
 			callbackName         string
 			callbackKeyStructPtr map[string]any
@@ -180,29 +180,34 @@ func run() int {
 		if cfg := cmd.Config.NotificationsSource; cfg.ApiBaseUrl != "" {
 			logger.Info("Starting Icinga Notifications source")
 
-			notificationsSource := notifications.NewNotificationsClient(
+			notificationsSource, err := notifications.NewNotificationsClient(
 				ctx,
 				db,
 				rc,
 				logs.GetChildLogger("notifications-source"),
 				cfg)
+			if err != nil {
+				logger.Fatalw("Can't create Icinga Notifications client from config", zap.Error(err))
+			}
 
 			callbackName = "notifications_sync"
 			callbackKeyStructPtr = notifications.SyncKeyStructPtrs
 			callbackFn = notificationsSource.Submit
 		}
 
-		logger.Info("Starting history sync")
+		go func() {
+			logger.Info("Starting history sync")
 
-		if err := hs.Sync(
-			ctx,
-			callbackName,
-			callbackKeyStructPtr,
-			callbackFn,
-		); err != nil && !utils.IsContextCanceled(err) {
-			logger.Fatalf("%+v", err)
-		}
-	}()
+			if err := hs.Sync(
+				ctx,
+				callbackName,
+				callbackKeyStructPtr,
+				callbackFn,
+			); err != nil && !utils.IsContextCanceled(err) {
+				logger.Fatalf("%+v", err)
+			}
+		}()
+	}
 
 	// Main loop
 	for {
