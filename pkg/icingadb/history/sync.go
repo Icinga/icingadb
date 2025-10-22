@@ -543,7 +543,7 @@ func makeCallbackStageFunc(
 
 					if len(msgs) == 1 {
 						backlogLastId = ""
-						logger.Infow("Finished rolling back backlog of callback elements", zap.Int("delay", backlogMsgCounter))
+						logger.Infow("Finished rolling back backlog of callback elements", zap.Int("elements", backlogMsgCounter))
 					} else {
 						backlogLastId = msgs[1].ID
 						backlogTimerInterval = backlogTimerMinInterval
