@@ -39,7 +39,7 @@ type Client struct {
 	notificationsClient *source.Client // The Icinga Notifications client used to interact with the API.
 	redisClient         *redis.Client  // redisClient is the Redis client used to fetch host and service names for events.
 
-	submissionMutex sync.Mutex
+	submissionMutex sync.Mutex // submissionMutex protects not concurrent safe struct fields in Client.Submit, i.e., rulesInfo.
 }
 
 // NewNotificationsClient creates a new Client connected to an existing database and logger.
@@ -132,7 +132,7 @@ func (client *Client) buildCommonEvent(
 	ctx context.Context,
 	hostId, serviceId types.Binary,
 ) (*event.Event, *redisLookupResult, error) {
-	rlr, err := client.fetchHostServiceName(ctx, hostId, serviceId)
+	rlr, err := client.fetchHostServiceFromRedis(ctx, hostId, serviceId)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -143,25 +143,26 @@ func (client *Client) buildCommonEvent(
 		objectTags map[string]string
 	)
 
-	if rlr.ServiceName != "" {
-		objectName = rlr.HostName + "!" + rlr.ServiceName
-		objectUrl = "/icingadb/service?name=" + utils.RawUrlEncode(rlr.ServiceName) + "&host.name=" + utils.RawUrlEncode(rlr.HostName)
+	if rlr.serviceName != "" {
+		objectName = rlr.hostName + "!" + rlr.serviceName
+		objectUrl = "/icingadb/service?name=" + utils.RawUrlEncode(rlr.serviceName) + "&host.name=" + utils.RawUrlEncode(rlr.hostName)
 		objectTags = map[string]string{
-			"host":    rlr.HostName,
-			"service": rlr.ServiceName,
+			"host":    rlr.hostName,
+			"service": rlr.serviceName,
 		}
 	} else {
-		objectName = rlr.HostName
-		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(rlr.HostName)
+		objectName = rlr.hostName
+		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(rlr.hostName)
 		objectTags = map[string]string{
-			"host": rlr.HostName,
+			"host": rlr.hostName,
 		}
 	}
 
 	return &event.Event{
-		Name: objectName,
-		URL:  objectUrl,
-		Tags: objectTags,
+		Name:      objectName,
+		URL:       objectUrl,
+		Tags:      objectTags,
+		ExtraTags: rlr.CustomVars(),
 	}, rlr, nil
 }
 
@@ -177,7 +178,7 @@ func (client *Client) buildStateHistoryEvent(ctx context.Context, h *v1history.S
 
 	ev.Type = event.TypeState
 
-	if rlr.ServiceName != "" {
+	if rlr.serviceName != "" {
 		switch h.HardState {
 		case 0:
 			ev.Severity = event.SeverityOK
