@@ -225,8 +225,8 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 func getCounterForEntity(e database.Entity) *com.Counter {
 	switch e.(type) {
 	case *v1.HostState, *v1.ServiceState:
-		return &telemetry.Stats.State
+		return telemetry.Stats.Get(telemetry.StatState)
 	default:
-		return &telemetry.Stats.Config
+		return telemetry.Stats.Get(telemetry.StatConfig)
 	}
 }

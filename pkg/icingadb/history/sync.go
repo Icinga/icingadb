@@ -2,6 +2,7 @@ package history
 
 import (
 	"context"
+	"fmt"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
@@ -15,9 +16,12 @@ import (
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"reflect"
+	"slices"
 	"sync"
+	"time"
 )
 
 // Sync specifies the source and destination of a history sync.
@@ -37,7 +41,26 @@ func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync
 }
 
 // Sync synchronizes Redis history streams from s.redis to s.db and deletes the original data on success.
-func (s Sync) Sync(ctx context.Context) error {
+//
+// It is possible to enable a callback functionality, e.g., for the Icinga Notifications integration. To do so, the
+// optional callbackFn and callbackKeyStructPtr must be set. Both must either be nil or not nil. If set, the additional
+// callbackName must also be set, to be used in [telemetry.Stats].
+//
+// The callbackKeyStructPtr says which pipeline keys should be mapped to which type, identified by a struct pointer. If
+// a key is missing from the map, it will not be used for the callback. The callbackFn function shall not block.
+func (s Sync) Sync(
+	ctx context.Context,
+	callbackName string,
+	callbackKeyStructPtr map[string]any,
+	callbackFn func(database.Entity) bool,
+) error {
+	if (callbackKeyStructPtr == nil) != (callbackFn == nil) {
+		return fmt.Errorf("either both callbackKeyStructPtr and callbackFn must be nil or none")
+	}
+	if (callbackKeyStructPtr != nil) && (callbackName == "") {
+		return fmt.Errorf("if callbackKeyStructPtr and callbackFn are set, a callbackName is required")
+	}
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	for key, pipeline := range syncPipelines {
@@ -62,6 +85,21 @@ func (s Sync) Sync(ctx context.Context) error {
 		// it has processed it, even if the stage itself does not do anything with this specific entry. It should only
 		// forward the entry after it has completed its own sync so that later stages can rely on previous stages being
 		// executed successfully.
+		//
+		// If a callback exists for this key, it will be appended to the pipeline. Thus, it is executed after every
+		// other pipeline action, but before deleteFromRedis.
+
+		var hasCallbackStage bool
+		if callbackKeyStructPtr != nil {
+			_, exists := callbackKeyStructPtr[key]
+			hasCallbackStage = exists
+		}
+
+		// Shadowed variable to allow appending custom callbacks.
+		pipeline := pipeline
+		if hasCallbackStage {
+			pipeline = append(slices.Clip(pipeline), makeCallbackStageFunc(callbackName, callbackKeyStructPtr, callbackFn))
+		}
 
 		ch := make([]chan redis.XMessage, len(pipeline)+1)
 		for i := range ch {
@@ -152,7 +190,6 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 			}
 
 			counter.Add(uint64(len(ids)))
-			telemetry.Stats.History.Add(uint64(len(ids)))
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -354,32 +391,214 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 	})(ctx, s, key, in, out)
 }
 
+// countElementStage increments the [Stats.History] counter.
+//
+// This stageFunc should be called last in a [syncPipeline]. Thus, it is still executed before the final
+// Sync.deleteFromRedis call in Sync.Sync. Furthermore, an optional callback function will be appended after this stage,
+// resulting in an incremented history state counter for synchronized history, but stalling callback actions.
+func countElementStage(ctx context.Context, _ Sync, _ string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
+	defer close(out)
+
+	for {
+		select {
+		case msg, ok := <-in:
+			if !ok {
+				return nil
+			}
+
+			telemetry.Stats.Get(telemetry.StatHistory).Add(1)
+			out <- msg
+
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// makeCallbackStageFunc creates a new stageFunc calling the given callback function for each message.
+//
+// The keyStructPtrs map decides what kind of database.Entity type will be used for the input data based on the key.
+//
+// The callback call is blocking and the message will be forwarded to the out channel after the function has returned.
+// Thus, please ensure this function does not block too long.
+//
+// If the callback function returns false, the stageFunc switches to a backlog mode, retrying the failed messages and
+// every subsequent message until there are no messages left. Only after a message was successfully handled by the
+// callback method, it will be forwarded to the out channel. Thus, this stage might "block" or "hold back" certain
+// messages during unhappy callback times.
+//
+// For each successfully submitted message, the telemetry stat named after this callback is incremented. Thus, a delta
+// between [telemetry.StatHistory] and this stat indicates blocking callbacks.
+func makeCallbackStageFunc(
+	name string,
+	keyStructPtrs map[string]any,
+	fn func(database.Entity) bool,
+) stageFunc {
+	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
+		defer close(out)
+
+		structPtr, ok := keyStructPtrs[key]
+		if !ok {
+			return fmt.Errorf("can't lookup struct pointer for key %q", key)
+		}
+
+		structifier := structify.MakeMapStructifier(
+			reflect.TypeOf(structPtr).Elem(),
+			"json",
+			contracts.SafeInit)
+
+		makeEntity := func(values map[string]interface{}) (database.Entity, error) {
+			val, err := structifier(values)
+			if err != nil {
+				return nil, errors.Wrapf(err, "can't structify values %#v for %q", values, key)
+			}
+
+			entity, ok := val.(database.Entity)
+			if !ok {
+				return nil, fmt.Errorf("structifier returned %T which does not implement database.Entity", val)
+			}
+
+			return entity, nil
+		}
+
+		backlogLastId := ""
+		backlogMsgCounter := 0
+
+		const backlogTimerMinInterval, backlogTimerMaxInterval = time.Millisecond, time.Minute
+		backlogTimerInterval := backlogTimerMinInterval
+		backlogTimer := time.NewTimer(backlogTimerInterval)
+		_ = backlogTimer.Stop()
+
+		for {
+			select {
+			case msg, ok := <-in:
+				if !ok {
+					return nil
+				}
+
+				// Only submit the entity directly if there is no backlog.
+				// The second check covers a potential corner case if the XRANGE below races this stream.
+				if backlogLastId != "" && backlogLastId != msg.ID {
+					continue
+				}
+
+				entity, err := makeEntity(msg.Values)
+				if err != nil {
+					return err
+				}
+
+				if fn(entity) {
+					out <- msg
+					telemetry.Stats.Get(name).Add(1)
+					backlogLastId = ""
+				} else {
+					backlogLastId = msg.ID
+					backlogMsgCounter = 0
+					backlogTimerInterval = backlogTimerMinInterval
+					_ = backlogTimer.Reset(backlogTimerInterval)
+					s.logger.Warnw("Failed to submit entity to callback, entering into backlog",
+						zap.String("key", key),
+						zap.String("id", backlogLastId))
+				}
+
+			case <-backlogTimer.C:
+				if backlogLastId == "" { // Should never happen.
+					return fmt.Errorf("backlog timer logic for %q was called while backlogLastId was empty", key)
+				}
+
+				logger := s.logger.With(
+					zap.String("key", key),
+					zap.String("last-id", backlogLastId))
+
+				logger.Debug("Trying to advance backlog of callback elements")
+
+				xrangeCmd := s.redis.XRangeN(ctx, "icinga:history:stream:"+key, backlogLastId, "+", 2)
+				msgs, err := xrangeCmd.Result()
+				if err != nil {
+					return errors.Wrapf(err, "XRANGE %q to %q on stream %q failed", backlogLastId, "+", key)
+				}
+
+				if len(msgs) < 1 || len(msgs) > 2 {
+					return fmt.Errorf("XRANGE %q to %q on stream %q returned %d messages, not 1 or 2",
+						backlogLastId, "+", key, len(msgs))
+				}
+
+				msg := msgs[0]
+				entity, err := makeEntity(msg.Values)
+				if err != nil {
+					return errors.Wrapf(err, "can't structify backlog value %q for %q", backlogLastId, key)
+				}
+
+				if fn(entity) {
+					out <- msg
+					backlogMsgCounter++
+					telemetry.Stats.Get(name).Add(1)
+
+					if len(msgs) == 1 {
+						backlogLastId = ""
+						logger.Infow("Finished rolling back backlog of callback elements", zap.Int("elements", backlogMsgCounter))
+					} else {
+						backlogLastId = msgs[1].ID
+						backlogTimerInterval = backlogTimerMinInterval
+						_ = backlogTimer.Reset(backlogTimerInterval)
+						logger.Debugw("Advanced backlog",
+							zap.String("new-last-id", backlogLastId),
+							zap.Duration("delay", backlogTimerInterval))
+					}
+				} else {
+					backlogTimerInterval = min(backlogTimerMaxInterval, backlogTimerInterval*2)
+					_ = backlogTimer.Reset(backlogTimerInterval)
+					logger.Warnw("Failed to roll back callback elements", zap.Duration("delay", backlogTimerInterval))
+				}
+
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	}
+}
+
+const (
+	SyncPipelineAcknowledgement = "acknowledgement"
+	SyncPipelineComment         = "comment"
+	SyncPipelineDowntime        = "downtime"
+	SyncPipelineFlapping        = "flapping"
+	SyncPipelineNotification    = "notification"
+	SyncPipelineState           = "state"
+)
+
 var syncPipelines = map[string][]stageFunc{
-	"notification": {
-		writeOneEntityStage((*v1.NotificationHistory)(nil)), // notification_history
-		userNotificationStage,                               // user_notification_history (depends on notification_history)
-		writeOneEntityStage((*v1.HistoryNotification)(nil)), // history (depends on notification_history)
+	SyncPipelineAcknowledgement: {
+		writeOneEntityStage((*v1.AcknowledgementHistory)(nil)), // acknowledgement_history
+		writeOneEntityStage((*v1.HistoryAck)(nil)),             // history (depends on acknowledgement_history)
+		countElementStage,
 	},
-	"state": {
-		writeOneEntityStage((*v1.StateHistory)(nil)),   // state_history
-		writeOneEntityStage((*v1.HistoryState)(nil)),   // history (depends on state_history)
-		writeMultiEntityStage(stateHistoryToSlaEntity), // sla_history_state
+	SyncPipelineComment: {
+		writeOneEntityStage((*v1.CommentHistory)(nil)), // comment_history
+		writeOneEntityStage((*v1.HistoryComment)(nil)), // history (depends on comment_history)
+		countElementStage,
 	},
-	"downtime": {
+	SyncPipelineDowntime: {
 		writeOneEntityStage((*v1.DowntimeHistory)(nil)),    // downtime_history
 		writeOneEntityStage((*v1.HistoryDowntime)(nil)),    // history (depends on downtime_history)
 		writeOneEntityStage((*v1.SlaHistoryDowntime)(nil)), // sla_history_downtime
+		countElementStage,
 	},
-	"comment": {
-		writeOneEntityStage((*v1.CommentHistory)(nil)), // comment_history
-		writeOneEntityStage((*v1.HistoryComment)(nil)), // history (depends on comment_history)
-	},
-	"flapping": {
+	SyncPipelineFlapping: {
 		writeOneEntityStage((*v1.FlappingHistory)(nil)), // flapping_history
 		writeOneEntityStage((*v1.HistoryFlapping)(nil)), // history (depends on flapping_history)
+		countElementStage,
 	},
-	"acknowledgement": {
-		writeOneEntityStage((*v1.AcknowledgementHistory)(nil)), // acknowledgement_history
-		writeOneEntityStage((*v1.HistoryAck)(nil)),             // history (depends on acknowledgement_history)
+	SyncPipelineNotification: {
+		writeOneEntityStage((*v1.NotificationHistory)(nil)), // notification_history
+		userNotificationStage,                               // user_notification_history (depends on notification_history)
+		writeOneEntityStage((*v1.HistoryNotification)(nil)), // history (depends on notification_history)
+		countElementStage,
+	},
+	SyncPipelineState: {
+		writeOneEntityStage((*v1.StateHistory)(nil)),   // state_history
+		writeOneEntityStage((*v1.HistoryState)(nil)),   // history (depends on state_history)
+		writeMultiEntityStage(stateHistoryToSlaEntity), // sla_history_state
+		countElementStage,
 	},
 }
