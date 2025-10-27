@@ -2,8 +2,9 @@ package notifications
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"net/url"
+	"slices"
 	"sync"
 
 	"github.com/icinga/icinga-go-library/database"
@@ -70,22 +71,41 @@ func NewNotificationsClient(
 	}, nil
 }
 
-// evaluateRulesForObject returns the rule IDs for each matching query.
+// evaluateRulesForObject checks each rule against the Icinga DB SQL database and returns matching rule IDs.
 //
-// At the moment, each rule filter expression is executed as a SQL query after the parameters are being bound. If the
-// query returns at least one line, the rule will match. Rules with an empty filter expression are a special case and
-// will always match.
+// Within the Icinga Notifications relation database, the rules are stored in rule.object_filter as a JSON object
+// created by Icinga DB Web. This object contains SQL queries with bindvars for the Icinga DB relational database, to be
+// executed with the given host, service and environment IDs. If this query returns at least one row, the rule is
+// considered as matching.
 //
-// The provided entity is passed as param to the queries, thus they are allowed to use all fields of that specific
-// entity. Cross-table column references are not supported unless the provided entity provides the fields in one way
-// or another.
-//
-// This allows a query like the following:
-//
-//	> select * from host where id = :host_id and environment_id = :environment_id and name like 'prefix_%'
-//
-// The :host_id and :environment_id parameters will be bound to the entity's ID and EnvironmentId fields, respectively.
-func (client *Client) evaluateRulesForObject(ctx context.Context, entity database.Entity) ([]string, error) {
+// Icinga DB Web's JSON structure is described in:
+// - https://github.com/Icinga/icingadb-web/pull/1289
+// - https://github.com/Icinga/icingadb/pull/998#issuecomment-3442298348
+func (client *Client) evaluateRulesForObject(ctx context.Context, hostId, serviceId, environmentId types.Binary) ([]string, error) {
+	const (
+		icingaDbWebRuleVersion     = 1
+		icingaDbWebRuleTypeAll     = "all"
+		icingaDbWebRuleTypeHost    = "host"
+		icingaDbWebRuleTypeService = "service"
+	)
+
+	type IcingaDbWebQuery struct {
+		Query      string   `json:"query"`
+		Parameters []string `json:"parameters"`
+	}
+
+	type IcingaDbWebRule struct {
+		Version int `json:"version"` // expect icingaDbWebRuleVersion
+		Config  struct {
+			Type   string `json:"type"`   // expect one of [all, host, service]
+			Filter string `json:"filter"` // Icinga DB Web filter expression
+		} `json:"config"`
+		Queries struct {
+			Host    *IcingaDbWebQuery `json:"host"`
+			Service *IcingaDbWebQuery `json:"service,omitempty"`
+		} `json:"queries"`
+	}
+
 	outRuleIds := make([]string, 0, len(client.rulesInfo.Rules))
 
 	for id, filterExpr := range client.rulesInfo.Rules {
@@ -94,14 +114,57 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, entity databas
 			continue
 		}
 
-		evaluates, err := func() (bool, error) {
-			// The raw SQL query in the database is URL-encoded (mostly the space character is replaced by %20).
-			// So, we need to unescape it before passing it to the database.
-			query, err := url.QueryUnescape(filterExpr)
-			if err != nil {
-				return false, errors.Wrapf(err, "cannot unescape rule %q object filter expression %q", id, filterExpr)
+		var webRule IcingaDbWebRule
+		if err := json.Unmarshal([]byte(filterExpr), &webRule); err != nil {
+			return nil, errors.Wrap(err, "cannot decode rule filter expression as JSON into struct")
+		}
+
+		if version := webRule.Version; version != icingaDbWebRuleVersion {
+			return nil, errors.Errorf("decoded rule filter expression .Version is %d, %d expected", version, icingaDbWebRuleVersion)
+		}
+		if cfgType := webRule.Config.Type; !slices.Contains(
+			[]string{icingaDbWebRuleTypeAll, icingaDbWebRuleTypeHost, icingaDbWebRuleTypeService}, cfgType) {
+			return nil, errors.Errorf("decoded rule filter expression contains unsupported .Config.Type %q", cfgType)
+		}
+		if cfgType := webRule.Config.Type; cfgType != icingaDbWebRuleTypeService && webRule.Queries.Host == nil {
+			return nil, errors.Errorf("decoded rule filter expression for .Config.Type %q with an empty .Queries.Host", cfgType)
+		}
+		if cfgType := webRule.Config.Type; cfgType != icingaDbWebRuleTypeHost && webRule.Queries.Service == nil {
+			return nil, errors.Errorf("decoded rule filter expression for .Config.Type %q with an empty .Queries.Service", cfgType)
+		}
+
+		var webQuery IcingaDbWebQuery
+		if !serviceId.Valid() {
+			if webRule.Config.Type == icingaDbWebRuleTypeService {
+				continue
 			}
-			rows, err := client.db.NamedQueryContext(ctx, client.db.Rebind(query), entity)
+			webQuery = *webRule.Queries.Host
+		} else {
+			if webRule.Config.Type == icingaDbWebRuleTypeHost {
+				continue
+			}
+			webQuery = *webRule.Queries.Service
+		}
+
+		queryArgs := make([]any, 0, len(webQuery.Parameters))
+		for _, param := range webQuery.Parameters {
+			switch param {
+			case ":host_id":
+				queryArgs = append(queryArgs, hostId.String())
+			case ":service_id":
+				if !serviceId.Valid() {
+					return nil, errors.New("host rule filter expression contains :service_id for replacement")
+				}
+				queryArgs = append(queryArgs, serviceId.String())
+			case ":environment_id":
+				queryArgs = append(queryArgs, environmentId.String())
+			default:
+				queryArgs = append(queryArgs, param)
+			}
+		}
+
+		evaluates, err := func() (bool, error) {
+			rows, err := client.db.QueryContext(ctx, client.db.Rebind(webQuery.Query), queryArgs...)
 			if err != nil {
 				return false, err
 			}
@@ -322,25 +385,32 @@ func (client *Client) Submit(entity database.Entity) bool {
 		return true
 	}
 
-	var ev *event.Event
-	var eventErr error
+	var (
+		ev          *event.Event
+		eventErr    error
+		metaHistory v1history.HistoryTableMeta
+	)
 
 	// Keep the type switch in sync with the values of SyncKeyStructPtrs below.
 	switch h := entity.(type) {
 	case *v1history.AcknowledgementHistory:
 		ev, eventErr = client.buildAcknowledgementHistoryEvent(client.ctx, h)
+		metaHistory = h.HistoryTableMeta
 
 	case *v1history.DowntimeHistoryMeta:
 		ev, eventErr = client.buildDowntimeHistoryMetaEvent(client.ctx, h)
+		metaHistory = h.HistoryTableMeta
 
 	case *v1history.FlappingHistory:
 		ev, eventErr = client.buildFlappingHistoryEvent(client.ctx, h)
+		metaHistory = h.HistoryTableMeta
 
 	case *v1history.StateHistory:
 		if h.StateType != common.HardState {
 			return true
 		}
 		ev, eventErr = client.buildStateHistoryEvent(client.ctx, h)
+		metaHistory = h.HistoryTableMeta
 
 	default:
 		client.logger.Error("Cannot process unsupported type", zap.String("type", fmt.Sprintf("%T", h)))
@@ -376,7 +446,11 @@ func (client *Client) Submit(entity database.Entity) bool {
 	// second try would be the resubmit, and the third try would be for bad luck, e.g., when a second rule update just
 	// crept in between. If there are three subsequent rule updates, something is wrong.
 	for try := 0; try < 3; try++ {
-		eventRuleIds, err := client.evaluateRulesForObject(client.ctx, entity)
+		eventRuleIds, err := client.evaluateRulesForObject(
+			client.ctx,
+			metaHistory.HostId,
+			metaHistory.ServiceId,
+			metaHistory.EnvironmentId)
 		if err != nil {
 			// While returning false would be more correct, this would result in never being able to refetch new rule
 			// versions. Consider an invalid object filter expression, which is now impossible to get rid of.
