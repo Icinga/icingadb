@@ -186,7 +186,7 @@ func run() int {
 			}
 
 			callbackCfg = &history.SyncCallbackConf{
-				Name:         "notifications_sync",
+				StatPtr:      &telemetry.Stats.NotificationSync,
 				KeyStructPtr: notifications.SyncKeyStructPtrs,
 				Fn:           notificationsSource.Submit,
 			}
