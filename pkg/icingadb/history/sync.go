@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"slices"
 	"sync"
-	"time"
 )
 
 // Sync specifies the source and destination of a history sync.
@@ -61,6 +60,11 @@ func (s Sync) Sync(
 		return fmt.Errorf("if callbackKeyStructPtr and callbackFn are set, a callbackName is required")
 	}
 
+	var callbackStageFn stageFunc
+	if callbackKeyStructPtr != nil {
+		callbackStageFn = makeSortedCallbackStageFunc(ctx, s.logger, callbackName, callbackKeyStructPtr, callbackFn)
+	}
+
 	g, ctx := errgroup.WithContext(ctx)
 
 	for key, pipeline := range syncPipelines {
@@ -98,7 +102,7 @@ func (s Sync) Sync(
 		// Shadowed variable to allow appending custom callbacks.
 		pipeline := pipeline
 		if hasCallbackStage {
-			pipeline = append(slices.Clip(pipeline), makeCallbackStageFunc(callbackName, callbackKeyStructPtr, callbackFn))
+			pipeline = append(slices.Clip(pipeline), callbackStageFn)
 		}
 
 		ch := make([]chan redis.XMessage, len(pipeline)+1)
@@ -422,39 +426,40 @@ func countElementStage(ctx context.Context, _ Sync, _ string, in <-chan redis.XM
 	}
 }
 
-// makeCallbackStageFunc creates a new stageFunc calling the given callback function for each message.
+// makeSortedCallbackStageFunc creates a new stageFunc calling the callback function after reordering messages.
+//
+// This stageFunc is designed to be used by multiple channels. The internal sorting logic - realized by a StreamSorter -
+// results in all messages to be sorted based on their Redis Stream ID and be ejected to the callback function in this
+// order.
 //
 // The keyStructPtrs map decides what kind of database.Entity type will be used for the input data based on the key.
 //
 // The callback call is blocking and the message will be forwarded to the out channel after the function has returned.
 // Thus, please ensure this function does not block too long.
 //
-// If the callback function returns false, the stageFunc switches to a backlog mode, retrying the failed messages and
-// every subsequent message until there are no messages left. Only after a message was successfully handled by the
-// callback method, it will be forwarded to the out channel. Thus, this stage might "block" or "hold back" certain
-// messages during unhappy callback times.
+// If the callback function returns false, the message will be retried after an increasing backoff. All subsequent
+// messages will wait until this one succeeds.
 //
 // For each successfully submitted message, the telemetry stat named after this callback is incremented. Thus, a delta
 // between [telemetry.StatHistory] and this stat indicates blocking callbacks.
-func makeCallbackStageFunc(
+func makeSortedCallbackStageFunc(
+	ctx context.Context,
+	logger *logging.Logger,
 	name string,
 	keyStructPtrs map[string]any,
 	fn func(database.Entity) bool,
 ) stageFunc {
-	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
-		defer close(out)
+	sorterCallbackFn := func(msg redis.XMessage, args any) bool {
+		makeEntity := func(key string, values map[string]interface{}) (database.Entity, error) {
+			structPtr, ok := keyStructPtrs[key]
+			if !ok {
+				return nil, fmt.Errorf("key is not part of keyStructPtrs")
+			}
 
-		structPtr, ok := keyStructPtrs[key]
-		if !ok {
-			return fmt.Errorf("can't lookup struct pointer for key %q", key)
-		}
-
-		structifier := structify.MakeMapStructifier(
-			reflect.TypeOf(structPtr).Elem(),
-			"json",
-			contracts.SafeInit)
-
-		makeEntity := func(values map[string]interface{}) (database.Entity, error) {
+			structifier := structify.MakeMapStructifier(
+				reflect.TypeOf(structPtr).Elem(),
+				"json",
+				contracts.SafeInit)
 			val, err := structifier(values)
 			if err != nil {
 				return nil, errors.Wrapf(err, "can't structify values %#v for %q", values, key)
@@ -468,13 +473,32 @@ func makeCallbackStageFunc(
 			return entity, nil
 		}
 
-		backlogLastId := ""
-		backlogMsgCounter := 0
+		key, ok := args.(string)
+		if !ok {
+			// Shall not happen; set to string some thirty lines below
+			panic(fmt.Sprintf("args is of type %T, not string", args))
+		}
 
-		const backlogTimerMinInterval, backlogTimerMaxInterval = time.Millisecond, time.Minute
-		backlogTimerInterval := backlogTimerMinInterval
-		backlogTimer := time.NewTimer(backlogTimerInterval)
-		_ = backlogTimer.Stop()
+		entity, err := makeEntity(key, msg.Values)
+		if err != nil {
+			logger.Errorw("Failed to create database.Entity out of Redis stream message",
+				zap.Error(err),
+				zap.String("key", key),
+				zap.String("id", msg.ID))
+			return false
+		}
+
+		success := fn(entity)
+		if success {
+			telemetry.Stats.Get(name).Add(1)
+		}
+		return success
+	}
+
+	sorter := NewStreamSorter(ctx, logger, sorterCallbackFn)
+
+	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
+		defer close(out)
 
 		for {
 			select {
@@ -483,79 +507,9 @@ func makeCallbackStageFunc(
 					return nil
 				}
 
-				// Only submit the entity directly if there is no backlog.
-				// The second check covers a potential corner case if the XRANGE below races this stream.
-				if backlogLastId != "" && backlogLastId != msg.ID {
-					continue
-				}
-
-				entity, err := makeEntity(msg.Values)
+				err := sorter.Submit(msg, key, out)
 				if err != nil {
-					return err
-				}
-
-				if fn(entity) {
-					out <- msg
-					telemetry.Stats.Get(name).Add(1)
-					backlogLastId = ""
-				} else {
-					backlogLastId = msg.ID
-					backlogMsgCounter = 0
-					backlogTimerInterval = backlogTimerMinInterval
-					_ = backlogTimer.Reset(backlogTimerInterval)
-					s.logger.Warnw("Failed to submit entity to callback, entering into backlog",
-						zap.String("key", key),
-						zap.String("id", backlogLastId))
-				}
-
-			case <-backlogTimer.C:
-				if backlogLastId == "" { // Should never happen.
-					return fmt.Errorf("backlog timer logic for %q was called while backlogLastId was empty", key)
-				}
-
-				logger := s.logger.With(
-					zap.String("key", key),
-					zap.String("last-id", backlogLastId))
-
-				logger.Debug("Trying to advance backlog of callback elements")
-
-				xrangeCmd := s.redis.XRangeN(ctx, "icinga:history:stream:"+key, backlogLastId, "+", 2)
-				msgs, err := xrangeCmd.Result()
-				if err != nil {
-					return errors.Wrapf(err, "XRANGE %q to %q on stream %q failed", backlogLastId, "+", key)
-				}
-
-				if len(msgs) < 1 || len(msgs) > 2 {
-					return fmt.Errorf("XRANGE %q to %q on stream %q returned %d messages, not 1 or 2",
-						backlogLastId, "+", key, len(msgs))
-				}
-
-				msg := msgs[0]
-				entity, err := makeEntity(msg.Values)
-				if err != nil {
-					return errors.Wrapf(err, "can't structify backlog value %q for %q", backlogLastId, key)
-				}
-
-				if fn(entity) {
-					out <- msg
-					backlogMsgCounter++
-					telemetry.Stats.Get(name).Add(1)
-
-					if len(msgs) == 1 {
-						backlogLastId = ""
-						logger.Infow("Finished rolling back backlog of callback elements", zap.Int("elements", backlogMsgCounter))
-					} else {
-						backlogLastId = msgs[1].ID
-						backlogTimerInterval = backlogTimerMinInterval
-						_ = backlogTimer.Reset(backlogTimerInterval)
-						logger.Debugw("Advanced backlog",
-							zap.String("new-last-id", backlogLastId),
-							zap.Duration("delay", backlogTimerInterval))
-					}
-				} else {
-					backlogTimerInterval = min(backlogTimerMaxInterval, backlogTimerInterval*2)
-					_ = backlogTimer.Reset(backlogTimerInterval)
-					logger.Warnw("Failed to roll back callback elements", zap.Duration("delay", backlogTimerInterval))
+					s.logger.Errorw("Failed to submit Redis stream event to stream sorter", zap.Error(err))
 				}
 
 			case <-ctx.Done():
