@@ -4,9 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
-	"sync"
-
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/notifications/event"
@@ -21,6 +18,8 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"slices"
+	"sync"
 )
 
 // Client is an Icinga Notifications compatible client implementation to push events to Icinga Notifications.
@@ -194,8 +193,8 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, hostId, servic
 func (client *Client) buildCommonEvent(
 	ctx context.Context,
 	hostId, serviceId types.Binary,
-) (*event.Event, *redisLookupResult, error) {
-	rlr, err := client.fetchHostServiceFromRedis(ctx, hostId, serviceId)
+) (*event.Event, *hostServiceInformation, error) {
+	info, err := client.fetchHostServiceData(ctx, hostId, serviceId)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -206,18 +205,18 @@ func (client *Client) buildCommonEvent(
 		objectTags map[string]string
 	)
 
-	if rlr.serviceName != "" {
-		objectName = rlr.hostName + "!" + rlr.serviceName
-		objectUrl = "/icingadb/service?name=" + utils.RawUrlEncode(rlr.serviceName) + "&host.name=" + utils.RawUrlEncode(rlr.hostName)
+	if info.serviceName != "" {
+		objectName = info.hostName + "!" + info.serviceName
+		objectUrl = "/icingadb/service?name=" + utils.RawUrlEncode(info.serviceName) + "&host.name=" + utils.RawUrlEncode(info.hostName)
 		objectTags = map[string]string{
-			"host":    rlr.hostName,
-			"service": rlr.serviceName,
+			"host":    info.hostName,
+			"service": info.serviceName,
 		}
 	} else {
-		objectName = rlr.hostName
-		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(rlr.hostName)
+		objectName = info.hostName
+		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(info.hostName)
 		objectTags = map[string]string{
-			"host": rlr.hostName,
+			"host": info.hostName,
 		}
 	}
 
@@ -225,8 +224,8 @@ func (client *Client) buildCommonEvent(
 		Name:      objectName,
 		URL:       objectUrl,
 		Tags:      objectTags,
-		ExtraTags: rlr.CustomVars(),
-	}, rlr, nil
+		ExtraTags: info.customVars,
+	}, info, nil
 }
 
 // buildStateHistoryEvent builds a fully initialized event.Event from a state history entry.
@@ -234,14 +233,14 @@ func (client *Client) buildCommonEvent(
 // The resulted event will have all the necessary information for a state change event, and must
 // not be further modified by the caller.
 func (client *Client) buildStateHistoryEvent(ctx context.Context, h *v1history.StateHistory) (*event.Event, error) {
-	ev, rlr, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+	ev, info, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
 
 	ev.Type = event.TypeState
 
-	if rlr.serviceName != "" {
+	if info.serviceName != "" {
 		switch h.HardState {
 		case 0:
 			ev.Severity = event.SeverityOK
