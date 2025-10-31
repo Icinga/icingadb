@@ -22,7 +22,7 @@ func NewSyncSubject(factoryFunc database.EntityFactoryFunc) *SyncSubject {
 	if _, ok := e.(contracts.Initer); ok {
 		factory = func() database.Entity {
 			e := factoryFunc()
-			e.(contracts.Initer).Init()
+			e.(contracts.Initer).Init() //nolint:forcetypeassert // Checked for factoryFunc() in the outer if
 
 			return e
 		}

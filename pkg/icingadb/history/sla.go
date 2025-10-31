@@ -6,6 +6,7 @@ import (
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
+	"github.com/pkg/errors"
 	"reflect"
 )
 
@@ -19,7 +20,10 @@ func stateHistoryToSlaEntity(entry redis.XMessage) ([]history.UpserterEntity, er
 	if err != nil {
 		return nil, err
 	}
-	slaState := slaStateInterface.(*history.SlaHistoryState)
+	slaState, ok := slaStateInterface.(*history.SlaHistoryState)
+	if !ok {
+		return nil, errors.New("slaStateInterface does not implement SlaHistoryState")
+	}
 
 	if slaState.StateType != common.HardState {
 		// only hard state changes are relevant for SLA history, discard all others

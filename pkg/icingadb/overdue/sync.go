@@ -164,15 +164,30 @@ func (s Sync) sync(ctx context.Context, objectType string, factory factory, coun
 				return errors.Wrap(err, "can't execute Redis script")
 			}
 
-			root := overdues.([]any)
+			root, ok := overdues.([]any)
+			if !ok {
+				return errors.Errorf("overdues is %T, not []any", overdues)
+			}
+			if len(root) < 2 {
+				return errors.Errorf("root has %d elements, 2 required", len(root))
+			}
+			rootFrst, rootFrstOk := root[0].([]any)
+			if !rootFrstOk {
+				return errors.Errorf("first root element is %T, not []any", root[0])
+			}
+			rootScnd, rootScndOk := root[1].([]any)
+			if !rootScndOk {
+				return errors.Errorf("second root element is %T, not []any", root[1])
+			}
+
 			g, ctx := errgroup.WithContext(ctx)
 
 			g.Go(func() error {
-				return s.updateOverdue(ctx, objectType, factory, counter, root[0].([]any), true)
+				return s.updateOverdue(ctx, objectType, factory, counter, rootFrst, true)
 			})
 
 			g.Go(func() error {
-				return s.updateOverdue(ctx, objectType, factory, counter, root[1].([]any), false)
+				return s.updateOverdue(ctx, objectType, factory, counter, rootScnd, false)
 			})
 
 			if err := g.Wait(); err != nil {
@@ -226,7 +241,11 @@ func (s Sync) updateDb(ctx context.Context, factory factory, ids []any, overdue 
 		defer close(ch)
 
 		for _, id := range ids {
-			e, err := factory(id.(string), overdue)
+			idStr, ok := id.(string)
+			if !ok {
+				return errors.Errorf("id is %T, not string", id)
+			}
+			e, err := factory(idStr, overdue)
 			if err != nil {
 				return errors.Wrap(err, "can't create entity")
 			}

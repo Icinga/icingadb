@@ -1,6 +1,7 @@
 package history
 
 import (
+	"fmt"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
@@ -39,8 +40,14 @@ func (he HistoryEntity) ID() database.ID {
 }
 
 // SetID implements part of the contracts.Entity interface.
+//
+// The id must be of type types.Binary. Otherwise, the method will panic.
 func (he *HistoryEntity) SetID(id database.ID) {
-	he.Id = id.(types.Binary)
+	idBinary, ok := id.(types.Binary)
+	if !ok {
+		panic(fmt.Sprintf("expects types.Binary, got %T", id))
+	}
+	he.Id = idBinary
 }
 
 // Upsert implements the contracts.Upserter interface.

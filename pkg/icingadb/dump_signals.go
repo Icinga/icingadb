@@ -69,8 +69,17 @@ func (s *DumpSignals) Listen(ctx context.Context) error {
 
 		for _, entry := range streams[0].Messages {
 			lastStreamId = entry.ID
-			key := entry.Values["key"].(string)
-			done := entry.Values["state"].(string) == "done"
+
+			key, keyOk := entry.Values["key"].(string)
+			if !keyOk {
+				return errors.Errorf("key value is %T, not string", entry.Values["key"])
+			}
+
+			state, stateOk := entry.Values["state"].(string)
+			if !stateOk {
+				return errors.Errorf("state value is %T, not string", entry.Values["state"])
+			}
+			done := state == "done"
 
 			s.logger.Debugw("Received dump signal from Redis", zap.String("key", key), zap.Bool("done", done))
 

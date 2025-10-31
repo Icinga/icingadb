@@ -121,10 +121,19 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 //
 // Both entities must either implement contracts.Checksumer or contracts.Equaler for this to work. If neither
 // interface is implemented nor if both entities don't implement the same interface, this function will panic.
+// The compare logic of contracts.Checksumer takes precedence.
 func entitiesEqual(a, b database.Entity) bool {
-	if _, ok := a.(contracts.Checksumer); ok {
-		return cmp.Equal(a.(contracts.Checksumer).Checksum(), b.(contracts.Checksumer).Checksum())
+	{
+		a, aOk := a.(contracts.Checksumer)
+		b, bOk := b.(contracts.Checksumer)
+		if aOk && bOk {
+			return cmp.Equal(a.Checksum(), b.Checksum())
+		}
 	}
 
-	return a.(contracts.Equaler).Equal(b)
+	if a, ok := a.(contracts.Equaler); ok {
+		return a.Equal(b)
+	}
+
+	panic("entitiesEqual: database.Entity values must implement either contracts.Checksummer or contracts.Equaler")
 }
