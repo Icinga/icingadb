@@ -230,7 +230,7 @@ func (r *Retention) Start(ctx context.Context) error {
 
 			deleted, err := stmt.CleanupOlderThan(
 				ctx, r.db, e.Id, r.count, olderThan,
-				database.OnSuccessIncrement[struct{}](telemetry.Stats.Get(telemetry.StatHistoryCleanup)),
+				database.OnSuccessIncrement[struct{}](&telemetry.Stats.HistoryCleanup),
 			)
 			if err != nil {
 				select {

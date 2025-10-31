@@ -32,8 +32,8 @@ type Sync struct {
 
 // SyncCallbackConf configures a callback stage given to Sync.Sync.
 type SyncCallbackConf struct {
-	// Name of this callback, used in [telemetry.Stats].
-	Name string
+	// StatPtr refers a [com.Counter] from the [telemetry.Stats] struct, e.g., Stats.NotificationSync.
+	StatPtr *com.Counter
 	// KeyStructPtr says which pipeline keys should be mapped to which type, identified by a struct pointer. If
 	// a key is missing from the map, it will not be used for the callback.
 	KeyStructPtr map[string]any
@@ -60,7 +60,7 @@ func (s Sync) Sync(ctx context.Context, callbackCfg *SyncCallbackConf) error {
 		callbackStageFn = makeSortedCallbackStageFunc(
 			ctx,
 			s.logger,
-			callbackCfg.Name,
+			callbackCfg.StatPtr,
 			callbackCfg.KeyStructPtr,
 			callbackCfg.Fn)
 	}
@@ -417,7 +417,7 @@ func countElementStage(ctx context.Context, _ Sync, _ string, in <-chan redis.XM
 				return nil
 			}
 
-			telemetry.Stats.Get(telemetry.StatHistory).Add(1)
+			telemetry.Stats.History.Add(1)
 			out <- msg
 
 		case <-ctx.Done():
@@ -440,12 +440,12 @@ func countElementStage(ctx context.Context, _ Sync, _ string, in <-chan redis.XM
 // If the callback function returns false, the message will be retried after an increasing backoff. All subsequent
 // messages will wait until this one succeeds.
 //
-// For each successfully submitted message, the telemetry stat named after this callback is incremented. Thus, a delta
-// between [telemetry.StatHistory] and this stat indicates blocking callbacks.
+// For each successfully submitted message, the telemetry stat referenced via a pointer s incremented. Thus, a delta
+// between telemetry.Stats.History and this stat indicates blocking callbacks.
 func makeSortedCallbackStageFunc(
 	ctx context.Context,
 	logger *logging.Logger,
-	name string,
+	statPtr *com.Counter,
 	keyStructPtrs map[string]any,
 	fn func(database.Entity) bool,
 ) stageFunc {
@@ -490,7 +490,7 @@ func makeSortedCallbackStageFunc(
 
 		success := fn(entity)
 		if success {
-			telemetry.Stats.Get(name).Add(1)
+			statPtr.Add(1)
 		}
 		return success
 	}
