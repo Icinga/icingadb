@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/utils"
@@ -171,11 +170,7 @@ func run() int {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	{
-		var (
-			callbackName         string
-			callbackKeyStructPtr map[string]any
-			callbackFn           func(database.Entity) bool
-		)
+		var callbackCfg *history.SyncCallbackConf
 
 		if cfg := cmd.Config.NotificationsSource; cfg.ApiBaseUrl != "" {
 			logger.Info("Starting Icinga Notifications source")
@@ -190,20 +185,17 @@ func run() int {
 				logger.Fatalw("Can't create Icinga Notifications client from config", zap.Error(err))
 			}
 
-			callbackName = "notifications_sync"
-			callbackKeyStructPtr = notifications.SyncKeyStructPtrs
-			callbackFn = notificationsSource.Submit
+			callbackCfg = &history.SyncCallbackConf{
+				Name:         "notifications_sync",
+				KeyStructPtr: notifications.SyncKeyStructPtrs,
+				Fn:           notificationsSource.Submit,
+			}
 		}
 
 		go func() {
 			logger.Info("Starting history sync")
 
-			if err := hs.Sync(
-				ctx,
-				callbackName,
-				callbackKeyStructPtr,
-				callbackFn,
-			); err != nil && !utils.IsContextCanceled(err) {
+			if err := hs.Sync(ctx, callbackCfg); err != nil && !utils.IsContextCanceled(err) {
 				logger.Fatalf("%+v", err)
 			}
 		}()

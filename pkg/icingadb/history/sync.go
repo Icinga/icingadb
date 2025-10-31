@@ -30,6 +30,17 @@ type Sync struct {
 	logger *logging.Logger
 }
 
+// SyncCallbackConf configures a callback stage given to Sync.Sync.
+type SyncCallbackConf struct {
+	// Name of this callback, used in [telemetry.Stats].
+	Name string
+	// KeyStructPtr says which pipeline keys should be mapped to which type, identified by a struct pointer. If
+	// a key is missing from the map, it will not be used for the callback.
+	KeyStructPtr map[string]any
+	// Fn is the actual callback function.
+	Fn func(database.Entity) bool
+}
+
 // NewSync creates a new Sync.
 func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
@@ -42,27 +53,16 @@ func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync
 // Sync synchronizes Redis history streams from s.redis to s.db and deletes the original data on success.
 //
 // It is possible to enable a callback functionality, e.g., for the Icinga Notifications integration. To do so, the
-// optional callbackFn and callbackKeyStructPtr must be set. Both must either be nil or not nil. If set, the additional
-// callbackName must also be set, to be used in [telemetry.Stats].
-//
-// The callbackKeyStructPtr says which pipeline keys should be mapped to which type, identified by a struct pointer. If
-// a key is missing from the map, it will not be used for the callback. The callbackFn function shall not block.
-func (s Sync) Sync(
-	ctx context.Context,
-	callbackName string,
-	callbackKeyStructPtr map[string]any,
-	callbackFn func(database.Entity) bool,
-) error {
-	if (callbackKeyStructPtr == nil) != (callbackFn == nil) {
-		return fmt.Errorf("either both callbackKeyStructPtr and callbackFn must be nil or none")
-	}
-	if (callbackKeyStructPtr != nil) && (callbackName == "") {
-		return fmt.Errorf("if callbackKeyStructPtr and callbackFn are set, a callbackName is required")
-	}
-
+// callbackCfg must be set according to the SyncCallbackConf struct documentation.
+func (s Sync) Sync(ctx context.Context, callbackCfg *SyncCallbackConf) error {
 	var callbackStageFn stageFunc
-	if callbackKeyStructPtr != nil {
-		callbackStageFn = makeSortedCallbackStageFunc(ctx, s.logger, callbackName, callbackKeyStructPtr, callbackFn)
+	if callbackCfg != nil {
+		callbackStageFn = makeSortedCallbackStageFunc(
+			ctx,
+			s.logger,
+			callbackCfg.Name,
+			callbackCfg.KeyStructPtr,
+			callbackCfg.Fn)
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -94,8 +94,8 @@ func (s Sync) Sync(
 		// other pipeline action, but before deleteFromRedis.
 
 		var hasCallbackStage bool
-		if callbackKeyStructPtr != nil {
-			_, exists := callbackKeyStructPtr[key]
+		if callbackCfg != nil {
+			_, exists := callbackCfg.KeyStructPtr[key]
 			hasCallbackStage = exists
 		}
 
