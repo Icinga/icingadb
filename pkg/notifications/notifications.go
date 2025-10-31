@@ -18,7 +18,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"slices"
 	"sync"
 )
 
@@ -81,12 +80,7 @@ func NewNotificationsClient(
 // - https://github.com/Icinga/icingadb-web/pull/1289
 // - https://github.com/Icinga/icingadb/pull/998#issuecomment-3442298348
 func (client *Client) evaluateRulesForObject(ctx context.Context, hostId, serviceId, environmentId types.Binary) ([]string, error) {
-	const (
-		icingaDbWebRuleVersion     = 1
-		icingaDbWebRuleTypeAll     = "all"
-		icingaDbWebRuleTypeHost    = "host"
-		icingaDbWebRuleTypeService = "service"
-	)
+	const icingaDbWebRuleVersion = 1
 
 	type IcingaDbWebQuery struct {
 		Query      string   `json:"query"`
@@ -95,12 +89,8 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, hostId, servic
 
 	type IcingaDbWebRule struct {
 		Version int `json:"version"` // expect icingaDbWebRuleVersion
-		Config  struct {
-			Type   string `json:"type"`   // expect one of [all, host, service]
-			Filter string `json:"filter"` // Icinga DB Web filter expression
-		} `json:"config"`
 		Queries struct {
-			Host    *IcingaDbWebQuery `json:"host"`
+			Host    *IcingaDbWebQuery `json:"host,omitempty"`
 			Service *IcingaDbWebQuery `json:"service,omitempty"`
 		} `json:"queries"`
 	}
@@ -117,29 +107,20 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, hostId, servic
 		if err := json.Unmarshal([]byte(filterExpr), &webRule); err != nil {
 			return nil, errors.Wrap(err, "cannot decode rule filter expression as JSON into struct")
 		}
-
 		if version := webRule.Version; version != icingaDbWebRuleVersion {
 			return nil, errors.Errorf("decoded rule filter expression .Version is %d, %d expected", version, icingaDbWebRuleVersion)
-		}
-		if cfgType := webRule.Config.Type; !slices.Contains(
-			[]string{icingaDbWebRuleTypeAll, icingaDbWebRuleTypeHost, icingaDbWebRuleTypeService}, cfgType) {
-			return nil, errors.Errorf("decoded rule filter expression contains unsupported .Config.Type %q", cfgType)
-		}
-		if cfgType := webRule.Config.Type; cfgType != icingaDbWebRuleTypeService && webRule.Queries.Host == nil {
-			return nil, errors.Errorf("decoded rule filter expression for .Config.Type %q with an empty .Queries.Host", cfgType)
-		}
-		if cfgType := webRule.Config.Type; cfgType != icingaDbWebRuleTypeHost && webRule.Queries.Service == nil {
-			return nil, errors.Errorf("decoded rule filter expression for .Config.Type %q with an empty .Queries.Service", cfgType)
 		}
 
 		var webQuery IcingaDbWebQuery
 		if !serviceId.Valid() {
-			if webRule.Config.Type == icingaDbWebRuleTypeService {
+			// Evaluate rule for a host object
+			if webRule.Queries.Host == nil {
 				continue
 			}
 			webQuery = *webRule.Queries.Host
 		} else {
-			if webRule.Config.Type == icingaDbWebRuleTypeHost {
+			// Evaluate rule for a service object
+			if webRule.Queries.Service == nil {
 				continue
 			}
 			webQuery = *webRule.Queries.Service
@@ -149,34 +130,31 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, hostId, servic
 		for _, param := range webQuery.Parameters {
 			switch param {
 			case ":host_id":
-				queryArgs = append(queryArgs, hostId.String())
+				queryArgs = append(queryArgs, hostId)
 			case ":service_id":
 				if !serviceId.Valid() {
 					return nil, errors.New("host rule filter expression contains :service_id for replacement")
 				}
-				queryArgs = append(queryArgs, serviceId.String())
+				queryArgs = append(queryArgs, serviceId)
 			case ":environment_id":
-				queryArgs = append(queryArgs, environmentId.String())
+				queryArgs = append(queryArgs, environmentId)
 			default:
 				queryArgs = append(queryArgs, param)
 			}
 		}
 
-		evaluates, err := func() (bool, error) {
+		matches, err := func() (bool, error) {
 			rows, err := client.db.QueryContext(ctx, client.db.Rebind(webQuery.Query), queryArgs...)
 			if err != nil {
 				return false, err
 			}
 			defer func() { _ = rows.Close() }()
 
-			if !rows.Next() {
-				return false, nil
-			}
-			return true, nil
+			return rows.Next(), nil
 		}()
 		if err != nil {
 			return nil, errors.Wrapf(err, "cannot fetch rule %q from %q", id, filterExpr)
-		} else if !evaluates {
+		} else if !matches {
 			continue
 		}
 		outRuleIds = append(outRuleIds, id)
