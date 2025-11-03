@@ -46,6 +46,26 @@ func Test_redisStreamIdToMs(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "missing first part",
+			input:   "-23",
+			wantErr: true,
+		},
+		{
+			name:    "missing second part",
+			input:   "23-",
+			wantErr: true,
+		},
+		{
+			name:    "only dash",
+			input:   "-",
+			wantErr: true,
+		},
+		{
+			name:    "just invalid",
+			input:   "oops",
+			wantErr: true,
+		},
+		{
 			name:    "invalid field types",
 			input:   "0x23-0x42",
 			wantErr: true,

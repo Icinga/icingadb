@@ -7,28 +7,27 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"math"
-	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
 // parseRedisStreamId parses a Redis Stream ID and returns the timestamp in ms and the sequence number, or an error.
 func parseRedisStreamId(redisStreamId string) (int64, int64, error) {
-	re := regexp.MustCompile(`^(\d+)-(\d+)$`)
-	matches := re.FindStringSubmatch(redisStreamId)
-	if len(matches) != 3 {
-		return 0, 0, errors.Errorf("value %q does not satisfy Redis Stream ID regex", redisStreamId)
+	dashPos := strings.IndexRune(redisStreamId, '-')
+	if dashPos <= 0 {
+		return 0, 0, errors.Errorf("value %q does not satisfy Redis Stream ID pattern", redisStreamId)
 	}
 
-	ms, err := strconv.ParseInt(matches[1], 10, 64)
+	ms, err := strconv.ParseInt(redisStreamId[:dashPos], 10, 64)
 	if err != nil {
 		return 0, 0, errors.Wrapf(
 			err,
 			"timestamp part of the Redis Stream ID %q cannot be parsed to int", redisStreamId)
 	}
 
-	seq, err := strconv.ParseInt(matches[2], 10, 64)
+	seq, err := strconv.ParseInt(redisStreamId[dashPos+1:], 10, 64)
 	if err != nil {
 		return 0, 0, errors.Wrapf(
 			err,
