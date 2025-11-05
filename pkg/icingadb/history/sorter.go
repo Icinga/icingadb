@@ -64,7 +64,7 @@ func (sub streamSorterSubmission) MarshalLogObject(encoder zapcore.ObjectEncoder
 }
 
 // streamSorterSubmissions implements [heap.Interface] for []streamSorterSubmission.
-type streamSorterSubmissions []streamSorterSubmission
+type streamSorterSubmissions []*streamSorterSubmission
 
 // Len implements [sort.Interface] required by [heap.Interface].
 func (subs streamSorterSubmissions) Len() int { return len(subs) }
@@ -86,7 +86,7 @@ func (subs streamSorterSubmissions) Less(i, j int) bool {
 
 // Push implements [heap.Interface].
 func (subs *streamSorterSubmissions) Push(x any) {
-	sub, ok := x.(streamSorterSubmission)
+	sub, ok := x.(*streamSorterSubmission)
 	if !ok {
 		panic(fmt.Sprintf("streamSorterSubmissions.Push received x of %T", x))
 	}
@@ -120,7 +120,7 @@ type StreamSorter struct {
 	ctx               context.Context
 	logger            *logging.Logger
 	callbackFn        func(redis.XMessage, any) bool
-	submissionCh      chan streamSorterSubmission
+	submissionCh      chan *streamSorterSubmission
 	closeChSubmission chan chan<- redis.XMessage
 	closeChQueue      chan chan<- redis.XMessage
 
@@ -138,7 +138,7 @@ func NewStreamSorter(
 		ctx:               ctx,
 		logger:            logger,
 		callbackFn:        callbackFn,
-		submissionCh:      make(chan streamSorterSubmission),
+		submissionCh:      make(chan *streamSorterSubmission),
 		closeChSubmission: make(chan chan<- redis.XMessage),
 		closeChQueue:      make(chan chan<- redis.XMessage),
 	}
@@ -149,7 +149,7 @@ func NewStreamSorter(
 		close(sorter.closeChQueue)
 	})
 
-	ch := make(chan streamSorterSubmission)
+	ch := make(chan *streamSorterSubmission)
 	go sorter.submissionWorker(ch)
 	go sorter.queueWorker(ch)
 
@@ -158,7 +158,7 @@ func NewStreamSorter(
 
 // submissionWorker listens ton submissionCh populated by Submit, fills the heap and ejects streamSorterSubmissions into
 // out, linked to the queueWorker goroutine for further processing.
-func (sorter *StreamSorter) submissionWorker(out chan<- streamSorterSubmission) {
+func (sorter *StreamSorter) submissionWorker(out chan<- *streamSorterSubmission) {
 	defer close(out)
 
 	// When a streamSorterSubmission is created in the Submit method, the current time.Time is added to the struct.
@@ -194,7 +194,7 @@ func (sorter *StreamSorter) submissionWorker(out chan<- streamSorterSubmission) 
 			bkp := &streamSorterSubmissions{}
 			for submissionHeap.Len() > 0 {
 				x := heap.Pop(submissionHeap)
-				sub, ok := x.(streamSorterSubmission)
+				sub, ok := x.(*streamSorterSubmission)
 				if !ok {
 					panic(fmt.Sprintf("invalid type %T from submission heap", x))
 				}
@@ -212,22 +212,20 @@ func (sorter *StreamSorter) submissionWorker(out chan<- streamSorterSubmission) 
 			submissionCounter := 0
 
 			for submissionHeap.Len() > 0 {
-				x := heap.Pop(submissionHeap)
-				sub, ok := x.(streamSorterSubmission)
-				if !ok {
-					panic(fmt.Sprintf("invalid type %T from submission heap", x))
-				}
-
-				if time.Since(sub.submitTime) < submissionMinAge {
+				if peek := (*submissionHeap)[0]; time.Since(peek.submitTime) < submissionMinAge {
 					if sorter.verbose {
 						sorter.logger.Debugw("Stopped popping heap as submission is not old enough",
-							zap.Object("submission", sub),
+							zap.Object("submission", peek),
 							zap.Int("submissions", submissionCounter),
 							zap.Duration("duration", time.Since(start)))
 					}
-
-					heap.Push(submissionHeap, sub)
 					break
+				}
+
+				x := heap.Pop(submissionHeap)
+				sub, ok := x.(*streamSorterSubmission)
+				if !ok {
+					panic(fmt.Sprintf("invalid type %T from submission heap", x))
 				}
 
 				out <- sub
@@ -244,13 +242,10 @@ func (sorter *StreamSorter) submissionWorker(out chan<- streamSorterSubmission) 
 }
 
 // queueWorker receives sorted streamSorterSubmissions from submissionWorker and forwards them to the callback.
-func (sorter *StreamSorter) queueWorker(in <-chan streamSorterSubmission) {
+func (sorter *StreamSorter) queueWorker(in <-chan *streamSorterSubmission) {
 	// Each streamSorterSubmission received from "in" is stored in the queue slice. From there on, the slice head is
-	// passed to the callback function. The queueEventCh has a buffer capacity of 1 to allow both filling and consuming
-	// in the same goroutine.
-	queue := make([]streamSorterSubmission, 0, 1024)
-	queueEventCh := make(chan struct{}, 1)
-	defer close(queueEventCh)
+	// passed to the callback function.
+	queue := make([]*streamSorterSubmission, 0, 1024)
 
 	// The actual callback function is executed concurrently as it might block longer than expected. A blocking select
 	// would result in the queue not being populated, effectively blocking the submissionWorker. Thus, the callbackFn is
@@ -259,7 +254,7 @@ func (sorter *StreamSorter) queueWorker(in <-chan streamSorterSubmission) {
 	const callbackMaxDelay = 10 * time.Second
 	var callbackDelay time.Duration
 	var callbackCh chan bool
-	callbackFn := func(submission streamSorterSubmission) {
+	callbackFn := func(submission *streamSorterSubmission) {
 		select {
 		case <-sorter.ctx.Done():
 			return
@@ -321,7 +316,7 @@ func (sorter *StreamSorter) queueWorker(in <-chan streamSorterSubmission) {
 				return
 			}
 
-			queue = slices.DeleteFunc(queue, func(sub streamSorterSubmission) bool {
+			queue = slices.DeleteFunc(queue, func(sub *streamSorterSubmission) bool {
 				return sub.out == ch
 			})
 
@@ -354,7 +349,7 @@ func (sorter *StreamSorter) Submit(msg redis.XMessage, args any, out chan<- redi
 		return errors.Wrap(err, "cannot parse Redis Stream ID")
 	}
 
-	submission := streamSorterSubmission{
+	submission := &streamSorterSubmission{
 		msg:         msg,
 		args:        args,
 		out:         out,

@@ -90,7 +90,7 @@ func Test_streamSorterSubmissions(t *testing.T) {
 	mkSubmitTime := func(offset int) time.Time {
 		return time.Date(2009, 11, 10, 23, 0, 0, offset, time.UTC)
 	}
-	submissions := []streamSorterSubmission{
+	submissions := streamSorterSubmissions{
 		{streamIdMs: 0, streamIdSeq: 0, submitTime: mkSubmitTime(0)},
 		{streamIdMs: 1, streamIdSeq: 0, submitTime: mkSubmitTime(0)},
 		{streamIdMs: 1, streamIdSeq: 1, submitTime: mkSubmitTime(0)},
@@ -102,12 +102,12 @@ func Test_streamSorterSubmissions(t *testing.T) {
 		{streamIdMs: 3, streamIdSeq: 1, submitTime: mkSubmitTime(2)},
 	}
 
-	submissionsRand := make([]streamSorterSubmission, 0, len(submissions))
+	submissionsRand := make(streamSorterSubmissions, 0, len(submissions))
 	for _, i := range rand.Perm(len(submissions)) {
 		submissionsRand = append(submissionsRand, submissions[i])
 	}
 
-	sort.Sort(streamSorterSubmissions(submissionsRand))
+	sort.Sort(submissionsRand)
 	require.Equal(t, submissions, submissionsRand)
 }
 
