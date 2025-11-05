@@ -87,16 +87,19 @@ func Test_redisStreamIdToMs(t *testing.T) {
 }
 
 func Test_streamSorterSubmissions(t *testing.T) {
+	mkSubmitTime := func(offset int) time.Time {
+		return time.Date(2009, 11, 10, 23, 0, 0, offset, time.UTC)
+	}
 	submissions := []streamSorterSubmission{
-		{streamIdMs: 0, streamIdSeq: 0, submitTimeNs: 0},
-		{streamIdMs: 1, streamIdSeq: 0, submitTimeNs: 0},
-		{streamIdMs: 1, streamIdSeq: 1, submitTimeNs: 0},
-		{streamIdMs: 2, streamIdSeq: 0, submitTimeNs: 0},
-		{streamIdMs: 2, streamIdSeq: 0, submitTimeNs: 1},
-		{streamIdMs: 3, streamIdSeq: 0, submitTimeNs: 0},
-		{streamIdMs: 3, streamIdSeq: 1, submitTimeNs: 0},
-		{streamIdMs: 3, streamIdSeq: 1, submitTimeNs: 1},
-		{streamIdMs: 3, streamIdSeq: 1, submitTimeNs: 2},
+		{streamIdMs: 0, streamIdSeq: 0, submitTime: mkSubmitTime(0)},
+		{streamIdMs: 1, streamIdSeq: 0, submitTime: mkSubmitTime(0)},
+		{streamIdMs: 1, streamIdSeq: 1, submitTime: mkSubmitTime(0)},
+		{streamIdMs: 2, streamIdSeq: 0, submitTime: mkSubmitTime(0)},
+		{streamIdMs: 2, streamIdSeq: 0, submitTime: mkSubmitTime(1)},
+		{streamIdMs: 3, streamIdSeq: 0, submitTime: mkSubmitTime(0)},
+		{streamIdMs: 3, streamIdSeq: 1, submitTime: mkSubmitTime(0)},
+		{streamIdMs: 3, streamIdSeq: 1, submitTime: mkSubmitTime(1)},
+		{streamIdMs: 3, streamIdSeq: 1, submitTime: mkSubmitTime(2)},
 	}
 
 	submissionsRand := make([]streamSorterSubmission, 0, len(submissions))
