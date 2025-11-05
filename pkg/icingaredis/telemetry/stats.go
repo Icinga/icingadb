@@ -17,7 +17,6 @@ var Stats struct {
 	Config           com.Counter
 	State            com.Counter
 	History          com.Counter
-	Callback         com.Counter
 	Overdue          com.Counter
 	HistoryCleanup   com.Counter
 	NotificationSync com.Counter
@@ -29,7 +28,6 @@ func WriteStats(ctx context.Context, client *redis.Client, logger *logging.Logge
 		"config_sync":       &Stats.Config,
 		"state_sync":        &Stats.State,
 		"history_sync":      &Stats.History,
-		"callback_sync":     &Stats.Callback,
 		"overdue_sync":      &Stats.Overdue,
 		"history_cleanup":   &Stats.HistoryCleanup,
 		"notification_sync": &Stats.NotificationSync,
