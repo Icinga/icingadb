@@ -498,7 +498,13 @@ func makeSortedCallbackStageFunc(
 	sorter := NewStreamSorter(ctx, logger, sorterCallbackFn)
 
 	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
-		defer close(out)
+		defer func() {
+			if err := sorter.CloseOutput(out); err != nil {
+				s.logger.Errorw("Closing stream sorter output failed",
+					zap.String("key", key),
+					zap.Error(err))
+			}
+		}()
 
 		for {
 			select {
@@ -509,7 +515,9 @@ func makeSortedCallbackStageFunc(
 
 				err := sorter.Submit(msg, key, out)
 				if err != nil {
-					s.logger.Errorw("Failed to submit Redis stream event to stream sorter", zap.Error(err))
+					s.logger.Errorw("Failed to submit Redis stream event to stream sorter",
+						zap.String("key", key),
+						zap.Error(err))
 				}
 
 			case <-ctx.Done():
