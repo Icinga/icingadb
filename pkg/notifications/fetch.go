@@ -22,7 +22,7 @@ func (client *Client) fetchHostServiceFromRedis(
 		key := "icinga:" + typ
 
 		var data string
-		if err := retry.WithBackoff(
+		err := retry.WithBackoff(
 			ctx,
 			func(ctx context.Context) (err error) {
 				data, err = client.redisClient.HGet(ctx, key, id).Result()
@@ -31,7 +31,8 @@ func (client *Client) fetchHostServiceFromRedis(
 			retry.Retryable,
 			backoff.DefaultBackoff,
 			retry.Settings{},
-		); err != nil {
+		)
+		if err != nil {
 			return "", errors.Wrapf(err, "redis HGET %q, %q failed", key, id)
 		}
 
@@ -60,24 +61,35 @@ func (client *Client) fetchHostServiceFromRedis(
 	return
 }
 
-// fetchCustomVarFromSql retrieves custom variables for the hsot and service from SQL.
+// customVar is used as an internal representation in Client.fetchCustomVarFromSql.
+type customVar struct {
+	Name  string       `db:"name"`
+	Value types.String `db:"value"`
+}
+
+// getValue returns this customvar's value as a string, transforming SQL NULLs to empty strings.
+func (cv customVar) getValue() string {
+	if cv.Value.Valid {
+		return cv.Value.String
+	}
+	return ""
+}
+
+// fetchCustomVarFromSql retrieves custom variables for the host and service from SQL.
 //
 // If serviceId is nil, only the host custom vars are fetched. Otherwise, both host and service custom vars are fetched.
 func (client *Client) fetchCustomVarFromSql(
 	ctx context.Context,
 	hostId, serviceId types.Binary,
 ) (map[string]string, error) {
-	type customVar struct {
-		Name  string `db:"name"`
-		Value string `db:"value"`
-	}
-
 	getCustomVarsFromSql := func(ctx context.Context, typ string, id types.Binary) ([]customVar, error) {
 		stmt, err := client.db.Preparex(client.db.Rebind(
-			`SELECT customvar.name AS name, customvar.value AS value
+			`SELECT
+				customvar_flat.flatname AS name,
+				customvar_flat.flatvalue AS value
 			FROM ` + typ + `_customvar
-			LEFT JOIN customvar
-			ON ` + typ + `_customvar.customvar_id = customvar.id
+			JOIN customvar_flat
+			ON ` + typ + `_customvar.customvar_id = customvar_flat.customvar_id
 			WHERE ` + typ + `_customvar.` + typ + `_id = ?`))
 		if err != nil {
 			return nil, err
@@ -99,7 +111,7 @@ func (client *Client) fetchCustomVarFromSql(
 	}
 
 	for _, hostVar := range hostVars {
-		customVars["host.vars."+hostVar.Name] = hostVar.Value
+		customVars["host.vars."+hostVar.Name] = hostVar.getValue()
 	}
 
 	if serviceId != nil {
@@ -109,7 +121,7 @@ func (client *Client) fetchCustomVarFromSql(
 		}
 
 		for _, serviceVar := range serviceVars {
-			customVars["service.vars."+serviceVar.Name] = serviceVar.Value
+			customVars["service.vars."+serviceVar.Name] = serviceVar.getValue()
 		}
 	}
 
