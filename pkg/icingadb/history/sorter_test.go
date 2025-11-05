@@ -116,6 +116,7 @@ func TestStreamSorter(t *testing.T) {
 		name                   string
 		messages               int
 		producers              int
+		producersEarlyClose    int
 		callbackMaxDelayMs     int
 		callbackSuccessPercent int
 		expectTimeout          bool
@@ -185,6 +186,15 @@ func TestStreamSorter(t *testing.T) {
 			outMaxDelayMs:          1000,
 		},
 		{
+			name:                   "producer out early close",
+			messages:               100,
+			producers:              10,
+			producersEarlyClose:    5,
+			callbackMaxDelayMs:     1000,
+			callbackSuccessPercent: 100,
+			expectTimeout:          true,
+		},
+		{
 			name:                   "pure chaos",
 			messages:               50,
 			producers:              10,
@@ -247,9 +257,13 @@ func TestStreamSorter(t *testing.T) {
 				callbackFn)
 			sorter.verbose = true
 
-			for range tt.producers {
+			for i := range tt.producers {
+				earlyClose := i < tt.producersEarlyClose
+
 				out := make(chan redis.XMessage)
-				defer close(out) // no leakage, general cleanup after finishing test run
+				if !earlyClose {
+					defer func() { _ = sorter.CloseOutput(out) }() // no leakage, general cleanup
+				}
 
 				go func() {
 					for {
@@ -282,6 +296,13 @@ func TestStreamSorter(t *testing.T) {
 
 						msg := redis.XMessage{ID: fmt.Sprintf("%d-%d", ms, seq)}
 						require.NoError(t, sorter.Submit(msg, nil, out))
+
+						// 25% chance of closing for early closing producers
+						if earlyClose && rand.Int63n(4) == 3 {
+							require.NoError(t, sorter.CloseOutput(out))
+							t.Log("Successfully closed producer early")
+							return
+						}
 					}
 				}()
 

@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -116,9 +117,12 @@ func (subs *streamSorterSubmissions) Pop() any {
 // context. If the callback function returns true, the element will be removed from the queue. Otherwise, the element
 // will be kept at top of the queue and retried next time.
 type StreamSorter struct {
-	logger       *logging.Logger
-	callbackFn   func(redis.XMessage, any) bool
-	submissionCh chan streamSorterSubmission
+	ctx               context.Context
+	logger            *logging.Logger
+	callbackFn        func(redis.XMessage, any) bool
+	submissionCh      chan streamSorterSubmission
+	closeChSubmission chan chan<- redis.XMessage
+	closeChQueue      chan chan<- redis.XMessage
 
 	// verbose implies a verbose debug logging. Don't think one want to have this outside the tests.
 	verbose bool
@@ -131,23 +135,30 @@ func NewStreamSorter(
 	callbackFn func(msg redis.XMessage, args any) bool,
 ) *StreamSorter {
 	sorter := &StreamSorter{
-		logger:       logger,
-		callbackFn:   callbackFn,
-		submissionCh: make(chan streamSorterSubmission),
+		ctx:               ctx,
+		logger:            logger,
+		callbackFn:        callbackFn,
+		submissionCh:      make(chan streamSorterSubmission),
+		closeChSubmission: make(chan chan<- redis.XMessage),
+		closeChQueue:      make(chan chan<- redis.XMessage),
 	}
 
-	_ = context.AfterFunc(ctx, func() { close(sorter.submissionCh) })
+	_ = context.AfterFunc(ctx, func() {
+		close(sorter.submissionCh)
+		close(sorter.closeChSubmission)
+		close(sorter.closeChQueue)
+	})
 
 	ch := make(chan streamSorterSubmission)
-	go sorter.submissionWorker(ctx, ch)
-	go sorter.queueWorker(ctx, ch)
+	go sorter.submissionWorker(ch)
+	go sorter.queueWorker(ch)
 
 	return sorter
 }
 
 // submissionWorker listens ton submissionCh populated by Submit, fills the heap and ejects streamSorterSubmissions into
 // out, linked to the queueWorker goroutine for further processing.
-func (sorter *StreamSorter) submissionWorker(ctx context.Context, out chan<- streamSorterSubmission) {
+func (sorter *StreamSorter) submissionWorker(out chan<- streamSorterSubmission) {
 	defer close(out)
 
 	// When a streamSorterSubmission is created in the Submit method, the current time.Time is added to the struct.
@@ -161,15 +172,40 @@ func (sorter *StreamSorter) submissionWorker(ctx context.Context, out chan<- str
 
 	for {
 		select {
-		case <-ctx.Done():
+		case <-sorter.ctx.Done():
 			return
 
-		case sub := <-sorter.submissionCh:
+		case sub, ok := <-sorter.submissionCh:
+			if !ok {
+				return
+			}
+
 			if sorter.verbose {
 				sorter.logger.Debugw("Push submission to heap", zap.Object("submission", sub))
 			}
 
 			heap.Push(submissionHeap, sub)
+
+		case ch, ok := <-sorter.closeChSubmission:
+			if !ok {
+				return
+			}
+
+			bkp := &streamSorterSubmissions{}
+			for submissionHeap.Len() > 0 {
+				x := heap.Pop(submissionHeap)
+				sub, ok := x.(streamSorterSubmission)
+				if !ok {
+					panic(fmt.Sprintf("invalid type %T from submission heap", x))
+				}
+
+				if sub.out == ch {
+					continue
+				}
+
+				bkp.Push(sub)
+			}
+			submissionHeap = bkp
 
 		case <-ticker.C:
 			start := time.Now()
@@ -208,7 +244,7 @@ func (sorter *StreamSorter) submissionWorker(ctx context.Context, out chan<- str
 }
 
 // queueWorker receives sorted streamSorterSubmissions from submissionWorker and forwards them to the callback.
-func (sorter *StreamSorter) queueWorker(ctx context.Context, in <-chan streamSorterSubmission) {
+func (sorter *StreamSorter) queueWorker(in <-chan streamSorterSubmission) {
 	// Each streamSorterSubmission received from "in" is stored in the queue slice. From there on, the slice head is
 	// passed to the callback function. The queueEventCh has a buffer capacity of 1 to allow both filling and consuming
 	// in the same goroutine.
@@ -225,7 +261,7 @@ func (sorter *StreamSorter) queueWorker(ctx context.Context, in <-chan streamSor
 	var callbackCh chan bool
 	callbackFn := func(submission streamSorterSubmission) {
 		select {
-		case <-ctx.Done():
+		case <-sorter.ctx.Done():
 			return
 		case <-time.After(callbackDelay):
 		}
@@ -233,6 +269,13 @@ func (sorter *StreamSorter) queueWorker(ctx context.Context, in <-chan streamSor
 		start := time.Now()
 		success := sorter.callbackFn(submission.msg, submission.args)
 		if success {
+			defer func() {
+				// Ensure not to panic if the out channel was closed via CloseOutput in the meantime.
+				if r := recover(); r != nil {
+					sorter.logger.Error("Recovered from sending submission", zap.Any("recovery", r))
+				}
+			}()
+
 			submission.out <- submission.msg
 			callbackDelay = 0
 		} else {
@@ -257,7 +300,7 @@ func (sorter *StreamSorter) queueWorker(ctx context.Context, in <-chan streamSor
 		}
 
 		select {
-		case <-ctx.Done():
+		case <-sorter.ctx.Done():
 			return
 
 		case sub, ok := <-in:
@@ -273,8 +316,18 @@ func (sorter *StreamSorter) queueWorker(ctx context.Context, in <-chan streamSor
 					zap.Int("queue-size", len(queue)))
 			}
 
+		case ch, ok := <-sorter.closeChQueue:
+			if !ok {
+				return
+			}
+
+			queue = slices.DeleteFunc(queue, func(sub streamSorterSubmission) bool {
+				return sub.out == ch
+			})
+
 		case success := <-callbackCh:
-			if success {
+			// The len(queue) part is necessary as sorter.closeChQueue might interfere.
+			if success && len(queue) > 0 {
 				queue = queue[1:]
 			}
 
@@ -311,10 +364,39 @@ func (sorter *StreamSorter) Submit(msg redis.XMessage, args any, out chan<- redi
 	}
 
 	select {
+	case <-sorter.ctx.Done():
+		return sorter.ctx.Err()
+
 	case sorter.submissionCh <- submission:
 		return nil
 
 	case <-time.After(time.Second):
 		return errors.New("submission timed out")
 	}
+}
+
+// CloseOutput clears all submissions targeting this output channel and closes the channel afterwards.
+//
+// This will only result in submissions with this out channel to be removed from both the submissionWorker's heap and
+// the queueWorker's queue. In case such a submission is already in the actual submission process, it might still be
+// tried, but sending it to the out channel is recovered internally.
+//
+// As filtering/recreating the caches is potentially expensive, only call this method if required. In the current
+// architecture of sync.go, this is fine.
+func (sorter *StreamSorter) CloseOutput(out chan<- redis.XMessage) error {
+	for _, ch := range []chan chan<- redis.XMessage{sorter.closeChSubmission, sorter.closeChQueue} {
+		select {
+		case <-sorter.ctx.Done():
+			return sorter.ctx.Err()
+
+		case ch <- out:
+
+		case <-time.After(time.Second):
+			return errors.New("sending to channel for closing timed out")
+		}
+	}
+
+	close(out)
+
+	return nil
 }
