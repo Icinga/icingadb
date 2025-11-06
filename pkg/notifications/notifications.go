@@ -83,8 +83,8 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, hostId, servic
 	const icingaDbWebRuleVersion = 1
 
 	type IcingaDbWebQuery struct {
-		Query      string   `json:"query"`
-		Parameters []string `json:"parameters"`
+		Query      string `json:"query"`
+		Parameters []any  `json:"parameters"`
 	}
 
 	type IcingaDbWebRule struct {
