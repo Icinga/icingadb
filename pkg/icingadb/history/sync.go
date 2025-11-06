@@ -449,7 +449,7 @@ func makeSortedCallbackStageFunc(
 	keyStructPtrs map[string]any,
 	fn func(database.Entity) bool,
 ) stageFunc {
-	sorterCallbackFn := func(msg redis.XMessage, args any) bool {
+	sorterCallbackFn := func(msg redis.XMessage, key string) bool {
 		makeEntity := func(key string, values map[string]interface{}) (database.Entity, error) {
 			structPtr, ok := keyStructPtrs[key]
 			if !ok {
@@ -473,12 +473,6 @@ func makeSortedCallbackStageFunc(
 			return entity, nil
 		}
 
-		key, ok := args.(string)
-		if !ok {
-			// Shall not happen; set to string some thirty lines below
-			panic(fmt.Sprintf("args is of type %T, not string", args))
-		}
-
 		entity, err := makeEntity(key, msg.Values)
 		if err != nil {
 			logger.Errorw("Failed to create database.Entity out of Redis stream message",
@@ -495,36 +489,7 @@ func makeSortedCallbackStageFunc(
 		return success
 	}
 
-	sorter := NewStreamSorter(ctx, logger, sorterCallbackFn)
-
-	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
-		defer func() {
-			if err := sorter.CloseOutput(out); err != nil {
-				s.logger.Errorw("Closing stream sorter output failed",
-					zap.String("key", key),
-					zap.Error(err))
-			}
-		}()
-
-		for {
-			select {
-			case msg, ok := <-in:
-				if !ok {
-					return nil
-				}
-
-				err := sorter.Submit(msg, key, out)
-				if err != nil {
-					s.logger.Errorw("Failed to submit Redis stream event to stream sorter",
-						zap.String("key", key),
-						zap.Error(err))
-				}
-
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-	}
+	return NewStreamSorter(ctx, logger, sorterCallbackFn).PipelineFunc
 }
 
 const (
