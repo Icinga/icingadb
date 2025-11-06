@@ -3,6 +3,7 @@ package history
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/redis"
@@ -192,7 +193,6 @@ func TestStreamSorter(t *testing.T) {
 			producersEarlyClose:    5,
 			callbackMaxDelayMs:     1000,
 			callbackSuccessPercent: 100,
-			expectTimeout:          true,
 		},
 		{
 			name:                   "pure chaos",
@@ -211,7 +211,7 @@ func TestStreamSorter(t *testing.T) {
 			var (
 				callbackCollection      []string
 				callbackCollectionMutex sync.Mutex
-				callbackFn              = func(msg redis.XMessage, _ any) bool {
+				callbackFn              = func(msg redis.XMessage, _ string) bool {
 					if tt.callbackMaxDelayMs > 0 {
 						time.Sleep(time.Duration(rand.Int63n(int64(tt.callbackMaxDelayMs))) * time.Millisecond)
 					}
@@ -260,9 +260,14 @@ func TestStreamSorter(t *testing.T) {
 			for i := range tt.producers {
 				earlyClose := i < tt.producersEarlyClose
 
+				in := make(chan redis.XMessage)
 				out := make(chan redis.XMessage)
+				go func() {
+					require.NoError(t, sorter.PipelineFunc(context.Background(), Sync{}, "", in, out))
+				}()
+
 				if !earlyClose {
-					defer func() { _ = sorter.CloseOutput(out) }() // no leakage, general cleanup
+					defer close(in) // no leakage, general cleanup
 				}
 
 				go func() {
@@ -295,12 +300,12 @@ func TestStreamSorter(t *testing.T) {
 						}
 
 						msg := redis.XMessage{ID: fmt.Sprintf("%d-%d", ms, seq)}
-						require.NoError(t, sorter.Submit(msg, nil, out))
+						in <- msg
 
 						// 25% chance of closing for early closing producers
 						if earlyClose && rand.Int63n(4) == 3 {
-							require.NoError(t, sorter.CloseOutput(out))
-							t.Log("Successfully closed producer early")
+							close(in)
+							t.Log("closed producer early")
 							return
 						}
 					}
