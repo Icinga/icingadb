@@ -255,7 +255,7 @@ func TestStreamSorter(t *testing.T) {
 				t.Context(),
 				logging.NewLogger(zaptest.NewLogger(t).Sugar(), time.Second),
 				callbackFn)
-			sorter.verbose = true
+			sorter.isVerbose = true
 
 			for i := range tt.producers {
 				earlyClose := i < tt.producersEarlyClose

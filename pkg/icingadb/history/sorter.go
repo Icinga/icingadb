@@ -135,8 +135,8 @@ type StreamSorter struct {
 	// that output channel and it can be closed by the worker after it processed all pending submissions for it.
 	closeOutCh chan chan<- redis.XMessage
 
-	// verbose implies a verbose debug logging. Don't think one want to have this outside the tests.
-	verbose bool
+	// isVerbose implies a isVerbose debug logging. Don't think one want to have this outside the tests.
+	isVerbose bool
 }
 
 // NewStreamSorter creates a StreamSorter honoring the given context and returning elements to the callback function.
@@ -159,6 +159,22 @@ func NewStreamSorter(
 	return sorter
 }
 
+// verbose produces a debug log messages if StreamSorter.isVerbose is set.
+func (sorter *StreamSorter) verbose(msg string, keysAndValues ...any) {
+	// When used in tests and the test context is done, using the logger results in a data race. Since there are a few
+	// log messages which might occur after the test has finished, better not log at all.
+	// https://github.com/uber-go/zap/issues/687#issuecomment-473382859
+	if sorter.ctx.Err() != nil {
+		return
+	}
+
+	if !sorter.isVerbose {
+		return
+	}
+
+	sorter.logger.Debugw(msg, keysAndValues...)
+}
+
 // startCallback initiates the callback in a background goroutine and returns a channel that is closed once the callback
 // has succeeded. It retries the callback with a backoff until it signal success by returning true.
 func (sorter *StreamSorter) startCallback(msg redis.XMessage, key string) <-chan struct{} {
@@ -170,7 +186,7 @@ func (sorter *StreamSorter) startCallback(msg redis.XMessage, key string) <-chan
 		const callbackMaxDelay = 10 * time.Second
 		callbackDelay := time.Duration(0)
 
-		for {
+		for try := 0; ; try++ {
 			select {
 			case <-sorter.ctx.Done():
 				return
@@ -180,34 +196,36 @@ func (sorter *StreamSorter) startCallback(msg redis.XMessage, key string) <-chan
 			start := time.Now()
 			success := sorter.callbackFn(msg, key)
 
-			if sorter.verbose {
-				sorter.logger.Debugw("Callback finished",
-					zap.String("id", msg.ID),
-					zap.Bool("success", success),
-					zap.Duration("duration", time.Since(start)),
-					zap.Duration("next-delay", callbackDelay))
-			}
+			sorter.verbose("startCallback: finished executing callbackFn",
+				zap.String("id", msg.ID),
+				zap.Bool("success", success),
+				zap.Int("try", try),
+				zap.Duration("duration", time.Since(start)),
+				zap.Duration("next-delay", callbackDelay))
 
 			if success {
 				return
 			} else {
-				callbackDelay = min(2*max(time.Millisecond, callbackDelay), callbackMaxDelay)
+				callbackDelay = min(max(time.Millisecond, 2*callbackDelay), callbackMaxDelay)
 			}
-
 		}
 	}()
 
 	return callbackCh
 }
 
-// worker
+// worker is the background worker, started in a goroutine from NewStreamSorter, reacts upon messages from the channels,
+// and runs until the StreamSorter.ctx is done.
 func (sorter *StreamSorter) worker() {
 	// When a streamSorterSubmission is created in the submit method, the current time.Time is added to the struct.
 	// Only if the submission was at least three seconds (submissionMinAge) ago, a popped submission from the heap will
-	// be forwarded to the other goroutine for future processing.
+	// be passed to startCallback in its own goroutine to execute the callback function.
 	const submissionMinAge = 3 * time.Second
 	var submissionHeap streamSorterSubmissions
 
+	// Each registered output is stored in the registeredOutputs map, mapping output channels to the following struct.
+	// It counts pending submissions in the heap for each received submission from submissionCh and can be marked as
+	// closed to be cleaned up after its work is done.
 	type OutputState struct {
 		pending int
 		close   bool
@@ -222,13 +240,15 @@ func (sorter *StreamSorter) worker() {
 		}
 	}()
 
+	// If a submission is currently given to the callback via startCallback, these two variables are not nil. After the
+	// callback has finished, the channel will be closed.
 	var runningSubmission *streamSorterSubmission
 	var runningCallbackCh <-chan struct{}
 
 	for {
-		// Sanity check
 		if (runningSubmission == nil) != (runningCallbackCh == nil) {
-			panic(fmt.Sprintf("inconsistent state: runningSubmission=%#v and runningCallbackCh=%#v", runningSubmission, runningCallbackCh))
+			panic(fmt.Sprintf("inconsistent state: runningSubmission=%#v and runningCallbackCh=%#v",
+				runningSubmission, runningCallbackCh))
 		}
 
 		var nextSubmissionDue <-chan time.Time
@@ -246,9 +266,7 @@ func (sorter *StreamSorter) worker() {
 
 		select {
 		case out := <-sorter.registerOutCh:
-			if sorter.verbose {
-				sorter.logger.Debugw("worker: register output", zap.String("out", fmt.Sprint(out)))
-			}
+			sorter.verbose("worker: register output", zap.String("out", fmt.Sprint(out)))
 			if _, ok := registeredOutputs[out]; ok {
 				panic("attempting to register the same output channel twice")
 			}
@@ -256,9 +274,7 @@ func (sorter *StreamSorter) worker() {
 			// This function is now responsible for closing out.
 
 		case out := <-sorter.closeOutCh:
-			if sorter.verbose {
-				sorter.logger.Debugw("worker: request close output", zap.String("out", fmt.Sprint(out)))
-			}
+			sorter.verbose("worker: request close output", zap.String("out", fmt.Sprint(out)))
 			if state := registeredOutputs[out]; state == nil {
 				panic("requested to close unknown output channel")
 			} else if state.pending > 0 {
@@ -271,9 +287,7 @@ func (sorter *StreamSorter) worker() {
 			}
 
 		case sub := <-sorter.submissionCh:
-			if sorter.verbose {
-				sorter.logger.Debugw("Push submission to heap", zap.Object("submission", sub))
-			}
+			sorter.verbose("worker: push submission to heap", zap.Object("submission", sub))
 
 			if state := registeredOutputs[sub.out]; state == nil {
 				panic("submission for an unknown output channel")
@@ -322,14 +336,14 @@ func (sorter *StreamSorter) submit(msg redis.XMessage, key string, out chan<- re
 	}
 
 	select {
-	case <-sorter.ctx.Done():
-		return sorter.ctx.Err()
-
 	case sorter.submissionCh <- submission:
 		return nil
 
 	case <-time.After(time.Second):
 		return errors.New("submission timed out")
+
+	case <-sorter.ctx.Done():
+		return sorter.ctx.Err()
 	}
 }
 
