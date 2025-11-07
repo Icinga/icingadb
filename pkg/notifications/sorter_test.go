@@ -1,5 +1,5 @@
 // #nosec G404 -- Allow math/rand for the tests
-package history
+package notifications
 
 import (
 	"cmp"
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 	"math/rand"
@@ -263,7 +264,7 @@ func TestStreamSorter(t *testing.T) {
 				in := make(chan redis.XMessage)
 				out := make(chan redis.XMessage)
 				go func() {
-					require.NoError(t, sorter.PipelineFunc(context.Background(), Sync{}, "", in, out))
+					require.NoError(t, sorter.PipelineFunc(context.Background(), history.Sync{}, "", in, out))
 				}()
 
 				if !earlyClose {

@@ -2,7 +2,6 @@ package history
 
 import (
 	"context"
-	"fmt"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
@@ -16,7 +15,6 @@ import (
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"reflect"
 	"slices"
@@ -30,17 +28,6 @@ type Sync struct {
 	logger *logging.Logger
 }
 
-// SyncCallbackConf configures a callback stage given to Sync.Sync.
-type SyncCallbackConf struct {
-	// StatPtr refers a [com.Counter] from the [telemetry.Stats] struct, e.g., Stats.NotificationSync.
-	StatPtr *com.Counter
-	// KeyStructPtr says which pipeline keys should be mapped to which type, identified by a struct pointer. If
-	// a key is missing from the map, it will not be used for the callback.
-	KeyStructPtr map[string]any
-	// Fn is the actual callback function.
-	Fn func(database.Entity) bool
-}
-
 // NewSync creates a new Sync.
 func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync {
 	return &Sync{
@@ -52,19 +39,9 @@ func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync
 
 // Sync synchronizes Redis history streams from s.redis to s.db and deletes the original data on success.
 //
-// It is possible to enable a callback functionality, e.g., for the Icinga Notifications integration. To do so, the
-// callbackCfg must be set according to the SyncCallbackConf struct documentation.
-func (s Sync) Sync(ctx context.Context, callbackCfg *SyncCallbackConf) error {
-	var callbackStageFn stageFunc
-	if callbackCfg != nil {
-		callbackStageFn = makeSortedCallbackStageFunc(
-			ctx,
-			s.logger,
-			callbackCfg.StatPtr,
-			callbackCfg.KeyStructPtr,
-			callbackCfg.Fn)
-	}
-
+// The optional extraStages parameter allows specifying an additional extra stage for each pipeline, identified by their
+// key. This stage is executed after every other stage, but before the entry gets deleted from Redis.
+func (s Sync) Sync(ctx context.Context, extraStages map[string]StageFunc) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for key, pipeline := range syncPipelines {
@@ -90,19 +67,16 @@ func (s Sync) Sync(ctx context.Context, callbackCfg *SyncCallbackConf) error {
 		// forward the entry after it has completed its own sync so that later stages can rely on previous stages being
 		// executed successfully.
 		//
-		// If a callback exists for this key, it will be appended to the pipeline. Thus, it is executed after every
+		// If an extra stage exists for this key, it will be appended to the pipeline. Thus, it is executed after every
 		// other pipeline action, but before deleteFromRedis.
-
-		var hasCallbackStage bool
-		if callbackCfg != nil {
-			_, exists := callbackCfg.KeyStructPtr[key]
-			hasCallbackStage = exists
-		}
 
 		// Shadowed variable to allow appending custom callbacks.
 		pipeline := pipeline
-		if hasCallbackStage {
-			pipeline = append(slices.Clip(pipeline), callbackStageFn)
+		if extraStages != nil {
+			extraStage, ok := extraStages[key]
+			if ok {
+				pipeline = append(slices.Clip(pipeline), extraStage)
+			}
 		}
 
 		ch := make([]chan redis.XMessage, len(pipeline)+1)
@@ -200,19 +174,19 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 	}
 }
 
-// stageFunc is a function type that represents a sync pipeline stage. It is called with a context (it should stop
+// StageFunc is a function type that represents a sync pipeline stage. It is called with a context (it should stop
 // once that context is canceled), the Sync instance (for access to Redis, SQL database, logging), the key (information
 // about which pipeline this function is running in,  i.e. "notification"), an in channel for the stage to read history
 // events from and an out channel to forward history entries to after processing them successfully. A stage function
 // is supposed to forward each message from in to out, even if the event is not relevant for the current stage. On
 // error conditions, the message must not be forwarded to the next stage so that the event is not deleted from Redis
 // and can be processed at a later time.
-type stageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error
+type StageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error
 
-// writeOneEntityStage creates a stageFunc from a pointer to a struct implementing the v1.UpserterEntity interface.
+// writeOneEntityStage creates a StageFunc from a pointer to a struct implementing the v1.UpserterEntity interface.
 // For each history event it receives, it parses that event into a new instance of that entity type and writes it to
 // the database. It writes exactly one entity to the database for each history event.
-func writeOneEntityStage(structPtr any) stageFunc {
+func writeOneEntityStage(structPtr any) StageFunc {
 	structifier := structify.MakeMapStructifier(
 		reflect.TypeOf(structPtr).Elem(),
 		"json",
@@ -231,9 +205,9 @@ func writeOneEntityStage(structPtr any) stageFunc {
 	})
 }
 
-// writeMultiEntityStage creates a stageFunc from a function that takes a history event as an input and returns a
+// writeMultiEntityStage creates a StageFunc from a function that takes a history event as an input and returns a
 // (potentially empty) slice of v1.UpserterEntity instances that it then inserts into the database.
-func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.UpserterEntity, error)) stageFunc {
+func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.UpserterEntity, error)) StageFunc {
 	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
 		type State struct {
 			Message redis.XMessage // Original event from Redis.
@@ -345,7 +319,7 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 	}
 }
 
-// userNotificationStage is a specialized stageFunc that populates the user_notification_history table. It is executed
+// userNotificationStage is a specialized StageFunc that populates the user_notification_history table. It is executed
 // on the notification history stream and uses the users_notified_ids attribute to create an entry in the
 // user_notification_history relation table for each user ID.
 func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
@@ -404,9 +378,8 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 
 // countElementStage increments the [Stats.History] counter.
 //
-// This stageFunc should be called last in a [syncPipeline]. Thus, it is still executed before the final
-// Sync.deleteFromRedis call in Sync.Sync. Furthermore, an optional callback function will be appended after this stage,
-// resulting in an incremented history state counter for synchronized history, but stalling callback actions.
+// This StageFunc should be called last in each syncPipeline. Thus, it is executed before the final
+// Sync.deleteFromRedis call in Sync.Sync, but before optional extra stages, potentially blocking.
 func countElementStage(ctx context.Context, _ Sync, _ string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
 	defer close(out)
 
@@ -426,72 +399,6 @@ func countElementStage(ctx context.Context, _ Sync, _ string, in <-chan redis.XM
 	}
 }
 
-// makeSortedCallbackStageFunc creates a new stageFunc calling the callback function after reordering messages.
-//
-// This stageFunc is designed to be used by multiple channels. The internal sorting logic - realized by a StreamSorter -
-// results in all messages to be sorted based on their Redis Stream ID and be ejected to the callback function in this
-// order.
-//
-// The keyStructPtrs map decides what kind of database.Entity type will be used for the input data based on the key.
-//
-// The callback call is blocking and the message will be forwarded to the out channel after the function has returned.
-// Thus, please ensure this function does not block too long.
-//
-// If the callback function returns false, the message will be retried after an increasing backoff. All subsequent
-// messages will wait until this one succeeds.
-//
-// For each successfully submitted message, the telemetry stat referenced via a pointer s incremented. Thus, a delta
-// between telemetry.Stats.History and this stat indicates blocking callbacks.
-func makeSortedCallbackStageFunc(
-	ctx context.Context,
-	logger *logging.Logger,
-	statPtr *com.Counter,
-	keyStructPtrs map[string]any,
-	fn func(database.Entity) bool,
-) stageFunc {
-	sorterCallbackFn := func(msg redis.XMessage, key string) bool {
-		makeEntity := func(key string, values map[string]interface{}) (database.Entity, error) {
-			structPtr, ok := keyStructPtrs[key]
-			if !ok {
-				return nil, fmt.Errorf("key is not part of keyStructPtrs")
-			}
-
-			structifier := structify.MakeMapStructifier(
-				reflect.TypeOf(structPtr).Elem(),
-				"json",
-				contracts.SafeInit)
-			val, err := structifier(values)
-			if err != nil {
-				return nil, errors.Wrapf(err, "can't structify values %#v for %q", values, key)
-			}
-
-			entity, ok := val.(database.Entity)
-			if !ok {
-				return nil, fmt.Errorf("structifier returned %T which does not implement database.Entity", val)
-			}
-
-			return entity, nil
-		}
-
-		entity, err := makeEntity(key, msg.Values)
-		if err != nil {
-			logger.Errorw("Failed to create database.Entity out of Redis stream message",
-				zap.Error(err),
-				zap.String("key", key),
-				zap.String("id", msg.ID))
-			return false
-		}
-
-		success := fn(entity)
-		if success {
-			statPtr.Add(1)
-		}
-		return success
-	}
-
-	return NewStreamSorter(ctx, logger, sorterCallbackFn).PipelineFunc
-}
-
 const (
 	SyncPipelineAcknowledgement = "acknowledgement"
 	SyncPipelineComment         = "comment"
@@ -501,7 +408,7 @@ const (
 	SyncPipelineState           = "state"
 )
 
-var syncPipelines = map[string][]stageFunc{
+var syncPipelines = map[string][]StageFunc{
 	SyncPipelineAcknowledgement: {
 		writeOneEntityStage((*v1.AcknowledgementHistory)(nil)), // acknowledgement_history
 		writeOneEntityStage((*v1.HistoryAck)(nil)),             // history (depends on acknowledgement_history)
