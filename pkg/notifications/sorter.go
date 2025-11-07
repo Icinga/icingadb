@@ -1,4 +1,4 @@
-package history
+package notifications
 
 import (
 	"container/heap"
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -347,7 +348,7 @@ func (sorter *StreamSorter) submit(msg redis.XMessage, key string, out chan<- re
 	}
 }
 
-// PipelineFunc implements the interface expected for a history sync pipeline stage.
+// PipelineFunc implements the [history.StageFunc] type expected for a history sync pipeline stage.
 //
 // This method of a single StreamSorter can be inserted into multiple history sync pipelines and will forward all
 // messages from in to out as expected from a pipeline stage. In between, all messages are processed by the
@@ -355,7 +356,7 @@ func (sorter *StreamSorter) submit(msg redis.XMessage, key string, out chan<- re
 // according to its specification (see the comment on the StreamSorter type).
 func (sorter *StreamSorter) PipelineFunc(
 	ctx context.Context,
-	s Sync,
+	_ history.Sync,
 	key string,
 	in <-chan redis.XMessage,
 	out chan<- redis.XMessage,
@@ -395,7 +396,7 @@ func (sorter *StreamSorter) PipelineFunc(
 
 			err := sorter.submit(msg, key, out)
 			if err != nil {
-				s.logger.Errorw("Failed to submit Redis stream event to stream sorter",
+				sorter.logger.Errorw("Failed to submit Redis stream event to stream sorter",
 					zap.String("key", key),
 					zap.Error(err))
 			}

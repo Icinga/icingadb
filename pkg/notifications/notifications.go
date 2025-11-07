@@ -9,15 +9,19 @@ import (
 	"github.com/icinga/icinga-go-library/notifications/event"
 	"github.com/icinga/icinga-go-library/notifications/source"
 	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/structify"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/common"
+	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	v1history "github.com/icinga/icingadb/pkg/icingadb/v1/history"
+	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"reflect"
 	"sync"
 )
 
@@ -463,9 +467,64 @@ func (client *Client) Submit(entity database.Entity) bool {
 	return false
 }
 
-var SyncKeyStructPtrs = map[string]any{
-	history.SyncPipelineAcknowledgement: (*v1history.AcknowledgementHistory)(nil),
-	history.SyncPipelineDowntime:        (*v1history.DowntimeHistoryMeta)(nil),
-	history.SyncPipelineFlapping:        (*v1history.FlappingHistory)(nil),
-	history.SyncPipelineState:           (*v1history.StateHistory)(nil),
+// SyncExtraStages returns a map of history sync keys to [history.StageFunc] to be used for [history.Sync].
+//
+// Passing the return value of this method as the extraStages parameter to [history.Sync] results in forwarding events
+// from the Icinga DB history stream to Icinga Notifications after being resorted via the StreamSorter.
+func (client *Client) SyncExtraStages() map[string]history.StageFunc {
+	var syncKeyStructPtrs = map[string]any{
+		history.SyncPipelineAcknowledgement: (*v1history.AcknowledgementHistory)(nil),
+		history.SyncPipelineDowntime:        (*v1history.DowntimeHistoryMeta)(nil),
+		history.SyncPipelineFlapping:        (*v1history.FlappingHistory)(nil),
+		history.SyncPipelineState:           (*v1history.StateHistory)(nil),
+	}
+
+	sorterCallbackFn := func(msg redis.XMessage, key string) bool {
+		makeEntity := func(key string, values map[string]interface{}) (database.Entity, error) {
+			structPtr, ok := syncKeyStructPtrs[key]
+			if !ok {
+				return nil, fmt.Errorf("key is not part of keyStructPtrs")
+			}
+
+			structifier := structify.MakeMapStructifier(
+				reflect.TypeOf(structPtr).Elem(),
+				"json",
+				contracts.SafeInit)
+			val, err := structifier(values)
+			if err != nil {
+				return nil, errors.Wrapf(err, "can't structify values %#v for %q", values, key)
+			}
+
+			entity, ok := val.(database.Entity)
+			if !ok {
+				return nil, fmt.Errorf("structifier returned %T which does not implement database.Entity", val)
+			}
+
+			return entity, nil
+		}
+
+		entity, err := makeEntity(key, msg.Values)
+		if err != nil {
+			client.logger.Errorw("Failed to create database.Entity out of Redis stream message",
+				zap.Error(err),
+				zap.String("key", key),
+				zap.String("id", msg.ID))
+			return false
+		}
+
+		success := client.Submit(entity)
+		if success {
+			telemetry.Stats.NotificationSync.Add(1)
+		}
+		return success
+	}
+
+	pipelineFn := NewStreamSorter(client.ctx, client.logger, sorterCallbackFn).PipelineFunc
+
+	extraStages := make(map[string]history.StageFunc)
+	for k := range syncKeyStructPtrs {
+		extraStages[k] = pipelineFn
+	}
+
+	return extraStages
 }

@@ -170,8 +170,7 @@ func run() int {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	{
-		var callbackCfg *history.SyncCallbackConf
-
+		var extraStages map[string]history.StageFunc
 		if cfg := cmd.Config.NotificationsSource; cfg.ApiBaseUrl != "" {
 			logger.Info("Starting Icinga Notifications source")
 
@@ -185,17 +184,13 @@ func run() int {
 				logger.Fatalw("Can't create Icinga Notifications client from config", zap.Error(err))
 			}
 
-			callbackCfg = &history.SyncCallbackConf{
-				StatPtr:      &telemetry.Stats.NotificationSync,
-				KeyStructPtr: notifications.SyncKeyStructPtrs,
-				Fn:           notificationsSource.Submit,
-			}
+			extraStages = notificationsSource.SyncExtraStages()
 		}
 
 		go func() {
 			logger.Info("Starting history sync")
 
-			if err := hs.Sync(ctx, callbackCfg); err != nil && !utils.IsContextCanceled(err) {
+			if err := hs.Sync(ctx, extraStages); err != nil && !utils.IsContextCanceled(err) {
 				logger.Fatalf("%+v", err)
 			}
 		}()
