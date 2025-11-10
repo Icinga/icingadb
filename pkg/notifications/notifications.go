@@ -327,7 +327,7 @@ func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v
 
 	if !h.ClearTime.Time().IsZero() {
 		ev.Type = event.TypeAcknowledgementCleared
-		ev.Message = "Checkable was cleared"
+		ev.Message = "Acknowledgement was cleared"
 
 		if h.ClearedBy.Valid {
 			ev.Username = h.ClearedBy.String
