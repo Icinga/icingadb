@@ -8,6 +8,7 @@ import (
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
+	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 	"math/rand"
@@ -214,7 +215,7 @@ func TestStreamSorter(t *testing.T) {
 				callbackCollectionMutex sync.Mutex
 				callbackFn              = func(msg redis.XMessage, _ string) bool {
 					if tt.callbackMaxDelayMs > 0 {
-						time.Sleep(time.Duration(rand.Int63n(int64(tt.callbackMaxDelayMs))) * time.Millisecond)
+						time.Sleep(time.Duration(rand.Int63n(int64(tt.callbackMaxDelayMs))) * time.Microsecond)
 					}
 
 					if rand.Int63n(100)+1 > int64(tt.callbackSuccessPercent) {
@@ -234,7 +235,7 @@ func TestStreamSorter(t *testing.T) {
 				outConsumer  = func(out chan redis.XMessage) {
 					for {
 						if tt.outMaxDelayMs > 0 {
-							time.Sleep(time.Duration(rand.Int63n(int64(tt.outMaxDelayMs))) * time.Millisecond)
+							time.Sleep(time.Duration(rand.Int63n(int64(tt.outMaxDelayMs))) * time.Microsecond)
 						}
 
 						_, ok := <-out
@@ -256,6 +257,8 @@ func TestStreamSorter(t *testing.T) {
 				t.Context(),
 				logging.NewLogger(zaptest.NewLogger(t).Sugar(), time.Second),
 				callbackFn)
+			sorter.callbackMaxDelay = 100 * time.Millisecond
+			sorter.submissionMinAge = 50 * time.Millisecond
 			sorter.isVerbose = true
 
 			for i := range tt.producers {
@@ -264,7 +267,15 @@ func TestStreamSorter(t *testing.T) {
 				in := make(chan redis.XMessage)
 				out := make(chan redis.XMessage)
 				go func() {
-					require.NoError(t, sorter.PipelineFunc(context.Background(), history.Sync{}, "", in, out))
+					err := sorter.PipelineFunc(t.Context(), history.Sync{}, "", in, out)
+					// When closing down, both the test context is closed and the in channel is closed deferred. Within
+					// the PipelineFunc's select, both are checked and in most cases, the closed channel wins. However,
+					// sometimes a context close wins.
+					//
+					// So, ignore this kind of error. The checks below will still work and report if something is wrong.
+					if !errors.Is(err, context.Canceled) {
+						require.NoError(t, err)
+					}
 				}()
 
 				if !earlyClose {
@@ -273,7 +284,7 @@ func TestStreamSorter(t *testing.T) {
 
 				go func() {
 					for {
-						time.Sleep(time.Duration(rand.Int63n(250)) * time.Millisecond)
+						time.Sleep(time.Duration(rand.Int63n(250)) * time.Microsecond)
 
 						inCounterMutex.Lock()
 						isFin := inCounter <= 0
@@ -286,14 +297,14 @@ func TestStreamSorter(t *testing.T) {
 							return
 						}
 
-						ms := time.Now().UnixMilli() + rand.Int63n(2_000) - 1_000
-						seq := rand.Int63n(100)
+						ms := time.Now().UnixMilli() + rand.Int63n(10) - 5
+						seq := rand.Int63n(1_000)
 
 						// Add 10% time travelers
 						if rand.Int63n(10) == 9 {
-							distanceMs := int64(1_500)
+							distanceMs := int64(5)
 							if rand.Int63n(2) > 0 {
-								// Don't go back too far. Otherwise, elements would be out of order. Three seconds max.
+								// Don't go back too far. Otherwise, elements would be out of order - submissionMinAge.
 								ms -= distanceMs
 							} else {
 								ms += distanceMs
@@ -325,7 +336,7 @@ func TestStreamSorter(t *testing.T) {
 						break breakFor
 					}
 
-				case <-time.After(2 * time.Minute):
+				case <-time.After(3 * time.Second):
 					if tt.expectTimeout {
 						return
 					}
@@ -336,6 +347,7 @@ func TestStreamSorter(t *testing.T) {
 			if tt.expectTimeout {
 				t.Fatal("Timeout was expected")
 			}
+			t.Log("received all messages")
 
 			callbackCollectionMutex.Lock()
 			for i := 0; i < len(callbackCollection)-1; i++ {

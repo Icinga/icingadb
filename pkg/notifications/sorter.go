@@ -136,6 +136,13 @@ type StreamSorter struct {
 	// that output channel and it can be closed by the worker after it processed all pending submissions for it.
 	closeOutCh chan chan<- redis.XMessage
 
+	// The following fields should only be changed for the tests.
+
+	// callbackMaxDelay is the maximum delay for continuously failing callbacks. Defaults to 10s.
+	callbackMaxDelay time.Duration
+	// submissionMinAge is the minimum age for a submission before being forwarded. Defaults to 3s.
+	submissionMinAge time.Duration
+
 	// isVerbose implies a isVerbose debug logging. Don't think one want to have this outside the tests.
 	isVerbose bool
 }
@@ -147,12 +154,14 @@ func NewStreamSorter(
 	callbackFn func(msg redis.XMessage, key string) bool,
 ) *StreamSorter {
 	sorter := &StreamSorter{
-		ctx:           ctx,
-		logger:        logger,
-		callbackFn:    callbackFn,
-		submissionCh:  make(chan *streamSorterSubmission),
-		registerOutCh: make(chan chan<- redis.XMessage),
-		closeOutCh:    make(chan chan<- redis.XMessage),
+		ctx:              ctx,
+		logger:           logger,
+		callbackFn:       callbackFn,
+		submissionCh:     make(chan *streamSorterSubmission),
+		registerOutCh:    make(chan chan<- redis.XMessage),
+		closeOutCh:       make(chan chan<- redis.XMessage),
+		callbackMaxDelay: 10 * time.Second,
+		submissionMinAge: 3 * time.Second,
 	}
 
 	go sorter.worker()
@@ -184,7 +193,6 @@ func (sorter *StreamSorter) startCallback(msg redis.XMessage, key string) <-chan
 	go func() {
 		defer close(callbackCh)
 
-		const callbackMaxDelay = 10 * time.Second
 		callbackDelay := time.Duration(0)
 
 		for try := 0; ; try++ {
@@ -207,7 +215,7 @@ func (sorter *StreamSorter) startCallback(msg redis.XMessage, key string) <-chan
 			if success {
 				return
 			} else {
-				callbackDelay = min(max(time.Millisecond, 2*callbackDelay), callbackMaxDelay)
+				callbackDelay = min(max(time.Millisecond, 2*callbackDelay), sorter.callbackMaxDelay)
 			}
 		}
 	}()
@@ -221,7 +229,6 @@ func (sorter *StreamSorter) worker() {
 	// When a streamSorterSubmission is created in the submit method, the current time.Time is added to the struct.
 	// Only if the submission was at least three seconds (submissionMinAge) ago, a popped submission from the heap will
 	// be passed to startCallback in its own goroutine to execute the callback function.
-	const submissionMinAge = 3 * time.Second
 	var submissionHeap streamSorterSubmissions
 
 	// Each registered output is stored in the registeredOutputs map, mapping output channels to the following struct.
@@ -255,12 +262,12 @@ func (sorter *StreamSorter) worker() {
 		var nextSubmissionDue <-chan time.Time
 		if runningCallbackCh == nil {
 			if next := submissionHeap.Peek(); next != nil {
-				if submissionAge := time.Since(next.submitTime); submissionAge >= submissionMinAge {
+				if submissionAge := time.Since(next.submitTime); submissionAge >= sorter.submissionMinAge {
 					runningCallbackCh = sorter.startCallback(next.msg, next.key)
 					runningSubmission = next
 					heap.Pop(&submissionHeap)
 				} else {
-					nextSubmissionDue = time.After(submissionMinAge - submissionAge)
+					nextSubmissionDue = time.After(sorter.submissionMinAge - submissionAge)
 				}
 			}
 		}
@@ -275,7 +282,6 @@ func (sorter *StreamSorter) worker() {
 			// This function is now responsible for closing out.
 
 		case out := <-sorter.closeOutCh:
-			sorter.verbose("worker: request close output", zap.String("out", fmt.Sprint(out)))
 			if state := registeredOutputs[out]; state == nil {
 				panic("requested to close unknown output channel")
 			} else if state.pending > 0 {
@@ -361,7 +367,6 @@ func (sorter *StreamSorter) PipelineFunc(
 	in <-chan redis.XMessage,
 	out chan<- redis.XMessage,
 ) error {
-
 	// Register output channel with worker.
 	select {
 	case sorter.registerOutCh <- out:
