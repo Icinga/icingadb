@@ -304,6 +304,7 @@ func (client *Client) buildFlappingHistoryEvent(ctx context.Context, h *v1histor
 		ev.Message = fmt.Sprintf(
 			"Checkable stopped flapping (Current flapping value %.2f%% < low threshold %.2f%%)",
 			h.PercentStateChangeEnd.Float64, h.FlappingThresholdLow)
+		ev.Mute = types.MakeBool(false)
 	} else if h.PercentStateChangeStart.Valid {
 		ev.Type = event.TypeFlappingStart
 		ev.Message = fmt.Sprintf(
@@ -328,12 +329,15 @@ func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v
 	if !h.ClearTime.Time().IsZero() {
 		ev.Type = event.TypeAcknowledgementCleared
 		ev.Message = "Acknowledgement was cleared"
+		ev.Mute = types.MakeBool(false)
 
 		if h.ClearedBy.Valid {
 			ev.Username = h.ClearedBy.String
 		}
 	} else if !h.SetTime.Time().IsZero() {
 		ev.Type = event.TypeAcknowledgementSet
+		ev.Mute = types.MakeBool(true)
+		ev.MuteReason = "Checkable was acknowledged"
 
 		if h.Comment.Valid {
 			ev.Message = h.Comment.String
