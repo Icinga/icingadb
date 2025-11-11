@@ -176,6 +176,12 @@ ICINGADB_RETENTION_OPTIONS=comment:356
 
 ## Notifications Source Configuration
 
+!!! warning
+
+    The Icinga Notifications integration is a feature preview that you can try out.
+    However, incompatible changes may happen, so be sure to check the changelog for future updates.
+    Please do not use it in production.
+
 Icinga DB can act as an event source for [Icinga Notifications](https://icinga.com/docs/icinga-notifications/).
 If configured, Icinga DB will submit events to the Icinga Notifications API.
 
