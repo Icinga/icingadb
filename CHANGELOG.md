@@ -1,5 +1,18 @@
 # Icinga DB Changelog
 
+## 1.5.0 (2025-11-XX)
+
+The focus of this Icinga DB release is an integration with [Icinga Notifications](https://icinga.com/docs/icinga-notifications/latest/) , which allows Icinga DB to act as an Icinga Notifications source.
+With the new [`notifications-source` configuration](https://icinga.com/docs/icinga-db/latest/doc/03-Configuration/#notifications-source-configuration) set, Icinga DB forwards events to Icinga Notifications.
+
+Additionally, maintenance work was completed.
+The most notable changes are as follows.
+
+* Introduce `notifications-source` to let Icinga DB forward events to Icinga Notifications. #998
+* Use a dedicated SQL connection for schema imports to prevent side effects on future queries. #1008
+* Modernize the Go codebase. #1013, #1026
+* Document PostgreSQL user usage for schema upgrades. #991
+
 ## 1.4.0 (2025-06-18)
 
 This Icinga DB release introduces support for Icinga 2 dependencies, continues to retry certain long-persisting errors, and tweaks the logging.
