@@ -171,14 +171,14 @@ func run() int {
 
 	{
 		var extraStages map[string]history.StageFunc
-		if cfg := cmd.Config.NotificationsSource; cfg.ApiBaseUrl != "" {
+		if cfg := cmd.Config.Notifications; cfg.Url != "" {
 			logger.Info("Starting Icinga Notifications source")
 
 			notificationsSource, err := notifications.NewNotificationsClient(
 				ctx,
 				db,
 				rc,
-				logs.GetChildLogger("notifications-source"),
+				logs.GetChildLogger("notifications"),
 				cfg)
 			if err != nil {
 				logger.Fatalw("Can't create Icinga Notifications client from config", zap.Error(err))
