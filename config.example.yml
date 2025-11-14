@@ -139,3 +139,15 @@ redis:
 #    flapping:
 #    notification:
 #    state:
+
+# Icinga DB can act as an event source for Icinga Notifications. If the following block is not empty, Icinga DB will
+# submit events to the Icinga Notifications API.
+#notifications:
+  # URL to the API root.
+#  url: http://localhost:5680
+
+  # Username to authenticate against the Icinga Notifications API.
+#  username: icingadb
+
+  # Password for the defined user.
+#  password: insecureinsecure

@@ -4,6 +4,7 @@ import (
 	"github.com/creasty/defaults"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/notifications/source"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/pkg/errors"
@@ -15,10 +16,11 @@ const DefaultConfigPath = "/etc/icingadb/config.yml"
 
 // Config defines Icinga DB config.
 type Config struct {
-	Database  database.Config `yaml:"database" envPrefix:"DATABASE_"`
-	Redis     redis.Config    `yaml:"redis" envPrefix:"REDIS_"`
-	Logging   logging.Config  `yaml:"logging" envPrefix:"LOGGING_"`
-	Retention RetentionConfig `yaml:"retention" envPrefix:"RETENTION_"`
+	Database      database.Config `yaml:"database" envPrefix:"DATABASE_"`
+	Redis         redis.Config    `yaml:"redis" envPrefix:"REDIS_"`
+	Logging       logging.Config  `yaml:"logging" envPrefix:"LOGGING_"`
+	Retention     RetentionConfig `yaml:"retention" envPrefix:"RETENTION_"`
+	Notifications source.Config   `yaml:"notifications" envPrefix:"NOTIFICATIONS_"`
 }
 
 func (c *Config) SetDefaults() {

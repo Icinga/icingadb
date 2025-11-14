@@ -14,17 +14,23 @@ import (
 
 var Stats struct {
 	// Config & co. are to be increased by the T sync once for every T object synced.
-	Config, State, History, Overdue, HistoryCleanup com.Counter
+	Config           com.Counter
+	State            com.Counter
+	History          com.Counter
+	Overdue          com.Counter
+	HistoryCleanup   com.Counter
+	NotificationSync com.Counter
 }
 
 // WriteStats periodically forwards Stats to Redis for being monitored by Icinga 2.
 func WriteStats(ctx context.Context, client *redis.Client, logger *logging.Logger) {
 	counters := map[string]*com.Counter{
-		"config_sync":     &Stats.Config,
-		"state_sync":      &Stats.State,
-		"history_sync":    &Stats.History,
-		"overdue_sync":    &Stats.Overdue,
-		"history_cleanup": &Stats.HistoryCleanup,
+		"config_sync":       &Stats.Config,
+		"state_sync":        &Stats.State,
+		"history_sync":      &Stats.History,
+		"overdue_sync":      &Stats.Overdue,
+		"history_cleanup":   &Stats.HistoryCleanup,
+		"notification_sync": &Stats.NotificationSync,
 	}
 
 	periodic.Start(ctx, time.Second, func(_ periodic.Tick) {
