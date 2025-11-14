@@ -174,7 +174,7 @@ ICINGADB_RETENTION_OPTIONS=comment:356
 | count        | **Optional.** Number of old historical data a single query can delete in a `"DELETE FROM ... LIMIT count"` manner. Defaults to `5000`.                                                                        |
 | options      | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification` and `state`.                        |
 
-## Notifications Source Configuration
+## Notifications Configuration
 
 !!! warning
 
@@ -185,14 +185,14 @@ ICINGADB_RETENTION_OPTIONS=comment:356
 Icinga DB can act as an event source for [Icinga Notifications](https://icinga.com/docs/icinga-notifications/).
 If configured, Icinga DB will submit events to the Icinga Notifications API.
 
-For YAML configuration, the options are part of the `notifications-source` dictionary.
-For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_SOURCE_`.
+For YAML configuration, the options are part of the `notifications` dictionary.
+For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_`.
 
-| Option       | Description                                                                       |
-|--------------|-----------------------------------------------------------------------------------|
-| api-base-url | **Optional.** Icinga Notifications API base URL, such as `http://localhost:5680`. |
-| username     | **Optional.** Icinga Notifications API user for this source.                      |
-| password     | **Optional.** Icinga Notifications API user password.                             |
+| Option   | Description                                                                       |
+|----------|-----------------------------------------------------------------------------------|
+| url      | **Optional.** Icinga Notifications API base URL, such as `http://localhost:5680`. |
+| username | **Optional.** Icinga Notifications API user for this source.                      |
+| password | **Optional.** Icinga Notifications API user password.                             |
 
 ## Appendix
 
