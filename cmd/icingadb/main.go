@@ -15,6 +15,7 @@ import (
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
+	"github.com/icinga/icingadb/pkg/notifications"
 	"github.com/okzk/sdnotify"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -168,13 +169,32 @@ func run() int {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
-	go func() {
-		logger.Info("Starting history sync")
+	{
+		var extraStages map[string]history.StageFunc
+		if cfg := cmd.Config.Notifications; cfg.Url != "" {
+			logger.Info("Starting Icinga Notifications source")
 
-		if err := hs.Sync(ctx); err != nil && !utils.IsContextCanceled(err) {
-			logger.Fatalf("%+v", err)
+			notificationsSource, err := notifications.NewNotificationsClient(
+				ctx,
+				db,
+				rc,
+				logs.GetChildLogger("notifications"),
+				cfg)
+			if err != nil {
+				logger.Fatalw("Can't create Icinga Notifications client from config", zap.Error(err))
+			}
+
+			extraStages = notificationsSource.SyncExtraStages()
 		}
-	}()
+
+		go func() {
+			logger.Info("Starting history sync")
+
+			if err := hs.Sync(ctx, extraStages); err != nil && !utils.IsContextCanceled(err) {
+				logger.Fatalf("%+v", err)
+			}
+		}()
+	}
 
 	// Main loop
 	for {

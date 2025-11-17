@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"reflect"
+	"slices"
 	"sync"
 )
 
@@ -37,7 +38,10 @@ func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync
 }
 
 // Sync synchronizes Redis history streams from s.redis to s.db and deletes the original data on success.
-func (s Sync) Sync(ctx context.Context) error {
+//
+// The optional extraStages parameter allows specifying an additional extra stage for each pipeline, identified by their
+// key. This stage is executed after every other stage, but before the entry gets deleted from Redis.
+func (s Sync) Sync(ctx context.Context, extraStages map[string]StageFunc) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	for key, pipeline := range syncPipelines {
@@ -62,6 +66,18 @@ func (s Sync) Sync(ctx context.Context) error {
 		// it has processed it, even if the stage itself does not do anything with this specific entry. It should only
 		// forward the entry after it has completed its own sync so that later stages can rely on previous stages being
 		// executed successfully.
+		//
+		// If an extra stage exists for this key, it will be appended to the pipeline. Thus, it is executed after every
+		// other pipeline action, but before deleteFromRedis.
+
+		// Shadowed variable to allow appending custom callbacks.
+		pipeline := pipeline
+		if extraStages != nil {
+			extraStage, ok := extraStages[key]
+			if ok {
+				pipeline = append(slices.Clip(pipeline), extraStage)
+			}
+		}
 
 		ch := make([]chan redis.XMessage, len(pipeline)+1)
 		for i := range ch {
@@ -152,26 +168,25 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 			}
 
 			counter.Add(uint64(len(ids)))
-			telemetry.Stats.History.Add(uint64(len(ids)))
 		case <-ctx.Done():
 			return ctx.Err()
 		}
 	}
 }
 
-// stageFunc is a function type that represents a sync pipeline stage. It is called with a context (it should stop
+// StageFunc is a function type that represents a sync pipeline stage. It is called with a context (it should stop
 // once that context is canceled), the Sync instance (for access to Redis, SQL database, logging), the key (information
 // about which pipeline this function is running in,  i.e. "notification"), an in channel for the stage to read history
 // events from and an out channel to forward history entries to after processing them successfully. A stage function
 // is supposed to forward each message from in to out, even if the event is not relevant for the current stage. On
 // error conditions, the message must not be forwarded to the next stage so that the event is not deleted from Redis
 // and can be processed at a later time.
-type stageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error
+type StageFunc func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error
 
-// writeOneEntityStage creates a stageFunc from a pointer to a struct implementing the v1.UpserterEntity interface.
+// writeOneEntityStage creates a StageFunc from a pointer to a struct implementing the v1.UpserterEntity interface.
 // For each history event it receives, it parses that event into a new instance of that entity type and writes it to
 // the database. It writes exactly one entity to the database for each history event.
-func writeOneEntityStage(structPtr any) stageFunc {
+func writeOneEntityStage(structPtr any) StageFunc {
 	structifier := structify.MakeMapStructifier(
 		reflect.TypeOf(structPtr).Elem(),
 		"json",
@@ -190,9 +205,9 @@ func writeOneEntityStage(structPtr any) stageFunc {
 	})
 }
 
-// writeMultiEntityStage creates a stageFunc from a function that takes a history event as an input and returns a
+// writeMultiEntityStage creates a StageFunc from a function that takes a history event as an input and returns a
 // (potentially empty) slice of v1.UpserterEntity instances that it then inserts into the database.
-func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.UpserterEntity, error)) stageFunc {
+func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.UpserterEntity, error)) StageFunc {
 	return func(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
 		type State struct {
 			Message redis.XMessage // Original event from Redis.
@@ -304,7 +319,7 @@ func writeMultiEntityStage(entryToEntities func(entry redis.XMessage) ([]v1.Upse
 	}
 }
 
-// userNotificationStage is a specialized stageFunc that populates the user_notification_history table. It is executed
+// userNotificationStage is a specialized StageFunc that populates the user_notification_history table. It is executed
 // on the notification history stream and uses the users_notified_ids attribute to create an entry in the
 // user_notification_history relation table for each user ID.
 func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
@@ -361,32 +376,70 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 	})(ctx, s, key, in, out)
 }
 
-var syncPipelines = map[string][]stageFunc{
-	"notification": {
-		writeOneEntityStage((*v1.NotificationHistory)(nil)), // notification_history
-		userNotificationStage,                               // user_notification_history (depends on notification_history)
-		writeOneEntityStage((*v1.HistoryNotification)(nil)), // history (depends on notification_history)
+// countElementStage increments the [Stats.History] counter.
+//
+// This StageFunc should be called last in each syncPipeline. Thus, it is executed before the final
+// Sync.deleteFromRedis call in Sync.Sync, but before optional extra stages, potentially blocking.
+func countElementStage(ctx context.Context, _ Sync, _ string, in <-chan redis.XMessage, out chan<- redis.XMessage) error {
+	defer close(out)
+
+	for {
+		select {
+		case msg, ok := <-in:
+			if !ok {
+				return nil
+			}
+
+			telemetry.Stats.History.Add(1)
+			out <- msg
+
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+const (
+	SyncPipelineAcknowledgement = "acknowledgement"
+	SyncPipelineComment         = "comment"
+	SyncPipelineDowntime        = "downtime"
+	SyncPipelineFlapping        = "flapping"
+	SyncPipelineNotification    = "notification"
+	SyncPipelineState           = "state"
+)
+
+var syncPipelines = map[string][]StageFunc{
+	SyncPipelineAcknowledgement: {
+		writeOneEntityStage((*v1.AcknowledgementHistory)(nil)), // acknowledgement_history
+		writeOneEntityStage((*v1.HistoryAck)(nil)),             // history (depends on acknowledgement_history)
+		countElementStage,
 	},
-	"state": {
-		writeOneEntityStage((*v1.StateHistory)(nil)),   // state_history
-		writeOneEntityStage((*v1.HistoryState)(nil)),   // history (depends on state_history)
-		writeMultiEntityStage(stateHistoryToSlaEntity), // sla_history_state
+	SyncPipelineComment: {
+		writeOneEntityStage((*v1.CommentHistory)(nil)), // comment_history
+		writeOneEntityStage((*v1.HistoryComment)(nil)), // history (depends on comment_history)
+		countElementStage,
 	},
-	"downtime": {
+	SyncPipelineDowntime: {
 		writeOneEntityStage((*v1.DowntimeHistory)(nil)),    // downtime_history
 		writeOneEntityStage((*v1.HistoryDowntime)(nil)),    // history (depends on downtime_history)
 		writeOneEntityStage((*v1.SlaHistoryDowntime)(nil)), // sla_history_downtime
+		countElementStage,
 	},
-	"comment": {
-		writeOneEntityStage((*v1.CommentHistory)(nil)), // comment_history
-		writeOneEntityStage((*v1.HistoryComment)(nil)), // history (depends on comment_history)
-	},
-	"flapping": {
+	SyncPipelineFlapping: {
 		writeOneEntityStage((*v1.FlappingHistory)(nil)), // flapping_history
 		writeOneEntityStage((*v1.HistoryFlapping)(nil)), // history (depends on flapping_history)
+		countElementStage,
 	},
-	"acknowledgement": {
-		writeOneEntityStage((*v1.AcknowledgementHistory)(nil)), // acknowledgement_history
-		writeOneEntityStage((*v1.HistoryAck)(nil)),             // history (depends on acknowledgement_history)
+	SyncPipelineNotification: {
+		writeOneEntityStage((*v1.NotificationHistory)(nil)), // notification_history
+		userNotificationStage,                               // user_notification_history (depends on notification_history)
+		writeOneEntityStage((*v1.HistoryNotification)(nil)), // history (depends on notification_history)
+		countElementStage,
+	},
+	SyncPipelineState: {
+		writeOneEntityStage((*v1.StateHistory)(nil)),   // state_history
+		writeOneEntityStage((*v1.HistoryState)(nil)),   // history (depends on state_history)
+		writeMultiEntityStage(stateHistoryToSlaEntity), // sla_history_state
+		countElementStage,
 	},
 }
