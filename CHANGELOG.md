@@ -1,5 +1,31 @@
 # Icinga DB Changelog
 
+## 1.5.0 (2025-11-18)
+
+The focus of this Icinga DB release is an integration with [Icinga Notifications](https://icinga.com/docs/icinga-notifications/latest/),
+which allows Icinga DB to act as an Icinga Notifications source.
+With the new [`notifications` configuration](https://icinga.com/docs/icinga-db/latest/doc/03-Configuration/#notifications-configuration) set,
+Icinga DB forwards events to Icinga Notifications.
+
+Additionally, maintenance work was completed.
+The most notable changes are as follows.
+
+* Introduce `notifications` to let Icinga DB forward events to Icinga Notifications. #998
+* Use a dedicated SQL connection for schema imports to prevent side effects on future queries. #1008
+* Modernize the Go codebase. #1013, #1026
+* Document PostgreSQL user usage for schema upgrades. #991
+
+### SELinux Policy
+
+The Icinga DB SELinux package, `icingadb-selinux`, has a new SELinux boolean, `icingadb_can_connect_all`,
+which allows outgoing TCP connections, such as to Icinga Notifications.
+
+When Icinga DB is used as an Icinga Notifications source, it submits events to the Icinga Notifications API.
+However, by default, Icinga DB's SELinux policy forbids outgoing TCP connections except to the relational database and Redis®.
+To enable event submission to Icinga Notifications, please set the `icingadb_can_connect_all` SELinux boolean.
+
+Note that the `icingadb-selinux` package is only available for Amazon Linux, Fedora, RHEL, openSUSE, and SLES.
+
 ## 1.4.0 (2025-06-18)
 
 This Icinga DB release introduces support for Icinga 2 dependencies, continues to retry certain long-persisting errors, and tweaks the logging.
