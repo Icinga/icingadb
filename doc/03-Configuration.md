@@ -185,6 +185,14 @@ ICINGADB_RETENTION_OPTIONS=comment:356
 Icinga DB can act as an event source for [Icinga Notifications](https://icinga.com/docs/icinga-notifications/).
 If configured, Icinga DB will submit events to the Icinga Notifications API.
 
+!!! important
+
+    When using Icinga DB with SELinux, please enable the `icingadb_can_connect_all` SELinux boolean to allow Icinga DB to connect to the Icinga Notifications API.
+
+    ```
+    setsebool -P icingadb_can_connect_all on
+    ```
+
 For YAML configuration, the options are part of the `notifications` dictionary.
 For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_`.
 
