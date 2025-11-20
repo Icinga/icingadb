@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout HEAD
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Sync For-Container.md
         uses: ms-jpq/sync-dockerhub-readme@df5121ab3314dc86fd36863eb111ab986fc6c612
