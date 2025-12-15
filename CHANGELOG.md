@@ -1,5 +1,21 @@
 # Icinga DB Changelog
 
+## 1.5.1 (2025-12-15)
+
+This Icinga DB release addresses the issue of leaking SQL prepared statements when Icinga DB is configured as a source for Icinga Notifications.
+
+Each time the custom variables for an Icinga Notifications event were fetched, a new prepared statement was executed by the database.
+Unfortunately, this prepared statement was not closed, resulting in an increasing number of open prepared statements until the database refuses to create any more.
+This effectively blocked both Icinga DB and potentially the entire database management system.
+
+This bug does not affect those who are not using the Icinga Notifications source.
+
+Additionally, dependencies were updated.
+
+* Close Prepared Statement in Icinga Notifications Source. #1051
+* Use `icinga/icinga2:edge` container image for testing. #1048
+* Update dependencies. [11 times](https://github.com/Icinga/icingadb/pulls?q=is%3Apr+milestone%3A1.5.1+label%3Adependencies)
+
 ## 1.5.0 (2025-11-18)
 
 The focus of this Icinga DB release is an integration with [Icinga Notifications](https://icinga.com/docs/icinga-notifications/latest/),
