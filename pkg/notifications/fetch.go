@@ -94,6 +94,7 @@ func (client *Client) fetchCustomVarFromSql(
 		if err != nil {
 			return nil, err
 		}
+		defer func() { _ = stmt.Close() }()
 
 		var customVars []customVar
 		if err := stmt.SelectContext(ctx, &customVars, id); err != nil {
