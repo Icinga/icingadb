@@ -1,7 +1,7 @@
 -- get_overdues.lua takes the following KEYS:
 -- * either icinga:nextupdate:host or icinga:nextupdate:service
 -- * either icingadb:overdue:host or icingadb:overdue:service
--- * a random one
+-- * a temporary one with a random name in the icingadb:temp namespace
 --
 -- It takes the following ARGV:
 -- * the current date and time as *nix timestamp float in seconds
