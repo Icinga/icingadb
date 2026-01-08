@@ -1,0 +1,2 @@
+CREATE INDEX idx_user_notification_history_notification_history_id ON user_notification_history(notification_history_id);
+COMMENT ON INDEX idx_user_notification_history_notification_history_id IS 'Speed up ON DELETE CASCADE';
