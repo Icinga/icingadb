@@ -1142,7 +1142,9 @@ CREATE TABLE user_notification_history (
 
   PRIMARY KEY (id),
 
-  CONSTRAINT fk_user_notification_history_notification_history FOREIGN KEY (notification_history_id) REFERENCES notification_history (id) ON DELETE CASCADE
+  CONSTRAINT fk_user_notification_history_notification_history FOREIGN KEY (notification_history_id) REFERENCES notification_history (id) ON DELETE CASCADE,
+
+  INDEX idx_user_notification_history_notification_history_id (notification_history_id) COMMENT 'Speed up ON DELETE CASCADE'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE state_history (
