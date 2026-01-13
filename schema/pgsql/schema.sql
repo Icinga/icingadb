@@ -1840,10 +1840,13 @@ ALTER TABLE user_notification_history ALTER COLUMN environment_id SET STORAGE PL
 ALTER TABLE user_notification_history ALTER COLUMN notification_history_id SET STORAGE PLAIN;
 ALTER TABLE user_notification_history ALTER COLUMN user_id SET STORAGE PLAIN;
 
+CREATE INDEX idx_user_notification_history_notification_history_id ON user_notification_history(notification_history_id);
+
 COMMENT ON COLUMN user_notification_history.id IS 'sha1(notification_history_id + user_id)';
 COMMENT ON COLUMN user_notification_history.environment_id IS 'environment.id';
 COMMENT ON COLUMN user_notification_history.notification_history_id IS 'UUID notification_history.id';
 COMMENT ON COLUMN user_notification_history.user_id IS 'user.id';
+COMMENT ON INDEX idx_user_notification_history_notification_history_id IS 'Speed up ON DELETE CASCADE';
 
 CREATE TABLE state_history (
   id bytea20 NOT NULL,
