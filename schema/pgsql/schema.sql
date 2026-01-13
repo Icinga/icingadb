@@ -210,9 +210,9 @@ CREATE TABLE host (
   check_timeperiod_name citext NOT NULL,
   check_timeperiod_id bytea20 DEFAULT NULL,
 
-  check_timeout uint DEFAULT NULL,
-  check_interval uint NOT NULL,
-  check_retry_interval uint NOT NULL,
+  check_timeout float DEFAULT NULL,
+  check_interval float NOT NULL,
+  check_retry_interval float NOT NULL,
 
   total_children uint DEFAULT NULL,
 
@@ -431,9 +431,9 @@ CREATE TABLE host_state (
 
   affects_children boolenum NOT NULL,
 
-  execution_time uint DEFAULT NULL,
-  latency uint DEFAULT NULL,
-  check_timeout uint DEFAULT NULL,
+  execution_time float DEFAULT NULL,
+  latency float DEFAULT NULL,
+  check_timeout float DEFAULT NULL,
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
 
@@ -489,9 +489,9 @@ CREATE TABLE service (
   check_timeperiod_name citext NOT NULL,
   check_timeperiod_id bytea20 DEFAULT NULL,
 
-  check_timeout uint DEFAULT NULL,
-  check_interval uint NOT NULL,
-  check_retry_interval uint NOT NULL,
+  check_timeout float DEFAULT NULL,
+  check_interval float NOT NULL,
+  check_retry_interval float NOT NULL,
 
   total_children uint DEFAULT NULL,
 
@@ -706,9 +706,9 @@ CREATE TABLE service_state (
 
   affects_children boolenum NOT NULL,
 
-  execution_time uint DEFAULT NULL,
-  latency uint DEFAULT NULL,
-  check_timeout uint DEFAULT NULL,
+  execution_time float DEFAULT NULL,
+  latency float DEFAULT NULL,
+  check_timeout float DEFAULT NULL,
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
 

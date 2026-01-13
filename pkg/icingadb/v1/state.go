@@ -13,7 +13,7 @@ type State struct {
 	CheckCommandline          types.String    `json:"check_commandline"`
 	CheckSource               types.String    `json:"check_source"`
 	SchedulingSource          types.String    `json:"scheduling_source"`
-	ExecutionTime             float64         `json:"execution_time"`
+	ExecutionTime             types.Float     `json:"execution_time"`
 	HardState                 uint8           `json:"hard_state"`
 	InDowntime                types.Bool      `json:"in_downtime"`
 	AffectsChildren           types.Bool      `json:"affects_children"`
@@ -25,7 +25,7 @@ type State struct {
 	IsReachable               types.Bool      `json:"is_reachable"`
 	LastStateChange           types.UnixMilli `json:"last_state_change"`
 	LastUpdate                types.UnixMilli `json:"last_update"`
-	Latency                   float64         `json:"latency"`
+	Latency                   types.Float     `json:"latency"`
 	LongOutput                types.String    `json:"long_output"`
 	NextCheck                 types.UnixMilli `json:"next_check"`
 	NextUpdate                types.UnixMilli `json:"next_update"`
@@ -37,5 +37,5 @@ type State struct {
 	Severity                  uint16          `json:"severity"`
 	SoftState                 uint8           `json:"soft_state"`
 	StateType                 string          `json:"state_type"`
-	CheckTimeout              float64         `json:"check_timeout"`
+	CheckTimeout              types.Float     `json:"check_timeout"`
 }

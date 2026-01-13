@@ -184,9 +184,9 @@ CREATE TABLE host (
   check_timeperiod_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
   check_timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
-  check_timeout int unsigned DEFAULT NULL,
-  check_interval int unsigned NOT NULL,
-  check_retry_interval int unsigned NOT NULL,
+  check_timeout float DEFAULT NULL,
+  check_interval float NOT NULL,
+  check_retry_interval float NOT NULL,
 
   total_children int unsigned DEFAULT NULL,
 
@@ -318,9 +318,9 @@ CREATE TABLE host_state (
 
   affects_children enum('n', 'y') NOT NULL,
 
-  execution_time int unsigned DEFAULT NULL,
-  latency int unsigned DEFAULT NULL,
-  check_timeout int unsigned DEFAULT NULL,
+  execution_time float DEFAULT NULL,
+  latency float DEFAULT NULL,
+  check_timeout float DEFAULT NULL,
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
 
@@ -357,9 +357,9 @@ CREATE TABLE service (
   check_timeperiod_name varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'timeperiod.name',
   check_timeperiod_id binary(20) DEFAULT NULL COMMENT 'timeperiod.id',
 
-  check_timeout int unsigned DEFAULT NULL,
-  check_interval int unsigned NOT NULL,
-  check_retry_interval int unsigned NOT NULL,
+  check_timeout float DEFAULT NULL,
+  check_interval float NOT NULL,
+  check_retry_interval float NOT NULL,
 
   total_children int unsigned DEFAULT NULL,
 
@@ -492,9 +492,9 @@ CREATE TABLE service_state (
 
   affects_children enum('n', 'y') NOT NULL,
 
-  execution_time int unsigned DEFAULT NULL,
-  latency int unsigned DEFAULT NULL,
-  check_timeout int unsigned DEFAULT NULL,
+  execution_time float DEFAULT NULL,
+  latency float DEFAULT NULL,
+  check_timeout float DEFAULT NULL,
   check_source text DEFAULT NULL,
   scheduling_source text DEFAULT NULL,
 
