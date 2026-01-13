@@ -143,7 +143,7 @@ func (s Sync) sync(ctx context.Context, objectType string, factory factory, coun
 
 	keys := [3]string{"icinga:nextupdate:" + objectType, "icingadb:overdue:" + objectType, ""}
 	if rand, err := uuid.NewRandom(); err == nil {
-		keys[2] = rand.String()
+		keys[2] = "icingadb:temp:" + rand.String()
 	} else {
 		return errors.Wrap(err, "can't create random UUID")
 	}
