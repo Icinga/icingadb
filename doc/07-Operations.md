@@ -125,3 +125,27 @@ save 3600 1 900 100000
 can be used.
 In this example, a dump is performed every hour (3600s) if at least on changes occurred in that time frame
 and every fifteen minutes (900s) if at least 100,000 changes occurred.
+
+#### Redis® Access Control List
+
+When using a shared Redis® server between Icinga DB and other applications, configuring the
+[Redis® Access Control List (ACL)](https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/)
+should be considered.
+Creating dedicated Redis® users and ACL entries ensure that each application can only access its data.
+
+Icinga DB only needs to access Redis® keys in the `icinga` and `icingadb` namespaces.
+
+Using the [`ACL SETUSER`](https://redis.io/docs/latest/commands/acl-setuser/) command,
+a new `icingadb` user only permitted to access its keys can be created.
+Please change the password behind `>` in the following example.
+
+```
+> ACL SETUSER icingadb on >PASSWORD_CHANGE_ME ~icinga:* ~icingadb:* +@all
+ OK
+```
+
+Afterward, Icinga DB needs to connect using this username and password.
+This requires a change to
+[Icinga 2's `IcingaDB` object](https://icinga.com/docs/icinga-2/latest/doc/09-object-types/#icingadb),
+[Icinga DB's Redis® configuration](03-Configuration.md#redis-configuration) and
+[Icinga DB Web's Redis® configuration](https://icinga.com/docs/icinga-db-web/latest/doc/03-Configuration/#redis-configuration).
