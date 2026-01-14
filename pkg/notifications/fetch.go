@@ -30,7 +30,7 @@ func (client *Client) fetchHostServiceFromRedis(
 			},
 			retry.Retryable,
 			backoff.DefaultBackoff,
-			retry.Settings{},
+			retry.Settings{Timeout: retry.DefaultTimeout},
 		)
 		if err != nil {
 			return "", errors.Wrapf(err, "redis HGET %q, %q failed", key, id)
