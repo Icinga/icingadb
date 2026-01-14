@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/icinga/icinga-go-library/backoff"
+	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/pkg/errors"
@@ -83,21 +84,37 @@ func (client *Client) fetchCustomVarFromSql(
 	hostId, serviceId types.Binary,
 ) (map[string]string, error) {
 	getCustomVarsFromSql := func(ctx context.Context, typ string, id types.Binary) ([]customVar, error) {
-		stmt, err := client.db.Preparex(client.db.Rebind(
-			`SELECT
-				customvar_flat.flatname AS name,
-				customvar_flat.flatvalue AS value
-			FROM ` + typ + `_customvar
-			JOIN customvar_flat
-			ON ` + typ + `_customvar.customvar_id = customvar_flat.customvar_id
-			WHERE ` + typ + `_customvar.` + typ + `_id = ?`))
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = stmt.Close() }()
-
 		var customVars []customVar
-		if err := stmt.SelectContext(ctx, &customVars, id); err != nil {
+
+		err := retry.WithBackoff(
+			ctx,
+			func(ctx context.Context) error {
+				query := client.db.Rebind(
+					`SELECT
+						customvar_flat.flatname AS name,
+						customvar_flat.flatvalue AS value
+					FROM ` + typ + `_customvar
+					JOIN customvar_flat
+					ON ` + typ + `_customvar.customvar_id = customvar_flat.customvar_id
+					WHERE ` + typ + `_customvar.` + typ + `_id = ?`)
+
+				stmt, err := client.db.Preparex(query)
+				if err != nil {
+					return err
+				}
+				defer func() { _ = stmt.Close() }()
+
+				err = stmt.SelectContext(ctx, &customVars, id)
+				if err != nil {
+					return database.CantPerformQuery(err, query)
+				}
+
+				return nil
+			},
+			retry.Retryable,
+			backoff.DefaultBackoff,
+			client.db.GetDefaultRetrySettings())
+		if err != nil {
 			return nil, err
 		}
 
