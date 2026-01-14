@@ -5,11 +5,13 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/periodic"
 	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/overdue"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
@@ -83,13 +85,26 @@ func (s Sync) initSync(ctx context.Context, objectType string) error {
 	start := time.Now()
 
 	var rows []v1.IdMeta
-	query := fmt.Sprintf("SELECT id FROM %s_state WHERE is_overdue='y'", objectType)
 
-	if err := s.db.SelectContext(ctx, &rows, query); err != nil {
-		return database.CantPerformQuery(err, query)
+	err := retry.WithBackoff(
+		ctx,
+		func(ctx context.Context) error {
+			query := fmt.Sprintf("SELECT id FROM %s_state WHERE is_overdue='y'", objectType)
+			err := s.db.SelectContext(ctx, &rows, query)
+			if err != nil {
+				return database.CantPerformQuery(err, query)
+			}
+
+			return nil
+		},
+		retry.Retryable,
+		backoff.DefaultBackoff,
+		s.db.GetDefaultRetrySettings())
+	if err != nil {
+		return err
 	}
 
-	_, err := s.redis.Pipelined(ctx, func(pipe redis.Pipeliner) error {
+	_, err = s.redis.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		key := "icingadb:overdue:" + objectType
 		pipe.Del(ctx, key)
 
