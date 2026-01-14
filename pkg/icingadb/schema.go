@@ -48,12 +48,13 @@ func CheckSchema(ctx context.Context, db *database.DB) error {
 		return ErrSchemaNotExists
 	}
 
-	var version uint16
+	var versions []uint16
+
 	err := retry.WithBackoff(
 		ctx,
 		func(ctx context.Context) error {
-			query := "SELECT version FROM icingadb_schema ORDER BY id DESC LIMIT 1"
-			if err := db.QueryRowxContext(ctx, query).Scan(&version); err != nil {
+			query := "SELECT version FROM icingadb_schema ORDER BY version ASC"
+			if err := db.SelectContext(ctx, &versions, query); err != nil {
 				return database.CantPerformQuery(err, query)
 			}
 			return nil
@@ -65,12 +66,28 @@ func CheckSchema(ctx context.Context, db *database.DB) error {
 		return errors.Wrap(err, "can't check database schema version")
 	}
 
-	if version != expectedDbSchemaVersion {
+	if len(versions) == 0 {
+		return fmt.Errorf("%w: no database schema version is stored in the database", ErrSchemaMismatch)
+	}
+
+	// Check if each schema update between the initial import and the latest version was applied or, in other words,
+	// that no schema update was left out. The loop goes over the ascending sorted array of schema versions, verifying
+	// that each element's successor is the increment of this version, ensuring no gaps in between.
+	for i := 0; i < len(versions)-1; i++ {
+		if versions[i] != versions[i+1]-1 {
+			return fmt.Errorf(
+				"%w: incomplete database schema upgrade: intermediate version v%d is missing,"+
+					" please make sure you have applied all database migrations after upgrading Icinga DB",
+				ErrSchemaMismatch, versions[i]+1)
+		}
+	}
+
+	if latestVersion := versions[len(versions)-1]; latestVersion != expectedDbSchemaVersion {
 		// Since these error messages are trivial and mostly caused by users, we don't need
 		// to print a stack trace here. However, since errors.Errorf() does this automatically,
 		// we need to use fmt instead.
 		return fmt.Errorf("%w: v%d (expected v%d), please make sure you have applied all database"+
-			" migrations after upgrading Icinga DB", ErrSchemaMismatch, version, expectedDbSchemaVersion,
+			" migrations after upgrading Icinga DB", ErrSchemaMismatch, latestVersion, expectedDbSchemaVersion,
 		)
 	}
 
