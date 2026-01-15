@@ -7,7 +7,7 @@ require (
 	github.com/goccy/go-yaml v1.13.0
 	github.com/google/uuid v1.6.0
 	github.com/icinga/icinga-go-library v0.8.2
-	github.com/icinga/icinga-testing v0.0.0-20251203103317-c39907077768
+	github.com/icinga/icinga-testing v0.0.0-20260115121300-9db2e5976933
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
 	github.com/redis/go-redis/v9 v9.17.2

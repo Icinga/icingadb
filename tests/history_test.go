@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-testing/services"
 	"github.com/icinga/icinga-testing/utils"
 	"github.com/icinga/icinga-testing/utils/eventually"
@@ -449,6 +450,75 @@ func testHistory(t *testing.T, numNodes int) {
 		if testing.Short() {
 			t.Skip("skipped expiring downtime")
 		}
+	})
+
+	// https://github.com/Icinga/icingadb/issues/910
+	t.Run("DowntimeRemovedCheckable", func(t *testing.T) {
+		type DowntimeHistoryEvent struct {
+			CancelledBy      types.String    `db:"cancelled_by"`
+			HasBeenCancelled types.Bool      `db:"has_been_cancelled"`
+			CancelTime       types.UnixMilli `db:"cancel_time"`
+			Author           string          `db:"author"`
+			Comment          string          `db:"comment"`
+		}
+
+		configPack := utils.RandomString(8)
+		client.CreateConfigPackage(t, configPack)
+
+		hostname := utils.UniqueName(t, "host")
+		client.CreateConfigPackageStage(t, configPack, map[string]string{
+			"conf.d/h.conf": fmt.Sprintf(`object Host %q { check_command = "dummy" }`, hostname),
+		})
+
+		// Wait for the new config package stage to be applied.
+		_ = eventually.Assert(t, func(t require.TestingT) {
+			response, err := client.GetJson("/v1/objects/hosts/" + hostname)
+			require.NoErrorf(t, err, "fetching host %q should not fail", hostname)
+			require.Equalf(t, 200, response.StatusCode, "fetching host %q should not fail", hostname)
+		}, 15*time.Second, 200*time.Millisecond)
+
+		downtimeStart := time.Now()
+		author := utils.RandomString(8)
+		comment := utils.RandomString(8)
+		req, err := json.Marshal(ActionsScheduleDowntimeRequest{
+			Type:      "Host",
+			Filter:    fmt.Sprintf(`host.name==%q`, hostname),
+			StartTime: downtimeStart.Unix(),
+			EndTime:   downtimeStart.Add(time.Hour).Unix(),
+			Fixed:     true,
+			Author:    author,
+			Comment:   comment,
+		})
+		require.NoError(t, err, "marshal request")
+		response, err := client.PostJson("/v1/actions/schedule-downtime", bytes.NewBuffer(req))
+		require.NoError(t, err, "schedule-downtime")
+		require.Equal(t, 200, response.StatusCode, "schedule-downtime")
+
+		var scheduleResponse ActionsScheduleDowntimeResponse
+		err = json.NewDecoder(response.Body).Decode(&scheduleResponse)
+		require.NoError(t, err, "decode schedule-downtime response")
+		require.Equal(t, 1, len(scheduleResponse.Results), "schedule-downtime should return 1 result")
+		require.Equal(t, http.StatusOK, scheduleResponse.Results[0].Code, "schedule-downtime result should have OK status")
+
+		client.CreateConfigPackageStage(t, configPack, map[string]string{})
+
+		_ = eventually.Assert(t, func(t require.TestingT) {
+			var got []DowntimeHistoryEvent
+			err = db.Select(&got, db.Rebind(`
+					SELECT cancelled_by, has_been_cancelled, cancel_time, author, comment
+					FROM downtime_history
+					WHERE
+						cancelled_by = ? AND
+						has_been_cancelled = 'y' AND
+						author = ? AND
+						comment = ?
+					`),
+				"Downtime Config Removed", // Magic string from SyncDowntimeHistoryEndEvent
+				author,
+				comment)
+			require.NoError(t, err, "select downtime_history")
+			assert.NotEmpty(t, got, "no matching downtime_history entry")
+		}, 15*time.Second, 200*time.Millisecond)
 	})
 
 	t.Run("Flapping", func(t *testing.T) {
