@@ -3,6 +3,9 @@ package icingadb
 import (
 	"context"
 	"fmt"
+	"runtime"
+	"time"
+
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
@@ -16,8 +19,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"runtime"
-	"time"
 )
 
 // Sync implements a rendezvous point for Icinga DB and Redis to synchronize their entities.
@@ -171,9 +172,35 @@ func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
 	// Delete
 	if len(delta.Delete) > 0 {
 		s.logger.Infof("Deleting %d items of type %s", len(delta.Delete), strcase.Delimited(types.Name(delta.Subject.Entity()), ' '))
-		g.Go(func() error {
-			return s.db.Delete(ctx, delta.Subject.Entity(), delta.Delete.IDs(), database.OnSuccessIncrement[any](stat))
-		})
+
+		ids := delta.Delete.IDs()
+
+		// Those objects are probably removed from the configuration files, i.e., Icinga 2 won't send the
+		// corresponding end/removed events for them. So try to mark them as cancelled manually, so that
+		// they don't show up as if they were still active in the UI.
+		//
+		// This is not performed in a separate goroutine to ensure that the relevant Comment/Downtime
+		// object is not deleted before closing the history.
+
+		var err error
+		switch delta.Subject.Entity().(type) {
+		case *v1.Comment:
+			err = s.mockCommentEnd(ctx, ids)
+		case *v1.Downtime:
+			err = s.mockDowntimeEnd(ctx, ids)
+		}
+
+		if ctx.Err() == nil {
+			g.Go(func() error { return err })
+		}
+
+		// Start the deletion process only if we haven't aborted the config sync due to an error in the
+		// downtime history update above.
+		if ctx.Err() == nil {
+			g.Go(func() error {
+				return s.db.Delete(ctx, delta.Subject.Entity(), ids, database.OnSuccessIncrement[any](stat))
+			})
+		}
 	}
 
 	return g.Wait()
