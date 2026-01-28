@@ -36,7 +36,7 @@ var RetentionStatements = []retentionStatement{{
 	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "acknowledgement_history",
 		PK:     "id",
-		Column: "clear_time",
+		Column: "set_time",
 	},
 }, {
 	RetentionType: RetentionHistory,
@@ -44,7 +44,7 @@ var RetentionStatements = []retentionStatement{{
 	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "comment_history",
 		PK:     "comment_id",
-		Column: "remove_time",
+		Column: "entry_time",
 	},
 }, {
 	RetentionType: RetentionHistory,
@@ -52,7 +52,7 @@ var RetentionStatements = []retentionStatement{{
 	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "downtime_history",
 		PK:     "downtime_id",
-		Column: "end_time",
+		Column: "entry_time",
 	},
 }, {
 	RetentionType: RetentionHistory,
@@ -60,7 +60,7 @@ var RetentionStatements = []retentionStatement{{
 	CleanupStmt: icingadb.CleanupStmt{
 		Table:  "flapping_history",
 		PK:     "id",
-		Column: "end_time",
+		Column: "start_time",
 	},
 }, {
 	RetentionType: RetentionHistory,

@@ -158,22 +158,22 @@ var retentionStatements = map[string]cleanupStmt{
 	"acknowledgement": {
 		Table:  "acknowledgement_history",
 		PK:     "id",
-		Column: "clear_time",
+		Column: "set_time",
 	},
 	"comment": {
 		Table:  "comment_history",
 		PK:     "comment_id",
-		Column: "remove_time",
+		Column: "entry_time",
 	},
 	"downtime": {
 		Table:  "downtime_history",
 		PK:     "downtime_id",
-		Column: "end_time",
+		Column: "entry_time",
 	},
 	"flapping": {
 		Table:  "flapping_history",
 		PK:     "id",
-		Column: "end_time",
+		Column: "start_time",
 	},
 	"notification": {
 		Table:  "notification_history",
