@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-testing/services"
 	"github.com/icinga/icinga-testing/utils"
 	"github.com/icinga/icinga-testing/utils/eventually"
@@ -636,6 +637,189 @@ func testHistory(t *testing.T, numNodes int) {
 		}, 5*time.Second, 200*time.Millisecond)
 
 		testConsistency(t, stream)
+	})
+
+	t.Run("UndeployedComment", func(t *testing.T) {
+		configPack := utils.RandomString(8)
+		client.CreateConfigPackage(t, configPack)
+
+		hostname := utils.UniqueName(t, "host")
+		client.CreateConfigPackageStage(t, configPack, map[string]string{
+			"conf.d/h.conf": fmt.Sprintf(`object Host %q { check_command = "dummy" }`, hostname),
+		})
+		defer client.DeleteConfigPackage(t, configPack)
+
+		// Wait for the new config package stage to be applied.
+		eventually.Require(t, func(t require.TestingT) {
+			response, err := client.GetJson("/v1/objects/hosts/" + hostname)
+			require.NoErrorf(t, err, "fetching host %q should not fail", hostname)
+			require.Equalf(t, 200, response.StatusCode, "fetching host %q should not fail", hostname)
+		}, 15*time.Second, 200*time.Millisecond)
+
+		author := utils.RandomString(8)
+		comment := utils.RandomString(8)
+		req, err := json.Marshal(ActionsAddCommentRequest{
+			Type:    "Host",
+			Filter:  fmt.Sprintf(`host.name==%q`, hostname),
+			Author:  author,
+			Comment: comment,
+		})
+		require.NoError(t, err, "marshal request")
+		response, err := client.PostJson("/v1/actions/add-comment", bytes.NewBuffer(req))
+		require.NoError(t, err, "add-comment")
+		require.Equal(t, 200, response.StatusCode, "add-comment")
+
+		var commentId types.Binary
+		eventually.Require(t, func(t require.TestingT) {
+			err := db.Get(&commentId, db.Rebind(`
+					SELECT comment.id
+					FROM comment
+					JOIN host ON comment.host_id = host.id
+					WHERE host.name = ?`),
+				hostname)
+			require.NoError(t, err, "select comment_id")
+		}, 15*time.Second, 200*time.Millisecond)
+
+		// Undeploy config pack, let the host vanish.
+		client.CreateConfigPackageStage(t, configPack, map[string]string{})
+
+		eventually.Require(t, func(t require.TestingT) {
+			// Check for updated comment_history row with has_been_removed = 'y'.
+			var commentHistoryEvents int
+			err := db.Get(&commentHistoryEvents, db.Rebind(`
+					SELECT COUNT(*)
+					FROM comment_history
+					WHERE
+						comment_id = ? AND
+						has_been_removed = 'y' AND
+						author = ? AND
+						comment = ?`),
+				commentId,
+				author,
+				comment)
+			require.NoError(t, err, "select count(*) comment_history")
+			assert.Equal(t, 1, commentHistoryEvents, "not exactly one comment_history entry")
+
+			// Check if new history row was created.
+			var historyEvents int
+			err = db.Get(&historyEvents, db.Rebind(`
+					SELECT COUNT(*)
+					FROM history
+					WHERE comment_history_id = ?`),
+				commentId)
+			require.NoError(t, err, "select count(*) history")
+			assert.Equal(t, 2, historyEvents, "not exactly two history entries")
+		}, 15*time.Second, 200*time.Millisecond)
+	})
+
+	t.Run("UndeployedDowntime", func(t *testing.T) {
+		// Compared to the previous UndeployedComment test case, this test let's a configurable amount of
+		// hosts with assigned downtimes vanish.
+		const hosts = 1000
+
+		configPack := utils.RandomString(8)
+		client.CreateConfigPackage(t, configPack)
+
+		hostnamePrefix := utils.RandomString(4) + "."
+		hostnames := make([]string, 0, hosts)
+		hostObjectConf := make(map[string]string)
+		for range hosts {
+			hostname := hostnamePrefix + utils.RandomString(8)
+			hostnames = append(hostnames, hostname)
+			hostObjectConf[fmt.Sprintf("conf.d/%s.conf", hostname)] = fmt.Sprintf(
+				`object Host %q { check_command = "dummy" }`, hostname)
+		}
+		client.CreateConfigPackageStage(t, configPack, hostObjectConf)
+		defer client.DeleteConfigPackage(t, configPack)
+
+		// Wait for the new config package stage to be applied.
+		eventually.Require(t, func(t require.TestingT) {
+			for _, hostname := range hostnames {
+				response, err := client.GetJson("/v1/objects/hosts/" + hostname)
+				require.NoErrorf(t, err, "fetching host %q should not fail", hostname)
+				require.Equalf(t, 200, response.StatusCode, "fetching host %q should not fail", hostname)
+			}
+		}, 15*time.Second, 200*time.Millisecond)
+
+		downtimeStart := time.Now()
+		author := utils.RandomString(8)
+		comment := utils.RandomString(8)
+		req, err := json.Marshal(ActionsScheduleDowntimeRequest{
+			Type:      "Host",
+			Filter:    fmt.Sprintf(`match("%s*", host.name)`, hostnamePrefix),
+			StartTime: downtimeStart.Unix(),
+			EndTime:   downtimeStart.Add(time.Hour).Unix(),
+			Fixed:     true,
+			Author:    author,
+			Comment:   comment,
+		})
+		require.NoError(t, err, "marshal request")
+		response, err := client.PostJson("/v1/actions/schedule-downtime", bytes.NewBuffer(req))
+		require.NoError(t, err, "schedule-downtime")
+		require.Equal(t, 200, response.StatusCode, "schedule-downtime")
+
+		var downtimeIds []types.Binary
+		eventually.Require(t, func(t require.TestingT) {
+			downtimeIds = make([]types.Binary, 0, len(hostnames))
+			for _, hostname := range hostnames {
+				var downtimeId types.Binary
+				err := db.Get(&downtimeId, db.Rebind(`
+					SELECT downtime.id
+					FROM downtime
+					JOIN host ON downtime.host_id = host.id
+					WHERE host.name = ?`),
+					hostname)
+				require.NoError(t, err, "select downtime_id")
+				downtimeIds = append(downtimeIds, downtimeId)
+			}
+		}, 15*time.Second, 200*time.Millisecond)
+
+		// Undeploy config pack, let the host vanish.
+		client.CreateConfigPackageStage(t, configPack, map[string]string{})
+
+		eventually.Require(t, func(t require.TestingT) {
+			for _, downtimeId := range downtimeIds {
+				// Check for updated downtime_history row with has_been_cancelled = 'y'.
+				var downtimeHistoryEvents int
+				err := db.Get(&downtimeHistoryEvents, db.Rebind(`
+					SELECT COUNT(*)
+					FROM downtime_history
+					WHERE
+						downtime_id = ? AND
+						has_been_cancelled = 'y' AND
+						author = ? AND
+						comment = ?`),
+					downtimeId,
+					author,
+					comment)
+				require.NoError(t, err, "select count(*) downtime_history")
+				assert.Equal(t, 1, downtimeHistoryEvents, "not exactly one downtime_history entry")
+
+				// Check for updated sla_history_downtime row with new downtime_end time.
+				var slaHistoryDowntimes int
+				err = db.Get(&slaHistoryDowntimes, db.Rebind(`
+					SELECT COUNT(*)
+					FROM sla_history_downtime
+					WHERE
+						downtime_id = ? AND
+						? <= downtime_end AND downtime_end <= ?`),
+					downtimeId,
+					time.Now().Add(-time.Minute).UnixMilli(),
+					time.Now().Add(time.Minute).UnixMilli())
+				require.NoError(t, err, "select count(*) sla_history_downtime")
+				assert.Equal(t, 1, slaHistoryDowntimes, "not exactly one sla_history_downtime entry")
+
+				// Check if new history row was created.
+				var historyEvents int
+				err = db.Get(&historyEvents, db.Rebind(`
+					SELECT COUNT(*)
+					FROM history
+					WHERE downtime_history_id = ?`),
+					downtimeId)
+				require.NoError(t, err, "select count(*) history")
+				assert.Equal(t, 2, historyEvents, "not exactly two history entries")
+			}
+		}, 15*time.Second, 200*time.Millisecond)
 	})
 }
 
