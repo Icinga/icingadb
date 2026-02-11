@@ -15,12 +15,27 @@ jobs:
       fail-fast: false
       matrix:
         database:
-          - name: mysql
-            pretty_name: MySQL
-          - name: pgsql
-            pretty_name: PostgreSQL
+          - name: MySQL
+            type: MYSQL
+            image: mysql:latest
+          - name: MySQL (minimum required version)
+            type: MYSQL
+            image: mysql:8.0.0
+          - name: MariaDB
+            type: MYSQL
+            image: mariadb:latest
+          - name: MariaDB (minimum required version)
+            type: MYSQL
+            # Actually we support v10.2.2+, but Docker Hub doesn't.
+            image: mariadb:10.2.5
+          - name: PostgreSQL
+            type: PGSQL
+            image: postgres:latest
+          - name: PostgreSQL (minimum required version)
+            type: PGSQL
+            image: postgres:9.6.0
 
-    name: ${{ matrix.database.pretty_name }}
+    name: ${{ matrix.database.name }}
     runs-on: ubuntu-latest
 
     steps:
@@ -40,7 +55,8 @@ jobs:
       - name: Run Integration Tests
         run: ./icingadb-test -icingatesting.debuglog debug.log -test.v
         env:
-          ICINGADB_TESTS_DATABASE_TYPE: ${{ matrix.database.name }}
+          ICINGADB_TESTS_DATABASE_TYPE: ${{ matrix.database.type }}
+          ICINGA_TESTING_${{ matrix.database.type }}_IMAGE: ${{ matrix.database.image }}
           ICINGA_TESTING_ICINGADB_BINARY: ${{ github.workspace }}/icingadb
           ICINGA_TESTING_ICINGADB_SCHEMA_MYSQL: ${{ github.workspace }}/schema/mysql/schema.sql
           ICINGA_TESTING_ICINGADB_SCHEMA_PGSQL: ${{ github.workspace }}/schema/pgsql/schema.sql
