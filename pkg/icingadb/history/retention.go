@@ -30,69 +30,76 @@ type retentionStatement struct {
 }
 
 // RetentionStatements maps history categories with corresponding cleanup statements.
+//
+// For history retention, both the initial timestamp and the closing timestamp
+// are taken into account. The latter takes precedence, but might be NULL for
+// some forgotten objects, e.g., for comments.
+//
+// However, SLA retention only cares about the closing timestamp to ensure that a short retention
+// period will not mess up SLA calculations.
 var RetentionStatements = []retentionStatement{{
 	RetentionType: RetentionHistory,
 	Category:      "acknowledgement",
 	CleanupStmt: icingadb.CleanupStmt{
-		Table:  "acknowledgement_history",
-		PK:     "id",
-		Column: "clear_time",
+		Table:   "acknowledgement_history",
+		PK:      "id",
+		Columns: []string{"clear_time", "set_time"},
 	},
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "comment",
 	CleanupStmt: icingadb.CleanupStmt{
-		Table:  "comment_history",
-		PK:     "comment_id",
-		Column: "remove_time",
+		Table:   "comment_history",
+		PK:      "comment_id",
+		Columns: []string{"remove_time", "entry_time"},
 	},
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "downtime",
 	CleanupStmt: icingadb.CleanupStmt{
-		Table:  "downtime_history",
-		PK:     "downtime_id",
-		Column: "end_time",
+		Table:   "downtime_history",
+		PK:      "downtime_id",
+		Columns: []string{"end_time", "entry_time"},
 	},
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "flapping",
 	CleanupStmt: icingadb.CleanupStmt{
-		Table:  "flapping_history",
-		PK:     "id",
-		Column: "end_time",
+		Table:   "flapping_history",
+		PK:      "id",
+		Columns: []string{"end_time", "start_time"},
 	},
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "notification",
 	CleanupStmt: icingadb.CleanupStmt{
-		Table:  "notification_history",
-		PK:     "id",
-		Column: "send_time",
+		Table:   "notification_history",
+		PK:      "id",
+		Columns: []string{"send_time"},
 	},
 }, {
 	RetentionType: RetentionHistory,
 	Category:      "state",
 	CleanupStmt: icingadb.CleanupStmt{
-		Table:  "state_history",
-		PK:     "id",
-		Column: "event_time",
+		Table:   "state_history",
+		PK:      "id",
+		Columns: []string{"event_time"},
 	},
 }, {
 	RetentionType: RetentionSla,
 	Category:      "sla_downtime",
 	CleanupStmt: icingadb.CleanupStmt{
-		Table:  "sla_history_downtime",
-		PK:     "downtime_id",
-		Column: "downtime_end",
+		Table:   "sla_history_downtime",
+		PK:      "downtime_id",
+		Columns: []string{"downtime_end"},
 	},
 }, {
 	RetentionType: RetentionSla,
 	Category:      "sla_state",
 	CleanupStmt: icingadb.CleanupStmt{
-		Table:  "sla_history_state",
-		PK:     "id",
-		Column: "event_time",
+		Table:   "sla_history_state",
+		PK:      "id",
+		Columns: []string{"event_time"},
 	},
 }}
 
