@@ -29,9 +29,8 @@ import (
 )
 
 const (
-	ExitSuccess                = 0
-	ExitFailure                = 1
-	expectedRedisSchemaVersion = "6"
+	ExitSuccess = 0
+	ExitFailure = 1
 )
 
 func main() {
@@ -421,13 +420,13 @@ func checkRedisSchema(logger *logging.Logger, rc *redis.Client, pos string) (new
 	}
 
 	message := streams[0].Messages[0]
-	if version := message.Values["version"]; version != expectedRedisSchemaVersion {
+	if version := message.Values["version"]; version != internal.RedisSchemaVersion {
 		// Since these error messages are trivial and mostly caused by users, we don't need
 		// to print a stack trace here. However, since errors.Errorf() does this automatically,
 		// we need to use fmt instead.
 		return "", fmt.Errorf(
 			"unexpected Redis schema version: %q (expected %q), please make sure you are running compatible"+
-				" versions of Icinga 2 and Icinga DB", version, expectedRedisSchemaVersion,
+				" versions of Icinga 2 and Icinga DB", version, internal.RedisSchemaVersion,
 		)
 	}
 
