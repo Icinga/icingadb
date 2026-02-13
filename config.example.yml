@@ -22,6 +22,7 @@ database:
 
   # Database password.
   password: CHANGEME
+#  password_file: /path/to/password
 
   # List of low-level database options that can be set to influence some Icinga DB internal default behaviours.
   # Do not change the defaults if you don't have to!
@@ -74,6 +75,7 @@ redis:
 
   # Authentication password. May be used alone or together with a `username`.
 #  password:
+#  password_file: /path/to/password
 
   # Numerical database identifier, defaults to `0`.
 #  database: 0
@@ -151,3 +153,4 @@ redis:
 
   # Password for the defined user.
 #  password: insecureinsecure
+#  password_file: /path/to/password

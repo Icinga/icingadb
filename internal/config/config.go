@@ -46,6 +46,9 @@ func (c *Config) Validate() error {
 	if err := c.Retention.Validate(); err != nil {
 		return err
 	}
+	if err := c.Notifications.Validate(); err != nil {
+		return err
+	}
 
 	return nil
 }

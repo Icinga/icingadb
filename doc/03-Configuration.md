@@ -12,6 +12,9 @@ When using environment variables, the variable name is constructed by concatenat
 The hyphens in the names are to be replaced by underscores.
 For example, to set the database host, the `ICINGADB_DATABASE_HOST` environment variable is used.
 
+Passwords can be set directly or stored in a separate file, referenced via the `password_file` YAML key or `PASSWORD_FILE` environment variable.
+When both a direct password and a password file is given, the file takes precedence.
+
 ## Database Configuration
 
 Connection configuration for the SQL database to which Icinga DB synchronizes monitoring data.
@@ -23,20 +26,21 @@ In [high availability setups](05-Distributed-Setups.md), all Icinga DB instances
 For YAML configuration, the options are part of the `database` dictionary.
 For environment variables, each option is prefixed with`ICINGADB_DATABASE_`.
 
-| Option   | Description                                                                                                                                    |
-|----------|------------------------------------------------------------------------------------------------------------------------------------------------|
-| type     | **Optional.** Either `mysql` (default) or `pgsql`.                                                                                             |
-| host     | **Required.** Database host or absolute Unix socket path.                                                                                      |
-| port     | **Optional.** Database port. By default, the MySQL or PostgreSQL port, depending on the database type.                                         |
-| database | **Required.** Database name.                                                                                                                   |
-| user     | **Required.** Database username.                                                                                                               |
-| password | **Optional.** Database password.                                                                                                               |
-| tls      | **Optional.** Whether to use TLS.                                                                                                              |
-| cert     | **Optional.** TLS client certificate, either file path or PEM-encoded multiline string.                                                        |
-| key      | **Optional.** TLS client private key, either file path or PEM-encoded multiline string.                                                        |
-| ca       | **Optional.** TLS CA certificate, either file path or PEM-encoded multiline string.                                                            |
-| insecure | **Optional.** Whether not to verify the peer.                                                                                                  |
-| options  | **Optional.** List of low-level [database options](#database-options) that can be set to influence some Icinga DB internal default behaviours. |
+| Option        | Description                                                                                                                                    |
+|---------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| type          | **Optional.** Either `mysql` (default) or `pgsql`.                                                                                             |
+| host          | **Required.** Database host or absolute Unix socket path.                                                                                      |
+| port          | **Optional.** Database port. By default, the MySQL or PostgreSQL port, depending on the database type.                                         |
+| database      | **Required.** Database name.                                                                                                                   |
+| user          | **Required.** Database username.                                                                                                               |
+| password      | **Optional.** Database password.                                                                                                               |
+| password_file | **Optional.** Database password file.                                                                                                          |
+| tls           | **Optional.** Whether to use TLS.                                                                                                              |
+| cert          | **Optional.** TLS client certificate, either file path or PEM-encoded multiline string.                                                        |
+| key           | **Optional.** TLS client private key, either file path or PEM-encoded multiline string.                                                        |
+| ca            | **Optional.** TLS CA certificate, either file path or PEM-encoded multiline string.                                                            |
+| insecure      | **Optional.** Whether not to verify the peer.                                                                                                  |
+| options       | **Optional.** List of low-level [database options](#database-options) that can be set to influence some Icinga DB internal default behaviours. |
 
 ### Database Options
 
@@ -72,18 +76,19 @@ High availability setups require a dedicated Redis® server per Icinga 2 node an
 For YAML configuration, the options are part of the `redis` dictionary.
 For environment variables, each option is prefixed with `ICINGADB_REDIS_`.
 
-| Option   | Description                                                                                                             |
-|----------|-------------------------------------------------------------------------------------------------------------------------|
-| host     | **Required.** Host name or address, or absolute Unix socket path.                                                       |
-| port     | **Optional.** TCP port. Defaults to `6380` matching the Redis® open source server port in the `icingadb-redis` package. |
-| username | **Optional.** Authentication username, requires a `password` being set as well.                                         |
-| password | **Optional.** Authentication password. May be used alone or together with a `username`.                                 |
-| database | **Optional.** Numerical database identifier, defaults to `0`.                                                           |
-| tls      | **Optional.** Whether to use TLS.                                                                                       |
-| cert     | **Optional.** TLS client certificate, either file path or PEM-encoded multiline string.                                 |
-| key      | **Optional.** TLS client private key, either file path or PEM-encoded multiline string.                                 |
-| ca       | **Optional.** TLS CA certificate, either file path or PEM-encoded multiline string.                                     |
-| insecure | **Optional.** Whether not to verify the peer.                                                                           |
+| Option        | Description                                                                                                             |
+|---------------|-------------------------------------------------------------------------------------------------------------------------|
+| host          | **Required.** Host name or address, or absolute Unix socket path.                                                       |
+| port          | **Optional.** TCP port. Defaults to `6380` matching the Redis® open source server port in the `icingadb-redis` package. |
+| username      | **Optional.** Authentication username, requires a `password` being set as well.                                         |
+| password      | **Optional.** Authentication password. May be used alone or together with a `username`.                                 |
+| password_file | **Optional.** Authentication password file.                                                                             |
+| database      | **Optional.** Numerical database identifier, defaults to `0`.                                                           |
+| tls           | **Optional.** Whether to use TLS.                                                                                       |
+| cert          | **Optional.** TLS client certificate, either file path or PEM-encoded multiline string.                                 |
+| key           | **Optional.** TLS client private key, either file path or PEM-encoded multiline string.                                 |
+| ca            | **Optional.** TLS CA certificate, either file path or PEM-encoded multiline string.                                     |
+| insecure      | **Optional.** Whether not to verify the peer.                                                                           |
 
 ## Logging Configuration
 
@@ -196,11 +201,12 @@ If configured, Icinga DB will submit events to the Icinga Notifications API.
 For YAML configuration, the options are part of the `notifications` dictionary.
 For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_`.
 
-| Option   | Description                                                                       |
-|----------|-----------------------------------------------------------------------------------|
-| url      | **Optional.** Icinga Notifications API base URL, such as `http://localhost:5680`. |
-| username | **Optional.** Icinga Notifications API user for this source.                      |
-| password | **Optional.** Icinga Notifications API user password.                             |
+| Option        | Description                                                                       |
+|---------------|-----------------------------------------------------------------------------------|
+| url           | **Optional.** Icinga Notifications API base URL, such as `http://localhost:5680`. |
+| username      | **Optional.** Icinga Notifications API user for this source.                      |
+| password      | **Optional.** Icinga Notifications API user password.                             |
+| password_file | **Optional.** Icinga Notifications API user password file.                        |
 
 ## Appendix
 
