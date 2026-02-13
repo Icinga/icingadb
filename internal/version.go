@@ -33,3 +33,8 @@ var PgSqlSchemaVersions = map[uint16]string{
 	4: "1.2.1",
 	5: "1.4.0",
 }
+
+// RedisSchemaVersion is the expected Redis schema version.
+//
+// This version must match between Icinga 2 and Icinga DB.
+var RedisSchemaVersion = "6"
