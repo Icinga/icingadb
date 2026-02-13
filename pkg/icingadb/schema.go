@@ -7,15 +7,13 @@ import (
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/retry"
+	"github.com/icinga/icingadb/internal"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"maps"
 	"os"
 	"path"
-)
-
-const (
-	expectedMysqlSchemaVersion    = 7
-	expectedPostgresSchemaVersion = 5
+	"slices"
 )
 
 // ErrSchemaNotExists implies that no Icinga DB schema has been imported.
@@ -32,15 +30,17 @@ var ErrSchemaMismatch = stderrors.New("unexpected database schema version")
 //   - If the schema version does not match the expected version, the error returned is ErrSchemaMismatch.
 //   - Otherwise, the original error is returned, for example in case of general database problems.
 func CheckSchema(ctx context.Context, db *database.DB) error {
-	var expectedDbSchemaVersion uint16
+	var schemaVersions map[uint16]string
 	switch db.DriverName() {
 	case database.MySQL:
-		expectedDbSchemaVersion = expectedMysqlSchemaVersion
+		schemaVersions = internal.MySqlSchemaVersions
 	case database.PostgreSQL:
-		expectedDbSchemaVersion = expectedPostgresSchemaVersion
+		schemaVersions = internal.PgSqlSchemaVersions
 	default:
 		return errors.Errorf("unsupported database driver %q", db.DriverName())
 	}
+
+	expectedDbSchemaVersion := slices.Max(slices.Sorted(maps.Keys(schemaVersions)))
 
 	if hasSchemaTable, err := db.HasTable(ctx, "icingadb_schema"); err != nil {
 		return errors.Wrap(err, "can't verify existence of database schema table")
@@ -75,10 +75,18 @@ func CheckSchema(ctx context.Context, db *database.DB) error {
 	// that each element's successor is the increment of this version, ensuring no gaps in between.
 	for i := 0; i < len(versions)-1; i++ {
 		if versions[i] != versions[i+1]-1 {
+			missing := versions[i] + 1
+
+			release := "UNKNOWN"
+			if releaseVersion, ok := schemaVersions[missing]; ok {
+				release = releaseVersion
+			}
+
 			return fmt.Errorf(
-				"%w: incomplete database schema upgrade: intermediate version v%d is missing,"+
-					" please make sure you have applied all database migrations after upgrading Icinga DB",
-				ErrSchemaMismatch, versions[i]+1)
+				"%w: incomplete database schema upgrade: intermediate version v%d (%s) is missing, "+
+					"please inspect the icingadb_schema database table and ensure that all database "+
+					"migrations were applied in order after upgrading Icinga DB",
+				ErrSchemaMismatch, missing, release)
 		}
 	}
 
@@ -86,9 +94,10 @@ func CheckSchema(ctx context.Context, db *database.DB) error {
 		// Since these error messages are trivial and mostly caused by users, we don't need
 		// to print a stack trace here. However, since errors.Errorf() does this automatically,
 		// we need to use fmt instead.
-		return fmt.Errorf("%w: v%d (expected v%d), please make sure you have applied all database"+
-			" migrations after upgrading Icinga DB", ErrSchemaMismatch, latestVersion, expectedDbSchemaVersion,
-		)
+		return fmt.Errorf("%w: v%d (expected v%d), "+
+			"please apply the %s.sql schema upgrade file to your database after upgrading Icinga DB: "+
+			"https://icinga.com/docs/icinga-db/latest/doc/04-Upgrading/",
+			ErrSchemaMismatch, latestVersion, expectedDbSchemaVersion, schemaVersions[expectedDbSchemaVersion])
 	}
 
 	return nil
