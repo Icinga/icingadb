@@ -88,6 +88,10 @@ func run() int {
 		_ = db.Close()
 
 		logger.Info("The database schema was successfully imported")
+
+	case errors.Is(err, icingadb.ErrSchemaImperfect):
+		logger.Warnw("Database schema should be checked", zap.Error(err))
+
 	case err != nil:
 		logger.Fatalf("%+v", err)
 	}
