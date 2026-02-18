@@ -289,7 +289,7 @@ func convertDowntimeRows(
 		// with factor 1,000 should not overflow anything. In theory, at least. To make sure, invalid values are capped.
 		var flexibleDuration uint64
 		if durationSec := row.Duration; durationSec >= 0 && durationSec < math.MaxUint64/1_000 {
-			flexibleDuration = uint64(durationSec) * 1_000
+			flexibleDuration = uint64(durationSec) * 1_000 // #nosec G115 -- int64 -> uint64 cannot overflow, check above
 		}
 
 		downtimeHistory = append(downtimeHistory, &history.DowntimeHistory{

@@ -129,6 +129,8 @@ func parseConfig(f *Flags) (_ *Config, exit int) {
 	}
 
 	if err := yaml.NewDecoder(cf, yaml.DisallowUnknownField()).Decode(c); err != nil {
+		// #nosec G705 -- this error message should do no harm in the output, being printed to stderr
+		// on a terminal and not used as an HTML page or the like
 		_, _ = fmt.Fprintf(os.Stderr, "can't parse config file: %s\n", err.Error())
 		return nil, 2
 	}
