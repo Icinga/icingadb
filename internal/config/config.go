@@ -35,16 +35,19 @@ func (c *Config) SetDefaults() {
 // Validate checks constraints in the supplied configuration and returns an error if they are violated.
 func (c *Config) Validate() error {
 	if err := c.Database.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "invalid database configuration")
 	}
 	if err := c.Redis.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "invalid redis configuration")
 	}
 	if err := c.Logging.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "invalid logging configuration")
 	}
 	if err := c.Retention.Validate(); err != nil {
-		return err
+		return errors.Wrap(err, "invalid retention configuration")
+	}
+	if err := c.Notifications.Validate(); err != nil {
+		return errors.Wrap(err, "invalid notifications configuration")
 	}
 
 	return nil
