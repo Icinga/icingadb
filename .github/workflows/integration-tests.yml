@@ -38,7 +38,7 @@ jobs:
         run: go test -o ../icingadb-test -c .
         working-directory: tests/
       - name: Run Integration Tests
-        run: ./icingadb-test -icingatesting.debuglog debug.log -test.v
+        run: ./icingadb-test -icingatesting.debuglog ${{ matrix.database.name }}-debug.log -test.v
         env:
           ICINGADB_TESTS_DATABASE_TYPE: ${{ matrix.database.name }}
           ICINGA_TESTING_ICINGADB_BINARY: ${{ github.workspace }}/icingadb
@@ -46,11 +46,11 @@ jobs:
           ICINGA_TESTING_ICINGADB_SCHEMA_PGSQL: ${{ github.workspace }}/schema/pgsql/schema.sql
       - name: Compress Debug Log
         if: ${{ always() }}
-        run: xz -9 debug.log
+        run: xz -9 ${{ matrix.database.name }}-debug.log
       - name: Upload Debug Log
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.database.name }}-debug.log.xz
-          path: debug.log.xz
+          path: ${{ matrix.database.name }}-debug.log.xz
+          archive: false
           retention-days: 1
