@@ -91,7 +91,7 @@ jobs:
 
       - name: Extract metadata (tags, labels)
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           # This will generate tags and labels for both the GHCR image and Docker Hub image.
           images: |
