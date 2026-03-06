@@ -10,6 +10,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -88,8 +89,15 @@ func TestCleanupAndRetention(t *testing.T) {
 			values = append(values, row{otherEnvId, getId(), startMilli - int64(j)})
 		}
 
-		_, err = db.NamedExec(fmt.Sprintf(`INSERT INTO %s (environment_id, %s, %s) VALUES (:env, :id, :time)`,
-			stmt.Table, stmt.PK, stmt.Column), values)
+		timeColumns := strings.Join(
+			append(stmt.ExtraTimeColumns, stmt.TimeColumn),
+			", ")
+		timeColumnsValuePlaceholder := strings.Join(
+			slices.Repeat([]string{":time"}, 1+len(stmt.ExtraTimeColumns)),
+			", ")
+
+		_, err = db.NamedExec(fmt.Sprintf(`INSERT INTO %s (environment_id, %s, %s) VALUES (:env, :id, %s)`,
+			stmt.Table, stmt.PK, timeColumns, timeColumnsValuePlaceholder), values)
 		require.NoError(t, err)
 	}
 
@@ -108,7 +116,7 @@ func TestCleanupAndRetention(t *testing.T) {
 
 			var rowsLeft int
 			err := db.QueryRow(
-				db.Rebind(fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE environment_id = ? AND %s < ?`, stmt.Table, stmt.Column)),
+				db.Rebind(fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE environment_id = ? AND %s < ?`, stmt.Table, stmt.TimeColumn)),
 				envId,
 				thresholdMilli,
 			).Scan(&rowsLeft)
@@ -116,7 +124,7 @@ func TestCleanupAndRetention(t *testing.T) {
 
 			var rowsSpared int
 			err = db.QueryRow(
-				db.Rebind(fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE environment_id = ? AND %s >= ?`, stmt.Table, stmt.Column)),
+				db.Rebind(fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE environment_id = ? AND %s >= ?`, stmt.Table, stmt.TimeColumn)),
 				envId,
 				thresholdMilli,
 			).Scan(&rowsSpared)
@@ -143,9 +151,10 @@ func TestCleanupAndRetention(t *testing.T) {
 }
 
 type cleanupStmt struct {
-	Table  string
-	PK     string
-	Column string
+	Table            string
+	PK               string
+	TimeColumn       string
+	ExtraTimeColumns []string
 }
 
 type retention struct {
@@ -156,44 +165,48 @@ type retention struct {
 
 var retentionStatements = map[string]cleanupStmt{
 	"acknowledgement": {
-		Table:  "acknowledgement_history",
-		PK:     "id",
-		Column: "clear_time",
+		Table:            "acknowledgement_history",
+		PK:               "id",
+		TimeColumn:       "clear_time",
+		ExtraTimeColumns: []string{"set_time"},
 	},
 	"comment": {
-		Table:  "comment_history",
-		PK:     "comment_id",
-		Column: "remove_time",
+		Table:            "comment_history",
+		PK:               "comment_id",
+		TimeColumn:       "remove_time",
+		ExtraTimeColumns: []string{"entry_time"},
 	},
 	"downtime": {
-		Table:  "downtime_history",
-		PK:     "downtime_id",
-		Column: "end_time",
+		Table:            "downtime_history",
+		PK:               "downtime_id",
+		TimeColumn:       "end_time",
+		ExtraTimeColumns: []string{"entry_time"},
 	},
 	"flapping": {
-		Table:  "flapping_history",
-		PK:     "id",
-		Column: "end_time",
+		Table:            "flapping_history",
+		PK:               "id",
+		TimeColumn:       "end_time",
+		ExtraTimeColumns: []string{"start_time"},
 	},
 	"notification": {
-		Table:  "notification_history",
-		PK:     "id",
-		Column: "send_time",
+		Table:      "notification_history",
+		PK:         "id",
+		TimeColumn: "send_time",
 	},
 	"state": {
-		Table:  "state_history",
-		PK:     "id",
-		Column: "event_time",
+		Table:      "state_history",
+		PK:         "id",
+		TimeColumn: "event_time",
 	},
 	"sla_downtime": {
-		Table:  "sla_history_downtime",
-		PK:     "downtime_id",
-		Column: "downtime_end",
+		Table:      "sla_history_downtime",
+		PK:         "downtime_id",
+		TimeColumn: "downtime_end",
 	},
 	"sla_state": {
-		Table:  "sla_history_state",
-		PK:     "id",
-		Column: "event_time",
+		Table:      "sla_history_state",
+		PK:         "id",
+		TimeColumn: "event_time",
 	},
 }
 
@@ -208,13 +221,26 @@ func dropNotNullColumns(db *sqlx.DB, stmt cleanupStmt) error {
 		schema = `CURRENT_SCHEMA()`
 	}
 
+	columnNames := append(
+		[]string{"environment_id", stmt.PK, stmt.TimeColumn},
+		stmt.ExtraTimeColumns...)
+	columnNamesPlaceholder := strings.Join(
+		slices.Repeat([]string{"?"}, len(columnNames)),
+		", ")
+
+	colsArgs := []any{stmt.Table}
+	for _, columnName := range columnNames {
+		colsArgs = append(colsArgs, columnName)
+	}
+	colsArgs = append(colsArgs, "NO")
+
 	var cols []string
 	err := db.Select(&cols, db.Rebind(fmt.Sprintf(`
 SELECT column_name
 FROM information_schema.columns
-WHERE table_schema = %s AND table_name = ? AND column_name NOT IN (?, ?, ?) AND is_nullable = ?`,
-		schema)),
-		stmt.Table, "environment_id", stmt.PK, stmt.Column, "NO")
+WHERE table_schema = %s AND table_name = ? AND column_name NOT IN (%s) AND is_nullable = ?`,
+		schema, columnNamesPlaceholder)),
+		colsArgs...)
 	if err != nil {
 		return err
 	}
