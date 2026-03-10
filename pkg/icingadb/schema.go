@@ -4,18 +4,17 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"maps"
+	"os"
+	"path"
+	"slices"
+
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/retry"
+	"github.com/icinga/icingadb/internal"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"os"
-	"path"
-)
-
-const (
-	expectedMysqlSchemaVersion    = 7
-	expectedPostgresSchemaVersion = 5
 )
 
 // ErrSchemaNotExists implies that no Icinga DB schema has been imported.
@@ -25,22 +24,29 @@ var ErrSchemaNotExists = stderrors.New("no database schema exists")
 // missed the schema upgrade.
 var ErrSchemaMismatch = stderrors.New("unexpected database schema version")
 
+// ErrSchemaImperfect implies some non critical failure condition of the database schema.
+var ErrSchemaImperfect = stderrors.New("imperfect database schema")
+
 // CheckSchema verifies the correct database schema is present.
 //
 // This function returns the following error types, possibly wrapped:
 //   - If no schema exists, the error returned is ErrSchemaNotExists.
 //   - If the schema version does not match the expected version, the error returned is ErrSchemaMismatch.
+//   - If there are non fatal database schema conditions, ErrSchemaImperfect is returned. This error must
+//     be reported back to the user, but should not lead in a program termination.
 //   - Otherwise, the original error is returned, for example in case of general database problems.
 func CheckSchema(ctx context.Context, db *database.DB) error {
-	var expectedDbSchemaVersion uint16
+	var schemaVersions map[uint16]string
 	switch db.DriverName() {
 	case database.MySQL:
-		expectedDbSchemaVersion = expectedMysqlSchemaVersion
+		schemaVersions = internal.MySqlSchemaVersions
 	case database.PostgreSQL:
-		expectedDbSchemaVersion = expectedPostgresSchemaVersion
+		schemaVersions = internal.PgSqlSchemaVersions
 	default:
 		return errors.Errorf("unsupported database driver %q", db.DriverName())
 	}
+
+	expectedDbSchemaVersion := slices.Max(slices.Sorted(maps.Keys(schemaVersions)))
 
 	if hasSchemaTable, err := db.HasTable(ctx, "icingadb_schema"); err != nil {
 		return errors.Wrap(err, "can't verify existence of database schema table")
@@ -53,7 +59,7 @@ func CheckSchema(ctx context.Context, db *database.DB) error {
 	err := retry.WithBackoff(
 		ctx,
 		func(ctx context.Context) error {
-			query := "SELECT version FROM icingadb_schema ORDER BY version ASC"
+			query := "SELECT version FROM icingadb_schema ORDER BY id ASC"
 			if err := db.SelectContext(ctx, &versions, query); err != nil {
 				return database.CantPerformQuery(err, query)
 			}
@@ -66,29 +72,51 @@ func CheckSchema(ctx context.Context, db *database.DB) error {
 		return errors.Wrap(err, "can't check database schema version")
 	}
 
+	// In the following, multiple error conditions are checked.
+	//
+	// Since their error messages are trivial and mostly caused by users, we don't need
+	// to print a stack trace here. However, since errors.Errorf() does this automatically,
+	// we need to use fmt.Errorf() instead.
+
+	// Check if any schema was imported.
 	if len(versions) == 0 {
 		return fmt.Errorf("%w: no database schema version is stored in the database", ErrSchemaMismatch)
 	}
 
-	// Check if each schema update between the initial import and the latest version was applied or, in other words,
-	// that no schema update was left out. The loop goes over the ascending sorted array of schema versions, verifying
-	// that each element's successor is the increment of this version, ensuring no gaps in between.
-	for i := 0; i < len(versions)-1; i++ {
-		if versions[i] != versions[i+1]-1 {
+	// Check if the latest schema version was imported.
+	if latestVersion := slices.Max(versions); latestVersion != expectedDbSchemaVersion {
+		return fmt.Errorf("%w: v%d (expected v%d), "+
+			"please apply the %s.sql schema upgrade file to your database after upgrading Icinga DB: "+
+			"https://icinga.com/docs/icinga-db/latest/doc/04-Upgrading/",
+			ErrSchemaMismatch, latestVersion, expectedDbSchemaVersion, schemaVersions[expectedDbSchemaVersion])
+	}
+
+	// Check if all schema updates between the oldest schema version and the expected version were applied.
+	for version := slices.Min(versions); version < expectedDbSchemaVersion; version++ {
+		if !slices.Contains(versions, version) {
+			release := "UNKNOWN"
+			if releaseVersion, ok := schemaVersions[version]; ok {
+				release = releaseVersion
+			}
+
 			return fmt.Errorf(
-				"%w: incomplete database schema upgrade: intermediate version v%d is missing,"+
-					" please make sure you have applied all database migrations after upgrading Icinga DB",
-				ErrSchemaMismatch, versions[i]+1)
+				"%w: incomplete database schema upgrade: intermediate version v%d (%s) is missing, "+
+					"please inspect the icingadb_schema database table and ensure that all database "+
+					"migrations were applied in order after upgrading Icinga DB",
+				ErrSchemaMismatch, version, release)
 		}
 	}
 
-	if latestVersion := versions[len(versions)-1]; latestVersion != expectedDbSchemaVersion {
-		// Since these error messages are trivial and mostly caused by users, we don't need
-		// to print a stack trace here. However, since errors.Errorf() does this automatically,
-		// we need to use fmt instead.
-		return fmt.Errorf("%w: v%d (expected v%d), please make sure you have applied all database"+
-			" migrations after upgrading Icinga DB", ErrSchemaMismatch, latestVersion, expectedDbSchemaVersion,
-		)
+	// Extend the prior check by checking if the schema updates were applied in a monotonic increasing order.
+	// However, this returns an ErrSchemaImperfect error instead of an ErrSchemaMismatch.
+	for i := 0; i < len(versions)-1; i++ {
+		if versions[i] != versions[i+1]-1 {
+			return fmt.Errorf(
+				"%w: unexpected schema upgrade order after schema version %d, "+
+					"please inspect the icingadb_schema database table and ensure that all database "+
+					"migrations were applied in order after upgrading Icinga DB",
+				ErrSchemaImperfect, versions[i])
+		}
 	}
 
 	return nil
