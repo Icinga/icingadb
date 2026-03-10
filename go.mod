@@ -1,6 +1,6 @@
 module github.com/icinga/icingadb
 
-go 1.24.1
+go 1.25.0
 
 require (
 	github.com/creasty/defaults v1.8.0
@@ -16,7 +16,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/vbauerster/mpb/v6 v6.0.4
 	go.uber.org/zap v1.27.1
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 )
 
 require (
