@@ -414,7 +414,7 @@ func (h *HA) realize(
 					return errors.Wrap(err, "can't commit transaction")
 				}
 			case <-ctx.Done():
-				return ctx.Err()
+				return errors.Wrap(ctx.Err(), "context finished before HA realization SQL transaction")
 			}
 
 			return nil
