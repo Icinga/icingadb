@@ -331,7 +331,7 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 	}
 
 	structifier := structify.MakeMapStructifier(
-		reflect.TypeOf((*NotificationHistory)(nil)).Elem(),
+		reflect.TypeFor[NotificationHistory](),
 		"structify",
 		contracts.SafeInit)
 
