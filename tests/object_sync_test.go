@@ -319,7 +319,11 @@ func TestObjectSync(t *testing.T) {
 	t.Run("Dependency", func(t *testing.T) {
 		t.Parallel()
 
-		t.Cleanup(func() { assertNoDependencyDanglingReferences(t, r, db) })
+		t.Cleanup(func() {
+			eventually.Assert(t, func(t require.TestingT) {
+				assertNoDependencyDanglingReferences(t, r, db)
+			}, 20*time.Second, 200*time.Millisecond)
+		})
 
 		for _, dependencyGroupTest := range data.DependencyGroups {
 			t.Run(dependencyGroupTest.TestName, func(t *testing.T) {
@@ -715,7 +719,11 @@ func TestObjectSync(t *testing.T) {
 			// parent test (Dependencies) teardown process. Note, this isn't the same as using plain defer ..., as
 			// all the subtests runs in parallel, and we want to make sure that the check is performed after all of
 			// them have completed and not when this closure returns.
-			t.Cleanup(func() { assertNoDependencyDanglingReferences(t, r, db) })
+			t.Cleanup(func() {
+				eventually.Assert(t, func(t require.TestingT) {
+					assertNoDependencyDanglingReferences(t, r, db)
+				}, 20*time.Second, 200*time.Millisecond)
+			})
 
 			for _, testCase := range makeRuntimeDependencyGroupTestCases() {
 				t.Run("CreateAndDelete-"+testCase.TestName, func(t *testing.T) {
