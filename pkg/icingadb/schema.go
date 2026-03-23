@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strings"
 
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/database"
@@ -85,10 +86,19 @@ func CheckSchema(ctx context.Context, db *database.DB) error {
 
 	// Check if the latest schema version was imported.
 	if latestVersion := slices.Max(versions); latestVersion != expectedDbSchemaVersion {
+		var missingUpgrades []string
+		for version := latestVersion + 1; version <= expectedDbSchemaVersion; version++ {
+			if release, ok := schemaVersions[version]; ok {
+				missingUpgrades = append(missingUpgrades, release+".sql")
+			} else {
+				missingUpgrades = append(missingUpgrades, fmt.Sprintf("UNKNOWN (v%d)", version))
+			}
+		}
+
 		return fmt.Errorf("%w: v%d (expected v%d), "+
-			"please apply the %s.sql schema upgrade file to your database after upgrading Icinga DB: "+
-			"https://icinga.com/docs/icinga-db/latest/doc/04-Upgrading/",
-			ErrSchemaMismatch, latestVersion, expectedDbSchemaVersion, schemaVersions[expectedDbSchemaVersion])
+			"please apply the following schema upgrade(s) to your database in order: %s "+
+			"(https://icinga.com/docs/icinga-db/latest/doc/04-Upgrading/)",
+			ErrSchemaMismatch, latestVersion, expectedDbSchemaVersion, strings.Join(missingUpgrades, ", "))
 	}
 
 	// Check if all schema updates between the oldest schema version and the expected version were applied.
