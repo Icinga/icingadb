@@ -135,11 +135,9 @@ func TestDelta(t *testing.T) {
 				// Log ID mapping to allow easier debugging in case of failures.
 				t.Logf("ID=%d(%s) Test=%s SendOrder=%s",
 					id, testDeltaMakeIdOrChecksum(id).String(), test.Name, sendOrder.Name)
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					sendOrder.Send(id, test, chActual, chDesired)
-				}()
+				})
 
 				if test.Create != 0 {
 					expectedCreate[id] = test.Create
