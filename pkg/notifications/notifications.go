@@ -430,7 +430,7 @@ func (client *Client) Submit(entity database.Entity) bool {
 	// This loop allows resubmitting an event if the rules have changed. The first try would be the rule update, the
 	// second try would be the resubmit, and the third try would be for bad luck, e.g., when a second rule update just
 	// crept in between. If there are three subsequent rule updates, something is wrong.
-	for try := 0; try < 3; try++ {
+	for range 3 {
 		eventRuleIds, err := client.evaluateRulesForObject(
 			client.ctx,
 			metaHistory.HostId,
@@ -484,7 +484,7 @@ func (client *Client) SyncExtraStages() map[string]history.StageFunc {
 	}
 
 	sorterCallbackFn := func(msg redis.XMessage, key string) bool {
-		makeEntity := func(key string, values map[string]interface{}) (database.Entity, error) {
+		makeEntity := func(key string, values map[string]any) (database.Entity, error) {
 			structPtr, ok := syncKeyStructPtrs[key]
 			if !ok {
 				return nil, fmt.Errorf("key is not part of keyStructPtrs")

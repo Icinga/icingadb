@@ -11,7 +11,7 @@ import (
 )
 
 var slaStateStructify = structify.MakeMapStructifier(
-	reflect.TypeOf((*history.SlaHistoryState)(nil)).Elem(),
+	reflect.TypeFor[history.SlaHistoryState](),
 	"json",
 	contracts.SafeInit)
 
