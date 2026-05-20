@@ -78,7 +78,7 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 
 	desired, redisErrs := icingaredis.YieldAll(ctx, s.redis, subject)
 	// Let errors from Redis cancel our group.
-	com.ErrgroupReceive(g, redisErrs)
+	com.ErrgroupReceiveWrap(g, redisErrs, "can't yield %q from redis for sync", subject.Name())
 
 	e, ok := v1.EnvironmentFromContext(ctx)
 	if !ok {
@@ -90,7 +90,7 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 		s.db.BuildSelectStmt(NewScopedEntity(subject.Entity(), e.Meta()), subject.Entity().Fingerprint()), e.Meta(),
 	)
 	// Let errors from DB cancel our group.
-	com.ErrgroupReceive(g, dbErrs)
+	com.ErrgroupReceiveWrap(g, dbErrs, "can't yield %q from database for sync", subject.Name())
 
 	g.Go(func() error {
 		return s.ApplyDelta(ctx, NewDelta(ctx, actual, desired, subject, s.logger))
@@ -191,7 +191,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	cv := common.NewSyncSubject(v1.NewCustomvar)
 
 	cvs, errs := icingaredis.YieldAll(ctx, s.redis, cv)
-	com.ErrgroupReceive(g, errs)
+	com.ErrgroupReceiveWrap(g, errs, "can't yield %q from redis for custom var sync", cv.Name())
 
 	desiredCvs, desiredFlatCvs, errs := v1.ExpandCustomvars(ctx, cvs)
 	com.ErrgroupReceive(g, errs)
@@ -200,7 +200,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 		ctx, cv.FactoryForDelta(),
 		s.db.BuildSelectStmt(NewScopedEntity(cv.Entity(), e.Meta()), cv.Entity().Fingerprint()), e.Meta(),
 	)
-	com.ErrgroupReceive(g, errs)
+	com.ErrgroupReceiveWrap(g, errs, "can't yield %q from database", cv.Name())
 
 	g.Go(func() error {
 		return s.ApplyDelta(ctx, NewDelta(ctx, actualCvs, desiredCvs, cv, s.logger))
@@ -212,7 +212,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 		ctx, flatCv.FactoryForDelta(),
 		s.db.BuildSelectStmt(NewScopedEntity(flatCv.Entity(), e.Meta()), flatCv.Entity().Fingerprint()), e.Meta(),
 	)
-	com.ErrgroupReceive(g, errs)
+	com.ErrgroupReceiveWrap(g, errs, "can't yield %q from database for custom var sync", flatCv.Name())
 
 	g.Go(func() error {
 		return s.ApplyDelta(ctx, NewDelta(ctx, actualFlatCvs, desiredFlatCvs, flatCv, s.logger))
