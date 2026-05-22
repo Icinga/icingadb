@@ -8,6 +8,7 @@ import (
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/pkg/errors"
+	"github.com/theory/jsonpath"
 	"time"
 )
 
@@ -48,6 +49,13 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Notifications.Validate(); err != nil {
 		return errors.Wrap(err, "invalid notifications configuration")
+	}
+
+	for _, relation := range c.Notifications.DefaultRelations {
+		_, err := jsonpath.Parse(relation)
+		if err != nil {
+			return errors.Wrapf(err, "default relation %q is not a valid JSONPath", relation)
+		}
 	}
 
 	return nil
