@@ -201,12 +201,13 @@ If configured, Icinga DB will submit events to the Icinga Notifications API.
 For YAML configuration, the options are part of the `notifications` dictionary.
 For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_`.
 
-| Option        | Description                                                                       |
-|---------------|-----------------------------------------------------------------------------------|
-| url           | **Optional.** Icinga Notifications API base URL, such as `http://localhost:5680`. |
-| username      | **Optional.** Icinga Notifications API user for this source.                      |
-| password      | **Optional.** Icinga Notifications API user password.                             |
-| password_file | **Optional.** Icinga Notifications API user password file.                        |
+| Option            | Description                                                                                                           |
+|-------------------|-----------------------------------------------------------------------------------------------------------------------|
+| url               | **Optional.** Icinga Notifications API base URL, such as `http://localhost:5680`.                                     |
+| username          | **Optional.** Icinga Notifications API user for this source.                                                          |
+| password          | **Optional.** Icinga Notifications API user password.                                                                 |
+| password_file     | **Optional.** Icinga Notifications API user password file.                                                            |
+| default_relations | **Optional.** List of relations as a JSONPath to resolve and include in the events submitted to Icinga Notifications. |
 
 ## Appendix
 
