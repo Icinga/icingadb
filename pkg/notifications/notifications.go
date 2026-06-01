@@ -2,8 +2,10 @@ package notifications
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"reflect"
+	"time"
+
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/notifications/event"
@@ -20,10 +22,35 @@ import (
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"reflect"
-	"sync"
 )
+
+// fetchableEvent wraps both event.Event and relations, allowing to enrich the Event based on Notifications feedback.
+type fetchableEvent struct {
+	*event.Event
+	*relations
+}
+
+// completeAndUpdate completes the internal relations and the Event.
+//
+// This method can be called with a nil slice to populate the event.Event without any fetching.
+func (ev *fetchableEvent) completeAndUpdate(ctx context.Context, attributes []string) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	for _, attribute := range attributes {
+		err := ev.relations.complete(ctx, attribute)
+		if err != nil {
+			return errors.Wrapf(err, "cannot complete relations for attribute %q", attribute)
+		}
+	}
+
+	// TODO: consider filtering fetched customvars to requested ones
+
+	ev.Event.Relations = ev.relations.asMap()
+	ev.Event.CompleteRelations = ev.relations.completeRelations
+
+	return nil
+}
 
 // Client is an Icinga Notifications compatible client implementation to push events to Icinga Notifications.
 //
@@ -35,14 +62,10 @@ type Client struct {
 	db     *database.DB
 	logger *logging.Logger
 
-	rulesInfo *source.RulesInfo // rulesInfo holds the latest rulesInfo fetched from Icinga Notifications.
-
 	ctx context.Context
 
 	notificationsClient *source.Client // The Icinga Notifications client used to interact with the API.
 	redisClient         *redis.Client  // redisClient is the Redis client used to fetch host and service names for events.
-
-	submissionMutex sync.Mutex // submissionMutex protects not concurrent safe struct fields in Client.Submit, i.e., rulesInfo.
 }
 
 // NewNotificationsClient creates a new Client connected to an existing database and logger.
@@ -66,105 +89,9 @@ func NewNotificationsClient(
 
 		ctx: ctx,
 
-		rulesInfo: &source.RulesInfo{},
-
 		notificationsClient: notificationsClient,
 		redisClient:         rc,
 	}, nil
-}
-
-// evaluateRulesForObject checks each rule against the Icinga DB SQL database and returns matching rule IDs.
-//
-// Within the Icinga Notifications relation database, the rules are stored in rule.object_filter as a JSON object
-// created by Icinga DB Web. This object contains SQL queries with bindvars for the Icinga DB relational database, to be
-// executed with the given host, service and environment IDs. If this query returns at least one row, the rule is
-// considered as matching.
-//
-// Icinga DB Web's JSON structure is described in:
-// - https://github.com/Icinga/icingadb-web/pull/1289
-// - https://github.com/Icinga/icingadb/pull/998#issuecomment-3442298348
-func (client *Client) evaluateRulesForObject(ctx context.Context, hostId, serviceId, environmentId types.Binary) ([]string, error) {
-	const icingaDbWebRuleVersion = 1
-
-	type IcingaDbWebQuery struct {
-		Query      string `json:"query"`
-		Parameters []any  `json:"parameters"`
-	}
-
-	type IcingaDbWebRule struct {
-		Version int `json:"version"` // expect icingaDbWebRuleVersion
-		Queries struct {
-			Host    *IcingaDbWebQuery `json:"host,omitempty"`
-			Service *IcingaDbWebQuery `json:"service,omitempty"`
-		} `json:"queries"`
-	}
-
-	outRuleIds := make([]string, 0, len(client.rulesInfo.Rules))
-
-	for id, filterExpr := range client.rulesInfo.Rules {
-		if filterExpr == "" {
-			outRuleIds = append(outRuleIds, id)
-			continue
-		}
-
-		var webRule IcingaDbWebRule
-		if err := json.Unmarshal([]byte(filterExpr), &webRule); err != nil {
-			return nil, errors.Wrap(err, "cannot decode rule filter expression as JSON into struct")
-		}
-		if version := webRule.Version; version != icingaDbWebRuleVersion {
-			return nil, errors.Errorf("decoded rule filter expression .Version is %d, %d expected", version, icingaDbWebRuleVersion)
-		}
-
-		var webQuery IcingaDbWebQuery
-		if !serviceId.Valid() {
-			// Evaluate rule for a host object
-			if webRule.Queries.Host == nil {
-				continue
-			}
-			webQuery = *webRule.Queries.Host
-		} else {
-			// Evaluate rule for a service object
-			if webRule.Queries.Service == nil {
-				continue
-			}
-			webQuery = *webRule.Queries.Service
-		}
-
-		queryArgs := make([]any, 0, len(webQuery.Parameters))
-		for _, param := range webQuery.Parameters {
-			switch param {
-			case ":host_id":
-				queryArgs = append(queryArgs, hostId)
-			case ":service_id":
-				if !serviceId.Valid() {
-					return nil, errors.New("host rule filter expression contains :service_id for replacement")
-				}
-				queryArgs = append(queryArgs, serviceId)
-			case ":environment_id":
-				queryArgs = append(queryArgs, environmentId)
-			default:
-				queryArgs = append(queryArgs, param)
-			}
-		}
-
-		matches, err := func() (bool, error) {
-			rows, err := client.db.QueryContext(ctx, client.db.Rebind(webQuery.Query), queryArgs...)
-			if err != nil {
-				return false, err
-			}
-			defer func() { _ = rows.Close() }()
-
-			return rows.Next(), nil
-		}()
-		if err != nil {
-			return nil, errors.Wrapf(err, "cannot fetch rule %q from %q", id, filterExpr)
-		} else if !matches {
-			continue
-		}
-		outRuleIds = append(outRuleIds, id)
-	}
-
-	return outRuleIds, nil
 }
 
 // buildCommonEvent creates an event.Event based on Host and (optional) Service IDs.
@@ -175,54 +102,76 @@ func (client *Client) evaluateRulesForObject(ctx context.Context, hostId, servic
 func (client *Client) buildCommonEvent(
 	ctx context.Context,
 	hostId, serviceId types.Binary,
-) (*event.Event, *hostServiceInformation, error) {
-	info, err := client.fetchHostServiceData(ctx, hostId, serviceId)
+) (*fetchableEvent, error) {
+	rel, err := client.fetchHostServiceData(ctx, hostId, serviceId)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	var (
-		objectName string
+		objectName  string
+		hostName    string
+		serviceName string
+
 		objectUrl  string
 		objectTags map[string]string
 	)
 
-	if info.serviceName != "" {
-		objectName = info.hostName + "!" + info.serviceName
-		objectUrl = "/icingadb/service?name=" + utils.RawUrlEncode(info.serviceName) + "&host.name=" + utils.RawUrlEncode(info.hostName)
+	if rel.Host == nil {
+		return nil, errors.New("relations does not contain a host")
+	}
+	hostName = rel.Host.Name
+
+	if serviceId != nil {
+		if len(rel.Services) == 0 {
+			return nil, errors.New("relations does not contain a service")
+		}
+		serviceName = rel.Services[0].Name
+
+		objectName = hostName + "!" + serviceName
+		objectUrl = "/icingadb/service?name=" + utils.RawUrlEncode(serviceName) +
+			"&host.name=" + utils.RawUrlEncode(hostName)
 		objectTags = map[string]string{
-			"host":    info.hostName,
-			"service": info.serviceName,
+			"host":    hostName,
+			"service": serviceName,
 		}
 	} else {
-		objectName = info.hostName
-		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(info.hostName)
+		objectName = hostName
+		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(hostName)
 		objectTags = map[string]string{
-			"host": info.hostName,
+			"host": hostName,
 		}
 	}
 
-	return &event.Event{
-		Name:      objectName,
-		URL:       objectUrl,
-		Tags:      objectTags,
-		ExtraTags: info.customVars,
-	}, info, nil
+	ev := &fetchableEvent{
+		Event: &event.Event{
+			Name: objectName,
+			URL:  objectUrl,
+			Tags: objectTags,
+		},
+		relations: rel,
+	}
+
+	if err = ev.completeAndUpdate(ctx, client.DefaultRelations); err != nil {
+		return nil, errors.Wrap(err, "cannot complete event relations")
+	}
+
+	return ev, nil
 }
 
 // buildStateHistoryEvent builds a fully initialized event.Event from a state history entry.
 //
 // The resulted event will have all the necessary information for a state change event, and must
 // not be further modified by the caller.
-func (client *Client) buildStateHistoryEvent(ctx context.Context, h *v1history.StateHistory) (*event.Event, error) {
-	ev, info, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+func (client *Client) buildStateHistoryEvent(ctx context.Context, h *v1history.StateHistory) (*fetchableEvent, error) {
+	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
 
 	ev.Type = event.TypeState
 
-	if info.serviceName != "" {
+	if h.ServiceId != nil {
 		switch h.HardState {
 		case 0:
 			ev.Severity = event.SeverityOK
@@ -257,8 +206,8 @@ func (client *Client) buildStateHistoryEvent(ctx context.Context, h *v1history.S
 }
 
 // buildDowntimeHistoryMetaEvent from a downtime history entry.
-func (client *Client) buildDowntimeHistoryMetaEvent(ctx context.Context, h *v1history.DowntimeHistoryMeta) (*event.Event, error) {
-	ev, _, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+func (client *Client) buildDowntimeHistoryMetaEvent(ctx context.Context, h *v1history.DowntimeHistoryMeta) (*fetchableEvent, error) {
+	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
@@ -293,8 +242,8 @@ func (client *Client) buildDowntimeHistoryMetaEvent(ctx context.Context, h *v1hi
 }
 
 // buildFlappingHistoryEvent from a flapping history entry.
-func (client *Client) buildFlappingHistoryEvent(ctx context.Context, h *v1history.FlappingHistory) (*event.Event, error) {
-	ev, _, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+func (client *Client) buildFlappingHistoryEvent(ctx context.Context, h *v1history.FlappingHistory) (*fetchableEvent, error) {
+	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
@@ -320,8 +269,8 @@ func (client *Client) buildFlappingHistoryEvent(ctx context.Context, h *v1histor
 }
 
 // buildAcknowledgementHistoryEvent from an acknowledgment history entry.
-func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v1history.AcknowledgementHistory) (*event.Event, error) {
-	ev, _, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v1history.AcknowledgementHistory) (*fetchableEvent, error) {
+	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
@@ -363,7 +312,7 @@ func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v
 // Returns true if this entity was processed or cannot be processed any further. Returns false if this entity should be
 // retried later.
 //
-// This method usees the Client's logger.
+// This method uses the Client's logger.
 func (client *Client) Submit(entity database.Entity) bool {
 	if client.ctx.Err() != nil {
 		client.logger.Errorw("Cannot process submitted entity as client context is done", zap.Error(client.ctx.Err()))
@@ -371,31 +320,26 @@ func (client *Client) Submit(entity database.Entity) bool {
 	}
 
 	var (
-		ev          *event.Event
-		eventErr    error
-		metaHistory v1history.HistoryTableMeta
+		ev       *fetchableEvent
+		eventErr error
 	)
 
 	// Keep the type switch in sync with the values of SyncKeyStructPtrs below.
 	switch h := entity.(type) {
 	case *v1history.AcknowledgementHistory:
 		ev, eventErr = client.buildAcknowledgementHistoryEvent(client.ctx, h)
-		metaHistory = h.HistoryTableMeta
 
 	case *v1history.DowntimeHistoryMeta:
 		ev, eventErr = client.buildDowntimeHistoryMetaEvent(client.ctx, h)
-		metaHistory = h.HistoryTableMeta
 
 	case *v1history.FlappingHistory:
 		ev, eventErr = client.buildFlappingHistoryEvent(client.ctx, h)
-		metaHistory = h.HistoryTableMeta
 
 	case *v1history.StateHistory:
 		if h.StateType != common.HardState {
 			return true
 		}
 		ev, eventErr = client.buildStateHistoryEvent(client.ctx, h)
-		metaHistory = h.HistoryTableMeta
 
 	default:
 		client.logger.Error("Cannot process unsupported type", zap.String("type", fmt.Sprintf("%T", h)))
@@ -414,60 +358,39 @@ func (client *Client) Submit(entity database.Entity) bool {
 		return true
 	}
 
-	eventLogger := client.logger.With(zap.Object(
-		"event",
-		zapcore.ObjectMarshalerFunc(func(encoder zapcore.ObjectEncoder) error {
-			encoder.AddString("name", ev.Name)
-			encoder.AddString("type", ev.Type.String())
-			return nil
-		}),
-	))
+	maxAttempts := 3
+	for attempt := range maxAttempts {
+		attributes, err := client.notificationsClient.ProcessEvent(client.ctx, ev.Event, true)
+		if errors.Is(err, source.ErrAttrsNegotiation) {
+			client.logger.Debugw("Icinga Notifications requested more attributes",
+				zap.String("event", ev.Name),
+				zap.Strings("attributes", attributes))
 
-	// The following code accesses Client.rulesInfo.
-	client.submissionMutex.Lock()
-	defer client.submissionMutex.Unlock()
+			if attempt == maxAttempts-1 {
+				// Another completeAndUpdate call would be useless, as it won't be evaluated anymore.
+				break
+			}
 
-	// This loop allows resubmitting an event if the rules have changed. The first try would be the rule update, the
-	// second try would be the resubmit, and the third try would be for bad luck, e.g., when a second rule update just
-	// crept in between. If there are three subsequent rule updates, something is wrong.
-	for range 3 {
-		eventRuleIds, err := client.evaluateRulesForObject(
-			client.ctx,
-			metaHistory.HostId,
-			metaHistory.ServiceId,
-			metaHistory.EnvironmentId)
-		if err != nil {
-			// While returning false would be more correct, this would result in never being able to refetch new rule
-			// versions. Consider an invalid object filter expression, which is now impossible to get rid of.
-			eventLogger.Errorw("Cannot evaluate rules for event, assuming no rule matched", zap.Error(err))
-			eventRuleIds = []string{}
-		}
-
-		ev.RulesVersion = client.rulesInfo.Version
-		ev.RuleIds = eventRuleIds
-
-		newEventRules, err := client.notificationsClient.ProcessEvent(client.ctx, ev)
-		if errors.Is(err, source.ErrRulesOutdated) {
-			eventLogger.Infow("Received a rule update from Icinga Notification, resubmitting event",
-				zap.String("old_rules_version", client.rulesInfo.Version),
-				zap.String("new_rules_version", newEventRules.Version))
-
-			client.rulesInfo = newEventRules
-
-			continue
+			err := ev.completeAndUpdate(client.ctx, attributes)
+			if err != nil {
+				client.logger.Errorw("Cannot fetch required attribute for event",
+					zap.String("event", ev.Name),
+					zap.Strings("attributes", attributes),
+					zap.Error(err))
+				return false
+			}
 		} else if err != nil {
-			eventLogger.Errorw("Cannot submit event to Icinga Notifications, will be retried",
-				zap.String("rules_version", client.rulesInfo.Version),
-				zap.Any("rules", eventRuleIds),
+			client.logger.Errorw("Cannot submit event to Icinga Notifications",
+				zap.String("event", ev.Name),
 				zap.Error(err))
 			return false
+		} else {
+			client.logger.Debugw("Successfully submitted event to Icinga Notifications", zap.String("event", ev.Name))
+			return true
 		}
-
-		eventLogger.Debugw("Successfully submitted event to Icinga Notifications", zap.Any("rules", eventRuleIds))
-		return true
 	}
 
-	eventLogger.Error("Received three rule updates from Icinga Notifications in a row, event will be retried")
+	client.logger.Warnw("Failed to submit event in three attempts", zap.String("event", ev.Name))
 	return false
 }
 
