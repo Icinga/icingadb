@@ -17,7 +17,7 @@ require (
 	github.com/theory/jsonpath v0.12.0
 	github.com/vbauerster/mpb/v6 v6.0.4
 	go.uber.org/zap v1.28.0
-	golang.org/x/sync v0.20.0
+	golang.org/x/sync v0.21.0
 )
 
 require (
