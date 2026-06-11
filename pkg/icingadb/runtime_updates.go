@@ -144,8 +144,8 @@ func (r *RuntimeUpdates) Sync(
 		})
 	}
 
-	// customvar and customvar_flat sync.
-	{
+	// customvar and customvar_flat sync don't need to be processed with state updates too.
+	if _, exists := streams["icinga:runtime"]; exists {
 		updateMessages := make(chan redis.XMessage, r.redis.Options.XReadCount)
 		upsertEntities := make(chan database.Entity, r.redis.Options.XReadCount)
 		deleteIds := make(chan any, r.redis.Options.XReadCount)
