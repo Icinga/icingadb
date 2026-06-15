@@ -169,32 +169,34 @@ func run() int {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
-	{
-		var extraStages map[string]history.StageFunc
-		if cfg := cmd.Config.Notifications; cfg.Url != "" {
-			logger.Info("Starting Icinga Notifications source")
+	var notificationsSource *notifications.Client
+	if cfg := cmd.Config.Notifications; cfg.Url != "" {
+		logger.Info("Starting Icinga Notifications source")
 
-			notificationsSource, err := notifications.NewNotificationsClient(
-				ctx,
-				db,
-				rc,
-				logs.GetChildLogger("notifications"),
-				cfg)
-			if err != nil {
-				logger.Fatalw("Can't create Icinga Notifications client from config", zap.Error(err))
-			}
-
-			extraStages = notificationsSource.SyncExtraStages()
+		notificationsSource, err = notifications.NewNotificationsClient(
+			db,
+			rc,
+			logs.GetChildLogger("notifications"),
+			cfg)
+		if err != nil {
+			logger.Fatalw("Can't create Icinga Notifications client from config", zap.Error(err))
 		}
-
-		go func() {
-			logger.Info("Starting history sync")
-
-			if err := hs.Sync(ctx, extraStages); err != nil && !utils.IsContextCanceled(err) {
-				logger.Fatalf("%+v", err)
-			}
-		}()
 	}
+
+	go func() {
+		logger.Info("Starting history sync")
+
+		var extraStages map[string]history.StageFunc
+		//if notificationsSource != nil {
+		// We don't need to subscribe to the history pipelines anymore, so disabling them temporarily until
+		// someone works on implementing https://github.com/Icinga/icinga-notifications/issues/409.
+		//extraStages = notificationsSource.SyncExtraStages(ctx)
+		//}
+
+		if err := hs.Sync(ctx, extraStages); err != nil && !utils.IsContextCanceled(err) {
+			logger.Fatalf("%+v", err)
+		}
+	}()
 
 	// Main loop
 	for {
@@ -325,7 +327,7 @@ func run() int {
 
 							logger.Info("Starting config runtime updates sync")
 
-							return rt.Sync(synctx, v1.ConfigFactories, runtimeConfigUpdateStreams, false)
+							return rt.Sync(synctx, v1.ConfigFactories, runtimeConfigUpdateStreams)
 						})
 
 						g.Go(func() error {
@@ -337,7 +339,12 @@ func run() int {
 
 							logger.Info("Starting state runtime updates sync")
 
-							return rt.Sync(synctx, v1.StateFactories, runtimeStateUpdateStreams, true)
+							runtimeUpdatesOpts := []icingadb.RUOption{icingadb.WithAllowParallel()}
+							if notificationsSource != nil {
+								runtimeUpdatesOpts = append(runtimeUpdatesOpts, icingadb.WithRUUpsert(notificationsSource.Submit))
+							}
+
+							return rt.Sync(synctx, v1.StateFactories, runtimeStateUpdateStreams, runtimeUpdatesOpts...)
 						})
 
 						g.Go(func() error {
