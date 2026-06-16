@@ -56,6 +56,75 @@ func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state redis.
 	return
 }
 
+// prepareCustomVarsForSync prepares the channels and goroutines for synchronizing custom variables.
+//
+// The returned channel is the one to which the Redis stream messages for custom variables will be sent.
+func (r *RuntimeUpdates) prepareCustomVarsForSync(ctx context.Context, g *errgroup.Group) chan<- redis.XMessage {
+	updateMessages := make(chan redis.XMessage, r.redis.Options.XReadCount)
+	upsertEntities := make(chan database.Entity, r.redis.Options.XReadCount)
+	deleteIds := make(chan any, r.redis.Options.XReadCount)
+
+	cv := common.NewSyncSubject(v1.NewCustomvar)
+	cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
+
+	r.logger.Debug("Syncing runtime updates of " + cv.Name())
+	r.logger.Debug("Syncing runtime updates of " + cvFlat.Name())
+
+	g.Go(structifyStream(
+		ctx, updateMessages, upsertEntities, deleteIds, nil,
+		structify.MakeMapStructifier(
+			reflect.TypeOf(cv.Entity()).Elem(),
+			"json",
+			contracts.SafeInit),
+	))
+
+	customvars, flatCustomvars, errs := v1.ExpandCustomvars(ctx, upsertEntities)
+	com.ErrgroupReceive(g, errs)
+
+	syncableCvs := map[*common.SyncSubject]<-chan database.Entity{cv: customvars, cvFlat: flatCustomvars}
+	for s, cvInCh := range syncableCvs {
+		g.Go(func() error {
+			var counter com.Counter
+			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
+				if count := counter.Reset(); count > 0 {
+					r.logger.Infof("Upserted %d %s items", count, s.Name())
+				}
+			}).Stop()
+
+			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
+			sem := semaphore.NewWeighted(1)
+
+			stmt, placeholders := r.db.BuildUpsertStmt(s.Entity())
+			return r.db.NamedBulkExec(
+				ctx, stmt, r.db.BatchSizeByPlaceholders(placeholders), sem, cvInCh,
+				database.SplitOnDupId[database.Entity],
+				database.OnSuccessIncrement[database.Entity](&counter),
+				database.OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
+			)
+		})
+	}
+
+	g.Go(func() error {
+		var once sync.Once
+		for {
+			select {
+			case _, ok := <-deleteIds:
+				if !ok {
+					return nil
+				}
+				// Icinga 2 does not send custom var delete events.
+				once.Do(func() {
+					r.logger.DPanic("received unexpected custom var delete event")
+				})
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		}
+	})
+
+	return updateMessages
+}
+
 // Sync synchronizes runtime update streams from r.redis to r.db and deletes the original data on success.
 //
 // The options parameter can be used to specify additional options for the synchronization, such as allowing
@@ -229,85 +298,10 @@ func (r *RuntimeUpdates) Sync(
 
 	// customvar and customvar_flat sync don't need to be processed with state updates too.
 	if _, exists := streams["icinga:runtime"]; exists {
-		updateMessages := make(chan redis.XMessage, r.redis.Options.XReadCount)
-		upsertEntities := make(chan database.Entity, r.redis.Options.XReadCount)
-		deleteIds := make(chan any, r.redis.Options.XReadCount)
-
-		cv := common.NewSyncSubject(v1.NewCustomvar)
-		cvFlat := common.NewSyncSubject(v1.NewCustomvarFlat)
-
-		r.logger.Debug("Syncing runtime updates of " + cv.Name())
-		r.logger.Debug("Syncing runtime updates of " + cvFlat.Name())
-
-		xReads[0]["icinga:"+strcase.Delimited(cv.Name(), ':')] = updateMessages
-		g.Go(structifyStream(
-			ctx, updateMessages, upsertEntities, deleteIds, nil,
-			structify.MakeMapStructifier(
-				reflect.TypeOf(cv.Entity()).Elem(),
-				"json",
-				contracts.SafeInit),
-		))
-
-		customvars, flatCustomvars, errs := v1.ExpandCustomvars(ctx, upsertEntities)
-		com.ErrgroupReceive(g, errs)
-
-		cvStmt, cvPlaceholders := r.db.BuildUpsertStmt(cv.Entity())
-		cvCount := r.db.BatchSizeByPlaceholders(cvPlaceholders)
-		g.Go(func() error {
-			var counter com.Counter
-			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
-				if count := counter.Reset(); count > 0 {
-					r.logger.Infof("Upserted %d %s items", count, cv.Name())
-				}
-			}).Stop()
-
-			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
-			sem := semaphore.NewWeighted(1)
-
-			return r.db.NamedBulkExec(
-				ctx, cvStmt, cvCount, sem, customvars, database.SplitOnDupId[database.Entity],
-				database.OnSuccessIncrement[database.Entity](&counter),
-				database.OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
-			)
-		})
-
-		cvFlatStmt, cvFlatPlaceholders := r.db.BuildUpsertStmt(cvFlat.Entity())
-		cvFlatCount := r.db.BatchSizeByPlaceholders(cvFlatPlaceholders)
-		g.Go(func() error {
-			var counter com.Counter
-			defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
-				if count := counter.Reset(); count > 0 {
-					r.logger.Infof("Upserted %d %s items", count, cvFlat.Name())
-				}
-			}).Stop()
-
-			// Updates must be executed in order, ensure this by using a semaphore with maximum 1.
-			sem := semaphore.NewWeighted(1)
-
-			return r.db.NamedBulkExec(
-				ctx, cvFlatStmt, cvFlatCount, sem, flatCustomvars,
-				database.SplitOnDupId[database.Entity], database.OnSuccessIncrement[database.Entity](&counter),
-				database.OnSuccessIncrement[database.Entity](&telemetry.Stats.Config),
-			)
-		})
-
-		g.Go(func() error {
-			var once sync.Once
-			for {
-				select {
-				case _, ok := <-deleteIds:
-					if !ok {
-						return nil
-					}
-					// Icinga 2 does not send custom var delete events.
-					once.Do(func() {
-						r.logger.DPanic("received unexpected custom var delete event")
-					})
-				case <-ctx.Done():
-					return ctx.Err()
-				}
-			}
-		})
+		if xReads[0] == nil {
+			xReads[0] = make(messageByKey)
+		}
+		xReads[0]["icinga:"+strcase.Delimited(types.Name(v1.Customvar{}), ':')] = r.prepareCustomVarsForSync(ctx, g)
 	}
 
 	// Since all xRead goroutines are going to consume messages from the same stream independently, we are only
