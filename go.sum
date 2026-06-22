@@ -61,8 +61,8 @@ github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D
 github.com/mattn/go-runewidth v0.0.12 h1:Y41i/hVW3Pgwr8gV+J23B9YEY0zxjptBuCWEaxmAOow=
 github.com/mattn/go-runewidth v0.0.12/go.mod h1:RAqKPSqVFrSLVXbA8x7dzmKdmGzieGRCM46jaSJTDAk=
 github.com/mattn/go-sqlite3 v1.14.22/go.mod h1:Uh1q+B4BYcTPb+yiD3kU8Ct7aC0hY9fxUwlHK0RXw+Y=
-github.com/mattn/go-sqlite3 v1.14.45 h1:6KA/spDguL3KV8rnybG7ezSaE4SeMR3KC9VbUoAQaIk=
-github.com/mattn/go-sqlite3 v1.14.45/go.mod h1:pjEuOr8IwzLJP2MfGeTb0A35jauH+C2kbHKBr7yXKVQ=
+github.com/mattn/go-sqlite3 v1.14.46 h1:ZfaNcYO/CGNMRxkN1vvG9qf+Y+uvXfgT9a6MlEw+HmU=
+github.com/mattn/go-sqlite3 v1.14.46/go.mod h1:6JTjA44L93a0QCyJef5YvlPoKXntQPjzWv5gtm9sB6w=
 github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd h1:+iAPaTbi1gZpcpDwe/BW1fx7Xoesv69hLNGPheoyhBs=
 github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd/go.mod h1:4soZNh0zW0LtYGdQ416i0jO0EIqMGcbtaspRS4BDvRQ=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
