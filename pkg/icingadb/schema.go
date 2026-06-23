@@ -127,7 +127,7 @@ func ImportSchema(
 		queries = database.MysqlSplitStatements(string(schema))
 	}
 
-	return errors.Wrapf(db.ExecTx(ctx, func(ctx context.Context, tx *sqlx.Tx) error {
+	return errors.Wrapf(db.ExecTx(ctx, nil, func(ctx context.Context, tx *sqlx.Tx) error {
 		for _, query := range queries {
 			if _, err := tx.ExecContext(ctx, query); err != nil {
 				return errors.Wrap(database.CantPerformQuery(err, query), "can't perform schema import")
