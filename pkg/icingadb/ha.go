@@ -210,8 +210,12 @@ func (h *HA) controller() {
 				realizeCtx, cancelRealizeCtx := context.WithDeadline(h.ctx, m.ExpiryTime())
 				err = h.realize(realizeCtx, s, envId, infoLogRoutineEvents)
 				cancelRealizeCtx()
-				if errors.Is(err, context.DeadlineExceeded) {
-					h.logger.Warnw("Instance update/insert exceeded heartbeat expiration time", zap.Error(err))
+				if errors.Is(realizeCtx.Err(), context.DeadlineExceeded) {
+					logFields := []any{zap.Error(realizeCtx.Err())}
+					if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+						logFields = append(logFields, zap.NamedError("internal_error", err))
+					}
+					h.logger.Warnw("Instance update/insert exceeded heartbeat expiration time", logFields...)
 					h.signalHandover("instance update/insert deadline exceeded heartbeat expiry time")
 
 					// Instance insert/update was not completed by the expiration time of the current heartbeat.
