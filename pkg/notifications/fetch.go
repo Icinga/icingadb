@@ -71,6 +71,8 @@ func (client *Client) fetchObjectsFromRedis(
 								"cannot JSON unmarshal Redis HMGET result for %q with key %q",
 								key, pair.Field)
 						}
+						obj.isVolatile = obj.IsVolatile.Valid && obj.IsVolatile.Bool
+						obj.IsVolatile = types.Bool{} // Reset it, so that it is omitted from the JSON output.
 						out[pair.Field] = obj
 					}
 				}
@@ -251,7 +253,9 @@ type icingaObject struct {
 	Name        string `json:"name" db:"name"`
 	DisplayName string `json:"display_name" db:"display_name"`
 	// Vars might be unpopulated for certain types, such as host or service groups.
-	Vars map[string]any `json:"vars,omitempty" db:"-"`
+	Vars       map[string]any `json:"vars,omitempty" db:"-"`
+	IsVolatile types.Bool     `json:"is_volatile,omitzero" db:"-"`
+	isVolatile bool           // internal representation of IsVolatile, so that it can be omitted from generated JSON
 }
 
 // relations of an object to be passed to Icinga Notifications.
