@@ -161,6 +161,7 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostId, serviceId)
 	}
 
+	ev.Tags["environment"] = s.EnvironmentId.String()
 	if s.Output.Valid {
 		ev.Message = s.Output.String
 	}
