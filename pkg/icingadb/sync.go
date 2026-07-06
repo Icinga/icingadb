@@ -36,9 +36,15 @@ func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync
 	}
 }
 
+// DeltaHook is a type for a function that takes a Delta and returns an error.
+//
+// It is used to hook into the sync process and perform additional actions on the delta while it is
+// being applied to the database (currently in parallel with the actual DB sync).
+type DeltaHook func(context.Context, *Delta) error
+
 // SyncAfterDump waits for a config dump to finish (using the dump parameter) and then starts a sync for the given
 // sync subject using the Sync function.
-func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, dump *DumpSignals) error {
+func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, dump *DumpSignals, hook DeltaHook) error {
 	typeName := types.Name(subject.Entity())
 	key := "icinga:" + strcase.Delimited(typeName, ':')
 
@@ -64,7 +70,7 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 				zap.String("type", typeName),
 				zap.String("key", key),
 				zap.Duration("waited", time.Since(startTime)))
-			return s.Sync(ctx, subject)
+			return s.Sync(ctx, subject, hook)
 		case <-ctx.Done():
 			return ctx.Err()
 		}
@@ -73,7 +79,7 @@ func (s Sync) SyncAfterDump(ctx context.Context, subject *common.SyncSubject, du
 
 // Sync synchronizes entities between Icinga DB and Redis created with the specified sync subject.
 // This function does not respect dump signals. For this, use SyncAfterDump.
-func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
+func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject, hook DeltaHook) error {
 	g, ctx := errgroup.WithContext(ctx)
 
 	desired, redisErrs := icingaredis.YieldAll(ctx, s.redis, subject)
@@ -93,20 +99,24 @@ func (s Sync) Sync(ctx context.Context, subject *common.SyncSubject) error {
 	com.ErrgroupReceive(g, dbErrs)
 
 	g.Go(func() error {
-		return s.ApplyDelta(ctx, NewDelta(ctx, actual, desired, subject, s.logger))
+		return s.ApplyDelta(ctx, NewDelta(ctx, actual, desired, subject, s.logger), hook)
 	})
 
 	return g.Wait()
 }
 
 // ApplyDelta applies all changes from Delta to the database.
-func (s Sync) ApplyDelta(ctx context.Context, delta *Delta) error {
+func (s Sync) ApplyDelta(ctx context.Context, delta *Delta, hook DeltaHook) error {
 	if err := delta.Wait(); err != nil {
 		return errors.Wrap(err, "can't calculate delta")
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
 	stat := getCounterForEntity(delta.Subject.Entity())
+
+	if hook != nil {
+		g.Go(func() error { return hook(ctx, delta) })
+	}
 
 	// Create
 	if len(delta.Create) > 0 {
@@ -203,7 +213,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	com.ErrgroupReceive(g, errs)
 
 	g.Go(func() error {
-		return s.ApplyDelta(ctx, NewDelta(ctx, actualCvs, desiredCvs, cv, s.logger))
+		return s.ApplyDelta(ctx, NewDelta(ctx, actualCvs, desiredCvs, cv, s.logger), nil)
 	})
 
 	flatCv := common.NewSyncSubject(v1.NewCustomvarFlat)
@@ -215,7 +225,7 @@ func (s Sync) SyncCustomvars(ctx context.Context) error {
 	com.ErrgroupReceive(g, errs)
 
 	g.Go(func() error {
-		return s.ApplyDelta(ctx, NewDelta(ctx, actualFlatCvs, desiredFlatCvs, flatCv, s.logger))
+		return s.ApplyDelta(ctx, NewDelta(ctx, actualFlatCvs, desiredFlatCvs, flatCv, s.logger), nil)
 	})
 
 	return g.Wait()

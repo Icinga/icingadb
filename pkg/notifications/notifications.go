@@ -2,29 +2,38 @@ package notifications
 
 import (
 	"context"
+	"crypto/sha1" // #nosec G505 -- Blocklisted import crypto/sha1
+	"encoding/hex"
 	"fmt"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/icinga/icinga-go-library/backoff"
+	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/notifications/event"
 	"github.com/icinga/icinga-go-library/notifications/source"
+	"github.com/icinga/icinga-go-library/objectpacker"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/retry"
+	"github.com/icinga/icinga-go-library/strcase"
 	"github.com/icinga/icinga-go-library/structify"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
+	"github.com/icinga/icingadb/pkg/icingadb"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1history "github.com/icinga/icingadb/pkg/icingadb/v1/history"
+	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 // fetchableEvent wraps both event.Event and relations, allowing to enrich the Event based on Notifications feedback.
@@ -64,6 +73,10 @@ type Client struct {
 
 	notificationsClient *source.Client // The Icinga Notifications client used to interact with the API.
 	redisClient         *redis.Client  // redisClient is the Redis client used to fetch host and service names for events.
+
+	// incidentsByObjId is a map of object IDs to incidents populated by the first call to ApplyDelta.
+	incidentsByObjId map[string]source.Incident
+	incidentsMu      sync.Mutex
 }
 
 // NewNotificationsClient creates a new Client connected to an existing database and logger.
@@ -87,6 +100,179 @@ func NewNotificationsClient(
 		notificationsClient: notificationsClient,
 		redisClient:         rc,
 	}, nil
+}
+
+// ClearIncidents clears the cached incidents previously populated by the [Client.ApplyDelta].
+//
+// This serves two purposes: it allows to free up memory when the incidents are no longer needed, and it allows
+// to force a re-fetch of the incidents from the Icinga Notifications API on the next config dump, e.g. due to
+// HA take over or the like.
+//
+// This function is not safe to call concurrently with [Client.ApplyDelta], but it is safe to call concurrently
+// with itself. The [Client.ApplyDelta] function accesses the internal cache in a read-only manner without any
+// synchronization once it has been populated, so you should ensure that all calls to [Client.ApplyDelta] have
+// completed before calling this function.
+func (client *Client) ClearIncidents() {
+	client.incidentsMu.Lock()
+	defer client.incidentsMu.Unlock()
+
+	client.incidentsByObjId = nil
+}
+
+// ApplyDelta applies the given delta to the Icinga Notifications API.
+//
+// This function is called by the initial config dump after the delta has been calculated. It fetches the current
+// incidents from the Icinga Notifications API and compares them with the delta. If there are any changes, it submits
+// the new or updated events to the API and closes any incidents for deleted objects.
+func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) error {
+	switch delta.Subject.Entity().(type) {
+	case *v1.HostState, *v1.ServiceState:
+	default:
+		return nil
+	}
+
+	client.logger.Debugw("Applying delta to Icinga Notifications",
+		zap.String("entity", delta.Subject.Name()),
+		zap.Int("deleted", len(delta.Delete)),
+		zap.Int("new", len(delta.Create)),
+		zap.Int("updated", len(delta.Update)))
+
+	if err := client.fetchIncidents(ctx); err != nil {
+		return err
+	}
+
+	g, ctx := errgroup.WithContext(ctx)
+	if len(delta.Create) > 0 || len(delta.Update) > 0 {
+		client.logger.Infof("Fetching %d entities of type %s from Redis for submission to Icinga Notifications",
+			len(delta.Create)+len(delta.Update),
+			delta.Subject.Name())
+
+		pairs, errs := client.redisClient.HMYield(
+			ctx,
+			fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
+			append(delta.Update.Keys(), delta.Create.Keys()...)...,
+		)
+		com.ErrgroupReceive(g, errs)
+
+		entities, rErrs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, 1)
+		com.ErrgroupReceive(g, rErrs)
+
+		g.Go(func() error {
+			for {
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case entity, ok := <-entities:
+					if !ok {
+						return nil
+					}
+
+					if _, exists := delta.Update[entity.ID().String()]; exists {
+						incident, ok := client.incidentsByObjId[entity.ID().String()]
+						client.logger.Debugw("Delta update for entity",
+							zap.String("entity", entity.ID().String()),
+							zap.Bool("incident_exists", ok))
+
+						if ok {
+							if same, err := HaveSameState(incident, entity); err != nil {
+								return err
+							} else if same {
+								// Should we send a message update here too or just wait for the timer to expire
+								// and sync the message accordingly? See https://github.com/Icinga/icingadb/issues/1140
+								continue
+							}
+						}
+					}
+
+					// If the entity is new or has a different state than the existing incident, submit it to
+					// Icinga Notifications via the regular /process-event endpoint.
+					if err := client.Submit(ctx, entity); err != nil {
+						return err
+					}
+				}
+			}
+		})
+	}
+
+	g.Go(func() error {
+		var filter []any
+		for id, incident := range client.incidentsByObjId {
+			_, isServiceIncident := incident.ObjectTags["service"]
+			_, isServiceState := delta.Subject.Entity().(*v1.ServiceState)
+
+			_, deleted := delta.Delete[id]
+			// We may have missed the initial config dump with the corresponding entity deletion, in which case we
+			// can't rely on delta.Delete, delta.Create, or delta.Update to determine if the incident is obsolete.
+			// Therefore, we also need to make sure that the corresponding object is still present in Redis.
+			_, isInRedis := delta.RedisSnapshot[id]
+			// Just because the object isn't in the Redis snapshot of this delta doesn't mean it's gone, but the
+			// delta.RedisSnapshot simply reflects the state of Redis for a specific entity type, thus we can only
+			// rely on it for the same entity type.
+			if deleted || (!isInRedis && isServiceState == isServiceIncident) {
+				filter = append(filter, incident.ObjectTags)
+			}
+		}
+		if len(filter) == 0 {
+			return nil
+		}
+
+		client.logger.Infof("Bulk closing %d obsolete incidents for deleted objects of type %s",
+			len(filter),
+			delta.Subject.Name())
+
+		attrs := source.ModifiableIncidentAttrs{Close: types.MakeBool(true)}
+		if err := client.notificationsClient.ModifyIncidents(ctx, attrs, filter); err != nil {
+			return errors.Wrap(err, "cannot close incidents for deleted objects")
+		}
+		return nil
+	})
+
+	return g.Wait()
+}
+
+// fetchIncidents fetches all incidents from the Icinga Notifications API and stores them in the Client's incidentsByObjId map.
+//
+// If the incidents have already been fetched, this function does nothing. This function is safe to call concurrently.
+func (client *Client) fetchIncidents(ctx context.Context) error {
+	client.incidentsMu.Lock()
+	defer client.incidentsMu.Unlock()
+
+	// ApplyDelta is called in parallel for each entity type, so we need to ensure
+	// that we only fetch the incidents once per environment.
+	if client.incidentsByObjId != nil {
+		return nil
+	}
+
+	environment, ok := v1.EnvironmentFromContext(ctx)
+	if !ok {
+		return errors.New("cannot get environment from context")
+	}
+
+	incidents, err := client.notificationsClient.GetIncidents(ctx, map[string]string{"environment": environment.ID().String()})
+	if err != nil {
+		return err
+	}
+
+	client.incidentsByObjId = make(map[string]source.Incident)
+	hash := sha1.New() // #nosec G401 -- used as a non-cryptographic hash function to hash IDs
+	for _, incident := range incidents {
+		// This implementation mimics the Icinga 2 ID generation behavior[^1] used to generate all Icinga DB
+		// related object IDs, so make sure to keep it in sync with the Icinga 2 implementation.
+		//
+		// [^1]: https://github.com/Icinga/icinga2/blob/v2.16.3/lib/icingadb/icingadb-utility.cpp#L81
+		idTags := []any{environment.ID().String()}
+		if service, ok := incident.ObjectTags["service"]; ok {
+			idTags = append(idTags, incident.ObjectTags["host"]+"!"+service)
+		} else {
+			idTags = append(idTags, incident.ObjectTags["host"])
+		}
+		if err := objectpacker.PackAny(idTags, hash); err != nil {
+			return err
+		}
+		client.incidentsByObjId[hex.EncodeToString(hash.Sum(nil))] = incident
+		hash.Reset()
+	}
+	return nil
 }
 
 // buildCommonEvent creates an event.Event based on Host and (optional) Service IDs.
@@ -182,28 +368,10 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 		return nil, errNonVolatileNonHardState
 	}
 
-	if serviceId != nil {
-		switch s.HardState {
-		case 0:
-			ev.Severity = event.SeverityOK
-		case 1:
-			ev.Severity = event.SeverityWarning
-		case 2:
-			ev.Severity = event.SeverityCrit
-		case 3:
-			ev.Severity = event.SeverityErr
-		default:
-			return nil, fmt.Errorf("unexpected service state %d", s.HardState)
-		}
+	if sev, err := StateToSeverity(s, serviceId != nil); err != nil {
+		return nil, err
 	} else {
-		switch s.HardState {
-		case 0:
-			ev.Severity = event.SeverityOK
-		case 1:
-			ev.Severity = event.SeverityCrit
-		default:
-			return nil, fmt.Errorf("unexpected host state %d", s.HardState)
-		}
+		ev.Severity = sev
 	}
 
 	inDowntime := s.InDowntime.Valid && s.InDowntime.Bool
@@ -508,4 +676,67 @@ func (client *Client) SyncExtraStages(ctx context.Context) map[string]history.St
 	}
 
 	return extraStages
+}
+
+// StateToSeverity converts a state integer to an event.Severity value.
+func StateToSeverity(s *v1.State, isService bool) (event.Severity, error) {
+	if isService {
+		switch s.HardState {
+		case 0:
+			return event.SeverityOK, nil
+		case 1:
+			return event.SeverityWarning, nil
+		case 2:
+			return event.SeverityCrit, nil
+		case 3:
+			return event.SeverityErr, nil
+		default:
+			return event.SeverityNone, fmt.Errorf("unexpected service state %d", s.HardState)
+		}
+	} else {
+		switch s.HardState {
+		case 0:
+			return event.SeverityOK, nil
+		case 1:
+			return event.SeverityCrit, nil
+		default:
+			return event.SeverityNone, fmt.Errorf("unexpected host state %d", s.HardState)
+		}
+	}
+}
+
+// HaveSameState checks if the given incident and the corresponding [database.Entity] have the same state.
+//
+// This function is used to determine if an incident in Icinga Notifications corresponds to the current state
+// of a checkable in Icinga DB. It compares the severity and muted status of the incident with the state of the
+// entity and returns true if they match, false otherwise. If the entity type is unsupported, an error is returned.
+func HaveSameState(incident source.Incident, entity database.Entity) (bool, error) {
+	var s *v1.State
+	var isService bool
+	switch e := entity.(type) {
+	case *v1.HostState:
+		s = &e.State
+	case *v1.ServiceState:
+		s = &e.State
+		isService = true
+	default:
+		return false, fmt.Errorf("unsupported entity type %T", entity)
+	}
+
+	severity, err := StateToSeverity(s, isService)
+	if err != nil {
+		return false, err
+	}
+
+	if incident.Severity != severity {
+		return false, nil
+	}
+
+	inDowntime := s.InDowntime.Valid && s.InDowntime.Bool
+	isAcked := s.IsAcknowledged.Valid && s.IsAcknowledged.Bool
+	isFlapping := s.IsFlapping.Valid && s.IsFlapping.Bool
+	if incident.IsMuted != (inDowntime || isAcked || isFlapping) {
+		return false, nil
+	}
+	return true, nil
 }

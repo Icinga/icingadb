@@ -15,6 +15,8 @@ import (
 
 // Delta calculates the delta of actual and desired entities, and stores which entities need to be created, updated, and deleted.
 type Delta struct {
+	RedisSnapshot map[string]struct{} // Reflects all the entities read from Redis (desired).
+
 	Create  EntitiesById
 	Update  EntitiesById
 	Delete  EntitiesById
@@ -27,9 +29,10 @@ type Delta struct {
 // that no duplicate entities are sent to the same stream.
 func NewDelta(ctx context.Context, actual, desired <-chan database.Entity, subject *common.SyncSubject, logger *logging.Logger) *Delta {
 	delta := &Delta{
-		Subject: subject,
-		done:    make(chan error, 1),
-		logger:  logger,
+		RedisSnapshot: make(map[string]struct{}),
+		Subject:       subject,
+		done:          make(chan error, 1),
+		logger:        logger,
 	}
 
 	go delta.run(ctx, actual, desired)
@@ -47,7 +50,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 
 	start := time.Now()
 	var endActual, endDesired time.Time
-	var numActual, numDesired uint64
+	var numActual uint64
 
 	actual := EntitiesById{}  // only read from actualCh (so far)
 	desired := EntitiesById{} // only read from desiredCh (so far)
@@ -83,9 +86,10 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 				desiredCh = nil // Done reading all desired entities, disable this case.
 				break
 			}
-			numDesired++
 
 			id := desiredValue.ID().String()
+			delta.RedisSnapshot[id] = struct{}{}
+
 			if actualValue, ok := actual[id]; ok {
 				delete(actual, id)
 				if update != nil && !entitiesEqual(actualValue, desiredValue) {
@@ -111,7 +115,7 @@ func (delta *Delta) run(ctx context.Context, actualCh, desiredCh <-chan database
 		zap.Duration("time_actual", endActual.Sub(start)),
 		zap.Duration("time_desired", endDesired.Sub(start)),
 		zap.Uint64("num_actual", numActual),
-		zap.Uint64("num_desired", numDesired),
+		zap.Int("num_desired", len(delta.RedisSnapshot)),
 		zap.Int("create", len(delta.Create)),
 		zap.Int("update", len(delta.Update)),
 		zap.Int("delete", len(delta.Delete)))
