@@ -280,9 +280,12 @@ func (client *Client) fetchIncidents(ctx context.Context) error {
 // This function is used by all event builders to create a common event structure that includes the host and service
 // names, an Icinga DB Web reference, and the tags for the event.
 // Any event type-specific information (like severity, message, etc.) is added by the specific event builders.
+//
+// The eventTime is used within Event.ID to distinguish two otherwise identical events.
 func (client *Client) buildCommonEvent(
 	ctx context.Context,
 	hostId, serviceId types.Binary,
+	eventTime types.UnixMilli,
 ) (*fetchableEvent, error) {
 	rel, err := client.fetchHostServiceData(ctx, hostId, serviceId)
 	if err != nil {
@@ -324,8 +327,11 @@ func (client *Client) buildCommonEvent(
 		}
 	}
 
+	objectId := objectName + fmt.Sprintf("!%d", eventTime.Time().UnixMilli())
+
 	return &fetchableEvent{
 		Event: &event.Event{
+			ID:   objectId,
 			Name: objectName,
 			URL:  objectUrl,
 			Tags: objectTags,
@@ -342,7 +348,7 @@ var errNonVolatileNonHardState = errors.New("non-hard state change for non-volat
 // The resulted event will have all the necessary information for a state change event, and must
 // not be further modified by the caller.
 func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, serviceId types.Binary) (*fetchableEvent, error) {
-	ev, err := client.buildCommonEvent(ctx, hostId, serviceId)
+	ev, err := client.buildCommonEvent(ctx, hostId, serviceId, s.LastStateChange)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostId, serviceId)
 	}
@@ -415,7 +421,7 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 func (client *Client) buildDowntimeHistoryMetaEvent(ctx context.Context, h *v1history.DowntimeHistoryMeta) (*fetchableEvent, error) {
 	defer func() { panic("downtime history event generation is incomplete and not yet implemented") }()
 
-	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId, types.UnixMilli{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
@@ -445,7 +451,7 @@ func (client *Client) buildDowntimeHistoryMetaEvent(ctx context.Context, h *v1hi
 func (client *Client) buildFlappingHistoryEvent(ctx context.Context, h *v1history.FlappingHistory) (*fetchableEvent, error) {
 	defer func() { panic("flapping history event generation is incomplete and not yet implemented") }()
 
-	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId, types.UnixMilli{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
@@ -469,7 +475,7 @@ func (client *Client) buildFlappingHistoryEvent(ctx context.Context, h *v1histor
 func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v1history.AcknowledgementHistory) (*fetchableEvent, error) {
 	defer func() { panic("acknowledgement history event generation is incomplete and not yet implemented") }()
 
-	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId, types.UnixMilli{})
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
