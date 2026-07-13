@@ -256,16 +256,28 @@ func run() int {
 							g.Go(func() error {
 								defer configInitSync.Done()
 
-								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump)
+								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump, nil)
 							})
 						}
+						var stateSyncWorkers atomic.Int64
+						stateSyncWorkers.Store(int64(len(v1.StateFactories)))
+
 						logger.Info("Starting initial state sync")
 						for _, factory := range v1.StateFactories {
 							stateInitSync.Add(1)
 							g.Go(func() error {
 								defer stateInitSync.Done()
 
-								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump)
+								var hook icingadb.DeltaHook
+								if notificationsSource != nil {
+									hook = notificationsSource.ApplyDelta
+									defer func() {
+										if stateSyncWorkers.Add(-1) == 0 {
+											notificationsSource.ClearIncidents()
+										}
+									}()
+								}
+								return s.SyncAfterDump(synctx, common.NewSyncSubject(factory), dump, hook)
 							})
 						}
 
