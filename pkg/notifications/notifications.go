@@ -252,16 +252,11 @@ func (client *Client) fetchIncidents(ctx context.Context) {
 		panic("cannot get environment from context")
 	}
 
-	incidents, err := client.notificationsClient.GetIncidents(ctx, map[string]string{"environment": environment.ID().String()})
-	if err != nil {
-		client.sendHeartbeat(false)
-		client.logger.Errorw("Failed to fetch incidents", zap.String("error", err.Error()))
-		return
-	}
+	incidentsCh, errCh := client.notificationsClient.YieldIncidents(ctx, map[string]string{"environment": environment.ID().String()})
 
 	client.incidentsByObjId = make(map[string]source.Incident)
 	hash := sha1.New() // #nosec G401 -- used as a non-cryptographic hash function to hash IDs
-	for _, incident := range incidents {
+	for incident := range incidentsCh {
 		// This implementation mimics the Icinga 2 ID generation behavior[^1] used to generate all Icinga DB
 		// related object IDs, so make sure to keep it in sync with the Icinga 2 implementation.
 		//
@@ -280,6 +275,11 @@ func (client *Client) fetchIncidents(ctx context.Context) {
 		}
 		client.incidentsByObjId[hex.EncodeToString(hash.Sum(nil))] = incident
 		hash.Reset()
+	}
+
+	if err := <-errCh; err != nil {
+		client.sendHeartbeat(false)
+		client.logger.Errorw("Failed to fetch incidents", zap.String("error", err.Error()))
 	}
 }
 
