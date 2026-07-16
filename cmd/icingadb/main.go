@@ -177,7 +177,8 @@ func run() int {
 			db,
 			rc,
 			logs.GetChildLogger("notifications"),
-			cfg)
+			cfg,
+			ha.NotificationsHeartbeat())
 		if err != nil {
 			logger.Fatalw("Can't create Icinga Notifications client from config", zap.Error(err))
 		}

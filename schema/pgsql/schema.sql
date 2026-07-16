@@ -801,6 +801,9 @@ CREATE TABLE icingadb_instance (
   icinga2_performance_data_enabled boolenum NOT NULL DEFAULT 'n',
 
   icingadb_version varchar(255) NOT NULL,
+  icingadb_service_user varchar(255) NOT NULL, -- see https://systemd.io/USER_NAMES/ for the restrictions on usernames.
+  notifications_healthy boolenum DEFAULT NULL, -- NULL means unknown, n means unhealthy, y means healthy.
+  notifications_discovered_socket_path text, -- The discovered Icinga Notifications socket path, if any.
 
   CONSTRAINT pk_icingadb_instance PRIMARY KEY (id)
 );

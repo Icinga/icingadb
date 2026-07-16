@@ -550,6 +550,9 @@ CREATE TABLE icingadb_instance (
   icinga2_performance_data_enabled enum('n', 'y') NOT NULL,
 
   icingadb_version varchar(255) NOT NULL,
+  icingadb_service_user varchar(255) NOT NULL, -- see https://systemd.io/USER_NAMES/ for the restrictions on usernames.
+  notifications_healthy enum('n', 'y') DEFAULT NULL, -- NULL means unknown, n means unhealthy, y means healthy.
+  notifications_discovered_socket_path mediumtext, -- The discovered Icinga Notifications socket path, if any.
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;

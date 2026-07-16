@@ -181,11 +181,12 @@ ICINGADB_RETENTION_OPTIONS=comment:356
 
 ## Notifications Configuration
 
-!!! warning
+!!! tip
 
-    The Icinga Notifications integration is a feature preview that you can try out.
-    However, incompatible changes may happen, so be sure to check the changelog for future updates.
-    Please do not use it in production.
+    If the `ICINGA_NOTIFICATIONS_LISTENER_SOCKET` environment variable is set, Icinga DB will automatically detect the
+    Icinga Notifications API Unix Domain Socket availability and persist the result in the database. This allows
+    Icinga DB Web to provide a one-click configure button for Icinga Notifications, which will automatically configure
+    this component, and create the corresponding Icinga Notifications source configuration on your behalf.
 
 Icinga DB can act as an event source for [Icinga Notifications](https://icinga.com/docs/icinga-notifications/).
 If configured, Icinga DB will submit events to the Icinga Notifications API.
