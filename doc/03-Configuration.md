@@ -198,15 +198,25 @@ If configured, Icinga DB will submit events to the Icinga Notifications API.
     setsebool -P icingadb_can_connect_all on
     ```
 
+Different URI schemes are possible for the configured URL, depending on how Icinga DB should connect to the Icinga Notifications API.
+
+* `http`: Unencrypted HTTP connection. Requires `username` and `password`/`password_file` to be set. For example: `http://example.com:5680`
+* `https`: HTTPS connection. Either `username` and `password`/`password_file` or `cert` and `key` are required. For example: `https://example.com:5680`
+* `unix`: HTTP connection over a Unix Domain Socket. Authentication is based on the operating system user. For example: `unix:///path/to/socket`
+
 For YAML configuration, the options are part of the `notifications` dictionary.
 For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_`.
 
 | Option            | Description                                                                                                           |
 |-------------------|-----------------------------------------------------------------------------------------------------------------------|
-| url               | **Optional.** Icinga Notifications API base URL, such as `http://localhost:5680`.                                     |
+| url               | **Optional.** Icinga Notifications API base URL.                                                                      |
 | username          | **Optional.** Icinga Notifications API user for this source.                                                          |
 | password          | **Optional.** Icinga Notifications API user password.                                                                 |
 | password_file     | **Optional.** Icinga Notifications API user password file.                                                            |
+| cert              | **Optional.** TLS client certificate, either file path or PEM-encoded multiline string.                               |
+| key               | **Optional.** TLS client private key, either file path or PEM-encoded multiline string.                               |
+| ca                | **Optional.** TLS CA certificate, either file path or PEM-encoded multiline string.                                   |
+| insecure          | **Optional.** Whether not to verify the peer.                                                                         |
 | default_relations | **Optional.** List of relations as a JSONPath to resolve and include in the events submitted to Icinga Notifications. |
 
 ## Appendix
