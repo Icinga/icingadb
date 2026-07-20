@@ -19,4 +19,7 @@ type IcingadbInstance struct {
 	Icinga2FlapDetectionEnabled       types.Bool      `json:"icinga2_flap_detection_enabled"`
 	Icinga2PerformanceDataEnabled     types.Bool      `json:"icinga2_performance_data_enabled"`
 	IcingadbVersion                   string          `json:"-"`
+	IcingadbServiceUser               string          `json:"-"`
+	NotificationsHealthy              types.Bool      `json:"-"`
+	NotificationsDiscoveredSocketPath types.String    `json:"-"`
 }

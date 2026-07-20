@@ -18,6 +18,10 @@ import (
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/sys/unix"
+	"os"
+	"os/user"
+	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,6 +36,25 @@ type haState struct {
 	responsibleTsMilli int64
 	responsible        bool
 	otherResponsible   bool
+}
+
+// NotificationsState holds the current state of the Icinga Notifications component.
+type NotificationsState struct {
+	unhealthySince time.Time // The time when the Icinga Notifications component was first detected as unhealthy.
+	healthy        types.Bool
+
+	// The discovered Icinga Notifications listener socket path, if any.
+	socketPath types.String
+
+	// lastProblemLoggedAt is the last time a problem with the Icinga Notifications component was logged.
+	// This is used to suppress recurring log messages.
+	lastProblemLoggedAt time.Time
+}
+
+// IsValidUnhealthy returns true if the healthy state is valid and set to false, indicating that the
+// Icinga Notifications component is unhealthy.
+func (ns *NotificationsState) IsValidUnhealthy() bool {
+	return ns.healthy.Valid && !ns.healthy.Bool
 }
 
 // HA provides high availability and indicates whether a Takeover or Handover must be made.
@@ -52,6 +75,13 @@ type HA struct {
 	errOnce       sync.Once
 	errMu         sync.Mutex
 	err           error
+
+	// notificationsHeartbeat is a channel that signals the status of the Icinga Notifications component.
+	//
+	// This will only receive events when the Icinga Notifications component is enabled, and its true value indicates
+	// that the component is healthy and able to process notifications, while a false value indicates that it is not.
+	notificationsHeartbeatCh chan bool
+	notifications            NotificationsState
 }
 
 // NewHA returns a new HA and starts the controller loop.
@@ -70,6 +100,8 @@ func NewHA(ctx context.Context, db *database.DB, heartbeat *icingaredis.Heartbea
 		handover:   make(chan string),
 		takeover:   make(chan string),
 		done:       make(chan struct{}),
+
+		notificationsHeartbeatCh: make(chan bool),
 	}
 
 	ha.state.Store(&haState{})
@@ -122,6 +154,12 @@ func (h *HA) Takeover() chan string {
 	return h.takeover
 }
 
+// NotificationsHeartbeat returns a channel to send the status of Icinga Notifications component into.
+//
+// The channel is used to signal the health of the Icinga Notifications component, where a true value indicates
+// that the component is healthy and able to process notifications, while a false value indicates that it is not.
+func (h *HA) NotificationsHeartbeat() chan<- bool { return h.notificationsHeartbeatCh }
+
 // State returns the status quo.
 func (h *HA) State() (responsibleTsMilli int64, responsible, otherResponsible bool) {
 	state := h.state.Load()
@@ -173,6 +211,12 @@ func (h *HA) controller() {
 
 					continue
 				}
+
+				// Returns true when a handover has been triggered, and we should skip the rest of the loop.
+				if h.verifyNotificationsState() {
+					continue
+				}
+
 				s, err := m.Stats().IcingaStatus()
 				if err != nil {
 					h.abort(err)
@@ -237,6 +281,16 @@ func (h *HA) controller() {
 				h.signalHandover("lost heartbeat")
 				h.realizeLostHeartbeat()
 			}
+
+		case healthy := <-h.notificationsHeartbeatCh:
+			h.logger.Debugw("Received notifications heartbeat", zap.Bool("healthy", healthy))
+			h.notifications.healthy = types.MakeBool(healthy)
+			if healthy {
+				h.notifications.unhealthySince = time.Time{}
+			} else if h.notifications.unhealthySince.IsZero() {
+				h.notifications.unhealthySince = time.Now()
+			}
+
 		case <-h.heartbeat.Done():
 			if err := h.heartbeat.Err(); err != nil {
 				h.abort(err)
@@ -365,6 +419,9 @@ func (h *HA) realize(
 				Icinga2FlapDetectionEnabled:       s.FlapDetectionEnabled,
 				Icinga2PerformanceDataEnabled:     s.PerformanceDataEnabled,
 				IcingadbVersion:                   internal.Version.Version,
+				IcingadbServiceUser:               ServiceUser(),
+				NotificationsHealthy:              h.notifications.healthy,
+				NotificationsDiscoveredSocketPath: h.probeNotificationsSocketPath(),
 			}
 
 			stmt, _ := h.db.BuildUpsertStmt(i)
@@ -480,10 +537,21 @@ func (h *HA) realize(
 	return nil
 }
 
+// instanceCount returns the number of instances in the current environment.
+func (h *HA) instanceCount() int64 {
+	query := h.db.Rebind("SELECT COUNT(*) FROM icingadb_instance WHERE environment_id = ?")
+	var count int64
+	if err := h.db.GetContext(h.ctx, &count, query, h.environment.Id); err != nil {
+		h.logger.Warnw("Cannot count instances", zap.Error(database.CantPerformQuery(err, query)))
+		return 0
+	}
+	return count
+}
+
 // realizeLostHeartbeat updates "responsible = n" for this HA into the database.
 func (h *HA) realizeLostHeartbeat() {
-	stmt := h.db.Rebind("UPDATE icingadb_instance SET responsible = ? WHERE id = ?")
-	if _, err := h.db.ExecContext(h.ctx, stmt, "n", h.instanceId); err != nil && !utils.IsContextCanceled(err) {
+	stmt := h.db.Rebind("UPDATE icingadb_instance SET responsible = ?, notifications_healthy = ? WHERE id = ?")
+	if _, err := h.db.ExecContext(h.ctx, stmt, "n", h.notifications.healthy, h.instanceId); err != nil && !utils.IsContextCanceled(err) {
 		h.logger.Warnw("Can't update instance", zap.Error(database.CantPerformQuery(err, stmt)))
 	}
 }
@@ -557,5 +625,82 @@ func (h *HA) signalTakeover(reason string) {
 		case <-h.ctx.Done():
 			// Noop
 		}
+	}
+}
+
+// verifyNotificationsState checks the state of the Icinga Notifications component and triggers a handover if necessary.
+//
+// It returns true if a handover was triggered, false otherwise.
+func (h *HA) verifyNotificationsState() bool {
+	now := time.Now()
+	if h.notifications.IsValidUnhealthy() && now.After(h.notifications.unhealthySince.Add(retry.DefaultTimeout)) {
+		lastLogged := h.notifications.lastProblemLoggedAt
+		if lastLogged.IsZero() || now.After(lastLogged.Add(retry.DefaultTimeout)) {
+			h.logger.Errorw("Icinga Notifications component has been unhealthy for a long time",
+				zap.Time("unhealthy_since", h.notifications.unhealthySince))
+		}
+		h.notifications.lastProblemLoggedAt = now
+
+		// If we're indeed running in a multi-instance environment, we should hand over responsibility
+		// to another instance, otherwise there's no other instance to take over, so we let this retry
+		// its connection attempts to the Icinga Notifications API.
+		if h.instanceCount() > 1 {
+			h.signalHandover("notifications component has been unhealthy for a long time")
+			h.realizeLostHeartbeat()
+
+			// Reset the notifications state, so that we have a fresh start when this instance regains responsibility.
+			h.notifications = NotificationsState{}
+
+			return true
+		}
+	} else {
+		h.notifications.lastProblemLoggedAt = time.Time{}
+	}
+
+	return false
+}
+
+// probeNotificationsSocketPath checks the availability of the Icinga Notifications listener socket and returns
+// its path if available.
+func (h *HA) probeNotificationsSocketPath() (socketPath types.String) {
+	if h.notifications.socketPath.Valid && h.notifications.socketPath.String != "" {
+		return h.notifications.socketPath
+	}
+	defer func() { h.notifications.socketPath = socketPath }()
+
+	path := os.Getenv("ICINGA_NOTIFICATIONS_LISTENER_SOCKET")
+	if path == "" {
+		h.logger.Debugw("Cannot probe Icinga Notifications listener socket availability: ICINGA_NOTIFICATIONS_LISTENER_SOCKET is not set")
+		return types.MakeString("", types.TransformEmptyStringToNull)
+	}
+
+	path = filepath.Clean(path)
+	info, err := os.Stat(path)
+	if err != nil {
+		h.logger.Warnw("Failed to stat Icinga Notifications listener socket", zap.String("path", path), zap.Error(err))
+		return types.MakeString("", types.TransformEmptyStringToNull)
+	}
+
+	if info.Mode()&os.ModeSocket == 0 {
+		h.logger.Warnw("Icinga Notifications listener socket path is not a socket", zap.String("path", path))
+		return types.MakeString("", types.TransformEmptyStringToNull)
+	}
+
+	if err := unix.Access(path, unix.R_OK|unix.W_OK); err != nil {
+		h.logger.Warnw("Icinga DB user has no permissions to access Icinga Notifications listener socket",
+			zap.String("path", path), zap.Error(err))
+		return types.MakeString("", types.TransformEmptyStringToNull)
+	}
+
+	h.logger.Debugw("Successfully probed Icinga Notifications listener socket availability", zap.String("path", path))
+	return types.MakeString(path)
+}
+
+// ServiceUser returns the name the service user the process is running as.
+func ServiceUser() string {
+	if currentUser, err := user.Current(); err != nil {
+		return "unknown"
+	} else {
+		return currentUser.Username
 	}
 }

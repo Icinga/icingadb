@@ -5,7 +5,9 @@ import (
 	"crypto/sha1" // #nosec G505 -- Blocklisted import crypto/sha1
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -77,6 +79,9 @@ type Client struct {
 	// incidentsByObjId is a map of object IDs to incidents populated by the first call to ApplyDelta.
 	incidentsByObjId map[string]source.Incident
 	incidentsMu      sync.Mutex
+
+	// heartbeatOutCh is a channel used to send heartbeat signals to the HA controller.
+	heartbeatOutCh chan<- bool
 }
 
 // NewNotificationsClient creates a new Client connected to an existing database and logger.
@@ -85,6 +90,7 @@ func NewNotificationsClient(
 	rc *redis.Client,
 	logger *logging.Logger,
 	cfg source.Config,
+	heartbeatOutCh chan<- bool,
 ) (*Client, error) {
 	notificationsClient, err := source.NewClient(cfg, "Icinga DB "+internal.Version.Version)
 	if err != nil {
@@ -99,6 +105,8 @@ func NewNotificationsClient(
 
 		notificationsClient: notificationsClient,
 		redisClient:         rc,
+
+		heartbeatOutCh: heartbeatOutCh,
 	}, nil
 }
 
@@ -124,6 +132,10 @@ func (client *Client) ClearIncidents() {
 // This function is called by the initial config dump after the delta has been calculated. It fetches the current
 // incidents from the Icinga Notifications API and compares them with the delta. If there are any changes, it submits
 // the new or updated events to the API and closes any incidents for deleted objects.
+//
+// Returns an error only when the provided context is canceled or Redis is unavailable. Otherwise, it will log any
+// errors encountered during the submission of events to the Icinga Notifications API and continue processing the
+// remaining events, but never returns an error for those.
 func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) error {
 	switch delta.Subject.Entity().(type) {
 	case *v1.HostState, *v1.ServiceState:
@@ -131,68 +143,57 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		return nil
 	}
 
-	client.logger.Debugw("Applying delta to Icinga Notifications",
-		zap.String("entity", delta.Subject.Name()),
-		zap.Int("deleted", len(delta.Delete)),
-		zap.Int("new", len(delta.Create)),
-		zap.Int("updated", len(delta.Update)))
-
-	if err := client.fetchIncidents(ctx); err != nil {
-		return err
+	client.fetchIncidents(ctx)
+	if len(client.incidentsByObjId) == 0 {
+		return nil
 	}
+
+	client.logger.Infof("Fetching %d entities of type %s from Redis for submission to Icinga Notifications",
+		len(delta.RedisSnapshot),
+		delta.Subject.Name())
 
 	g, ctx := errgroup.WithContext(ctx)
-	if len(delta.Create) > 0 || len(delta.Update) > 0 {
-		client.logger.Infof("Fetching %d entities of type %s from Redis for submission to Icinga Notifications",
-			len(delta.Create)+len(delta.Update),
-			delta.Subject.Name())
+	pairs, errs := client.redisClient.HMYield(
+		ctx,
+		fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
+		slices.Collect(maps.Keys(delta.RedisSnapshot))...,
+	)
+	com.ErrgroupReceive(g, errs)
 
-		pairs, errs := client.redisClient.HMYield(
-			ctx,
-			fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
-			append(delta.Update.Keys(), delta.Create.Keys()...)...,
-		)
-		com.ErrgroupReceive(g, errs)
+	entities, rErrs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, 1)
+	com.ErrgroupReceive(g, rErrs)
 
-		entities, rErrs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, 1)
-		com.ErrgroupReceive(g, rErrs)
+	g.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case entity, ok := <-entities:
+				if !ok {
+					return nil
+				}
 
-		g.Go(func() error {
-			for {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case entity, ok := <-entities:
-					if !ok {
-						return nil
-					}
-
-					if _, exists := delta.Update[entity.ID().String()]; exists {
-						incident, ok := client.incidentsByObjId[entity.ID().String()]
-						client.logger.Debugw("Delta update for entity",
-							zap.String("entity", entity.ID().String()),
-							zap.Bool("incident_exists", ok))
-
-						if ok {
-							if same, err := HaveSameState(incident, entity); err != nil {
-								return err
-							} else if same {
-								// Should we send a message update here too or just wait for the timer to expire
-								// and sync the message accordingly? See https://github.com/Icinga/icingadb/issues/1140
-								continue
-							}
-						}
-					}
-
-					// If the entity is new or has a different state than the existing incident, submit it to
-					// Icinga Notifications via the regular /process-event endpoint.
-					if err := client.Submit(ctx, entity); err != nil {
+				if incident, exists := client.incidentsByObjId[entity.ID().String()]; exists {
+					if same, err := HaveSameState(incident, entity); err != nil {
 						return err
+					} else if same {
+						// Should we send a message update here too or just wait for the timer to expire
+						// and sync the message accordingly? See https://github.com/Icinga/icingadb/issues/1140
+						continue
 					}
 				}
+
+				// If the entity is new or has a different state than the existing incident, submit it to Icinga
+				// Notifications via the regular /process-event endpoint. Though, in case the API isn't healthy,
+				// it will retry it endlessly, so set a timeout to avoid blocking the entire config dump.
+				func() {
+					ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+					defer cancel()
+					_ = client.Submit(ctx, entity)
+				}()
 			}
-		})
-	}
+		}
+	})
 
 	g.Go(func() error {
 		var filter []any
@@ -222,7 +223,10 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 
 		attrs := source.ModifiableIncidentAttrs{Close: types.MakeBool(true)}
 		if err := client.notificationsClient.ModifyIncidents(ctx, attrs, filter); err != nil {
-			return errors.Wrap(err, "cannot close incidents for deleted objects")
+			client.logger.Errorw("Failed to bulk close obsolete incidents for deleted objects",
+				zap.String("entity", delta.Subject.Name()),
+				zap.Int("count", len(filter)),
+				zap.String("error", err.Error()))
 		}
 		return nil
 	})
@@ -233,24 +237,26 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 // fetchIncidents fetches all incidents from the Icinga Notifications API and stores them in the Client's incidentsByObjId map.
 //
 // If the incidents have already been fetched, this function does nothing. This function is safe to call concurrently.
-func (client *Client) fetchIncidents(ctx context.Context) error {
+func (client *Client) fetchIncidents(ctx context.Context) {
 	client.incidentsMu.Lock()
 	defer client.incidentsMu.Unlock()
 
 	// ApplyDelta is called in parallel for each entity type, so we need to ensure
 	// that we only fetch the incidents once per environment.
 	if client.incidentsByObjId != nil {
-		return nil
+		return
 	}
 
 	environment, ok := v1.EnvironmentFromContext(ctx)
 	if !ok {
-		return errors.New("cannot get environment from context")
+		panic("cannot get environment from context")
 	}
 
 	incidents, err := client.notificationsClient.GetIncidents(ctx, map[string]string{"environment": environment.ID().String()})
 	if err != nil {
-		return err
+		client.sendHeartbeat(false)
+		client.logger.Errorw("Failed to fetch incidents", zap.String("error", err.Error()))
+		return
 	}
 
 	client.incidentsByObjId = make(map[string]source.Incident)
@@ -260,19 +266,30 @@ func (client *Client) fetchIncidents(ctx context.Context) error {
 		// related object IDs, so make sure to keep it in sync with the Icinga 2 implementation.
 		//
 		// [^1]: https://github.com/Icinga/icinga2/blob/v2.16.3/lib/icingadb/icingadb-utility.cpp#L81
-		idTags := []any{environment.ID().String()}
+		idTags := []string{environment.ID().String()}
 		if service, ok := incident.ObjectTags["service"]; ok {
 			idTags = append(idTags, incident.ObjectTags["host"]+"!"+service)
 		} else {
 			idTags = append(idTags, incident.ObjectTags["host"])
 		}
 		if err := objectpacker.PackAny(idTags, hash); err != nil {
-			return err
+			client.logger.Warnw("Cannot pack incident object ID for hashing, skipping incident",
+				zap.Strings("id_tags", idTags),
+				zap.Error(err))
+			continue
 		}
 		client.incidentsByObjId[hex.EncodeToString(hash.Sum(nil))] = incident
 		hash.Reset()
 	}
-	return nil
+}
+
+// sendHeartbeat sends a heartbeat signal to the HA controller via the heartbeatOutCh channel.
+func (client *Client) sendHeartbeat(alive bool) {
+	select {
+	case client.heartbeatOutCh <- alive:
+	default:
+		client.logger.Debugw("Heartbeat channel is full, dropping signal", zap.Bool("healthy", alive))
+	}
 }
 
 // buildCommonEvent creates an event.Event based on Host and (optional) Service IDs.
@@ -568,7 +585,7 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 		client.logger.Errorw("BUG: generated event is invalid, skipping submission",
 			zap.Any("event", ev.Event),
 			zap.Any("entity", entity),
-			zap.Error(err))
+			zap.String("error", err.Error()))
 		return nil
 	}
 
@@ -582,11 +599,7 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 						zap.String("event", ev.Name),
 						zap.Strings("attributes", attributes),
 						zap.Error(err))
-
-					// ev.completeAndUpdate retries any retryable errors internally, so if we get an error here,
-					// it means that we cannot complete the event with the given attributes, so we should not retry
-					// anymore. Therefore, we return a non-retryable error here instead of propagating the original one.
-					return errors.New("cannot complete event relations")
+					return err
 				}
 
 				attributes, err = client.notificationsClient.ProcessEvent(ctx, ev.Event, true)
@@ -599,11 +612,11 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 				return err
 			}
 		},
-		retry.Retryable,
+		func(err error) bool { return true }, // Retry all errors.
 		backoff.DefaultBackoff,
 		retry.Settings{
-			Timeout: retry.DefaultTimeout,
 			OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
+				client.sendHeartbeat(true)
 				telemetry.Stats.NotificationSync.Add(1)
 
 				client.logger.Debugw("Successfully submitted event to Icinga Notifications",
@@ -613,11 +626,15 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 					zap.Error(lastErr))
 			},
 			OnRetryableError: func(elapsed time.Duration, attempt uint64, err, lastErr error) {
-				client.logger.Warnw("Cannot submit event to Icinga Notifications",
-					zap.String("event", ev.Name),
-					zap.Uint64("attempt", attempt),
-					zap.Duration("elapsed", elapsed),
-					zap.Error(err))
+				client.sendHeartbeat(false)
+
+				if lastErr == nil || err.Error() != lastErr.Error() {
+					client.logger.Errorw("Cannot submit event to Icinga Notifications",
+						zap.String("event", ev.Name),
+						zap.Uint64("attempt", attempt),
+						zap.Duration("elapsed", elapsed),
+						zap.Error(err))
+				}
 			},
 		},
 	)
