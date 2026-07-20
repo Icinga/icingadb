@@ -5,7 +5,9 @@ import (
 	"crypto/sha1" // #nosec G505 -- Blocklisted import crypto/sha1
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"reflect"
+	"slices"
 	"sync"
 	"time"
 
@@ -146,67 +148,52 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		return nil
 	}
 
-	client.logger.Debugw("Applying delta to Icinga Notifications",
-		zap.String("entity", delta.Subject.Name()),
-		zap.Int("deleted", len(delta.Delete)),
-		zap.Int("new", len(delta.Create)),
-		zap.Int("updated", len(delta.Update)))
+	client.logger.Infof("Fetching %d entities of type %s from Redis for submission to Icinga Notifications",
+		len(delta.RedisSnapshot),
+		delta.Subject.Name())
 
 	g, ctx := errgroup.WithContext(ctx)
-	if len(delta.Create) > 0 || len(delta.Update) > 0 {
-		client.logger.Infof("Fetching %d entities of type %s from Redis for submission to Icinga Notifications",
-			len(delta.Create)+len(delta.Update),
-			delta.Subject.Name())
+	pairs, errs := client.redisClient.HMYield(
+		ctx,
+		fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
+		slices.Collect(maps.Keys(delta.RedisSnapshot))...,
+	)
+	com.ErrgroupReceive(g, errs)
 
-		pairs, errs := client.redisClient.HMYield(
-			ctx,
-			fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
-			append(delta.Update.Keys(), delta.Create.Keys()...)...,
-		)
-		com.ErrgroupReceive(g, errs)
+	entities, rErrs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, 1)
+	com.ErrgroupReceive(g, rErrs)
 
-		entities, rErrs := icingaredis.CreateEntities(ctx, delta.Subject.Factory(), pairs, 1)
-		com.ErrgroupReceive(g, rErrs)
-
-		g.Go(func() error {
-			for {
-				select {
-				case <-ctx.Done():
-					return ctx.Err()
-				case entity, ok := <-entities:
-					if !ok {
-						return nil
-					}
-
-					if _, exists := delta.Update[entity.ID().String()]; exists {
-						incident, ok := client.incidentsByObjId[entity.ID().String()]
-						client.logger.Debugw("Delta update for entity",
-							zap.String("entity", entity.ID().String()),
-							zap.Bool("incident_exists", ok))
-
-						if ok {
-							if same, err := HaveSameState(incident, entity); err != nil {
-								return err
-							} else if same {
-								// Should we send a message update here too or just wait for the timer to expire
-								// and sync the message accordingly? See https://github.com/Icinga/icingadb/issues/1140
-								continue
-							}
-						}
-					}
-
-					// If the entity is new or has a different state than the existing incident, submit it to Icinga
-					// Notifications via the regular /process-event endpoint. Though, in case the API isn't healthy,
-					// it will retry it endlessly, so set a timeout to avoid blocking the entire config dump.
-					func() {
-						ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
-						defer cancel()
-						_ = client.Submit(ctx, entity)
-					}()
+	g.Go(func() error {
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case entity, ok := <-entities:
+				if !ok {
+					return nil
 				}
+
+				if incident, exists := client.incidentsByObjId[entity.ID().String()]; exists {
+					if same, err := HaveSameState(incident, entity); err != nil {
+						return err
+					} else if same {
+						// Should we send a message update here too or just wait for the timer to expire
+						// and sync the message accordingly? See https://github.com/Icinga/icingadb/issues/1140
+						continue
+					}
+				}
+
+				// If the entity is new or has a different state than the existing incident, submit it to Icinga
+				// Notifications via the regular /process-event endpoint. Though, in case the API isn't healthy,
+				// it will retry it endlessly, so set a timeout to avoid blocking the entire config dump.
+				func() {
+					ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+					defer cancel()
+					_ = client.Submit(ctx, entity)
+				}()
 			}
-		})
-	}
+		}
+	})
 
 	g.Go(func() error {
 		var filter []any
