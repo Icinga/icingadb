@@ -11,6 +11,7 @@ import (
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
+	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/jmoiron/sqlx"
@@ -28,28 +29,21 @@ func panicForInvalidType(allowList []string, request string) {
 	}
 }
 
-// fetchObjectsFromRedis returns the objects with the requested ids of type typ from Redis.
-func (client *Client) fetchObjectsFromRedis(
-	ctx context.Context, typ string, ids ...types.Binary,
-) (map[string]*icingaObject, error) {
-	panicForInvalidType([]string{"host", "service"}, typ)
-
-	if len(ids) == 0 {
-		return nil, nil
-	}
-
-	key := "icinga:" + typ
-	strIds := make([]string, 0, len(ids))
-	for _, id := range ids {
-		strIds = append(strIds, id.String())
-	}
-
-	var out map[string]*icingaObject
-	err := retry.WithBackoff(
+// streamRedisHashObjects streams objects of type T from a Redis hash with the given key.
+//
+// This function is used to stream generic objects, such as hosts, host states, etc., from Redis.
+// The visitor function is called for each object, and can return an error to stop the streaming.
+func streamRedisHashObjects[T any](
+	ctx context.Context,
+	redisClient *redis.Client,
+	key string,
+	visitor func(*T, string) error,
+	ids ...string,
+) error {
+	return retry.WithBackoff(
 		ctx,
 		func(ctx context.Context) error {
-			out = make(map[string]*icingaObject)
-			pairCh, errCh := client.redisClient.HMYield(ctx, key, strIds...)
+			pairCh, errCh := redisClient.HMYield(ctx, key, ids...)
 
 			g, ctx := errgroup.WithContext(ctx)
 
@@ -65,15 +59,15 @@ func (client *Client) fetchObjectsFromRedis(
 							return nil
 						}
 
-						obj := new(icingaObject)
+						obj := new(T)
 						if err := json.Unmarshal([]byte(pair.Value), obj); err != nil {
 							return errors.Wrapf(err,
 								"cannot JSON unmarshal Redis HMGET result for %q with key %q",
 								key, pair.Field)
 						}
-						obj.isVolatile = obj.IsVolatile.Valid && obj.IsVolatile.Bool
-						obj.IsVolatile = types.Bool{} // Reset it, so that it is omitted from the JSON output.
-						out[pair.Field] = obj
+						if err := visitor(obj, pair.Field); err != nil {
+							return err
+						}
 					}
 				}
 			})
@@ -84,11 +78,34 @@ func (client *Client) fetchObjectsFromRedis(
 		backoff.DefaultBackoff,
 		retry.Settings{Timeout: retry.DefaultTimeout},
 	)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot HMGET %q, %q from Redis", key, strIds)
+}
+
+// fetchObjectsFromRedis returns the objects with the requested ids of type typ from Redis.
+func (client *Client) fetchObjectsFromRedis(
+	ctx context.Context, typ string, ids ...types.Binary,
+) (map[string]*icingaObject, error) {
+	panicForInvalidType([]string{"host", "service"}, typ)
+
+	if len(ids) == 0 {
+		return nil, nil
 	}
 
-	return out, nil
+	strIds := make([]string, 0, len(ids))
+	for _, id := range ids {
+		strIds = append(strIds, id.String())
+	}
+
+	objects := make(map[string]*icingaObject)
+	err := streamRedisHashObjects(ctx, client.redisClient, "icinga:"+typ, func(obj *icingaObject, field string) error {
+		obj.isVolatile = obj.IsVolatile.Valid && obj.IsVolatile.Bool
+		obj.IsVolatile = types.Bool{} // Reset it, so that it is omitted from the JSON output.
+		objects[field] = obj
+		return nil
+	}, strIds...)
+	if err != nil {
+		return nil, err
+	}
+	return objects, nil
 }
 
 // fetchObjectFromRedis returns the single object with the requested id of type typ from Redis.
