@@ -18,7 +18,7 @@ require (
 	github.com/vbauerster/mpb/v6 v6.0.4
 	go.uber.org/zap v1.28.0
 	golang.org/x/sync v0.22.0
-	golang.org/x/sys v0.30.0
+	golang.org/x/sys v0.47.0
 )
 
 require (
