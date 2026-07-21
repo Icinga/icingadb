@@ -374,6 +374,20 @@ func run() int {
 							return ret.Start(synctx)
 						})
 
+						if notificationsSource != nil {
+							g.Go(func() error {
+								stateInitSync.Wait()
+
+								if err := synctx.Err(); err != nil {
+									return err
+								}
+
+								logger.Info("Starting Icinga Notifications periodic outputs sync")
+
+								return notificationsSource.SyncCheckOutputs(synctx)
+							})
+						}
+
 						if err := g.Wait(); err != nil && !utils.IsContextCanceled(err) {
 							logger.Fatalf("%+v", err)
 						}
