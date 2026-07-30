@@ -8,6 +8,7 @@ import (
 	"maps"
 	"reflect"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -143,7 +144,17 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		return nil
 	}
 
-	client.fetchIncidents(ctx)
+	func() {
+		client.incidentsMu.Lock()
+		defer client.incidentsMu.Unlock()
+
+		// ApplyDelta is called in parallel for each entity type, so we need to ensure
+		// that we only fetch the incidents once per environment.
+		if client.incidentsByObjId != nil {
+			return
+		}
+		client.incidentsByObjId = client.retrieveEnvironmentIncidents(ctx)
+	}()
 	if len(client.incidentsByObjId) == 0 {
 		return nil
 	}
@@ -177,8 +188,8 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 					if same, err := HaveSameState(incident, entity); err != nil {
 						return err
 					} else if same {
-						// Should we send a message update here too or just wait for the timer to expire
-						// and sync the message accordingly? See https://github.com/Icinga/icingadb/issues/1140
+						// Same state, but not necessarily the same output/message, and since we have a separate
+						// worker for syncing check outputs (see Client.SyncCheckOutputs), skip it entirely here.
 						continue
 					}
 				}
@@ -234,19 +245,124 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 	return g.Wait()
 }
 
-// fetchIncidents fetches all incidents from the Icinga Notifications API and stores them in the Client's incidentsByObjId map.
+// SyncCheckOutputs periodically syncs the check outputs of all hosts and services to the Icinga Notifications API.
 //
-// If the incidents have already been fetched, this function does nothing. This function is safe to call concurrently.
-func (client *Client) fetchIncidents(ctx context.Context) {
-	client.incidentsMu.Lock()
-	defer client.incidentsMu.Unlock()
+// This function fetches the current incidents from the Icinga Notifications API, computes the corresponding
+// object IDs, retrieves all host and service states matching those IDs from Redis, and updates the check
+// outputs in Icinga Notifications if they have changed since the last sync.
+func (client *Client) SyncCheckOutputs(ctx context.Context) error {
+	lastSync := time.Now()
 
-	// ApplyDelta is called in parallel for each entity type, so we need to ensure
-	// that we only fetch the incidents once per environment.
-	if client.incidentsByObjId != nil {
-		return
+	// modify is a helper function to update the check output of a given state in Icinga Notifications.
+	modify := func(s *v1.State, idTags map[string]string) error {
+		if !s.Output.Valid || s.LastUpdate.Time().Before(lastSync) {
+			return nil // Skip state updates that haven't changed since the last sync, or that don't have a valid output.
+		}
+
+		var sb strings.Builder
+		sb.Grow(len(s.Output.String) + len(s.LongOutput.String) + 1)
+		sb.WriteString(s.Output.String)
+		if !s.LongOutput.IsZero() {
+			sb.WriteRune('\n')
+			sb.WriteString(s.LongOutput.String)
+		}
+
+		filter := make(map[string]any)
+		for k, v := range idTags {
+			filter[k] = v
+		}
+		if _, exists := idTags["service"]; !exists {
+			// Only match host incidents, not service incidents that have the same host name.
+			filter["service"] = nil
+		}
+
+		attrs := source.ModifiableIncidentAttrs{Message: types.MakeString(sb.String())}
+		return retry.WithBackoff(
+			ctx,
+			func(ctx context.Context) error { return client.notificationsClient.ModifyIncidents(ctx, attrs, filter) },
+			func(err error) bool { return true },
+			backoff.DefaultBackoff,
+			retry.Settings{
+				OnSuccess: func(elapsed time.Duration, attempt uint64, err error) {
+					client.sendHeartbeat(true)
+					if attempt > 1 {
+						client.logger.Debugw("Successfully updated incident status after retries",
+							zap.String("object_type", types.Name(s)),
+							zap.Duration("elapsed", elapsed),
+							zap.Uint64("attempt", attempt),
+							zap.String("error", err.Error()))
+					}
+				},
+				OnRetryableError: func(elapsed time.Duration, attempt uint64, err, lastErr error) {
+					client.sendHeartbeat(false)
+					if lastErr == nil || err.Error() != lastErr.Error() {
+						client.logger.Errorw("Failed to update incident status",
+							zap.String("object_type", types.Name(s)),
+							zap.Duration("elapsed", elapsed),
+							zap.Error(lastErr))
+					}
+				},
+			},
+		)
 	}
 
+	const interval = 5 * time.Minute
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case tick := <-ticker.C:
+			hostIncidents := make(map[string]source.Incident)
+			serviceIncidents := make(map[string]source.Incident)
+			for id, incident := range client.retrieveEnvironmentIncidents(ctx) {
+				if _, exists := incident.ObjectTags["service"]; exists {
+					serviceIncidents[id] = incident
+				} else {
+					hostIncidents[id] = incident
+				}
+			}
+
+			client.logger.Debugw("Syncing check outputs for incidents",
+				zap.Int("host_incidents", len(hostIncidents)),
+				zap.Int("service_incidents", len(serviceIncidents)),
+				zap.Time("last_sync", lastSync))
+
+			var wg sync.WaitGroup
+			if len(hostIncidents) > 0 {
+				wg.Go(func() {
+					_ = streamRedisHashObjects(ctx, client.redisClient, "icinga:host:state", func(hs *v1.HostState, _ string) error {
+						return modify(&hs.State, hostIncidents[hs.HostId.String()].ObjectTags)
+					}, slices.Collect(maps.Keys(hostIncidents))...)
+				})
+			}
+
+			if len(serviceIncidents) > 0 {
+				wg.Go(func() {
+					_ = streamRedisHashObjects(ctx, client.redisClient, "icinga:service:state", func(ss *v1.ServiceState, _ string) error {
+						return modify(&ss.State, serviceIncidents[ss.ServiceId.String()].ObjectTags)
+					}, slices.Collect(maps.Keys(serviceIncidents))...)
+				})
+			}
+			wg.Wait()
+
+			lastSync = tick
+			// In case the sync took a long time, the next tick might come immediately,
+			// so we reset the ticker to ensure a full interval between syncs.
+			ticker.Reset(interval)
+		}
+	}
+}
+
+// retrieveEnvironmentIncidents fetches all incidents for the current environment from the Icinga Notifications API.
+//
+// The incidents are returned as a map of object IDs to incidents. The object IDs are generated based on the
+// environment ID and the host/service names, mimicking the Icinga 2 ID generation behavior used to generate
+// all Icinga DB related object IDs.
+func (client *Client) retrieveEnvironmentIncidents(ctx context.Context) map[string]source.Incident {
 	environment, ok := v1.EnvironmentFromContext(ctx)
 	if !ok {
 		panic("cannot get environment from context")
@@ -254,7 +370,7 @@ func (client *Client) fetchIncidents(ctx context.Context) {
 
 	incidentsCh, errCh := client.notificationsClient.YieldIncidents(ctx, map[string]string{"environment": environment.ID().String()})
 
-	client.incidentsByObjId = make(map[string]source.Incident)
+	incidentsByID := make(map[string]source.Incident)
 	hash := sha1.New() // #nosec G401 -- used as a non-cryptographic hash function to hash IDs
 	for incident := range incidentsCh {
 		// This implementation mimics the Icinga 2 ID generation behavior[^1] used to generate all Icinga DB
@@ -273,7 +389,7 @@ func (client *Client) fetchIncidents(ctx context.Context) {
 				zap.Error(err))
 			continue
 		}
-		client.incidentsByObjId[hex.EncodeToString(hash.Sum(nil))] = incident
+		incidentsByID[hex.EncodeToString(hash.Sum(nil))] = incident
 		hash.Reset()
 	}
 
@@ -281,6 +397,7 @@ func (client *Client) fetchIncidents(ctx context.Context) {
 		client.sendHeartbeat(false)
 		client.logger.Errorw("Failed to fetch incidents", zap.String("error", err.Error()))
 	}
+	return incidentsByID
 }
 
 // sendHeartbeat sends a heartbeat signal to the HA controller via the heartbeatOutCh channel.
