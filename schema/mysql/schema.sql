@@ -553,6 +553,7 @@ CREATE TABLE icingadb_instance (
   icingadb_service_user varchar(255) NOT NULL, -- see https://systemd.io/USER_NAMES/ for the restrictions on usernames.
   notifications_healthy enum('n', 'y') DEFAULT NULL, -- NULL means unknown, n means unhealthy, y means healthy.
   notifications_discovered_socket_path mediumtext, -- The discovered Icinga Notifications socket path, if any.
+  notifications_synchronize_with_database enum('n', 'y') NOT NULL,
 
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
@@ -1406,6 +1407,18 @@ CREATE TABLE dependency_edge (
   CONSTRAINT pk_dependency_edge PRIMARY KEY (id),
 
   UNIQUE INDEX idx_dependency_edge_from_node_to_node_id (from_node_id, to_node_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
+
+CREATE TABLE icingadb_config (
+  environment_id binary(20) NOT NULL COMMENT 'environment.id',
+  endpoint_id binary(20) NOT NULL DEFAULT 0x0000000000000000000000000000000000000000 COMMENT 'endpoint.id, all zero bytes if unknown',
+
+  env_key varchar(255) NOT NULL,
+  env_value text NOT NULL,
+
+  locked enum('n', 'y') NOT NULL COMMENT 'static config from Icinga DB config is considered as locked',
+
+  CONSTRAINT pk_icingadb_config PRIMARY KEY (environment_id, endpoint_id, env_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
 
 CREATE TABLE icingadb_schema (

@@ -152,7 +152,7 @@ redis:
 	#   For example: https://example.com:5680
 	# - unix: HTTP connection over a Unix Domain Socket. Authentication is based on the operating system user.
 	#   For example: unix:///path/to/socket
-#  url: http://localhost:5680
+#  url:
 
   # Base URL of the Icinga Web 2 setup in front of this Icinga DB. It is used to build the absolute object URLs
   # transmitted with each event, which Icinga Notifications passes on to the notified contacts. This must be an
@@ -160,10 +160,10 @@ redis:
 #  icingaweb2_url: https://example.com/icingaweb2
 
   # Username to authenticate against the Icinga Notifications API.
-#  username: icingadb
+#  username:
 
   # Password for the defined user.
-#  password: insecureinsecure
+#  password:
 #  password_file: /run/secerets/icingadb_notifications_password
 
   # TLS configuration for https URLs. The ca is used to verify the server cert, while cert and key are the client certificate.
@@ -171,7 +171,10 @@ redis:
 #  cert: /path/to/client.crt
 #  key: /path/to/client.key
 
-  # Relations as a JSONPath to resolve and include in the events submitted to Icinga Notifications.
+  # Relations as an array of JSONPath to resolve and include in the events submitted to Icinga Notifications.
+  # For example '$.host.vars' and '$.services[*].vars'.
 #  default_relations:
-#    - '$.host.vars'
-#    - '$.services[*].vars'
+
+  # Synchronize the configuration with the database. This allows Icinga Notifications Web to configure this source.
+  # If set, all other fields can be left empty. However, if set, they take precedence.
+#  synchronize_with_database: true

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"github.com/creasty/defaults"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
@@ -9,6 +10,9 @@ import (
 	"github.com/icinga/icingadb/pkg/icingadb/history"
 	"github.com/pkg/errors"
 	"github.com/theory/jsonpath"
+	"reflect"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -17,11 +21,11 @@ const DefaultConfigPath = "/etc/icingadb/config.yml"
 
 // Config defines Icinga DB config.
 type Config struct {
-	Database      database.Config `yaml:"database" envPrefix:"DATABASE_"`
-	Redis         redis.Config    `yaml:"redis" envPrefix:"REDIS_"`
-	Logging       logging.Config  `yaml:"logging" envPrefix:"LOGGING_"`
-	Retention     RetentionConfig `yaml:"retention" envPrefix:"RETENTION_"`
-	Notifications source.Config   `yaml:"notifications" envPrefix:"NOTIFICATIONS_"`
+	Database      database.Config     `yaml:"database" envPrefix:"DATABASE_"`
+	Redis         redis.Config        `yaml:"redis" envPrefix:"REDIS_"`
+	Logging       logging.Config      `yaml:"logging" envPrefix:"LOGGING_"`
+	Retention     RetentionConfig     `yaml:"retention" envPrefix:"RETENTION_"`
+	Notifications NotificationsConfig `yaml:"notifications" envPrefix:"NOTIFICATIONS_"`
 }
 
 func (c *Config) SetDefaults() {
@@ -123,4 +127,65 @@ func (r *RetentionConfig) Validate() error {
 	}
 
 	return r.Options.Validate()
+}
+
+// NotificationsConfig wraps source.Config for autoconfiguration and env-like serialization.
+//
+// When NotificationsConfig.SynchronizeWithDatabase is set, everything is sourced from the database.
+type NotificationsConfig struct {
+	source.Config `yaml:",inline"`
+
+	SynchronizeWithDatabase bool `yaml:"synchronize_with_database" env:"SYNCHRONIZE_WITH_DATABASE" default:"true"`
+}
+
+// StaticConfig emits all set/changed/non-default configuration values with a key mimicking the env key.
+//
+// Pairs carrying sensitive information, such as passwords or private keys, are stored with a redacted value.
+func (c NotificationsConfig) StaticConfig() map[string]string {
+	out := make(map[string]string)
+	activeEncConfig(reflect.ValueOf(c.Config), "ICINGADB_NOTIFICATIONS_", out)
+	return out
+}
+
+// activeEncConfig emits all set config values into a map with a key mimicking the env key.
+//
+// This function is used in NotificationsConfig.StaticConfig and currently only implements what is required there.
+//
+// Fields with the "unset" env tag option are considered sensitive. Their value will be REDACTED.
+func activeEncConfig(v reflect.Value, prefix string, out map[string]string) {
+	t := v.Type()
+	for i := range t.NumField() {
+		fieldT := t.Field(i)
+		fieldV := v.Field(i)
+
+		if !fieldT.IsExported() {
+			continue
+		}
+
+		if fieldV.Kind() == reflect.Struct {
+			activeEncConfig(fieldV, prefix+fieldT.Tag.Get("envPrefix"), out)
+			continue
+		}
+
+		name, opts, _ := strings.Cut(fieldT.Tag.Get("env"), ",")
+		if name == "" || name == "-" {
+			continue
+		}
+
+		if defaults.CanUpdate(fieldV.Interface()) {
+			continue
+		}
+
+		if slices.Contains(strings.Split(opts, ","), "unset") {
+			out[prefix+name] = "REDACTED"
+		} else if fieldV.Kind() == reflect.Slice {
+			parts := make([]string, fieldV.Len())
+			for i := range parts {
+				parts[i] = fmt.Sprintf("%v", fieldV.Index(i).Interface())
+			}
+			out[prefix+name] = strings.Join(parts, ",")
+		} else {
+			out[prefix+name] = fmt.Sprintf("%v", fieldV.Interface())
+		}
+	}
 }
