@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
@@ -26,6 +27,7 @@ import (
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/internal"
+	"github.com/icinga/icingadb/internal/config"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	"github.com/icinga/icingadb/pkg/icingadb"
@@ -34,6 +36,7 @@ import (
 	v1history "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
@@ -69,46 +72,433 @@ func (ev *fetchableEvent) completeAndUpdate(ctx context.Context, attributes []st
 // A new Client should be created by the NewNotificationsClient function. New history entries can be submitted by
 // calling the Client.Submit method.
 type Client struct {
-	source.Config
+	db          *database.DB
+	redisClient *redis.Client
+	logger      *logging.Logger
 
-	db     *database.DB
-	logger *logging.Logger
+	// initialConfig is the static YAML and/or env configuration. Used in Client.SynchronizeConfigWithDatabase.
+	initialConfig config.NotificationsConfig
 
-	notificationsClient *source.Client // The Icinga Notifications client used to interact with the API.
-	redisClient         *redis.Client  // redisClient is the Redis client used to fetch host and service names for events.
+	// runtimeMu protects runtimeConfig, notificationsClient and configuredCh.
+	runtimeMu sync.RWMutex
+	// runtimeConfig is the currently loaded configuration.
+	runtimeConfig config.NotificationsConfig
+	// notificationsClient is the API client, configured via SynchronizeConfigWithDatabase.
+	notificationsClient *source.Client
+	// clientCtx is canceled when notificationsClient is replaced or removed; see Client.apiClient.
+	clientCtx    context.Context
+	clientCancel context.CancelFunc
+	// configuredCh is closed while notificationsClient is available; see Client.setClient.
+	configuredCh chan struct{}
+
+	// persistedLockedConfigCh is closed by Client.PersistLockedConfigOnce after it has finished.
+	persistedLockedConfigCh chan struct{}
+	// persistLockedConfigOnce ensures Client.PersistLockedConfigOnce performs its work only once.
+	persistLockedConfigOnce sync.Once
+
+	// syncMu synchronizes Client.PersistLockedConfigOnce and Client.SynchronizeConfigWithDatabase and protects
+	// lastEndpointId. The latter is called again for each HA takeover, which may overlap with an invocation from
+	// a previous takeover which has not returned yet.
+	syncMu sync.Mutex
+	// lastEndpointId is the last known endpoint ID, fetched via Client.endpointId.
+	lastEndpointId types.Binary
 
 	// incidentsByObjId is a map of object IDs to incidents populated by the first call to ApplyDelta.
 	incidentsByObjId map[string]source.Incident
 	incidentsMu      sync.Mutex
 
-	// heartbeatOutCh is a channel used to send heartbeat signals to the HA controller.
-	heartbeatOutCh chan<- bool
+	ha *icingadb.HA
 }
 
 // NewNotificationsClient creates a new Client connected to an existing database and logger.
+//
+// If cfg.SynchronizeWithDatabase is false, the Client can be directly used. Otherwise, one initial
+// Client.PersistLockedConfigOnce call and a continuous Client.SynchronizeConfigWithDatabase call for each HA
+// activation is necessary.
 func NewNotificationsClient(
 	db *database.DB,
 	rc *redis.Client,
 	logger *logging.Logger,
-	cfg source.Config,
-	heartbeatOutCh chan<- bool,
+	cfg config.NotificationsConfig,
+	ha *icingadb.HA,
 ) (*Client, error) {
-	notificationsClient, err := source.NewClient(cfg, "Icinga DB "+internal.Version.Version)
-	if err != nil {
-		return nil, err
+	client := &Client{
+		db:          db,
+		redisClient: rc,
+		logger:      logger,
+
+		initialConfig: cfg,
+
+		persistedLockedConfigCh: make(chan struct{}),
+		configuredCh:            make(chan struct{}),
+
+		ha: ha,
 	}
 
-	return &Client{
-		Config: cfg,
+	if !cfg.SynchronizeWithDatabase {
+		nc, err := source.NewClient(cfg.Config, "Icinga DB "+internal.Version.Version)
+		if err != nil {
+			return nil, err
+		}
+		client.setClient(cfg, nc)
+	}
 
-		db:     db,
-		logger: logger,
+	return client, nil
+}
 
-		notificationsClient: notificationsClient,
-		redisClient:         rc,
+// setClient stores the runtime configuration together with its API client and returns the previous client.
+//
+// Passing a nil client marks this Client as unconfigured, reopening the channel returned by Client.Configured.
+// In both cases, the context of the previous client is canceled, aborting all its pending requests.
+func (client *Client) setClient(cfg config.NotificationsConfig, nc *source.Client) *source.Client {
+	client.runtimeMu.Lock()
+	defer client.runtimeMu.Unlock()
 
-		heartbeatOutCh: heartbeatOutCh,
-	}, nil
+	prev := client.notificationsClient
+	if client.clientCancel != nil {
+		client.clientCancel()
+	}
+
+	client.runtimeConfig = cfg
+	client.notificationsClient = nc
+	client.clientCtx, client.clientCancel = nil, nil
+	if nc != nil {
+		client.clientCtx, client.clientCancel = context.WithCancel(context.Background())
+	}
+
+	switch {
+	case nc != nil && prev == nil:
+		close(client.configuredCh)
+	case nc == nil && prev != nil:
+		client.configuredCh = make(chan struct{})
+	}
+
+	return prev
+}
+
+// Configured returns a channel being closed as soon as the Icinga Notifications API client became available.
+//
+// As the client might become unavailable again, the returned channel is only a snapshot of the current state.
+func (client *Client) Configured() <-chan struct{} {
+	client.runtimeMu.RLock()
+	defer client.runtimeMu.RUnlock()
+
+	return client.configuredCh
+}
+
+// IsConfigured reports whether the Icinga Notifications API client is available.
+func (client *Client) IsConfigured() bool {
+	client.runtimeMu.RLock()
+	defer client.runtimeMu.RUnlock()
+
+	return client.notificationsClient != nil
+}
+
+// apiClient returns the currently configured Icinga Notifications API client along with a derived context.
+//
+// The returned context is canceled as soon as the returned client is being replaced or removed, aborting all its
+// pending requests. Its cancel function must always be called to release the associated resources.
+//
+// If this client is not configured, a nil client is returned.
+func (client *Client) apiClient(ctx context.Context) (*source.Client, context.Context, context.CancelFunc) {
+	client.runtimeMu.RLock()
+	nc, clientCtx := client.notificationsClient, client.clientCtx
+	client.runtimeMu.RUnlock()
+
+	if nc == nil {
+		return nil, ctx, func() {}
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	stopAfterFunc := context.AfterFunc(clientCtx, cancel)
+
+	return nc, ctx, func() { stopAfterFunc(); cancel() }
+}
+
+// defaultRelations returns the currently configured default relations.
+func (client *Client) defaultRelations() []string {
+	client.runtimeMu.RLock()
+	defer client.runtimeMu.RUnlock()
+
+	return client.runtimeConfig.DefaultRelations
+}
+
+// endpointId returns this node's endpoint ID or the null endpoint ID, if unconfigured.
+func (client *Client) endpointId() types.Binary {
+	endpointId := client.ha.EndpointID()
+	if endpointId.Valid() {
+		return endpointId
+	}
+
+	return v1.UnconfiguredEndpointId()
+}
+
+// PersistLockedConfigOnce writes the static Notifications configuration to the database.
+//
+// This method must only be called once, as the static configuration is not expected to change; subsequent calls
+// return an error without performing any work. If the Client config disabled SynchronizeConfigWithDatabase, the
+// method immediately returns with a nil error.
+func (client *Client) PersistLockedConfigOnce(ctx context.Context) error {
+	if !client.initialConfig.SynchronizeWithDatabase {
+		return nil
+	}
+
+	err := errors.New("initial synchronization was already performed")
+	client.persistLockedConfigOnce.Do(func() {
+		if err = client.persistLockedConfig(ctx); err == nil {
+			close(client.persistedLockedConfigCh)
+		}
+	})
+
+	return err
+}
+
+// persistLockedConfig performs PersistLockedConfigOnce's database interaction, retrying until it succeeds.
+func (client *Client) persistLockedConfig(ctx context.Context) error {
+	client.syncMu.Lock()
+	defer client.syncMu.Unlock()
+
+	// errNotYetPopulated is returned in retry.WithBackoff below if environmentId is unset. Might happen if HA is raced.
+	errNotYetPopulated := errors.New("notifications client is not yet populated")
+
+	cleanupOrphansStmt := client.db.Rebind(
+		`DELETE FROM "icingadb_config"
+		 WHERE
+			 "environment_id" = ? AND
+			 "endpoint_id" <> ? AND
+			 NOT EXISTS (
+				 SELECT 1 FROM "icingadb_instance"
+				 WHERE
+					 "icingadb_instance"."environment_id" = "icingadb_config"."environment_id" AND
+					 "icingadb_instance"."endpoint_id" = "icingadb_config"."endpoint_id")`)
+	cleanupSelfStmt := client.db.Rebind(
+		`DELETE FROM "icingadb_config"
+		 WHERE "environment_id" = ? AND "endpoint_id" = ? AND "locked" = 'y'`)
+	upsertStmt, _ := client.db.BuildUpsertStmt(&v1.IcingadbConfig{})
+
+	retrySettings := client.db.GetDefaultRetrySettings()
+	retrySettings.Timeout = 0
+
+	err := retry.WithBackoff(
+		ctx,
+		func(ctx context.Context) error {
+			if client.ha.Environment() == nil {
+				return errNotYetPopulated
+			}
+
+			environmentId := client.ha.Environment().Meta().EnvironmentId
+			client.lastEndpointId = client.endpointId()
+
+			if !environmentId.Valid() {
+				return errNotYetPopulated
+			}
+
+			return client.db.ExecTx(ctx, nil, func(ctx context.Context, tx *sqlx.Tx) error {
+				_, err := tx.ExecContext(ctx, cleanupOrphansStmt, environmentId, v1.UnconfiguredEndpointId())
+				if err != nil {
+					return database.CantPerformQuery(err, cleanupOrphansStmt)
+				}
+
+				_, err = tx.ExecContext(ctx, cleanupSelfStmt, environmentId, client.lastEndpointId)
+				if err != nil {
+					return database.CantPerformQuery(err, cleanupSelfStmt)
+				}
+
+				for k, v := range client.initialConfig.StaticConfig() {
+					_, err = tx.NamedExecContext(
+						ctx,
+						upsertStmt,
+						&v1.IcingadbConfig{
+							EnvironmentMeta: v1.EnvironmentMeta{EnvironmentId: environmentId},
+							EnvKey:          k,
+							EnvValue:        v,
+							EndpointId:      client.lastEndpointId,
+							Locked:          types.MakeBool(true),
+						})
+					if err != nil {
+						return database.CantPerformQuery(err, upsertStmt)
+					}
+				}
+
+				return nil
+			})
+		},
+		func(err error) bool {
+			if errors.Is(err, errNotYetPopulated) {
+				return true
+			}
+			return retry.Retryable(err)
+		},
+		backoff.DefaultBackoff,
+		retrySettings)
+
+	return errors.Wrap(err, "cannot synchronize locked config")
+}
+
+// SynchronizeConfigWithDatabase checks the database-stored configuration periodically and applies changes.
+//
+// This method blocks until the provided context is done. Runtime errors are only reported via the logging. If the
+// Client config disabled SynchronizeConfigWithDatabase, the method immediately returns with a nil error.
+//
+// At the moment, not all possible env_keys are being consumed, but only those listed on an internal allow list.
+func (client *Client) SynchronizeConfigWithDatabase(ctx context.Context) error {
+	if !client.initialConfig.SynchronizeWithDatabase {
+		return nil
+	}
+
+	client.logger.Info("Starting Icinga Notifications configuration sync")
+
+	// envKeys is an allow list for env_keys we are consuming. At the moment, not all keys are used by web and
+	// some might cause issues. Then, all locked keys are being removed from the list.
+	// Context: https://github.com/Icinga/icingadb/pull/1158#discussion_r3758216321
+	envKeys := []string{
+		"ICINGADB_NOTIFICATIONS_URL",
+		"ICINGADB_NOTIFICATIONS_DEFAULT_RELATIONS",
+	}
+
+	lockedKeys := client.initialConfig.StaticConfig()
+	envKeys = slices.DeleteFunc(envKeys, func(k string) bool {
+		_, locked := lockedKeys[k]
+		return locked
+	})
+
+	// envKeyArgs are the trailing selectStmt query arguments; its leading ones are added in performSync below.
+	envKeyArgs := make([]any, len(envKeys))
+	for i, envKey := range envKeys {
+		envKeyArgs[i] = envKey
+	}
+
+	// selectStmt is used to fetch unlocked config for this node.
+	// Note: The query is invalid if there are no env_keys, but then it will not be executed.
+	selectStmt := client.db.Rebind(client.db.BuildSelectStmt(&v1.IcingadbConfig{}, &v1.IcingadbConfig{}) +
+		` WHERE "environment_id" = ? AND "endpoint_id" = ? AND "locked" = 'n'` +
+		` AND "env_key" IN (` + strings.Join(slices.Repeat([]string{"?"}, len(envKeys)), ", ") + `)`)
+
+	// updateStmt is used when the endpoint ID has changed; affecting all rows, regardless of their "locked" state.
+	updateStmt := client.db.Rebind(`
+		UPDATE "icingadb_config"
+		SET "endpoint_id" = ?
+		WHERE "environment_id" = ? AND "endpoint_id" = ?`)
+
+	performSync := func() {
+		client.syncMu.Lock()
+		defer client.syncMu.Unlock()
+
+		haEnvironment := client.ha.Environment()
+		if haEnvironment == nil {
+			client.logger.Warn("Cannot find active HA Environment")
+			return
+		}
+
+		environmentId := haEnvironment.Meta().EnvironmentId
+		if !environmentId.Valid() {
+			client.logger.Warn("Environment ID from HA is unpopulated")
+			return
+		}
+
+		if newEndpointId := client.endpointId(); !slices.Equal(client.lastEndpointId, newEndpointId) {
+			client.logger.Infow("Endpoint ID has changed, updating configuration",
+				zap.Stringer("old_endpoint_id", client.lastEndpointId),
+				zap.Stringer("new_endpoint_id", newEndpointId))
+
+			_, err := client.db.ExecContext(ctx, updateStmt, newEndpointId, environmentId, client.lastEndpointId)
+			if err != nil {
+				client.logger.Errorw("Cannot update icingadb_config after endpoint ID change",
+					zap.Error(database.CantPerformQuery(err, updateStmt)))
+			} else {
+				client.lastEndpointId = newEndpointId
+			}
+		}
+
+		// If there are no env_keys, but the client is not configured, we might (!) have already enough locked
+		// config to get it working. So, give it a try. Note: The SELECT query is excluded below.
+		//
+		// Otherwise, there is nothing to do here anymore except waiting for the context to be done.
+		if len(envKeys) == 0 && client.IsConfigured() {
+			return
+		}
+
+		newConf := client.initialConfig
+
+		if len(envKeys) > 0 {
+			var dbConfRows []v1.IcingadbConfig
+			err := client.db.SelectContext(
+				ctx,
+				&dbConfRows,
+				selectStmt,
+				append([]any{environmentId, client.lastEndpointId}, envKeyArgs...)...)
+			if err != nil {
+				client.logger.Errorw("Cannot fetch configuration from database", zap.Error(err))
+				return
+			}
+
+			envConf := make(map[string]string, len(dbConfRows))
+			for _, row := range dbConfRows {
+				envConf[row.EnvKey] = row.EnvValue
+			}
+
+			err = env.ParseWithOptions(&newConf, env.Options{Prefix: "ICINGADB_NOTIFICATIONS_", Environment: envConf})
+			if err != nil {
+				client.logger.Errorw("New Icinga Notifications configuration from the database cannot be parsed", zap.Error(err))
+				return
+			}
+
+			err = newConf.Validate()
+			if err != nil {
+				client.logger.Errorw("New Icinga Notifications configuration from the database is invalid", zap.Error(err))
+				return
+			}
+		}
+
+		client.runtimeMu.RLock()
+		unchanged := reflect.DeepEqual(newConf, client.runtimeConfig)
+		client.runtimeMu.RUnlock()
+
+		if unchanged {
+			return
+		}
+
+		var nc *source.Client
+		if newConf.Url != "" {
+			newClient, err := source.NewClient(newConf.Config, "Icinga DB "+internal.Version.Version)
+			if err != nil {
+				client.logger.Errorw("Cannot create new Notifications client from database configuration", zap.Error(err))
+				return
+			}
+			nc = newClient
+		}
+
+		prev := client.setClient(newConf, nc)
+
+		switch {
+		case nc != nil:
+			client.logger.Info("Synchronized new Icinga Notifications configuration from the database")
+		case prev != nil:
+			client.sendHeartbeatBlocking(ctx, types.Bool{})
+			client.logger.Info("Stopped Icinga Notifications client as no URL is configured anymore")
+		default:
+			client.logger.Debug("Postponing Notifications config synchronization step as no URL is configured")
+		}
+	}
+
+	select {
+	case <-client.persistedLockedConfigCh:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	performSync()
+
+	ticker := time.NewTicker(15 * time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+
+		case <-ticker.C:
+			performSync()
+		}
+	}
 }
 
 // ClearIncidents clears the cached incidents previously populated by the [Client.ApplyDelta].
@@ -138,6 +528,13 @@ func (client *Client) ClearIncidents() {
 // errors encountered during the submission of events to the Icinga Notifications API and continue processing the
 // remaining events, but never returns an error for those.
 func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) error {
+	nc, clientCtx, stopClientCtx := client.apiClient(ctx)
+	if nc == nil {
+		client.logger.Debug("Cannot apply delta as the Notifications Client is not yet configured")
+		return nil
+	}
+	defer stopClientCtx()
+
 	switch delta.Subject.Entity().(type) {
 	case *v1.HostState, *v1.ServiceState:
 	default:
@@ -153,7 +550,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		if client.incidentsByObjId != nil {
 			return
 		}
-		client.incidentsByObjId = client.retrieveEnvironmentIncidents(ctx)
+		client.incidentsByObjId = client.retrieveEnvironmentIncidents(clientCtx, nc)
 	}()
 	if len(client.incidentsByObjId) == 0 {
 		return nil
@@ -163,7 +560,8 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		len(delta.RedisSnapshot),
 		delta.Subject.Name())
 
-	g, ctx := errgroup.WithContext(ctx)
+	parentCtx := ctx
+	g, ctx := errgroup.WithContext(clientCtx)
 	pairs, errs := client.redisClient.HMYield(
 		ctx,
 		fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
@@ -233,7 +631,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 			delta.Subject.Name())
 
 		attrs := source.ModifiableIncidentAttrs{Close: types.MakeBool(true)}
-		if err := client.notificationsClient.ModifyIncidents(ctx, attrs, filter); err != nil {
+		if err := nc.ModifyIncidents(ctx, attrs, filter); err != nil {
 			client.logger.Errorw("Failed to bulk close obsolete incidents for deleted objects",
 				zap.String("entity", delta.Subject.Name()),
 				zap.Int("count", len(filter)),
@@ -242,7 +640,13 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		return nil
 	})
 
-	return g.Wait()
+	err := g.Wait()
+	if err != nil && clientCtx.Err() != nil && parentCtx.Err() == nil {
+		client.logger.Debug("Stopped applying delta as the Icinga Notifications client was replaced")
+		return nil
+	}
+
+	return err
 }
 
 // SyncCheckOutputs periodically syncs the check outputs of all hosts and services to the Icinga Notifications API.
@@ -254,7 +658,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 	lastSync := time.Now()
 
 	// modify is a helper function to update the check output of a given state in Icinga Notifications.
-	modify := func(s *v1.State, idTags map[string]string) error {
+	modify := func(ctx context.Context, nc *source.Client, s *v1.State, idTags map[string]string) error {
 		if !s.Output.Valid || s.LastUpdate.Time().Before(lastSync) {
 			return nil // Skip state updates that haven't changed since the last sync, or that don't have a valid output.
 		}
@@ -279,12 +683,12 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 		attrs := source.ModifiableIncidentAttrs{Message: types.MakeString(sb.String())}
 		return retry.WithBackoff(
 			ctx,
-			func(ctx context.Context) error { return client.notificationsClient.ModifyIncidents(ctx, attrs, filter) },
+			func(ctx context.Context) error { return nc.ModifyIncidents(ctx, attrs, filter) },
 			func(err error) bool { return true },
 			backoff.DefaultBackoff,
 			retry.Settings{
 				OnSuccess: func(elapsed time.Duration, attempt uint64, err error) {
-					client.sendHeartbeat(true)
+					client.sendHeartbeat(types.MakeBool(true))
 					if attempt > 1 {
 						client.logger.Debugw("Successfully updated incident status after retries",
 							zap.String("object_type", types.Name(s)),
@@ -294,7 +698,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 					}
 				},
 				OnRetryableError: func(elapsed time.Duration, attempt uint64, err, lastErr error) {
-					client.sendHeartbeat(false)
+					client.sendHeartbeat(types.MakeBool(false))
 					if lastErr == nil || err.Error() != lastErr.Error() {
 						client.logger.Errorw("Failed to update incident status",
 							zap.String("object_type", types.Name(s)),
@@ -316,9 +720,15 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 			return ctx.Err()
 
 		case tick := <-ticker.C:
+			nc, clientCtx, stopClientCtx := client.apiClient(ctx)
+			if nc == nil {
+				client.logger.Debug("Cannot sync check outputs as the Notifications Client is not yet configured")
+				continue
+			}
+
 			hostIncidents := make(map[string]source.Incident)
 			serviceIncidents := make(map[string]source.Incident)
-			for id, incident := range client.retrieveEnvironmentIncidents(ctx) {
+			for id, incident := range client.retrieveEnvironmentIncidents(clientCtx, nc) {
 				if _, exists := incident.ObjectTags["service"]; exists {
 					serviceIncidents[id] = incident
 				} else {
@@ -335,7 +745,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 			if len(hostIncidents) > 0 {
 				wg.Go(func() {
 					_ = streamRedisHashObjects(ctx, client.redisClient, "icinga:host:state", func(hs *v1.HostState, _ string) error {
-						return modify(&hs.State, hostIncidents[hs.HostId.String()].ObjectTags)
+						return modify(clientCtx, nc, &hs.State, hostIncidents[hs.HostId.String()].ObjectTags)
 					}, slices.Collect(maps.Keys(hostIncidents))...)
 				})
 			}
@@ -343,11 +753,12 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 			if len(serviceIncidents) > 0 {
 				wg.Go(func() {
 					_ = streamRedisHashObjects(ctx, client.redisClient, "icinga:service:state", func(ss *v1.ServiceState, _ string) error {
-						return modify(&ss.State, serviceIncidents[ss.ServiceId.String()].ObjectTags)
+						return modify(clientCtx, nc, &ss.State, serviceIncidents[ss.ServiceId.String()].ObjectTags)
 					}, slices.Collect(maps.Keys(serviceIncidents))...)
 				})
 			}
 			wg.Wait()
+			stopClientCtx()
 
 			lastSync = tick
 			// In case the sync took a long time, the next tick might come immediately,
@@ -362,13 +773,14 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 // The incidents are returned as a map of object IDs to incidents. The object IDs are generated based on the
 // environment ID and the host/service names, mimicking the Icinga 2 ID generation behavior used to generate
 // all Icinga DB related object IDs.
-func (client *Client) retrieveEnvironmentIncidents(ctx context.Context) map[string]source.Incident {
+func (client *Client) retrieveEnvironmentIncidents(ctx context.Context, nc *source.Client) map[string]source.Incident {
 	environment, ok := v1.EnvironmentFromContext(ctx)
 	if !ok {
 		panic("cannot get environment from context")
 	}
 
-	incidentsCh, errCh := client.notificationsClient.YieldIncidents(ctx, map[string]string{"environment": environment.ID().String()})
+	incidentsCh, errCh := nc.YieldIncidents(
+		ctx, map[string]string{"environment": environment.ID().String()})
 
 	incidentsByID := make(map[string]source.Incident)
 	hash := sha1.New() // #nosec G401 -- used as a non-cryptographic hash function to hash IDs
@@ -393,19 +805,37 @@ func (client *Client) retrieveEnvironmentIncidents(ctx context.Context) map[stri
 		hash.Reset()
 	}
 
-	if err := <-errCh; err != nil {
-		client.sendHeartbeat(false)
+	if err := <-errCh; err != nil && ctx.Err() == nil {
+		client.sendHeartbeat(types.MakeBool(false))
 		client.logger.Errorw("Failed to fetch incidents", zap.String("error", err.Error()))
 	}
 	return incidentsByID
 }
 
 // sendHeartbeat sends a heartbeat signal to the HA controller via the heartbeatOutCh channel.
-func (client *Client) sendHeartbeat(alive bool) {
+//
+// The signal is dropped if this Client is unconfigured or if the HA controller is currently not listening.
+func (client *Client) sendHeartbeat(alive types.Bool) {
+	if !client.IsConfigured() {
+		return
+	}
+
 	select {
-	case client.heartbeatOutCh <- alive:
+	case client.ha.NotificationsHeartbeat() <- alive:
 	default:
-		client.logger.Debugw("Heartbeat channel is full, dropping signal", zap.Bool("healthy", alive))
+		client.logger.Debugw("Heartbeat channel is full, dropping signal", zap.Any("healthy", alive))
+	}
+}
+
+// sendHeartbeatBlocking sends a heartbeat signal to the HA controller, blocking until it was received or ctx is done.
+//
+// An invalid types.Bool resets the state to unknown, e.g., after this Client became unconfigured. As such signals are
+// only sent once, they must not be dropped like those of Client.sendHeartbeat.
+func (client *Client) sendHeartbeatBlocking(ctx context.Context, alive types.Bool) {
+	select {
+	case client.ha.NotificationsHeartbeat() <- alive:
+	case <-ctx.Done():
+		client.logger.Debugw("Cannot send heartbeat, context is done", zap.Any("healthy", alive))
 	}
 }
 
@@ -638,6 +1068,13 @@ func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v
 // Note that this function is used as [icingadb.RUUpsertFunc] for the runtime updates pipeline, so its signature must
 // match the [icingadb.RUUpsertFunc] type.
 func (client *Client) Submit(ctx context.Context, entity database.Entity) error {
+	nc, clientCtx, stopClientCtx := client.apiClient(ctx)
+	if nc == nil {
+		client.logger.Debug("Cannot submit event as the Notifications Client is not yet configured")
+		return nil
+	}
+	defer stopClientCtx()
+
 	var (
 		ev       *fetchableEvent
 		eventErr error
@@ -702,9 +1139,10 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 		return nil
 	}
 
-	attributes := client.DefaultRelations
-	return retry.WithBackoff(
-		ctx,
+	attributes := client.defaultRelations()
+
+	err := retry.WithBackoff(
+		clientCtx,
 		func(ctx context.Context) (err error) {
 			for {
 				if err := ev.completeAndUpdate(ctx, attributes); err != nil {
@@ -715,7 +1153,7 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 					return err
 				}
 
-				attributes, err = client.notificationsClient.ProcessEvent(ctx, ev.Event, true)
+				attributes, err = nc.ProcessEvent(ctx, ev.Event, true)
 				if errors.Is(err, source.ErrAttrsNegotiation) {
 					client.logger.Debugw("Icinga Notifications requested more attributes",
 						zap.String("event", ev.Name),
@@ -729,7 +1167,7 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 		backoff.DefaultBackoff,
 		retry.Settings{
 			OnSuccess: func(elapsed time.Duration, attempt uint64, lastErr error) {
-				client.sendHeartbeat(true)
+				client.sendHeartbeat(types.MakeBool(true))
 				telemetry.Stats.NotificationSync.Add(1)
 
 				client.logger.Debugw("Successfully submitted event to Icinga Notifications",
@@ -739,7 +1177,7 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 					zap.Error(lastErr))
 			},
 			OnRetryableError: func(elapsed time.Duration, attempt uint64, err, lastErr error) {
-				client.sendHeartbeat(false)
+				client.sendHeartbeat(types.MakeBool(false))
 
 				if lastErr == nil || err.Error() != lastErr.Error() {
 					client.logger.Errorw("Cannot submit event to Icinga Notifications",
@@ -751,6 +1189,13 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 			},
 		},
 	)
+	if err != nil && clientCtx.Err() != nil && ctx.Err() == nil {
+		client.logger.Debugw("Stopped submitting event as the Icinga Notifications client was replaced",
+			zap.String("event", ev.Name))
+		return nil
+	}
+
+	return err
 }
 
 // SyncExtraStages returns a map of history sync keys to [history.StageFunc] to be used for [history.Sync].
