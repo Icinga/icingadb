@@ -59,22 +59,22 @@ func (ns *NotificationsState) IsValidUnhealthy() bool {
 
 // HA provides high availability and indicates whether a Takeover or Handover must be made.
 type HA struct {
-	state         atomic.Pointer[haState]
-	ctx           context.Context
-	cancelCtx     context.CancelFunc
-	instanceId    types.Binary
-	db            *database.DB
-	environmentMu sync.Mutex
-	environment   *v1.Environment
-	heartbeat     *icingaredis.Heartbeat
-	logger        *logging.Logger
-	responsible   bool
-	handover      chan string
-	takeover      chan string
-	done          chan struct{}
-	errOnce       sync.Once
-	errMu         sync.Mutex
-	err           error
+	state       atomic.Pointer[haState]
+	ctx         context.Context
+	cancelCtx   context.CancelFunc
+	instanceId  types.Binary
+	db          *database.DB
+	environment *v1.Environment
+	endpointId  types.Binary
+	heartbeat   *icingaredis.Heartbeat
+	logger      *logging.Logger
+	responsible bool
+	handover    chan string
+	takeover    chan string
+	done        chan struct{}
+	errOnce     sync.Once
+	err         error
+	mu          sync.Mutex // protects environment, endpointId, and err
 
 	// notificationsHeartbeat is a channel that signals the status of the Icinga Notifications component.
 	//
@@ -130,16 +130,24 @@ func (h *HA) Done() <-chan struct{} {
 
 // Environment returns the current environment.
 func (h *HA) Environment() *v1.Environment {
-	h.environmentMu.Lock()
-	defer h.environmentMu.Unlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	return h.environment
 }
 
+// EndpointID returns the current endpoint ID.
+func (h *HA) EndpointID() types.Binary {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	return h.endpointId
+}
+
 // Err returns an error if Done has been closed and there is an error. Otherwise returns nil.
 func (h *HA) Err() error {
-	h.errMu.Lock()
-	defer h.errMu.Unlock()
+	h.mu.Lock()
+	defer h.mu.Unlock()
 
 	return h.err
 }
@@ -169,9 +177,9 @@ func (h *HA) State() (responsibleTsMilli int64, responsible, otherResponsible bo
 
 func (h *HA) abort(err error) {
 	h.errOnce.Do(func() {
-		h.errMu.Lock()
+		h.mu.Lock()
 		h.err = errors.Wrap(err, "HA aborted")
-		h.errMu.Unlock()
+		h.mu.Unlock()
 
 		h.cancelCtx()
 	})
@@ -222,6 +230,17 @@ func (h *HA) controller() {
 					h.abort(err)
 				}
 
+				h.mu.Lock()
+				if !bytes.Equal(h.endpointId, s.EndpointId) {
+					if h.endpointId.Valid() {
+						h.logger.Warnw("Endpoint ID changed unexpectedly",
+							zap.String("current", h.endpointId.String()),
+							zap.String("new", s.EndpointId.String()))
+					}
+					h.endpointId = s.EndpointId
+				}
+				h.mu.Unlock()
+
 				envId, err := m.EnvironmentID()
 				if err != nil {
 					h.abort(err)
@@ -234,14 +253,14 @@ func (h *HA) controller() {
 							zap.String("new", envId.String()))
 					}
 
-					h.environmentMu.Lock()
+					h.mu.Lock()
 					h.environment = &v1.Environment{
 						EntityWithoutChecksum: v1.EntityWithoutChecksum{IdMeta: v1.IdMeta{
 							Id: envId,
 						}},
 						Name: types.MakeString(envId.String()),
 					}
-					h.environmentMu.Unlock()
+					h.mu.Unlock()
 				}
 
 				select {

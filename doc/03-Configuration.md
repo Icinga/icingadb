@@ -205,20 +205,26 @@ Different URI schemes are possible for the configured URL, depending on how Icin
 * `https`: HTTPS connection. Either `username` and `password`/`password_file` or `cert` and `key` are required. For example: `https://example.com:5680`
 * `unix`: HTTP connection over a Unix Domain Socket. Authentication is based on the operating system user. For example: `unix:///path/to/socket`
 
+Icinga DB synchronizes the Icinga Notifications configuration with the database.
+This allows Icinga Notifications Web to configure this source.
+Any option set in either the YAML or environment variable configuration takes precedence over everything which might be configured in the database.
+To disable a database-bound configuration, set `synchronize_with_database` to `false`.
+
 For YAML configuration, the options are part of the `notifications` dictionary.
 For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_`.
 
-| Option            | Description                                                                                                           |
-|-------------------|-----------------------------------------------------------------------------------------------------------------------|
-| url               | **Optional.** Icinga Notifications API base URL.                                                                      |
-| username          | **Optional.** Icinga Notifications API user for this source.                                                          |
-| password          | **Optional.** Icinga Notifications API user password.                                                                 |
-| password_file     | **Optional.** Icinga Notifications API user password file.                                                            |
-| cert              | **Optional.** TLS client certificate, either file path or PEM-encoded multiline string.                               |
-| key               | **Optional.** TLS client private key, either file path or PEM-encoded multiline string.                               |
-| ca                | **Optional.** TLS CA certificate, either file path or PEM-encoded multiline string.                                   |
-| insecure          | **Optional.** Whether not to verify the peer.                                                                         |
-| default_relations | **Optional.** List of relations as a JSONPath to resolve and include in the events submitted to Icinga Notifications. |
+| Option                    | Description                                                                                                           |
+|---------------------------|-----------------------------------------------------------------------------------------------------------------------|
+| url                       | **Optional.** Icinga Notifications API base URL.                                                                      |
+| username                  | **Optional.** Icinga Notifications API user for this source.                                                          |
+| password                  | **Optional.** Icinga Notifications API user password.                                                                 |
+| password_file             | **Optional.** Icinga Notifications API user password file.                                                            |
+| cert                      | **Optional.** TLS client certificate, either file path or PEM-encoded multiline string.                               |
+| key                       | **Optional.** TLS client private key, either file path or PEM-encoded multiline string.                               |
+| ca                        | **Optional.** TLS CA certificate, either file path or PEM-encoded multiline string.                                   |
+| insecure                  | **Optional.** Whether not to verify the peer.                                                                         |
+| default_relations         | **Optional.** List of relations as a JSONPath to resolve and include in the events submitted to Icinga Notifications. |
+| synchronize_with_database | **Optional.** Synchronize complete Notifications Configuration with the database. Enabled by default.                 |
 
 ## Appendix
 
