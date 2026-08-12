@@ -426,10 +426,7 @@ func (client *Client) buildCommonEvent(
 	}
 
 	var (
-		objectName  string
-		hostName    string
-		serviceName string
-
+		objectName string
 		objectUrl  string
 		objectTags map[string]string
 	)
@@ -437,26 +434,25 @@ func (client *Client) buildCommonEvent(
 	if rel.Host == nil {
 		return nil, errors.New("relations does not contain a host")
 	}
-	hostName = rel.Host.Name
+	objectName = rel.Host.DisplayName
 
 	if serviceId != nil {
 		if len(rel.Services) == 0 {
 			return nil, errors.New("relations does not contain a service")
 		}
-		serviceName = rel.Services[0].Name
+		serviceName := rel.Services[0].Name
 
-		objectName = hostName + "!" + serviceName
+		objectName += ": " + rel.Services[0].DisplayName
 		objectUrl = "/icingadb/service?name=" + utils.RawUrlEncode(serviceName) +
-			"&host.name=" + utils.RawUrlEncode(hostName)
+			"&host.name=" + utils.RawUrlEncode(rel.Host.Name)
 		objectTags = map[string]string{
-			"host":    hostName,
+			"host":    rel.Host.Name,
 			"service": serviceName,
 		}
 	} else {
-		objectName = hostName
-		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(hostName)
+		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(rel.Host.Name)
 		objectTags = map[string]string{
-			"host": hostName,
+			"host": rel.Host.Name,
 		}
 	}
 
