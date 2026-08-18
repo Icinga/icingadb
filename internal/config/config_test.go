@@ -1,10 +1,12 @@
 package config
 
 import (
+	"github.com/caarlos0/env/v11"
 	"github.com/creasty/defaults"
 	"github.com/icinga/icinga-go-library/config"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/notifications/source"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/testutils"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
@@ -183,6 +185,36 @@ retention:
 			},
 		},
 		{
+			Name: "Custom Notifications Config from YAML",
+			Data: testutils.ConfigTestData{
+				Yaml: yamlConfig + `
+notifications:
+  url: http://example.com/
+  username: icingadb
+  password: insecure
+`,
+			},
+			Expected: &Config{
+				Database: database.Config{
+					Host:     "192.0.2.1",
+					Database: "icingadb",
+					User:     "icingadb",
+					Password: "icingadb",
+				},
+				Redis: redis.Config{
+					Host: "2001:db8::1",
+				},
+				Notifications: NotificationsConfig{
+					Config: source.Config{
+						Url:      "http://example.com/",
+						Username: "icingadb",
+						Password: "insecure",
+					},
+					SynchronizeWithDatabase: true,
+				},
+			},
+		},
+		{
 			Name: "Unknown YAML field",
 			Data: testutils.ConfigTestData{
 				Yaml: `unknown: unknown`,
@@ -218,4 +250,30 @@ retention:
 			return actual, err
 		}))
 	}
+}
+
+func TestNotificationsConfig_StaticConfig(t *testing.T) {
+	cfg := NotificationsConfig{
+		Config: source.Config{
+			Url:              "https://example.com:5680",
+			Username:         "icingadb",
+			Password:         "icingadb",
+			TlsOptions:       config.TLS{Insecure: true},
+			DefaultRelations: []string{"$.foo", "$.bar"},
+		},
+	}
+
+	staticConf := cfg.StaticConfig()
+	require.Equal(t, map[string]string{
+		"ICINGADB_NOTIFICATIONS_URL":               "https://example.com:5680",
+		"ICINGADB_NOTIFICATIONS_USERNAME":          "icingadb",
+		"ICINGADB_NOTIFICATIONS_PASSWORD":          "REDACTED",
+		"ICINGADB_NOTIFICATIONS_INSECURE":          "true",
+		"ICINGADB_NOTIFICATIONS_DEFAULT_RELATIONS": "$.foo,$.bar",
+	}, staticConf)
+
+	var cmpCfg Config
+	require.NoError(t, env.ParseWithOptions(&cmpCfg, env.Options{Prefix: "ICINGADB_", Environment: staticConf}))
+	cmpCfg.Notifications.Config.Password = "icingadb" // Reset, as redacted in output
+	require.Equal(t, cfg, cmpCfg.Notifications)
 }

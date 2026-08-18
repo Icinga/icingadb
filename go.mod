@@ -3,6 +3,7 @@ module github.com/icinga/icingadb
 go 1.25.0
 
 require (
+	github.com/caarlos0/env/v11 v11.4.1
 	github.com/creasty/defaults v1.8.0
 	github.com/goccy/go-yaml v1.13.0
 	github.com/google/go-cmp v0.7.0
@@ -25,7 +26,6 @@ require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
-	github.com/caarlos0/env/v11 v11.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect

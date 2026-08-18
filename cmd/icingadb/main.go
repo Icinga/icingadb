@@ -170,18 +170,23 @@ func run() int {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 
 	var notificationsSource *notifications.Client
-	if cfg := cmd.Config.Notifications; cfg.Url != "" {
-		logger.Info("Starting Icinga Notifications source")
-
+	if cfg := cmd.Config.Notifications; cfg.SynchronizeWithDatabase || cfg.Url != "" {
 		notificationsSource, err = notifications.NewNotificationsClient(
 			db,
 			rc,
 			logs.GetChildLogger("notifications"),
 			cfg,
-			ha.NotificationsHeartbeat())
+			ha)
 		if err != nil {
 			logger.Fatalw("Can't create Icinga Notifications client from config", zap.Error(err))
 		}
+
+		go func() {
+			err := notificationsSource.PersistLockedConfigOnce(ctx)
+			if err != nil && !utils.IsContextCanceled(err) {
+				logger.Fatalf("%+v", err)
+			}
+		}()
 	}
 
 	go func() {
@@ -207,6 +212,16 @@ func run() int {
 			case takeoverReason := <-ha.Takeover():
 				logger.WithOptions(logs.ForceLog()).Infow("Taking over", zap.String("reason", takeoverReason))
 
+				if notificationsSource != nil {
+					go func() {
+						logger.Info("Starting Icinga Notifications configuration sync")
+						err := notificationsSource.SynchronizeConfigWithDatabase(hactx)
+						if err != nil && !utils.IsContextCanceled(err) {
+							logger.Fatalf("%+v", err)
+						}
+					}()
+				}
+
 				go func() {
 					for hactx.Err() == nil {
 						synctx, cancelSynctx := context.WithCancel(ha.Environment().NewContext(hactx))
@@ -215,6 +230,10 @@ func run() int {
 						// Runtime updates must wait for initial synchronization to complete.
 						configInitSync := sync.WaitGroup{}
 						stateInitSync := &sync.WaitGroup{}
+
+						// Decided once per sync round, so that everything within agrees on whether Icinga Notifications
+						// is available. A Client becoming configured later cancels synctx and starts a new round.
+						notificationsConfigured := notificationsSource != nil && notificationsSource.IsConfigured()
 
 						// Clear the runtime update streams before starting anything else (rather than after the sync),
 						// otherwise updates may be lost.
@@ -231,11 +250,19 @@ func run() int {
 						})
 
 						g.Go(func() error {
+							var notificationsCh <-chan struct{}
+							if notificationsSource != nil && !notificationsConfigured {
+								notificationsCh = notificationsSource.Configured()
+							}
+
 							select {
 							case <-dump.InProgress():
 								logger.Info("Icinga 2 started a new config dump, waiting for it to complete")
 								cancelSynctx()
-
+								return nil
+							case <-notificationsCh:
+								logger.Info("Icinga Notifications became configured, restarting sync")
+								cancelSynctx()
 								return nil
 							case <-synctx.Done():
 								return synctx.Err()
@@ -270,7 +297,7 @@ func run() int {
 								defer stateInitSync.Done()
 
 								var hook icingadb.DeltaHook
-								if notificationsSource != nil {
+								if notificationsConfigured {
 									hook = notificationsSource.ApplyDelta
 									defer func() {
 										if stateSyncWorkers.Add(-1) == 0 {
@@ -353,7 +380,7 @@ func run() int {
 							logger.Info("Starting state runtime updates sync")
 
 							runtimeUpdatesOpts := []icingadb.RUOption{icingadb.WithAllowParallel()}
-							if notificationsSource != nil {
+							if notificationsConfigured {
 								runtimeUpdatesOpts = append(runtimeUpdatesOpts, icingadb.WithRUUpsert(notificationsSource.Submit))
 							}
 
@@ -374,7 +401,7 @@ func run() int {
 							return ret.Start(synctx)
 						})
 
-						if notificationsSource != nil {
+						if notificationsConfigured {
 							g.Go(func() error {
 								stateInitSync.Wait()
 
