@@ -456,11 +456,8 @@ func (client *Client) buildCommonEvent(
 		}
 	}
 
-	objectId := objectName + fmt.Sprintf("!%d", time.Now().UnixMilli())
-
 	return &fetchableEvent{
 		Event: &event.Event{
-			ID:   objectId,
 			Name: objectName,
 			URL:  objectUrl,
 			Tags: objectTags,
@@ -481,6 +478,9 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostId, serviceId)
 	}
+
+	// build uuid from hostId and serviceId, so that we can identify the event in the future
+	ev.ID = types.UUIDFromBinaries(hostId, serviceId)
 
 	ev.Tags["environment"] = s.EnvironmentId.String()
 	if s.Output.Valid {
