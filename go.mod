@@ -10,7 +10,7 @@ require (
 	github.com/icinga/icinga-go-library v0.9.1-0.20260720105104-6c88850b5909
 	github.com/jessevdk/go-flags v1.6.1
 	github.com/jmoiron/sqlx v1.4.0
-	github.com/mattn/go-sqlite3 v1.14.49
+	github.com/mattn/go-sqlite3 v1.14.50
 	github.com/okzk/sdnotify v0.0.0-20180710141335-d9becc38acbd
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.12.1
