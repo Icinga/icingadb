@@ -102,6 +102,8 @@ vm.overcommit_memory = 1
 
 #### Huge memory footprint and IO usage in large setups
 
+##### Redis® dumps
+
 For large setups, the default Redis® configuration is slightly problematic, since Redis® will try to perpetually save its state
 to the filesystem, a process that gets triggered often enough to make the save process a permanent companion.
 This will increase the memory usage by a factor of two and also cause a troublesome amount of IO.
@@ -125,6 +127,33 @@ save 3600 1 900 100000
 can be used.
 In this example, a dump is performed every hour (3600s) if at least on changes occurred in that time frame
 and every fifteen minutes (900s) if at least 100,000 changes occurred.
+
+##### Redis® memory mappings
+
+In large setups Redis® will allocate a significant number of small memory pieces, which might not fill up the memory itself regarding the pure volume,
+but might exceed the limit of mappings allowed in general.
+This can result in Redis® (most likely the `icingadb-redis` service) dying with this message in the log:
+```
+Out Of Memory allocating n bytes
+```
+(where `n` is some number)
+
+The Linux kernel allows setting the maximum amount of virtual memory mapping via `sysctl`:
+
+```shell
+sysctl vm.max_map_count=1048576
+```
+
+The value of "1048576" (2^20)  _should_ be enough if the default setting of "65536" (2^16, default on some distributions) does not suffice.
+
+To persist this setting across reboots, add the following line to [`sysctl.conf(5)`](https://man7.org/linux/man-pages/man5/sysctl.conf.5.html).
+If your distribution uses systemd, a configuration file under `/etc/sysctl.d/` is required, as described by
+[`systemd-sysctl.service(8)`](https://www.freedesktop.org/software/systemd/man/latest/systemd-sysctl.service.html) and
+[`sysctl.d(5)`](https://man7.org/linux/man-pages/man5/sysctl.d.5.html).
+
+```shell
+vm.max_map_count = 1048576
+```
 
 #### Redis® Access Control List
 
