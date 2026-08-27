@@ -299,7 +299,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 						client.logger.Errorw("Failed to update incident status",
 							zap.String("object_type", types.Name(s)),
 							zap.Duration("elapsed", elapsed),
-							zap.Error(lastErr))
+							zap.Error(err))
 					}
 				},
 			},
