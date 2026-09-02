@@ -154,6 +154,11 @@ redis:
 	#   For example: unix:///path/to/socket
 #  url: http://localhost:5680
 
+  # Base URL of the Icinga Web 2 setup in front of this Icinga DB. It is used to build the absolute object URLs
+  # transmitted with each event, which Icinga Notifications passes on to the notified contacts. This must be an
+  # absolute URL. If left empty, events are submitted without an object URL.
+#  icingaweb2_url: https://example.com/icingaweb2
+
   # Username to authenticate against the Icinga Notifications API.
 #  username: icingadb
 

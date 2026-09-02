@@ -443,14 +443,20 @@ func (client *Client) buildCommonEvent(
 		serviceName := rel.Services[0].Name
 
 		objectName += ": " + rel.Services[0].DisplayName
-		objectUrl = "/icingadb/service?name=" + utils.RawUrlEncode(serviceName) +
-			"&host.name=" + utils.RawUrlEncode(rel.Host.Name)
+		if client.Icingaweb2UrlParsed != nil {
+			objectUrl = client.Icingaweb2UrlParsed.JoinPath("/icingadb/service").String()
+			objectUrl += "?name=" + utils.RawUrlEncode(serviceName) +
+				"&host.name=" + utils.RawUrlEncode(rel.Host.Name)
+		}
 		objectTags = map[string]string{
 			"host":    rel.Host.Name,
 			"service": serviceName,
 		}
 	} else {
-		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(rel.Host.Name)
+		if client.Icingaweb2UrlParsed != nil {
+			objectUrl = client.Icingaweb2UrlParsed.JoinPath("/icingadb/host").String()
+			objectUrl += "?name=" + utils.RawUrlEncode(rel.Host.Name)
+		}
 		objectTags = map[string]string{
 			"host": rel.Host.Name,
 		}
