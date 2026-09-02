@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/caarlos0/env/v11"
@@ -42,6 +43,14 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+var (
+	// errClientReset is used as a cancellation cause when replacing or removing the Notifications client.
+	errClientReset = errors.New("notifications client was reset")
+
+	// errNonVolatileNonHardState is returned when a non-hard state change is attempted to be submitted for a non-volatile checkable.
+	errNonVolatileNonHardState = errors.New("non-hard state change for non-volatile checkable")
+)
+
 // fetchableEvent wraps both event.Event and relations, allowing to enrich the Event based on Notifications feedback.
 type fetchableEvent struct {
 	*event.Event
@@ -67,6 +76,21 @@ func (ev *fetchableEvent) completeAndUpdate(ctx context.Context, attributes []st
 	return nil
 }
 
+// apiClientSession holds the Icinga Notifications API client, its runtime config and the associated ctx and canceler.
+//
+// The ctx is canceled whenever an atomic swap of the current apiClientSession occurs, e.g., when the client is
+// reconfigured or unconfigured. This allows any ongoing operations to be aborted and cleaned up. The canceler
+// must always be called to release the associated resources.
+type apiClientSession struct {
+	// cfg is the (?runtime) config this session was created with.
+	// Always populated, even if the client is unconfigured (client == nil).
+	cfg config.NotificationsConfig
+
+	client *source.Client          // The Icinga Notifications API client. Nil if it is unconfigured (cfg.Url == "").
+	ctx    context.Context         // The associated ctx of the client. (client != nil) => (ctx != nil)
+	cancel context.CancelCauseFunc // The canceler for the associated ctx. (ctx != nil) => (cancel != nil)
+}
+
 // Client is an Icinga Notifications compatible client implementation to push events to Icinga Notifications.
 //
 // A new Client should be created by the NewNotificationsClient function. New history entries can be submitted by
@@ -79,17 +103,20 @@ type Client struct {
 	// initialConfig is the static YAML and/or env configuration. Used in Client.SynchronizeConfigWithDatabase.
 	initialConfig config.NotificationsConfig
 
-	// runtimeMu protects runtimeConfig, notificationsClient and configuredCh.
-	runtimeMu sync.RWMutex
-	// runtimeConfig is the currently loaded configuration.
-	runtimeConfig config.NotificationsConfig
-	// notificationsClient is the API client, configured via SynchronizeConfigWithDatabase.
-	notificationsClient *source.Client
-	// clientCtx is canceled when notificationsClient is replaced or removed; see Client.apiClient.
-	clientCtx    context.Context
-	clientCancel context.CancelFunc
-	// configuredCh is closed while notificationsClient is available; see Client.setClient.
-	configuredCh chan struct{}
+	// currentAPIClient holds the current Icinga Notifications API client session.
+	//
+	// The client might get configured and unconfigured multiple times, so this pointer is used to atomically swap
+	// the client and its configuration whenever it is re-configured. The context of the previous client (if any)
+	// is canceled to abort any ongoing ops. If the client is unconfigured, the pointer holds a nil client.
+	currentAPIClient atomic.Pointer[apiClientSession]
+
+	// reconfiguredCh delivers a signal whenever the Icinga Notifications API client is reconfigured.
+	//
+	// The client might get configured and unconfigured multiple times, so this channel delivers an event each
+	// time the client is re-configured to inform the main sync loop to restart its work, so the config delta
+	// can be re-applied. If DB synchronization is disabled, this will block waiters forever and never deliver
+	// a signal (won't even be initialized).
+	reconfiguredCh chan struct{}
 
 	// persistedLockedConfigCh is closed by Client.PersistLockedConfigOnce after it has finished.
 	persistedLockedConfigCh chan struct{}
@@ -130,97 +157,92 @@ func NewNotificationsClient(
 		initialConfig: cfg,
 
 		persistedLockedConfigCh: make(chan struct{}),
-		configuredCh:            make(chan struct{}),
 
 		ha: ha,
 	}
+	// Init the atomic value with a valid pointer to simplify its swap and load operations.
+	client.currentAPIClient.Store(&apiClientSession{cfg: cfg})
 
 	if !cfg.SynchronizeWithDatabase {
-		nc, err := source.NewClient(cfg.Config, "Icinga DB "+internal.Version.Version)
-		if err != nil {
+		if _, err := client.exchangeAPIClientSession(cfg, true); err != nil {
 			return nil, err
 		}
-		client.setClient(cfg, nc)
+	} else {
+		client.reconfiguredCh = make(chan struct{})
 	}
 
 	return client, nil
 }
 
-// setClient stores the runtime configuration together with its API client and returns the previous client.
+// exchangeAPIClientSession exchanges the current Icinga Notifications API client session with a new one.
 //
-// Passing a nil client marks this Client as unconfigured, reopening the channel returned by Client.Configured.
-// In both cases, the context of the previous client is canceled, aborting all its pending requests.
-func (client *Client) setClient(cfg config.NotificationsConfig, nc *source.Client) *source.Client {
-	client.runtimeMu.Lock()
-	defer client.runtimeMu.Unlock()
-
-	prev := client.notificationsClient
-	if client.clientCancel != nil {
-		client.clientCancel()
-	}
-
-	client.runtimeConfig = cfg
-	client.notificationsClient = nc
-	client.clientCtx, client.clientCancel = nil, nil
-	if nc != nil {
-		client.clientCtx, client.clientCancel = context.WithCancel(context.Background())
-	}
-
-	switch {
-	case nc != nil && prev == nil:
-		close(client.configuredCh)
-	case nc == nil && prev != nil:
-		client.configuredCh = make(chan struct{})
-	}
-
-	return prev
-}
-
-// Configured returns a channel being closed as soon as the Icinga Notifications API client became available.
+// This method atomically swaps the current apiClientSession with a newly created one. If 'withClient' is
+// true, a new Icinga Notifications API client is created and associated with the new session. The context
+// of the previous client (if any) is canceled to abort any ongoing operations. Also, if the client was
+// previously unconfigured and is now being configured, a signal is sent to the reconfiguredCh channel to
+// inform the sync loop to restart its work, but may be dropped if no one is listening.
 //
-// As the client might become unavailable again, the returned channel is only a snapshot of the current state.
-func (client *Client) Configured() <-chan struct{} {
-	client.runtimeMu.RLock()
-	defer client.runtimeMu.RUnlock()
+// Returns the previous apiClientSession and any error encountered while creating the new client.
+func (client *Client) exchangeAPIClientSession(cfg config.NotificationsConfig, withClient bool) (*apiClientSession, error) {
+	newSession := &apiClientSession{cfg: cfg}
+	if withClient {
+		nc, err := source.NewClient(cfg.Config, "Icinga DB "+internal.Version.Version)
+		if err != nil {
+			return nil, err
+		}
+		newSession.client = nc
+		newSession.ctx, newSession.cancel = context.WithCancelCause(context.Background())
+	}
 
-	return client.configuredCh
-}
+	prev := client.currentAPIClient.Swap(newSession)
+	if prev.cancel != nil {
+		prev.cancel(errClientReset)
+	}
 
-// IsConfigured reports whether the Icinga Notifications API client is available.
-func (client *Client) IsConfigured() bool {
-	client.runtimeMu.RLock()
-	defer client.runtimeMu.RUnlock()
+	if client.reconfiguredCh != nil && withClient && prev.client == nil {
+		// We don't know how long the client was in an unconfigured state, so we need to signal the
+		// main sync loop to restart its work again, so that the config delta can be re-applied.
+		select {
+		case client.reconfiguredCh <- struct{}{}:
+		default:
+			// Main sync loop is not listening, probably due to an ongoing HA handover/takeover?
+			// Doesn't matter, drop the signal.
+		}
+	}
 
-	return client.notificationsClient != nil
+	return prev, nil
 }
 
 // apiClient returns the currently configured Icinga Notifications API client along with a derived context.
 //
-// The returned context is canceled as soon as the returned client is being replaced or removed, aborting all its
-// pending requests. Its cancel function must always be called to release the associated resources.
+// The returned context is canceled whenever the current apiClientSession is replaced, e.g., when it is reconfigured
+// or unconfigured, the provided ctx is canceled, or when the returned canceler is called, whichever happens first.
+// If a non-nil client is returned, the canceler must always be called to release the associated resources.
 //
-// If this client is not configured, a nil client is returned.
+// If the client is unconfigured, nil values are returned for all three return values.
 func (client *Client) apiClient(ctx context.Context) (*source.Client, context.Context, context.CancelFunc) {
-	client.runtimeMu.RLock()
-	nc, clientCtx := client.notificationsClient, client.clientCtx
-	client.runtimeMu.RUnlock()
-
-	if nc == nil {
-		return nil, ctx, func() {}
+	current := client.currentAPIClient.Load()
+	if current.client == nil {
+		return nil, nil, nil
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
-	stopAfterFunc := context.AfterFunc(clientCtx, cancel)
+	ctx, cancel := context.WithCancelCause(ctx)
+	stopAfterFunc := context.AfterFunc(current.ctx, func() { cancel(context.Cause(current.ctx)) })
 
-	return nc, ctx, func() { stopAfterFunc(); cancel() }
+	return current.client, ctx, func() { stopAfterFunc(); cancel(nil) }
 }
+
+// ReconfiguredCh returns a channel that delivers a signal whenever the Icinga Notifications API client is reconfigured.
+//
+// If DB synchronization is disabled, a nil channel is returned and waiters will block forever.
+func (client *Client) ReconfiguredCh() <-chan struct{} { return client.reconfiguredCh }
+
+// IsConfigured reports whether the Icinga Notifications API client is available.
+func (client *Client) IsConfigured() bool { return client.currentAPIClient.Load().client != nil }
 
 // defaultRelations returns the currently configured default relations.
 func (client *Client) defaultRelations() []string {
-	client.runtimeMu.RLock()
-	defer client.runtimeMu.RUnlock()
-
-	return client.runtimeConfig.DefaultRelations
+	return client.currentAPIClient.Load().cfg.DefaultRelations
 }
 
 // endpointId returns this node's endpoint ID or the null endpoint ID, if unconfigured.
@@ -450,30 +472,20 @@ func (client *Client) SynchronizeConfigWithDatabase(ctx context.Context) error {
 			}
 		}
 
-		client.runtimeMu.RLock()
-		unchanged := reflect.DeepEqual(newConf, client.runtimeConfig)
-		client.runtimeMu.RUnlock()
-
-		if unchanged {
+		if reflect.DeepEqual(newConf, client.currentAPIClient.Load().cfg) {
 			return
 		}
 
-		var nc *source.Client
-		if newConf.Url != "" {
-			newClient, err := source.NewClient(newConf.Config, "Icinga DB "+internal.Version.Version)
-			if err != nil {
-				client.logger.Errorw("Cannot create new Notifications client from database configuration", zap.Error(err))
-				return
-			}
-			nc = newClient
+		prev, err := client.exchangeAPIClientSession(newConf, newConf.Url != "")
+		if err != nil {
+			client.logger.Errorw("Cannot create new Notifications client from database configuration", zap.Error(err))
+			return
 		}
 
-		prev := client.setClient(newConf, nc)
-
 		switch {
-		case nc != nil:
+		case newConf.Url != "":
 			client.logger.Info("Synchronized new Icinga Notifications configuration from the database")
-		case prev != nil:
+		case prev.client != nil:
 			client.sendHeartbeatBlocking(ctx, types.Bool{})
 			client.logger.Info("Stopped Icinga Notifications client as no URL is configured anymore")
 		default:
@@ -528,18 +540,18 @@ func (client *Client) ClearIncidents() {
 // errors encountered during the submission of events to the Icinga Notifications API and continue processing the
 // remaining events, but never returns an error for those.
 func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) error {
-	nc, clientCtx, stopClientCtx := client.apiClient(ctx)
-	if nc == nil {
-		client.logger.Debug("Cannot apply delta as the Notifications Client is not yet configured")
-		return nil
-	}
-	defer stopClientCtx()
-
 	switch delta.Subject.Entity().(type) {
 	case *v1.HostState, *v1.ServiceState:
 	default:
 		return nil
 	}
+
+	nc, ctx, cancel := client.apiClient(ctx)
+	if nc == nil {
+		client.logger.Debug("Cannot apply delta as the Notifications Client is not yet configured")
+		return nil
+	}
+	defer cancel()
 
 	func() {
 		client.incidentsMu.Lock()
@@ -550,7 +562,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		if client.incidentsByObjId != nil {
 			return
 		}
-		client.incidentsByObjId = client.retrieveEnvironmentIncidents(clientCtx, nc)
+		client.incidentsByObjId = client.retrieveEnvironmentIncidents(ctx, nc)
 	}()
 	if len(client.incidentsByObjId) == 0 {
 		return nil
@@ -560,8 +572,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		len(delta.RedisSnapshot),
 		delta.Subject.Name())
 
-	parentCtx := ctx
-	g, ctx := errgroup.WithContext(clientCtx)
+	g, ctx := errgroup.WithContext(ctx)
 	pairs, errs := client.redisClient.HMYield(
 		ctx,
 		fmt.Sprintf("icinga:%s", strcase.Delimited(types.Name(delta.Subject.Entity()), ':')),
@@ -641,7 +652,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 	})
 
 	err := g.Wait()
-	if err != nil && clientCtx.Err() != nil && parentCtx.Err() == nil {
+	if errors.Is(context.Cause(ctx), errClientReset) {
 		client.logger.Debug("Stopped applying delta as the Icinga Notifications client was replaced")
 		return nil
 	}
@@ -720,7 +731,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 			return ctx.Err()
 
 		case tick := <-ticker.C:
-			nc, clientCtx, stopClientCtx := client.apiClient(ctx)
+			nc, ctx, cancel := client.apiClient(ctx)
 			if nc == nil {
 				client.logger.Debug("Cannot sync check outputs as the Notifications Client is not yet configured")
 				continue
@@ -728,7 +739,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 
 			hostIncidents := make(map[string]source.Incident)
 			serviceIncidents := make(map[string]source.Incident)
-			for id, incident := range client.retrieveEnvironmentIncidents(clientCtx, nc) {
+			for id, incident := range client.retrieveEnvironmentIncidents(ctx, nc) {
 				if _, exists := incident.ObjectTags["service"]; exists {
 					serviceIncidents[id] = incident
 				} else {
@@ -745,7 +756,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 			if len(hostIncidents) > 0 {
 				wg.Go(func() {
 					_ = streamRedisHashObjects(ctx, client.redisClient, "icinga:host:state", func(hs *v1.HostState, _ string) error {
-						return modify(clientCtx, nc, &hs.State, hostIncidents[hs.HostId.String()].ObjectTags)
+						return modify(ctx, nc, &hs.State, hostIncidents[hs.HostId.String()].ObjectTags)
 					}, slices.Collect(maps.Keys(hostIncidents))...)
 				})
 			}
@@ -753,12 +764,12 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 			if len(serviceIncidents) > 0 {
 				wg.Go(func() {
 					_ = streamRedisHashObjects(ctx, client.redisClient, "icinga:service:state", func(ss *v1.ServiceState, _ string) error {
-						return modify(clientCtx, nc, &ss.State, serviceIncidents[ss.ServiceId.String()].ObjectTags)
+						return modify(ctx, nc, &ss.State, serviceIncidents[ss.ServiceId.String()].ObjectTags)
 					}, slices.Collect(maps.Keys(serviceIncidents))...)
 				})
 			}
 			wg.Wait()
-			stopClientCtx()
+			cancel()
 
 			lastSync = tick
 			// In case the sync took a long time, the next tick might come immediately,
@@ -812,7 +823,7 @@ func (client *Client) retrieveEnvironmentIncidents(ctx context.Context, nc *sour
 	return incidentsByID
 }
 
-// sendHeartbeat sends a heartbeat signal to the HA controller via the heartbeatOutCh channel.
+// sendHeartbeat sends a heartbeat signal to the HA controller.
 //
 // The signal is dropped if this Client is unconfigured or if the HA controller is currently not listening.
 func (client *Client) sendHeartbeat(alive types.Bool) {
@@ -898,9 +909,6 @@ func (client *Client) buildCommonEvent(
 		relations: rel,
 	}, nil
 }
-
-// errNonVolatileNonHardState is returned when a non-hard state change is attempted to be submitted for a non-volatile checkable.
-var errNonVolatileNonHardState = errors.New("non-hard state change for non-volatile checkable")
 
 // buildStateEvent builds a fully initialized event.Event from a state history entry.
 //
@@ -1068,12 +1076,12 @@ func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v
 // Note that this function is used as [icingadb.RUUpsertFunc] for the runtime updates pipeline, so its signature must
 // match the [icingadb.RUUpsertFunc] type.
 func (client *Client) Submit(ctx context.Context, entity database.Entity) error {
-	nc, clientCtx, stopClientCtx := client.apiClient(ctx)
+	nc, ctx, cancel := client.apiClient(ctx)
 	if nc == nil {
 		client.logger.Debug("Cannot submit event as the Notifications Client is not yet configured")
 		return nil
 	}
-	defer stopClientCtx()
+	defer cancel()
 
 	var (
 		ev       *fetchableEvent
@@ -1142,7 +1150,7 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 	attributes := client.defaultRelations()
 
 	err := retry.WithBackoff(
-		clientCtx,
+		ctx,
 		func(ctx context.Context) (err error) {
 			for {
 				if err := ev.completeAndUpdate(ctx, attributes); err != nil {
@@ -1189,7 +1197,7 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 			},
 		},
 	)
-	if err != nil && clientCtx.Err() != nil && ctx.Err() == nil {
+	if errors.Is(context.Cause(ctx), errClientReset) {
 		client.logger.Debugw("Stopped submitting event as the Icinga Notifications client was replaced",
 			zap.String("event", ev.Name))
 		return nil

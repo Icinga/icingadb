@@ -254,9 +254,9 @@ func run() int {
 						})
 
 						g.Go(func() error {
-							var notificationsCh <-chan struct{}
-							if notificationsSource != nil && !notificationsConfigured {
-								notificationsCh = notificationsSource.Configured()
+							var notificationsReconfiguredCh <-chan struct{}
+							if notificationsSource != nil {
+								notificationsReconfiguredCh = notificationsSource.ReconfiguredCh()
 							}
 
 							select {
@@ -264,8 +264,8 @@ func run() int {
 								logger.Info("Icinga 2 started a new config dump, waiting for it to complete")
 								cancelSynctx()
 								return nil
-							case <-notificationsCh:
-								logger.Info("Icinga Notifications became configured, restarting sync")
+							case <-notificationsReconfiguredCh:
+								logger.Info("Icinga Notifications component has been reconfigured, restarting sync")
 								cancelSynctx()
 								return nil
 							case <-synctx.Done():
