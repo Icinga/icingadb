@@ -8,14 +8,19 @@ import (
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icinga-go-library/types"
+	"strings"
 	"time"
 )
 
 // CleanupStmt defines information needed to compose cleanup statements.
+//
+// When multiple Columns are given, COALESCE is being applied, returning the
+// first non NULL column. Thus, start by supplying the timestamp column expected
+// to appear later, e.g., remove_time before entry_time.
 type CleanupStmt struct {
-	Table  string
-	PK     string
-	Column string
+	Table   string
+	PK      string
+	Columns []string
 }
 
 // CleanupOlderThan deletes all rows with the specified statement that are older than the given time.
@@ -78,15 +83,20 @@ func (stmt *CleanupStmt) CleanupOlderThan(
 
 // build assembles the cleanup statement for the specified database driver with the given limit.
 func (stmt *CleanupStmt) build(driverName string, limit uint64) string {
+	if len(stmt.Columns) == 0 {
+		panic("CleanupStmt.Columns must not be empty")
+	}
+	timeCol := "COALESCE(" + strings.Join(stmt.Columns, ",") + ")"
+
 	switch driverName {
 	case database.MySQL:
 		return fmt.Sprintf(`DELETE FROM %[1]s WHERE environment_id = :environment_id AND %[2]s < :time LIMIT %[3]d`,
-			stmt.Table, stmt.Column, limit)
+			stmt.Table, timeCol, limit)
 	case database.PostgreSQL:
 		return fmt.Sprintf(`WITH rows AS (
 SELECT %[1]s FROM %[2]s WHERE environment_id = :environment_id AND %[3]s < :time LIMIT %[4]d
 )
-DELETE FROM %[2]s WHERE %[1]s IN (SELECT %[1]s FROM rows)`, stmt.PK, stmt.Table, stmt.Column, limit)
+DELETE FROM %[2]s WHERE %[1]s IN (SELECT %[1]s FROM rows)`, stmt.PK, stmt.Table, timeCol, limit)
 	default:
 		panic(fmt.Sprintf("invalid database type %s", driverName))
 	}
