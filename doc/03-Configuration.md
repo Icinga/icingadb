@@ -205,12 +205,18 @@ Different URI schemes are possible for the configured URL, depending on how Icin
 * `https`: HTTPS connection. Either `username` and `password`/`password_file` or `cert` and `key` are required. For example: `https://example.com:5680`
 * `unix`: HTTP connection over a Unix Domain Socket. Authentication is based on the operating system user. For example: `unix:///path/to/socket`
 
+Each event is submitted with a URL pointing at the affected host or service in Icinga Web 2, which Icinga Notifications
+passes on to the notified contacts. Since Icinga Notifications does not know where your Icinga Web 2 lives, this URL has
+to be absolute, which is what `icingaweb2_url` is for. Leaving it empty is allowed and results in events without an
+object URL, so the notified contacts get no link to follow.
+
 For YAML configuration, the options are part of the `notifications` dictionary.
 For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_`.
 
 | Option            | Description                                                                                                           |
 |-------------------|-----------------------------------------------------------------------------------------------------------------------|
 | url               | **Optional.** Icinga Notifications API base URL.                                                                      |
+| icingaweb2_url    | **Optional.** Base URL of your Icinga Web 2, e.g. `https://example.com/icingaweb2`. Must be absolute.                  |
 | username          | **Optional.** Icinga Notifications API user for this source.                                                          |
 | password          | **Optional.** Icinga Notifications API user password.                                                                 |
 | password_file     | **Optional.** Icinga Notifications API user password file.                                                            |

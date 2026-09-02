@@ -456,6 +456,15 @@ func (client *Client) buildCommonEvent(
 		}
 	}
 
+	// Icinga Notifications hands the object URL to the notified contacts and rejects a relative
+	// reference, so it has to be absolute. Without a configured Icinga Web 2 URL there is nothing
+	// to resolve it against, hence the event is submitted without an object URL at all.
+	if client.Icingaweb2Url != "" {
+		objectUrl = client.Icingaweb2Url + objectUrl
+	} else {
+		objectUrl = ""
+	}
+
 	objectId := objectName + fmt.Sprintf("!%d", time.Now().UnixMilli())
 
 	return &fetchableEvent{

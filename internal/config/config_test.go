@@ -5,6 +5,7 @@ import (
 	"github.com/icinga/icinga-go-library/config"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
+	"github.com/icinga/icinga-go-library/notifications/source"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/testutils"
 	"github.com/icinga/icingadb/pkg/icingadb/history"
@@ -181,6 +182,78 @@ retention:
 					Host: "2001:db8::1",
 				},
 			},
+		},
+		{
+			Name: "Notifications from YAML",
+			Data: testutils.ConfigTestData{
+				Yaml: yamlConfig + `
+notifications:
+  url: http://localhost:5680
+  username: icingadb
+  password: insecureinsecure
+  icingaweb2_url: https://example.com/icingaweb2/
+`,
+			},
+
+			Expected: &Config{
+				Database: database.Config{
+					Host:     "192.0.2.1",
+					Database: "icingadb",
+					User:     "icingadb",
+					Password: "icingadb",
+				},
+				Redis: redis.Config{
+					Host: "2001:db8::1",
+				},
+				Notifications: source.Config{
+					Url:           "http://localhost:5680",
+					Username:      "icingadb",
+					Password:      "insecureinsecure",
+					Icingaweb2Url: "https://example.com/icingaweb2",
+				},
+			},
+		},
+		{
+			Name: "Notifications from Env",
+			Data: testutils.ConfigTestData{
+				Yaml: yamlConfig,
+				Env: map[string]string{
+					"ICINGADB_NOTIFICATIONS_URL":            "http://localhost:5680",
+					"ICINGADB_NOTIFICATIONS_USERNAME":       "icingadb",
+					"ICINGADB_NOTIFICATIONS_PASSWORD":       "insecureinsecure",
+					"ICINGADB_NOTIFICATIONS_ICINGAWEB2_URL": "https://example.com/icingaweb2",
+				},
+			},
+			Expected: &Config{
+				Database: database.Config{
+					Host:     "192.0.2.1",
+					Database: "icingadb",
+					User:     "icingadb",
+					Password: "icingadb",
+				},
+				Redis: redis.Config{
+					Host: "2001:db8::1",
+				},
+				Notifications: source.Config{
+					Url:           "http://localhost:5680",
+					Username:      "icingadb",
+					Password:      "insecureinsecure",
+					Icingaweb2Url: "https://example.com/icingaweb2",
+				},
+			},
+		},
+		{
+			Name: "Relative icingaweb2_url",
+			Data: testutils.ConfigTestData{
+				Yaml: yamlConfig + `
+notifications:
+  url: http://localhost:5680
+  username: icingadb
+  password: insecureinsecure
+  icingaweb2_url: /icingaweb2
+`,
+			},
+			Error: testutils.ErrorContains("icingaweb2_url has to be an absolute URL"),
 		},
 		{
 			Name: "Unknown YAML field",
