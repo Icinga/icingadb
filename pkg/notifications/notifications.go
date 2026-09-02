@@ -443,26 +443,23 @@ func (client *Client) buildCommonEvent(
 		serviceName := rel.Services[0].Name
 
 		objectName += ": " + rel.Services[0].DisplayName
-		objectUrl = "/icingadb/service?name=" + utils.RawUrlEncode(serviceName) +
-			"&host.name=" + utils.RawUrlEncode(rel.Host.Name)
+		if client.Icingaweb2UrlParsed != nil {
+			objectUrl = client.Icingaweb2UrlParsed.JoinPath("/icingadb/service").String()
+			objectUrl += "?name=" + utils.RawUrlEncode(serviceName) +
+				"&host.name=" + utils.RawUrlEncode(rel.Host.Name)
+		}
 		objectTags = map[string]string{
 			"host":    rel.Host.Name,
 			"service": serviceName,
 		}
 	} else {
-		objectUrl = "/icingadb/host?name=" + utils.RawUrlEncode(rel.Host.Name)
+		if client.Icingaweb2UrlParsed != nil {
+			objectUrl = client.Icingaweb2UrlParsed.JoinPath("/icingadb/host").String()
+			objectUrl += "?name=" + utils.RawUrlEncode(rel.Host.Name)
+		}
 		objectTags = map[string]string{
 			"host": rel.Host.Name,
 		}
-	}
-
-	// Icinga Notifications hands the object URL to the notified contacts and rejects a relative
-	// reference, so it has to be absolute. Without a configured Icinga Web 2 URL there is nothing
-	// to resolve it against, hence the event is submitted without an object URL at all.
-	if client.Icingaweb2Url != "" {
-		objectUrl = client.Icingaweb2Url + objectUrl
-	} else {
-		objectUrl = ""
 	}
 
 	objectId := objectName + fmt.Sprintf("!%d", time.Now().UnixMilli())

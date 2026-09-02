@@ -216,7 +216,7 @@ For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_
 | Option            | Description                                                                                                           |
 |-------------------|-----------------------------------------------------------------------------------------------------------------------|
 | url               | **Optional.** Icinga Notifications API base URL.                                                                      |
-| icingaweb2_url    | **Optional.** Base URL of your Icinga Web 2, e.g. `https://example.com/icingaweb2`. Must be absolute.                  |
+| icingaweb2_url    | **Optional.** Base URL of your Icinga Web 2, e.g. `https://example.com/icingaweb2`. Must be absolute.                 |
 | username          | **Optional.** Icinga Notifications API user for this source.                                                          |
 | password          | **Optional.** Icinga Notifications API user password.                                                                 |
 | password_file     | **Optional.** Icinga Notifications API user password file.                                                            |
