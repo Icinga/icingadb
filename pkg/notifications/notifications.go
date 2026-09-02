@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/google/uuid"
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
@@ -920,11 +921,9 @@ func (client *Client) buildCommonEvent(
 		}
 	}
 
-	objectId := objectName + fmt.Sprintf("!%d", time.Now().UnixMilli())
-
 	return &fetchableEvent{
 		Event: &event.Event{
-			ID:   objectId,
+			ID:   types.MakeUUID(uuid.New()), // build a random uuid until https://github.com/Icinga/icingadb/issues/1112 is fixed
 			Name: objectName,
 			URL:  objectUrl,
 			Tags: objectTags,
