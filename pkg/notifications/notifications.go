@@ -117,6 +117,8 @@ type Client struct {
 	// time the client is re-configured to inform the main sync loop to restart its work, so the config delta
 	// can be re-applied. If DB synchronization is disabled, this will block waiters forever and never deliver
 	// a signal (won't even be initialized).
+	//
+	// This channel is buffered with a capacity of one, mitigating potential races in the main HA loop.
 	reconfiguredCh chan struct{}
 
 	// persistedLockedConfigCh is closed by Client.PersistLockedConfigOnce after it has finished.
@@ -169,7 +171,7 @@ func NewNotificationsClient(
 			return nil, err
 		}
 	} else {
-		client.reconfiguredCh = make(chan struct{})
+		client.reconfiguredCh = make(chan struct{}, 1)
 	}
 
 	return client, nil
@@ -180,7 +182,7 @@ func NewNotificationsClient(
 // This method atomically swaps the current apiClientSession with a newly created one. If 'withClient' is
 // true, a new Icinga Notifications API client is created and associated with the new session. The context
 // of the previous client (if any) is canceled to abort any ongoing operations. Also, a signal is sent to the
-// reconfiguredCh channel to inform the sync loop to restart its work, but may be dropped if no one is listening.
+// reconfiguredCh channel to inform the sync loop to restart its work.
 //
 // Returns the previous apiClientSession and any error encountered while creating the new client.
 func (client *Client) exchangeAPIClientSession(cfg config.NotificationsConfig, withClient bool) (*apiClientSession, error) {
@@ -205,8 +207,7 @@ func (client *Client) exchangeAPIClientSession(cfg config.NotificationsConfig, w
 		select {
 		case client.reconfiguredCh <- struct{}{}:
 		default:
-			// Main sync loop is not listening, probably due to an ongoing HA handover/takeover?
-			// Doesn't matter, drop the signal.
+			// There is already a buffered signal; the main HA loop is going to restart anyway.
 		}
 	}
 
