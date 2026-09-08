@@ -126,19 +126,11 @@ func flattenCustomvars(ctx context.Context, g *errgroup.Group, cvs <-chan databa
 
 						select {
 						case flatCustomvars <- &CustomvarFlat{
-							CustomvarMeta: CustomvarMeta{
-								EntityWithoutChecksum: EntityWithoutChecksum{
-									IdMeta: IdMeta{
-										// TODO(el): Schema comment is wrong.
-										// Without customvar.Id we would produce duplicate keys here.
-										Id: utils.Checksum(objectpacker.MustPackSlice(customvar.EnvironmentId, customvar.Id, flatname, fv)),
-									},
-								},
-								EnvironmentMeta: EnvironmentMeta{
-									EnvironmentId: customvar.EnvironmentId,
-								},
-								CustomvarId: customvar.Id,
-							},
+							// TODO(el): Schema comment is wrong.
+							// Without customvar.Id we would produce duplicate keys here.
+							Id:               utils.Checksum(objectpacker.MustPackSlice(customvar.EnvironmentId, customvar.Id, flatname, fv)),
+							EnvironmentId:    customvar.EnvironmentId,
+							CustomvarId:      customvar.Id,
 							Flatname:         flatname,
 							FlatnameChecksum: utils.Checksum(flatname),
 							Flatvalue:        flatvalue,

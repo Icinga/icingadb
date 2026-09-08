@@ -20,25 +20,25 @@ func TestFlappingEventTime_Value(t *testing.T) {
 		{name: "nil-history"},
 		{
 			name:  "bad-event-type",
-			input: &HistoryFlapping{HistoryMeta: HistoryMeta{EventType: "bad"}, StartTime: s, EndTime: e},
+			input: &HistoryFlapping{EventType: "bad", StartTime: s, EndTime: e},
 		},
 		{
 			name:   "start",
-			input:  &HistoryFlapping{HistoryMeta: HistoryMeta{EventType: "flapping_start"}, StartTime: s, EndTime: e},
+			input:  &HistoryFlapping{EventType: "flapping_start", StartTime: s, EndTime: e},
 			output: int64(12345),
 		},
 		{
 			name:   "end",
-			input:  &HistoryFlapping{HistoryMeta: HistoryMeta{EventType: "flapping_end"}, StartTime: s, EndTime: e},
+			input:  &HistoryFlapping{EventType: "flapping_end", StartTime: s, EndTime: e},
 			output: int64(67890),
 		},
 		{
 			name:  "start-nil",
-			input: &HistoryFlapping{HistoryMeta: HistoryMeta{EventType: "flapping_start"}, EndTime: e},
+			input: &HistoryFlapping{EventType: "flapping_start", EndTime: e},
 		},
 		{
 			name:  "end-nil",
-			input: &HistoryFlapping{HistoryMeta: HistoryMeta{EventType: "flapping_end"}, StartTime: s},
+			input: &HistoryFlapping{EventType: "flapping_end", StartTime: s},
 		},
 	}
 

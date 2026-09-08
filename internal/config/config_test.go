@@ -254,13 +254,11 @@ notifications:
 
 func TestNotificationsConfig_StaticConfig(t *testing.T) {
 	cfg := NotificationsConfig{
-		Config: source.Config{
-			Url:              "https://example.com:5680",
-			Username:         "icingadb",
-			Password:         "icingadb",
-			TlsOptions:       config.TLS{Insecure: true},
-			DefaultRelations: []string{"$.foo", "$.bar"},
-		},
+		Url:              "https://example.com:5680",
+		Username:         "icingadb",
+		Password:         "icingadb",
+		TlsOptions:       config.TLS{Insecure: true},
+		DefaultRelations: []string{"$.foo", "$.bar"},
 	}
 
 	staticConf := cfg.StaticConfig()

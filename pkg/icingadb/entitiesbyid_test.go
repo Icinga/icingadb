@@ -41,7 +41,7 @@ func TestEntitiesById_Keys(t *testing.T) {
 }
 
 func newEntity(id []byte) *v1.EntityWithoutChecksum {
-	return &v1.EntityWithoutChecksum{IdMeta: v1.IdMeta{Id: id}}
+	return &v1.EntityWithoutChecksum{Id: id}
 }
 
 func TestEntitiesById_IDs(t *testing.T) {

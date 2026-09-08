@@ -340,11 +340,11 @@ func (client *Client) persistLockedConfig(ctx context.Context) error {
 						ctx,
 						upsertStmt,
 						&v1.IcingadbConfig{
-							EnvironmentMeta: v1.EnvironmentMeta{EnvironmentId: environmentId},
-							EnvKey:          k,
-							EnvValue:        v,
-							EndpointId:      client.lastEndpointId,
-							Locked:          types.MakeBool(true),
+							EnvironmentId: environmentId,
+							EnvKey:        k,
+							EnvValue:      v,
+							EndpointId:    client.lastEndpointId,
+							Locked:        types.MakeBool(true),
 						})
 					if err != nil {
 						return database.CantPerformQuery(err, upsertStmt)

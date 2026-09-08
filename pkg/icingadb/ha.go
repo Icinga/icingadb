@@ -428,14 +428,8 @@ func (h *HA) realize(
 			}
 
 			i := v1.IcingadbInstance{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{
-						Id: h.instanceId,
-					},
-				},
-				EnvironmentMeta: v1.EnvironmentMeta{
-					EnvironmentId: envId,
-				},
+				Id:                                   h.instanceId,
+				EnvironmentId:                        envId,
 				Heartbeat:                            types.UnixMilli(time.UnixMilli(h.heartbeat.LastMessageTime())),
 				Responsible:                          types.Bool{Bool: takeover != "" || h.responsible, Valid: true},
 				EndpointId:                           s.EndpointId,
