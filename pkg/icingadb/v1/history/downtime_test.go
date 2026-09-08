@@ -23,36 +23,36 @@ func TestDowntimeEventTime_Value(t *testing.T) {
 	}{
 		{name: "nil-history"},
 		{name: "bad-event-type", input: &HistoryDowntime{
-			HistoryMeta: HistoryMeta{EventType: "bad"},
-			StartTime:   start, CancelTime: cancel, EndTime: end, HasBeenCancelled: T,
+			EventType: "bad",
+			StartTime: start, CancelTime: cancel, EndTime: end, HasBeenCancelled: T,
 		}},
 		{name: "start", output: int64(23320), input: &HistoryDowntime{
-			HistoryMeta: HistoryMeta{EventType: "downtime_start"},
-			StartTime:   start, CancelTime: cancel, EndTime: end, HasBeenCancelled: T,
+			EventType: "downtime_start",
+			StartTime: start, CancelTime: cancel, EndTime: end, HasBeenCancelled: T,
 		}},
 		{name: "has-been-cancelled-nil", input: &HistoryDowntime{
-			HistoryMeta: HistoryMeta{EventType: "downtime_end"},
-			StartTime:   start, CancelTime: cancel, EndTime: end,
+			EventType: "downtime_end",
+			StartTime: start, CancelTime: cancel, EndTime: end,
 		}},
 		{name: "has-been-cancelled", output: int64(42240), input: &HistoryDowntime{
-			HistoryMeta: HistoryMeta{EventType: "downtime_end"},
-			StartTime:   start, CancelTime: cancel, EndTime: end, HasBeenCancelled: T,
+			EventType: "downtime_end",
+			StartTime: start, CancelTime: cancel, EndTime: end, HasBeenCancelled: T,
 		}},
 		{name: "end", output: int64(1337733), input: &HistoryDowntime{
-			HistoryMeta: HistoryMeta{EventType: "downtime_end"},
-			StartTime:   start, CancelTime: cancel, EndTime: end, HasBeenCancelled: f,
+			EventType: "downtime_end",
+			StartTime: start, CancelTime: cancel, EndTime: end, HasBeenCancelled: f,
 		}},
 		{name: "start-nil", input: &HistoryDowntime{
-			HistoryMeta: HistoryMeta{EventType: "downtime_start"},
-			CancelTime:  cancel, EndTime: end, HasBeenCancelled: T,
+			EventType:  "downtime_start",
+			CancelTime: cancel, EndTime: end, HasBeenCancelled: T,
 		}},
 		{name: "cancel-time-nil", input: &HistoryDowntime{
-			HistoryMeta: HistoryMeta{EventType: "downtime_end"},
-			StartTime:   start, EndTime: end, HasBeenCancelled: T,
+			EventType: "downtime_end",
+			StartTime: start, EndTime: end, HasBeenCancelled: T,
 		}},
 		{name: "end-nil", input: &HistoryDowntime{
-			HistoryMeta: HistoryMeta{EventType: "downtime_end"},
-			StartTime:   start, CancelTime: cancel, HasBeenCancelled: f,
+			EventType: "downtime_end",
+			StartTime: start, CancelTime: cancel, HasBeenCancelled: f,
 		}},
 	}
 

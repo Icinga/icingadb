@@ -8,7 +8,6 @@ import (
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/pkg/common"
-	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
@@ -75,35 +74,29 @@ func convertCommentRows(
 			expireTime := convertTime(row.ExpirationTime, 0)
 
 			commentHistory = append(commentHistory, &history.CommentHistory{
-				CommentHistoryEntity: history.CommentHistoryEntity{CommentId: id},
-				HistoryTableMeta: history.HistoryTableMeta{
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-				},
-				CommentHistoryUpserter: history.CommentHistoryUpserter{
-					RemoveTime:     removeTime,
-					HasBeenRemoved: types.Bool{Bool: !removeTime.Time().IsZero(), Valid: true},
-				},
-				EntryTime:    entryTime,
-				Author:       row.AuthorName,
-				Comment:      row.CommentData,
-				EntryType:    "comment",
-				IsPersistent: types.Bool{Bool: row.IsPersistent != 0, Valid: true},
-				IsSticky:     types.Bool{Bool: false, Valid: true},
-				ExpireTime:   expireTime,
+				CommentId:      id,
+				EnvironmentId:  envId,
+				ObjectType:     typ,
+				HostId:         hostId,
+				ServiceId:      serviceId,
+				RemoveTime:     removeTime,
+				HasBeenRemoved: types.Bool{Bool: !removeTime.Time().IsZero(), Valid: true},
+				EntryTime:      entryTime,
+				Author:         row.AuthorName,
+				Comment:        row.CommentData,
+				EntryType:      "comment",
+				IsPersistent:   types.Bool{Bool: row.IsPersistent != 0, Valid: true},
+				IsSticky:       types.Bool{Bool: false, Valid: true},
+				ExpireTime:     expireTime,
 			})
 
 			h1 := &history.HistoryComment{
-				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_add", row.Name})},
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-					EventType:     "comment_add",
-				},
+				Id:               hashAny([]string{env, "comment_add", row.Name}),
+				EnvironmentId:    envId,
+				ObjectType:       typ,
+				HostId:           hostId,
+				ServiceId:        serviceId,
+				EventType:        "comment_add",
 				CommentHistoryId: id,
 				EntryTime:        entryTime,
 			}
@@ -113,14 +106,12 @@ func convertCommentRows(
 
 			if !removeTime.Time().IsZero() { // remove
 				h2 := &history.HistoryComment{
-					HistoryMeta: history.HistoryMeta{
-						HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "comment_remove", row.Name})},
-						EnvironmentId: envId,
-						ObjectType:    typ,
-						HostId:        hostId,
-						ServiceId:     serviceId,
-						EventType:     "comment_remove",
-					},
+					Id:               hashAny([]string{env, "comment_remove", row.Name}),
+					EnvironmentId:    envId,
+					ObjectType:       typ,
+					HostId:           hostId,
+					ServiceId:        serviceId,
+					EventType:        "comment_remove",
 					CommentHistoryId: id,
 					EntryTime:        entryTime,
 					RemoveTime:       removeTime,
@@ -142,20 +133,16 @@ func convertCommentRows(
 			acknowledgementHistoryId := hashAny([]any{env, name, setTs})
 
 			acknowledgementHistory = append(acknowledgementHistory, &history.AcknowledgementHistory{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{Id: acknowledgementHistoryId},
-				},
-				HistoryTableMeta: history.HistoryTableMeta{
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-				},
-				AckHistoryUpserter: history.AckHistoryUpserter{ClearTime: clearTime},
-				SetTime:            setTime,
-				Author:             types.MakeString(row.AuthorName),
-				Comment:            types.MakeString(row.CommentData),
-				ExpireTime:         convertTime(row.ExpirationTime, 0),
+				Id:            acknowledgementHistoryId,
+				EnvironmentId: envId,
+				ObjectType:    typ,
+				HostId:        hostId,
+				ServiceId:     serviceId,
+				ClearTime:     clearTime,
+				SetTime:       setTime,
+				Author:        types.MakeString(row.AuthorName),
+				Comment:       types.MakeString(row.CommentData),
+				ExpireTime:    convertTime(row.ExpirationTime, 0),
 				IsPersistent: types.Bool{
 					Bool:  row.IsPersistent != 0,
 					Valid: true,
@@ -163,16 +150,12 @@ func convertCommentRows(
 			})
 
 			h1 := &history.HistoryAck{
-				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{
-						Id: hashAny([]any{env, "ack_set", name, setTs}),
-					},
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-					EventType:     "ack_set",
-				},
+				Id:                       hashAny([]any{env, "ack_set", name, setTs}),
+				EnvironmentId:            envId,
+				ObjectType:               typ,
+				HostId:                   hostId,
+				ServiceId:                serviceId,
+				EventType:                "ack_set",
 				AcknowledgementHistoryId: acknowledgementHistoryId,
 				SetTime:                  setTime,
 				ClearTime:                clearTime,
@@ -183,16 +166,12 @@ func convertCommentRows(
 
 			if !clearTime.Time().IsZero() {
 				h2 := &history.HistoryAck{
-					HistoryMeta: history.HistoryMeta{
-						HistoryEntity: history.HistoryEntity{
-							Id: hashAny([]any{env, "ack_clear", name, setTs}),
-						},
-						EnvironmentId: envId,
-						ObjectType:    typ,
-						HostId:        hostId,
-						ServiceId:     serviceId,
-						EventType:     "ack_clear",
-					},
+					Id:                       hashAny([]any{env, "ack_clear", name, setTs}),
+					EnvironmentId:            envId,
+					ObjectType:               typ,
+					HostId:                   hostId,
+					ServiceId:                serviceId,
+					EventType:                "ack_clear",
 					AcknowledgementHistoryId: acknowledgementHistoryId,
 					SetTime:                  setTime,
 					ClearTime:                clearTime,
@@ -293,17 +272,13 @@ func convertDowntimeRows(
 		}
 
 		downtimeHistory = append(downtimeHistory, &history.DowntimeHistory{
-			DowntimeHistoryEntity: history.DowntimeHistoryEntity{DowntimeId: id},
-			HistoryTableMeta: history.HistoryTableMeta{
-				EnvironmentId: envId,
-				ObjectType:    typ,
-				HostId:        hostId,
-				ServiceId:     serviceId,
-			},
-			DowntimeHistoryUpserter: history.DowntimeHistoryUpserter{
-				HasBeenCancelled: types.Bool{Bool: row.WasCancelled != 0, Valid: true},
-				CancelTime:       cancelTime,
-			},
+			DowntimeId:         id,
+			EnvironmentId:      envId,
+			ObjectType:         typ,
+			HostId:             hostId,
+			ServiceId:          serviceId,
+			HasBeenCancelled:   types.Bool{Bool: row.WasCancelled != 0, Valid: true},
+			CancelTime:         cancelTime,
 			TriggeredById:      calcObjectId(env, row.TriggeredBy),
 			EntryTime:          convertTime(row.EntryTime, 0),
 			Author:             row.AuthorName,
@@ -318,14 +293,12 @@ func convertDowntimeRows(
 		})
 
 		h1 := &history.HistoryDowntime{
-			HistoryMeta: history.HistoryMeta{
-				HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "downtime_start", row.Name})},
-				EnvironmentId: envId,
-				ObjectType:    typ,
-				HostId:        hostId,
-				ServiceId:     serviceId,
-				EventType:     "downtime_start",
-			},
+			Id:                hashAny([]string{env, "downtime_start", row.Name}),
+			EnvironmentId:     envId,
+			ObjectType:        typ,
+			HostId:            hostId,
+			ServiceId:         serviceId,
+			EventType:         "downtime_start",
 			DowntimeHistoryId: id,
 			StartTime:         startTime,
 		}
@@ -335,14 +308,12 @@ func convertDowntimeRows(
 
 		if !actualEnd.Time().IsZero() { // remove
 			h2 := &history.HistoryDowntime{
-				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{Id: hashAny([]string{env, "downtime_end", row.Name})},
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-					EventType:     "downtime_end",
-				},
+				Id:                hashAny([]string{env, "downtime_end", row.Name}),
+				EnvironmentId:     envId,
+				ObjectType:        typ,
+				HostId:            hostId,
+				ServiceId:         serviceId,
+				EventType:         "downtime_end",
 				DowntimeHistoryId: id,
 				StartTime:         startTime,
 				CancelTime:        cancelTime,
@@ -355,13 +326,11 @@ func convertDowntimeRows(
 		}
 
 		s := &history.SlaHistoryDowntime{
-			DowntimeHistoryEntity: history.DowntimeHistoryEntity{DowntimeId: id},
-			HistoryTableMeta: history.HistoryTableMeta{
-				EnvironmentId: envId,
-				ObjectType:    typ,
-				HostId:        hostId,
-				ServiceId:     serviceId,
-			},
+			DowntimeId:       id,
+			EnvironmentId:    envId,
+			ObjectType:       typ,
+			HostId:           hostId,
+			ServiceId:        serviceId,
 			DowntimeStart:    startTime,
 			HasBeenCancelled: types.Bool{Bool: row.WasCancelled != 0, Valid: true},
 			CancelTime:       cancelTime,
@@ -454,35 +423,25 @@ func convertFlappingRows(
 		if row.EventType == 1001 { // end
 			// The start counterpart should already have been inserted.
 			flappingHistoryUpserts = append(flappingHistoryUpserts, &history.FlappingHistory{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{Id: flappingHistoryId},
-				},
-				HistoryTableMeta: history.HistoryTableMeta{
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-				},
-				FlappingHistoryUpserter: history.FlappingHistoryUpserter{
-					EndTime:               ts,
-					PercentStateChangeEnd: types.Float{NullFloat64: row.PercentStateChange},
-					FlappingThresholdLow:  float32(row.LowThreshold),
-					FlappingThresholdHigh: float32(row.HighThreshold),
-				},
-				StartTime: start,
+				Id:                    flappingHistoryId,
+				EnvironmentId:         envId,
+				ObjectType:            typ,
+				HostId:                hostId,
+				ServiceId:             serviceId,
+				EndTime:               ts,
+				PercentStateChangeEnd: types.Float{NullFloat64: row.PercentStateChange},
+				FlappingThresholdLow:  float32(row.LowThreshold),
+				FlappingThresholdHigh: float32(row.HighThreshold),
+				StartTime:             start,
 			})
 
 			h := &history.HistoryFlapping{
-				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{
-						Id: hashAny([]any{env, "flapping_end", name, startTime}),
-					},
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-					EventType:     "flapping_end",
-				},
+				Id:                hashAny([]any{env, "flapping_end", name, startTime}),
+				EnvironmentId:     envId,
+				ObjectType:        typ,
+				HostId:            hostId,
+				ServiceId:         serviceId,
+				EventType:         "flapping_end",
 				FlappingHistoryId: flappingHistoryId,
 				StartTime:         start,
 				EndTime:           ts,
@@ -492,34 +451,24 @@ func convertFlappingRows(
 			allHistory = append(allHistory, h)
 		} else {
 			flappingHistory = append(flappingHistory, &history.FlappingHistory{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{Id: flappingHistoryId},
-				},
-				HistoryTableMeta: history.HistoryTableMeta{
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-				},
-				FlappingHistoryUpserter: history.FlappingHistoryUpserter{
-					FlappingThresholdLow:  float32(row.LowThreshold),
-					FlappingThresholdHigh: float32(row.HighThreshold),
-				},
+				Id:                      flappingHistoryId,
+				EnvironmentId:           envId,
+				ObjectType:              typ,
+				HostId:                  hostId,
+				ServiceId:               serviceId,
+				FlappingThresholdLow:    float32(row.LowThreshold),
+				FlappingThresholdHigh:   float32(row.HighThreshold),
 				StartTime:               start,
 				PercentStateChangeStart: types.Float{NullFloat64: row.PercentStateChange},
 			})
 
 			h := &history.HistoryFlapping{
-				HistoryMeta: history.HistoryMeta{
-					HistoryEntity: history.HistoryEntity{
-						Id: hashAny([]any{env, "flapping_start", name, startTime}),
-					},
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-					EventType:     "flapping_start",
-				},
+				Id:                hashAny([]any{env, "flapping_start", name, startTime}),
+				EnvironmentId:     envId,
+				ObjectType:        typ,
+				HostId:            hostId,
+				ServiceId:         serviceId,
+				EventType:         "flapping_start",
 				FlappingHistoryId: flappingHistoryId,
 				StartTime:         start,
 			}
@@ -640,17 +589,11 @@ func convertNotificationRows(
 		}
 
 		notificationHistory = append(notificationHistory, &history.NotificationHistory{
-			HistoryTableEntity: history.HistoryTableEntity{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{Id: notificationHistoryId},
-				},
-			},
-			HistoryTableMeta: history.HistoryTableMeta{
-				EnvironmentId: envId,
-				ObjectType:    typ,
-				HostId:        hostId,
-				ServiceId:     serviceId,
-			},
+			Id:                notificationHistoryId,
+			EnvironmentId:     envId,
+			ObjectType:        typ,
+			HostId:            hostId,
+			ServiceId:         serviceId,
 			NotificationId:    calcObjectId(env, name),
 			Type:              history.NotificationType(notificationType),
 			SendTime:          ts,
@@ -661,14 +604,12 @@ func convertNotificationRows(
 		})
 
 		allHistory = append(allHistory, &history.HistoryNotification{
-			HistoryMeta: history.HistoryMeta{
-				HistoryEntity: history.HistoryEntity{Id: id},
-				EnvironmentId: envId,
-				ObjectType:    typ,
-				HostId:        hostId,
-				ServiceId:     serviceId,
-				EventType:     "notification",
-			},
+			Id:                    id,
+			EnvironmentId:         envId,
+			ObjectType:            typ,
+			HostId:                hostId,
+			ServiceId:             serviceId,
+			EventType:             "notification",
 			NotificationHistoryId: notificationHistoryId,
 			EventTime:             ts,
 		})
@@ -677,12 +618,8 @@ func convertNotificationRows(
 			userId := calcObjectId(env, contact)
 
 			userNotificationHistory = append(userNotificationHistory, &history.UserNotificationHistory{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{
-						Id: utils.Checksum(append(append([]byte(nil), notificationHistoryId...), userId...)),
-					},
-				},
-				EnvironmentMeta:       v1.EnvironmentMeta{EnvironmentId: envId},
+				Id:                    utils.Checksum(append(append([]byte(nil), notificationHistoryId...), userId...)),
+				EnvironmentId:         envId,
 				NotificationHistoryId: notificationHistoryId,
 				UserId:                userId,
 			})
@@ -828,17 +765,11 @@ func convertStateRows(
 		}
 
 		stateHistory = append(stateHistory, &history.StateHistory{
-			HistoryTableEntity: history.HistoryTableEntity{
-				EntityWithoutChecksum: v1.EntityWithoutChecksum{
-					IdMeta: v1.IdMeta{Id: stateHistoryId},
-				},
-			},
-			HistoryTableMeta: history.HistoryTableMeta{
-				EnvironmentId: envId,
-				ObjectType:    typ,
-				HostId:        hostId,
-				ServiceId:     serviceId,
-			},
+			Id:                stateHistoryId,
+			EnvironmentId:     envId,
+			ObjectType:        typ,
+			HostId:            hostId,
+			ServiceId:         serviceId,
 			EventTime:         ts,
 			StateType:         history.StateType(convertStateType(row.StateType)),
 			SoftState:         row.State,
@@ -853,14 +784,12 @@ func convertStateRows(
 		})
 
 		allHistory = append(allHistory, &history.HistoryState{
-			HistoryMeta: history.HistoryMeta{
-				HistoryEntity: history.HistoryEntity{Id: id},
-				EnvironmentId: envId,
-				ObjectType:    typ,
-				HostId:        hostId,
-				ServiceId:     serviceId,
-				EventType:     "state_change",
-			},
+			Id:             id,
+			EnvironmentId:  envId,
+			ObjectType:     typ,
+			HostId:         hostId,
+			ServiceId:      serviceId,
+			EventType:      "state_change",
 			StateHistoryId: stateHistoryId,
 			EventTime:      ts,
 		})
@@ -869,17 +798,11 @@ func convertStateRows(
 			// only hard state changes are relevant for SLA history, discard all others
 
 			sla = append(sla, &history.SlaHistoryState{
-				HistoryTableEntity: history.HistoryTableEntity{
-					EntityWithoutChecksum: v1.EntityWithoutChecksum{
-						IdMeta: v1.IdMeta{Id: stateHistoryId},
-					},
-				},
-				HistoryTableMeta: history.HistoryTableMeta{
-					EnvironmentId: envId,
-					ObjectType:    typ,
-					HostId:        hostId,
-					ServiceId:     serviceId,
-				},
+				Id:                stateHistoryId,
+				EnvironmentId:     envId,
+				ObjectType:        typ,
+				HostId:            hostId,
+				ServiceId:         serviceId,
 				EventTime:         ts,
 				StateType:         history.StateType(convertStateType(row.StateType)),
 				HardState:         hardState,

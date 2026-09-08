@@ -28,9 +28,7 @@ type testEntity struct {
 
 func newTestEntity(data int, id ...byte) *testEntity {
 	return &testEntity{
-		EntityWithoutChecksum: v1.EntityWithoutChecksum{
-			IdMeta: v1.IdMeta{Id: id},
-		},
+		Id:   id,
 		Data: data,
 	}
 }
@@ -156,18 +154,16 @@ type testEntityWithChecksum struct {
 
 func newTestEntityWithChecksum(id, checksum, data []byte) *testEntityWithChecksum {
 	return &testEntityWithChecksum{
-		EntityWithChecksum: v1.EntityWithChecksum{
-			EntityWithoutChecksum: v1.EntityWithoutChecksum{IdMeta: v1.IdMeta{Id: id}},
-			ChecksumMeta:          v1.ChecksumMeta{PropertiesChecksum: checksum},
-		},
-		Data: data,
+		Id:                 id,
+		PropertiesChecksum: checksum,
+		Data:               data,
 	}
 }
 
 func newEntityWithChecksum(id, checksum []byte) *v1.EntityWithChecksum {
 	return &v1.EntityWithChecksum{
-		EntityWithoutChecksum: v1.EntityWithoutChecksum{IdMeta: v1.IdMeta{Id: id}},
-		ChecksumMeta:          v1.ChecksumMeta{PropertiesChecksum: checksum},
+		Id:                 id,
+		PropertiesChecksum: checksum,
 	}
 }
 

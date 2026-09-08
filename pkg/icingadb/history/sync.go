@@ -11,7 +11,6 @@ import (
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/pkg/contracts"
-	v1types "github.com/icinga/icingadb/pkg/icingadb/v1"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1/history"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
@@ -359,14 +358,8 @@ func userNotificationStage(ctx context.Context, s Sync, key string, in <-chan re
 
 		for _, user := range users {
 			userNotifications = append(userNotifications, &v1.UserNotificationHistory{
-				EntityWithoutChecksum: v1types.EntityWithoutChecksum{
-					IdMeta: v1types.IdMeta{
-						Id: utils.Checksum(append(append([]byte(nil), notificationHistory.Id...), user...)),
-					},
-				},
-				EnvironmentMeta: v1types.EnvironmentMeta{
-					EnvironmentId: notificationHistory.EnvironmentId,
-				},
+				Id:                    utils.Checksum(append(append([]byte(nil), notificationHistory.Id...), user...)),
+				EnvironmentId:         notificationHistory.EnvironmentId,
 				NotificationHistoryId: notificationHistory.Id,
 				UserId:                user,
 			})
