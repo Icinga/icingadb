@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: 1.x
+          go-version: stable
 
       - run: go build ./...
 
@@ -32,7 +32,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: 1.x
+          go-version: stable
 
       - uses: golangci/golangci-lint-action@v9
         with:
@@ -46,7 +46,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: 1.x
+          go-version: stable
 
       - run: go vet ./...
 
@@ -57,7 +57,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: 1.x
+          go-version: stable
 
       - name: Run gofmt -d .
         run: |
@@ -72,7 +72,7 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: 1.x
+          go-version: stable
 
       - name: Run go mod tidy
         run: |
@@ -87,7 +87,7 @@ jobs:
     steps:
     - uses: actions/setup-go@v7
       with:
-        go-version: 1.x
+        go-version: stable
 
     - name: Checkout base commit
       uses: actions/checkout@v7
