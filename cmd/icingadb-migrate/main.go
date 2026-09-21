@@ -135,6 +135,16 @@ func parseConfig(f *Flags) (_ *Config, exit int) {
 		return nil, 2
 	}
 
+	if c.IDO.From > c.IDO.To {
+		_, _ = fmt.Fprintf(
+			os.Stderr,
+			"invalid IDO migration time range: from (%d) must not be newer than to (%d)\n",
+			c.IDO.From,
+			c.IDO.To,
+		)
+		return nil, 2
+	}
+
 	return c, -1
 }
 
