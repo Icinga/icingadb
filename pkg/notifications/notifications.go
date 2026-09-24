@@ -999,7 +999,7 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 		// If the object is still muted, we don't close incidents even with OK state changes.
 		// See https://github.com/Icinga/icingadb/issues/1127#issuecomment-4691435590 for details.
 		ev.Close = types.MakeBool(true)
-	} else if s.PreviousHardState == s.HardState {
+	} else if !ev.IsMuted() && s.PreviousHardState == s.HardState {
 		// NON-OK hard state changes that do not change the state are volatile ones, so set the notify flag.
 		ev.Notify = types.MakeBool(true)
 	}
