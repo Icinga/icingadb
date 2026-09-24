@@ -207,6 +207,10 @@ func run() int {
 		}
 	}()
 
+	// passively drain runtime update streams, safe as a takeover always starts with a full sync
+	logger.Info("Starting passive runtime updates stream clearing")
+	rt.SyncPassive(ctx, ha)
+
 	// Main loop
 	for {
 		hactx, cancelHactx := context.WithCancel(ctx)
@@ -241,6 +245,12 @@ func run() int {
 						// otherwise updates may be lost.
 						runtimeConfigUpdateStreams, runtimeStateUpdateStreams, err := rt.ClearStreams(synctx)
 						if err != nil {
+							cancelSynctx()
+
+							if utils.IsContextCanceled(err) {
+								continue
+							}
+
 							logger.Fatalf("%+v", err)
 						}
 

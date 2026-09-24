@@ -3,6 +3,10 @@ package icingadb
 import (
 	"context"
 	"fmt"
+	"maps"
+	"reflect"
+	"sync"
+
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
@@ -11,16 +15,15 @@ import (
 	"github.com/icinga/icinga-go-library/strcase"
 	"github.com/icinga/icinga-go-library/structify"
 	"github.com/icinga/icinga-go-library/types"
+	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/pkg/common"
 	"github.com/icinga/icingadb/pkg/contracts"
 	v1 "github.com/icinga/icingadb/pkg/icingadb/v1"
 	"github.com/icinga/icingadb/pkg/icingaredis/telemetry"
 	"github.com/pkg/errors"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
-	"maps"
-	"reflect"
-	"sync"
 )
 
 // RuntimeUpdates specifies the source and destination of runtime updates.
@@ -28,6 +31,7 @@ type RuntimeUpdates struct {
 	db     *database.DB
 	redis  *redis.Client
 	logger *logging.Logger
+	mu     sync.Mutex // mutex guards clearStreams against a concurrent passive drain and takeover.
 }
 
 // NewRuntimeUpdates creates a new RuntimeUpdates.
@@ -42,6 +46,14 @@ func NewRuntimeUpdates(db *database.DB, redis *redis.Client, logger *logging.Log
 // ClearStreams returns the stream key to ID mapping of the runtime update streams
 // for later use in Sync and clears the streams themselves.
 func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state redis.Streams, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.clearStreams(ctx)
+}
+
+// clearStreams is ClearStreams without locking, caller must hold r.mu.
+func (r *RuntimeUpdates) clearStreams(ctx context.Context) (config, state redis.Streams, err error) {
 	config = redis.Streams{"icinga:runtime": "0-0"}
 	state = redis.Streams{"icinga:runtime:state": "0-0"}
 
@@ -325,6 +337,24 @@ func (r *RuntimeUpdates) Sync(
 	g.Go(func() error { return r.redis.XDelOnAllConsumersAck(ctx, streams.Option()[0], xRedisMessageAcks...) })
 
 	return g.Wait()
+}
+
+// SyncPassive discards runtime update streams while this instance is passive. only the active instance
+// consumes them, so a passive instance's streams would grow indefinitely. safe to discard as a takeover
+// always starts with a full config and state sync from the icinga:* hashes.
+func (r *RuntimeUpdates) SyncPassive(ctx context.Context, ha *HA) {
+	periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+
+		if _, responsible, _ := ha.State(); responsible {
+			return
+		}
+
+		if _, _, err := r.clearStreams(ctx); err != nil && !utils.IsContextCanceled(err) {
+			r.logger.Warnw("Can't clear passive runtime update streams", zap.Error(err))
+		}
+	})
 }
 
 // xRead reads from the runtime update streams and sends the data to the corresponding updateMessages channel.

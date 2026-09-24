@@ -637,6 +637,33 @@ func testHistory(t *testing.T, numNodes int) {
 
 		testConsistency(t, stream)
 	})
+
+	t.Run("RuntimeStreams", func(t *testing.T) {
+		if numNodes < 2 {
+			t.Skip("requires an HA setup with a passive instance")
+		}
+
+		// passive instances must drain runtime updates, see issue #1122
+		hostname := utils.UniqueName(t, "host")
+		client.CreateHost(t, hostname, map[string]interface{}{
+			"attrs": map[string]interface{}{
+				"enable_active_checks":  false,
+				"enable_passive_checks": true,
+				"check_command":         "dummy",
+			},
+		})
+		processCheckResult(t, client, hostname, 1)
+
+		for _, n := range nodes {
+			// witness redis has no consumer, updates must still be there
+			assertEventuallyNotEmpty(t, n.ConsistencyRedisClient, "icinga:runtime")
+			assertEventuallyNotEmpty(t, n.ConsistencyRedisClient, "icinga:runtime:state")
+
+			// active consumes, passive drains
+			assertEventuallyDrained(t, n.RedisClient, "icinga:runtime")
+			assertEventuallyDrained(t, n.RedisClient, "icinga:runtime:state")
+		}
+	})
 }
 
 func assertEventuallyDrained(t testing.TB, redis *redis.Client, stream string) {
@@ -644,6 +671,14 @@ func assertEventuallyDrained(t testing.TB, redis *redis.Client, stream string) {
 		result, err := redis.XRange(context.Background(), stream, "-", "+").Result()
 		require.NoError(t, err, "reading %s should not fail", stream)
 		assert.Empty(t, result, "%s should eventually be drained", stream)
+	}, 5*time.Second, 10*time.Millisecond)
+}
+
+func assertEventuallyNotEmpty(t testing.TB, redis *redis.Client, stream string) {
+	eventually.Assert(t, func(t require.TestingT) {
+		result, err := redis.XRange(context.Background(), stream, "-", "+").Result()
+		require.NoError(t, err, "reading %s should not fail", stream)
+		assert.NotEmpty(t, result, "%s should eventually not be empty", stream)
 	}, 5*time.Second, 10*time.Millisecond)
 }
 
