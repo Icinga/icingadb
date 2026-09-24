@@ -2,7 +2,6 @@ package notifications
 
 import (
 	"context"
-	"crypto/sha1" // #nosec G505 -- Blocklisted import crypto/sha1
 	"encoding/hex"
 	"fmt"
 	"maps"
@@ -14,14 +13,12 @@ import (
 	"time"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/google/uuid"
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/notifications/event"
 	"github.com/icinga/icinga-go-library/notifications/source"
-	"github.com/icinga/icinga-go-library/objectpacker"
 	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icinga-go-library/strcase"
@@ -48,14 +45,18 @@ var (
 	// errClientReset is used as a cancellation cause when replacing or removing the Notifications client.
 	errClientReset = errors.New("notifications client was reset")
 
-	// errNonVolatileNonHardState is returned when a non-hard state change is attempted to be submitted for a non-volatile checkable.
-	errNonVolatileNonHardState = errors.New("non-hard state change for non-volatile checkable")
+	// errIrrelevantStateChange is used to indicate that a state change update is not relevant for
+	// Icinga Notifications, thus it can be ignored.
+	errIrrelevantStateChange = errors.New("irrelevant state change update")
 )
 
 // fetchableEvent wraps both event.Event and relations, allowing to enrich the Event based on Notifications feedback.
 type fetchableEvent struct {
 	*event.Event
 	*relations
+
+	// alertHistoryRef is a reference to the alert history entry associated with this event, if any.
+	alertHistoryRef *AlertHistoryRef
 }
 
 // completeAndUpdate completes the internal relations and the Event.
@@ -90,6 +91,12 @@ type apiClientSession struct {
 	client *source.Client          // The Icinga Notifications API client. Nil if it is unconfigured (cfg.Url == "").
 	ctx    context.Context         // The associated ctx of the client. (client != nil) => (ctx != nil)
 	cancel context.CancelCauseFunc // The canceler for the associated ctx. (ctx != nil) => (cancel != nil)
+}
+
+// incidentResp is a wrapper around source.Incident that includes the object ID for easier access.
+type incidentResp struct {
+	source.Incident
+	ObjectID types.Binary
 }
 
 // Client is an Icinga Notifications compatible client implementation to push events to Icinga Notifications.
@@ -134,7 +141,7 @@ type Client struct {
 	lastEndpointId types.Binary
 
 	// incidentsByObjId is a map of object IDs to incidents populated by the first call to ApplyDelta.
-	incidentsByObjId map[string]source.Incident
+	incidentsByObjId map[string]incidentResp
 	incidentsMu      sync.Mutex
 
 	ha *icingadb.HA
@@ -607,8 +614,8 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 					return nil
 				}
 
-				if incident, exists := client.incidentsByObjId[entity.ID().String()]; exists {
-					if same, err := HaveSameState(incident, entity); err != nil {
+				if ir, exists := client.incidentsByObjId[entity.ID().String()]; exists {
+					if same, err := HaveSameState(ir.Incident, entity); err != nil {
 						return err
 					} else if same {
 						// Same state, but not necessarily the same output/message, and since we have a separate
@@ -630,11 +637,11 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 	})
 
 	g.Go(func() error {
+		var deletedIds []types.Binary
 		var filter []any
+		_, isServiceState := delta.Subject.Entity().(*v1.ServiceState)
 		for id, incident := range client.incidentsByObjId {
 			_, isServiceIncident := incident.ObjectTags["service"]
-			_, isServiceState := delta.Subject.Entity().(*v1.ServiceState)
-
 			_, deleted := delta.Delete[id]
 			// We may have missed the initial config dump with the corresponding entity deletion, in which case we
 			// can't rely on delta.Delete, delta.Create, or delta.Update to determine if the incident is obsolete.
@@ -645,6 +652,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 			// rely on it for the same entity type.
 			if deleted || (!isInRedis && isServiceState == isServiceIncident) {
 				filter = append(filter, incident.ObjectTags)
+				deletedIds = append(deletedIds, incident.ObjectID)
 			}
 		}
 		if len(filter) == 0 {
@@ -662,6 +670,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 				zap.Int("count", len(filter)),
 				zap.String("error", err.Error()))
 		}
+		client.deleteAlertHistoryRefs(ctx, !isServiceState, deletedIds)
 		return nil
 	})
 
@@ -751,8 +760,8 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 				continue
 			}
 
-			hostIncidents := make(map[string]source.Incident)
-			serviceIncidents := make(map[string]source.Incident)
+			hostIncidents := make(map[string]incidentResp)
+			serviceIncidents := make(map[string]incidentResp)
 			for id, incident := range client.retrieveEnvironmentIncidents(ctx, nc) {
 				if _, exists := incident.ObjectTags["service"]; exists {
 					serviceIncidents[id] = incident
@@ -798,7 +807,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 // The incidents are returned as a map of object IDs to incidents. The object IDs are generated based on the
 // environment ID and the host/service names, mimicking the Icinga 2 ID generation behavior used to generate
 // all Icinga DB related object IDs.
-func (client *Client) retrieveEnvironmentIncidents(ctx context.Context, nc *source.Client) map[string]source.Incident {
+func (client *Client) retrieveEnvironmentIncidents(ctx context.Context, nc *source.Client) map[string]incidentResp {
 	environment, ok := v1.EnvironmentFromContext(ctx)
 	if !ok {
 		panic("cannot get environment from context")
@@ -807,27 +816,17 @@ func (client *Client) retrieveEnvironmentIncidents(ctx context.Context, nc *sour
 	incidentsCh, errCh := nc.YieldIncidents(
 		ctx, map[string]string{"environment": environment.ID().String()})
 
-	incidentsByID := make(map[string]source.Incident)
-	hash := sha1.New() // #nosec G401 -- used as a non-cryptographic hash function to hash IDs
+	incidentsByID := make(map[string]incidentResp)
 	for incident := range incidentsCh {
-		// This implementation mimics the Icinga 2 ID generation behavior[^1] used to generate all Icinga DB
-		// related object IDs, so make sure to keep it in sync with the Icinga 2 implementation.
-		//
-		// [^1]: https://github.com/Icinga/icinga2/blob/v2.16.3/lib/icingadb/icingadb-utility.cpp#L81
-		idTags := []string{environment.ID().String()}
-		if service, ok := incident.ObjectTags["service"]; ok {
-			idTags = append(idTags, incident.ObjectTags["host"]+"!"+service)
-		} else {
-			idTags = append(idTags, incident.ObjectTags["host"])
-		}
-		if err := objectpacker.PackAny(idTags, hash); err != nil {
-			client.logger.Warnw("Cannot pack incident object ID for hashing, skipping incident",
-				zap.Strings("id_tags", idTags),
-				zap.Error(err))
+		id, err := GenSHA1(environment.Id, incident.ObjectTags["host"], incident.ObjectTags["service"])
+		if err != nil {
+			client.logger.Warnw("Cannot generate incident object ID for hashing, skipping incident",
+				zap.String("host", incident.ObjectTags["host"]),
+				zap.String("service", incident.ObjectTags["service"]),
+				zap.String("error", err.Error()))
 			continue
 		}
-		incidentsByID[hex.EncodeToString(hash.Sum(nil))] = incident
-		hash.Reset()
+		incidentsByID[hex.EncodeToString(id)] = incidentResp{Incident: incident, ObjectID: id}
 	}
 
 	if err := <-errCh; err != nil && ctx.Err() == nil {
@@ -924,7 +923,6 @@ func (client *Client) buildCommonEvent(
 
 	return &fetchableEvent{
 		Event: &event.Event{
-			ID:   types.MakeUUID(uuid.New()), // build a random uuid until https://github.com/Icinga/icingadb/issues/1112 is fixed
 			Name: objectName,
 			URL:  objectUrl,
 			Tags: objectTags,
@@ -944,30 +942,34 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 	}
 
 	ev.Tags["environment"] = s.EnvironmentId.String()
-	if s.Output.Valid {
-		ev.Message = s.Output.String
-	}
-	if s.LongOutput.Valid {
-		ev.Message += "\n" + s.LongOutput.String
-	}
 
+	var objectName string
 	var isVolatile bool
 	if serviceId != nil {
 		isVolatile = ev.Services[0].isVolatile
+		objectName = ev.Host.Name + "!" + ev.Services[0].Name
 	} else {
 		isVolatile = ev.Host.isVolatile
+		objectName = ev.Host.Name
 	}
 
 	// If the checkable is volatile, it's always treated as a hard state change, but `StateType` is still set
 	// to `SOFT` due to an Icinga 2 bug (see https://github.com/Icinga/icinga2/issues/10879).
 	if s.StateType != common.HardState && !isVolatile {
-		return nil, errNonVolatileNonHardState
+		return nil, errIrrelevantStateChange
 	}
 
 	if sev, err := StateToSeverity(s, serviceId != nil); err != nil {
 		return nil, err
 	} else {
 		ev.Severity = sev
+	}
+
+	if s.Output.Valid {
+		ev.Message = s.Output.String
+	}
+	if s.LongOutput.Valid {
+		ev.Message += "\n" + s.LongOutput.String
 	}
 
 	inDowntime := s.InDowntime.Valid && s.InDowntime.Bool
@@ -1002,6 +1004,70 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 	} else if s.PreviousHardState == s.HardState {
 		// NON-OK hard state changes that do not change the state are volatile ones, so set the notify flag.
 		ev.Notify = types.MakeBool(true)
+	}
+
+	// The following logic is a bit tricky and perhaps very prone to errors since it heavily relies on the
+	// Icinga 2 internal state change serialization logic. The goal is to generate a deterministic event ID
+	// for each state, so that the SyncAlertHistories background worker can map the resulting notifications
+	// back to the original Icinga 2 event in the history table.
+	//
+	// First and foremost, if we don't have a recent enough Icinga 2 version (somewhere after v2.16.5 and v2.15.6),
+	// it's impossible to reconstruct the original event ID, so we just generate a random one. Otherwise, we can
+	// derive our own deterministic event ID by apply the following priority:
+	//
+	// 1. If this is a real state change update that we haven't seen before, the event ID must match the corresponding
+	//    Icinga 2 state change history ID. This is the most important case, and it must be handled first.
+	// 2. If this is triggered by an ACK change, the event ID must match the corresponding Icinga 2 ACK history ID.
+	// 3. If this is triggered by a downtime, the event ID must match the corresponding Icinga 2 downtime history ID.
+	//
+	// If none of the above applies, then this is probably a useless event that Icinga Notifications doesn't
+	// need to care about, so we just skip it.
+	var historyID types.Binary
+	switch meta := s.MetaData; true {
+	case !meta.StateChange.Valid || meta.ExecutionEnd.Time().IsZero():
+		// User is probably using an older Icinga 2 version.
+
+	case meta.StateChange.Bool:
+		ts := meta.ExecutionEnd
+		// See https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L1935
+		ev.ID, historyID, err = DeriveDeterministicEventUUID(s.EnvironmentId, "state_change", objectName, ts)
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot generate event ID")
+		}
+
+	case meta.AckTransitionType.Valid:
+		eventType := meta.AckTransitionType.String
+		// See https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2511 and
+		// https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2561
+		ev.ID, historyID, err = DeriveDeterministicEventUUID(s.EnvironmentId, eventType, objectName, s.AcknowledgementSetTime)
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot generate event ID")
+		}
+
+	case meta.DowntimeTransitionType.Valid:
+		eventType := meta.DowntimeTransitionType.String
+		downtimeName := Ternary(inDowntime, meta.LastTriggeredDowntimeName, meta.LastRemovedDowntimeName).String
+		// See https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2103 and
+		// https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2193
+		ev.ID, historyID, err = DeriveDeterministicEventUUID(s.EnvironmentId, eventType, downtimeName, types.UnixMilli{})
+		if err != nil {
+			return nil, errors.Wrap(err, "cannot generate event ID")
+		}
+
+	default:
+		// The trigger reason is not one of the above, so it must be like "comment_add", "comment_removed",
+		// or the like, which are not relevant for Icinga Notifications. So, we just skip it.
+		return nil, errIrrelevantStateChange
+	}
+
+	if historyID != nil {
+		// Prepare the alert history reference for Submit function to persist the mapping after successful submission.
+		ev.alertHistoryRef = &AlertHistoryRef{
+			HistoryID:     historyID,
+			HistoryIDUUID: ev.ID,
+			HostID:        hostId,
+			ServiceID:     serviceId,
+		}
 	}
 
 	return ev, nil
@@ -1148,7 +1214,7 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 	}
 
 	if eventErr != nil {
-		if !errors.Is(eventErr, errNonVolatileNonHardState) {
+		if !errors.Is(eventErr, errIrrelevantStateChange) {
 			client.logger.Errorw("Cannot build event for entity, skipping submission",
 				zap.String("type", fmt.Sprintf("%T", entity)),
 				zap.Error(eventErr))
@@ -1225,6 +1291,27 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 		return nil
 	}
 
+	if err == nil && ev.alertHistoryRef != nil {
+		insertStmtIgnore, _ := client.db.BuildInsertIgnoreStmt(AlertHistoryRef{})
+		err := retry.WithBackoff(
+			ctx,
+			func(ctx context.Context) error {
+				_, err := client.db.NamedExecContext(ctx, insertStmtIgnore, ev.alertHistoryRef)
+				return err
+			},
+			retry.Retryable,
+			backoff.DefaultBackoff,
+			client.db.GetDefaultRetrySettings())
+		if err != nil {
+			client.logger.Errorw("Failed to insert alert history reference into database",
+				zap.String("event", ev.Name),
+				zap.Stringer("history_id", ev.alertHistoryRef.HistoryID),
+				zap.Stringer("history_id_uuid", ev.ID),
+				zap.String("error", err.Error()))
+		}
+		return nil
+	}
+
 	return err
 }
 
@@ -1286,67 +1373,4 @@ func (client *Client) SyncExtraStages(ctx context.Context) map[string]history.St
 	}
 
 	return extraStages
-}
-
-// StateToSeverity converts a state integer to an event.Severity value.
-func StateToSeverity(s *v1.State, isService bool) (event.Severity, error) {
-	if isService {
-		switch s.HardState {
-		case 0:
-			return event.SeverityOK, nil
-		case 1:
-			return event.SeverityWarning, nil
-		case 2:
-			return event.SeverityCrit, nil
-		case 3:
-			return event.SeverityErr, nil
-		default:
-			return event.SeverityNone, fmt.Errorf("unexpected service state %d", s.HardState)
-		}
-	} else {
-		switch s.HardState {
-		case 0:
-			return event.SeverityOK, nil
-		case 1:
-			return event.SeverityCrit, nil
-		default:
-			return event.SeverityNone, fmt.Errorf("unexpected host state %d", s.HardState)
-		}
-	}
-}
-
-// HaveSameState checks if the given incident and the corresponding [database.Entity] have the same state.
-//
-// This function is used to determine if an incident in Icinga Notifications corresponds to the current state
-// of a checkable in Icinga DB. It compares the severity and muted status of the incident with the state of the
-// entity and returns true if they match, false otherwise. If the entity type is unsupported, an error is returned.
-func HaveSameState(incident source.Incident, entity database.Entity) (bool, error) {
-	var s *v1.State
-	var isService bool
-	switch e := entity.(type) {
-	case *v1.HostState:
-		s = &e.State
-	case *v1.ServiceState:
-		s = &e.State
-		isService = true
-	default:
-		return false, fmt.Errorf("unsupported entity type %T", entity)
-	}
-
-	severity, err := StateToSeverity(s, isService)
-	if err != nil {
-		return false, err
-	}
-
-	if incident.Severity != severity {
-		return false, nil
-	}
-
-	inDowntime := s.InDowntime.Valid && s.InDowntime.Bool
-	isAcked := s.IsAcknowledged.Valid && s.IsAcknowledged.Bool
-	isFlapping := s.IsFlapping.Valid && s.IsFlapping.Bool
-	if incident.IsMuted != (inDowntime || isAcked || isFlapping) {
-		return false, nil
-	}
-	return true, nil
 }
