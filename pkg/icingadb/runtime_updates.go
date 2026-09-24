@@ -327,6 +327,23 @@ func (r *RuntimeUpdates) Sync(
 	return g.Wait()
 }
 
+// SyncPassive discards the runtime update streams while this instance is not responsible (passive). Only the
+// responsible instance (active) consumes them, so without this a passive instance's streams would grow indefinitely.
+// discarding is safe since a takeover always starts with a full config and state sync from the icinga:* hashes.
+func (r *RuntimeUpdates) SyncPassive(ctx context.Context, ha *HA) {
+	defer periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
+		if _, responsible, _ := ha.State(); responsible {
+			return
+		}
+
+		if _, _, err := r.ClearStreams(ctx); err != nil {
+			r.logger.Warnf("Can't clear passive runtime update streams: %+v", err)
+		}
+	}).Stop()
+
+	<-ctx.Done()
+}
+
 // xRead reads from the runtime update streams and sends the data to the corresponding updateMessages channel.
 // The updateMessages channel is determined by a "redis_key" on each redis message.
 func (r *RuntimeUpdates) xRead(
