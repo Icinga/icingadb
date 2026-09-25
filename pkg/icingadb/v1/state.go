@@ -50,13 +50,18 @@ type State struct {
 // This struct is used to provide additional context about the state, which is going to be used only in memory
 // and not persisted in the database. Currently, these fields are mainly used by the Icinga Notifications component.
 type EphemeralStateInfo struct {
-	IsStateChange          types.Bool      `json:"is_state_change"`
+	StateChange            types.Bool      `json:"is_state_change"`
 	ExecutionEnd           types.UnixMilli `json:"execution_end"`
 	DowntimeTransitionType types.String    `json:"downtime_transition_type"`
 	AckTransitionType      types.String    `json:"ack_transition_type"`
 
 	LastTriggeredDowntimeName types.String `json:"last_triggered_downtime_name"`
 	LastRemovedDowntimeName   types.String `json:"last_removed_downtime_name"`
+}
+
+// IsStateChange returns true if the state is a state change, false otherwise.
+func (esi *EphemeralStateInfo) IsStateChange() bool {
+	return esi.StateChange.Valid && esi.StateChange.Bool
 }
 
 // UnmarshalText implements the [encoding.TextUnmarshaler] interface for EphemeralStateInfo.
