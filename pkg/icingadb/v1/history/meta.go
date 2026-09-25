@@ -74,6 +74,7 @@ type HistoryMeta struct {
 	HostId        types.Binary `json:"host_id"`
 	ServiceId     types.Binary `json:"service_id"`
 	EventType     string       `json:"event_type"`
+	AlertCount    types.Int    `json:"-" db:"alert_count"` // Number of associated alerts in the alert_history table.
 }
 
 // Assert interface compliance.

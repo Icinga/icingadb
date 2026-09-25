@@ -1,6 +1,8 @@
 package v1
 
 import (
+	"encoding/json"
+
 	"github.com/icinga/icinga-go-library/types"
 )
 
@@ -19,6 +21,7 @@ type State struct {
 	AffectsChildren           types.Bool      `json:"affects_children"`
 	IsAcknowledged            types.Bool      `json:"is_acknowledged"`
 	IsStickyAcknowledgement   types.Bool      `json:"is_sticky_acknowledgement"`
+	AcknowledgementSetTime    types.UnixMilli `json:"acknowledgement_set_time"`
 	IsFlapping                types.Bool      `json:"is_flapping"`
 	IsHandled                 types.Bool      `json:"is_handled"`
 	IsProblem                 types.Bool      `json:"is_problem"`
@@ -38,4 +41,35 @@ type State struct {
 	SoftState                 uint8           `json:"soft_state"`
 	StateType                 string          `json:"state_type"`
 	CheckTimeout              types.Float     `json:"check_timeout"`
+
+	MetaData EphemeralStateInfo `json:"metadata" db:"-"` // Excluded from database storage.
+}
+
+// EphemeralStateInfo contains additional metadata about the state that is not stored in the database.
+//
+// This struct is used to provide additional context about the state, which is going to be used only in memory
+// and not persisted in the database. Currently, these fields are mainly used by the Icinga Notifications component.
+type EphemeralStateInfo struct {
+	StateChange            types.Bool      `json:"is_state_change"`
+	ExecutionEnd           types.UnixMilli `json:"execution_end"`
+	DowntimeTransitionType types.String    `json:"downtime_transition_type"`
+	AckTransitionType      types.String    `json:"ack_transition_type"`
+
+	LastTriggeredDowntimeName types.String `json:"last_triggered_downtime_name"`
+	LastRemovedDowntimeName   types.String `json:"last_removed_downtime_name"`
+}
+
+// IsStateChange returns true if the state is a state change, false otherwise.
+func (esi *EphemeralStateInfo) IsStateChange() bool {
+	return esi.StateChange.Valid && esi.StateChange.Bool
+}
+
+// UnmarshalText implements the [encoding.TextUnmarshaler] interface for EphemeralStateInfo.
+func (esi *EphemeralStateInfo) UnmarshalText(text []byte) error { return esi.UnmarshalJSON(text) }
+
+// UnmarshalJSON implements the [json.Unmarshaler] interface for EphemeralStateInfo.
+func (esi *EphemeralStateInfo) UnmarshalJSON(data []byte) error {
+	// Use an alias to unmarshal the JSON data, otherwise, it would cause infinite recursion (might OOM or stack overflow).
+	type alias EphemeralStateInfo
+	return json.Unmarshal(data, (*alias)(esi))
 }
