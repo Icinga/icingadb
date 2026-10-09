@@ -1161,6 +1161,10 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 		return nil
 	}
 
+	// Consider the first line of the check output as the summary.
+	ev.Summary, _, _ = strings.Cut(strings.TrimLeft(ev.Message, "\n\t "), "\n")
+	ev.Summary = utils.EllipsizeRunes(ev.Summary, event.MaxSummaryLen)
+
 	if err := ev.Validate(); err != nil {
 		client.logger.Errorw("BUG: generated event is invalid, skipping submission",
 			zap.Any("event", ev.Event),
