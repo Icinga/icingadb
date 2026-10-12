@@ -209,14 +209,9 @@ func run() int {
 		}
 	}()
 
-	// a passive icinga db instance never consumes runtime updates, so these streams would
-	// grow indefinitely. Discarding them periodically since a takeover always starts with a
-	// full config and state sync from the icinga:* hashes.
-	go func() {
-		logger.Info("Starting passive runtime updates stream clearing")
-
-		rt.SyncPassive(ctx, ha)
-	}()
+	// passively drain runtime update streams, safe as a takeover always starts with a full sync
+	logger.Info("Starting passive runtime updates stream clearing")
+	rt.SyncPassive(ctx, ha)
 
 	// Main loop
 	for {
