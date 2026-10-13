@@ -1111,6 +1111,10 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 	)
 
 	canIgnoreStateUpdate := func(s *v1.State) bool {
+		// Ignore soft PROBLEM -> OK state changes, as these are not relevant for notifications.
+		if s.PreviousHardState == 0 && s.HardState == 0 {
+			return true
+		}
 		// Ignore PENDING -> OK, otherwise we'll have a bunch of incidents that are be closed immediately.
 		// Also ignore any Pending states (99), as these are not relevant for notifications.
 		return s.HardState == 99 || (s.HardState == 0 && s.PreviousHardState == 99)
