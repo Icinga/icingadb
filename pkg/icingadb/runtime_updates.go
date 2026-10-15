@@ -28,6 +28,7 @@ type RuntimeUpdates struct {
 	db     *database.DB
 	redis  *redis.Client
 	logger *logging.Logger
+	mu     sync.Mutex // mutex guards clearStreams against a concurrent passive drain and takeover.
 }
 
 // NewRuntimeUpdates creates a new RuntimeUpdates.
@@ -42,6 +43,14 @@ func NewRuntimeUpdates(db *database.DB, redis *redis.Client, logger *logging.Log
 // ClearStreams returns the stream key to ID mapping of the runtime update streams
 // for later use in Sync and clears the streams themselves.
 func (r *RuntimeUpdates) ClearStreams(ctx context.Context) (config, state redis.Streams, err error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return r.clearStreams(ctx)
+}
+
+// clearStreams is ClearStreams without locking, caller must hold r.mu.
+func (r *RuntimeUpdates) clearStreams(ctx context.Context) (config, state redis.Streams, err error) {
 	config = redis.Streams{"icinga:runtime": "0-0"}
 	state = redis.Streams{"icinga:runtime:state": "0-0"}
 
@@ -325,6 +334,24 @@ func (r *RuntimeUpdates) Sync(
 	g.Go(func() error { return r.redis.XDelOnAllConsumersAck(ctx, streams.Option()[0], xRedisMessageAcks...) })
 
 	return g.Wait()
+}
+
+// SyncPassive discards runtime update streams while this instance is passive. only the active instance
+// consumes them, so a passive instance's streams would grow indefinitely. safe to discard as a takeover
+// always starts with a full config and state sync from the icinga:* hashes.
+func (r *RuntimeUpdates) SyncPassive(ctx context.Context, ha *HA) {
+	periodic.Start(ctx, r.logger.Interval(), func(_ periodic.Tick) {
+		r.mu.Lock()
+		defer r.mu.Unlock()
+
+		if _, responsible, _ := ha.State(); responsible {
+			return
+		}
+
+		if _, _, err := r.clearStreams(ctx); err != nil {
+			r.logger.Warnf("Can't clear passive runtime update streams: %+v", err)
+		}
+	})
 }
 
 // xRead reads from the runtime update streams and sends the data to the corresponding updateMessages channel.
