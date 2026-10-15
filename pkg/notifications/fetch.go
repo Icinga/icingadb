@@ -98,7 +98,9 @@ func (client *Client) fetchObjectsFromRedis(
 	objects := make(map[string]*icingaObject)
 	err := streamRedisHashObjects(ctx, client.redisClient, "icinga:"+typ, func(obj *icingaObject, field string) error {
 		obj.isVolatile = obj.IsVolatile.Valid && obj.IsVolatile.Bool
-		obj.IsVolatile = types.Bool{} // Reset it, so that it is omitted from the JSON output.
+		obj.notificationsEnabled = obj.NotificationsEnabled.Valid && obj.NotificationsEnabled.Bool
+		obj.IsVolatile = types.Bool{}
+		obj.NotificationsEnabled = types.Bool{}
 		objects[field] = obj
 		return nil
 	}, strIds...)
@@ -270,9 +272,14 @@ type icingaObject struct {
 	Name        string `json:"name" db:"name"`
 	DisplayName string `json:"display_name" db:"display_name"`
 	// Vars might be unpopulated for certain types, such as host or service groups.
-	Vars       map[string]any `json:"vars,omitempty" db:"-"`
-	IsVolatile types.Bool     `json:"is_volatile,omitzero" db:"-"`
-	isVolatile bool           // internal representation of IsVolatile, so that it can be omitted from generated JSON
+	Vars map[string]any `json:"vars,omitempty" db:"-"`
+
+	// The following fields are used to determine whether the object has volatile checks or notifications enabled.
+	// They are not serialized to JSON, but are used internally to determine the state of the object.
+	IsVolatile           types.Bool `json:"is_volatile,omitzero" db:"-"`
+	NotificationsEnabled types.Bool `json:"notifications_enabled,omitzero" db:"-"`
+	isVolatile           bool
+	notificationsEnabled bool
 }
 
 // relations of an object to be passed to Icinga Notifications.

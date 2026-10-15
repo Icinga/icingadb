@@ -891,13 +891,12 @@ func (client *Client) buildCommonEvent(
 	objectName = rel.Host.DisplayName
 
 	current := client.currentAPIClient.Load()
-	if current.client == nil {
-		return nil, errors.New("unpopulated API client")
-	}
-
 	if serviceId != nil {
 		if len(rel.Services) == 0 {
 			return nil, errors.New("relations does not contain a service")
+		}
+		if !rel.Services[0].notificationsEnabled {
+			return nil, errIrrelevantStateChange // Skip events for services that have notifications disabled.
 		}
 		serviceName := rel.Services[0].Name
 
@@ -912,6 +911,9 @@ func (client *Client) buildCommonEvent(
 			"service": serviceName,
 		}
 	} else {
+		if !rel.Host.notificationsEnabled {
+			return nil, errIrrelevantStateChange // Skip events for hosts that have notifications disabled.
+		}
 		if current.cfg.Icingaweb2UrlParsed != nil {
 			objectUrl = current.cfg.Icingaweb2UrlParsed.JoinPath("/icingadb/host").String()
 			objectUrl += "?name=" + utils.RawUrlEncode(rel.Host.Name)
