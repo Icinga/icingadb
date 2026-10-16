@@ -28,6 +28,19 @@ type FlappingHistory struct {
 	PercentStateChangeStart  types.Float     `json:"percent_state_change_start"`
 }
 
+// FlappingHistoryMeta is combined struct of FlappingHistory and HistoryMeta.
+type FlappingHistoryMeta struct {
+	FlappingHistory `json:",inline"`
+	HistoryMeta     `json:",inline"`
+}
+
+// Fingerprint implements part of the database.Entity interface.
+//
+// All interface methods are implemented in the embedded structs. Use Fingerprint from FlappingHistory.
+func (f *FlappingHistoryMeta) Fingerprint() database.Fingerprinter {
+	return f.FlappingHistory.Fingerprint()
+}
+
 type HistoryFlapping struct {
 	HistoryMeta       `json:",inline"`
 	FlappingHistoryId types.Binary `json:"id"`

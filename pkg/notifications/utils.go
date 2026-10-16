@@ -95,6 +95,19 @@ func DeriveDeterministicEventUUID(envId types.Binary, eventType, objectName stri
 	return types.MakeUUID(uuid.NewSHA1(uuid.Nil, hash.Sum(nil))), hash.Sum(nil), nil
 }
 
+// deterministicHistoryEventUUID is used in DeriveDeterministicHistoryEventUUID; chosen by fair dice roll.
+var deterministicHistoryEventUUID = uuid.MustParse("bff98847-8619-4cc4-854b-bdcb1f8c1a6d")
+
+// DeriveDeterministicHistoryEventUUID creates a unique event ID for history entries.
+//
+// In an HA setup, both Icinga DB nodes process the history streams. When Icinga Notifications receives an event with
+// an already known Event.ID, it does not process it twice. So, include a deterministic event ID for history events.
+//
+// The UUID is seeded by a static and randomly chosen UUID to ensure it can be differentiated from other event types.
+func DeriveDeterministicHistoryEventUUID(historyId types.Binary) types.UUID {
+	return types.MakeUUID(uuid.NewSHA1(deterministicHistoryEventUUID, historyId))
+}
+
 // GenSHA1 generates a SHA1 hash based on the given environment ID, host name, and service name.
 //
 // This implementation mimics the Icinga 2 ID generation behavior[^1] used to generate all Icinga DB
@@ -120,4 +133,9 @@ func Ternary[T any](condition bool, trueVal, falseVal T) T {
 		return trueVal
 	}
 	return falseVal
+}
+
+// formatMilli formats a [types.UnixMilli] in the same format as Icinga Notifications.
+func formatMilli(t types.UnixMilli) string {
+	return t.Time().Format("2006-01-02 15:04:05 -0700")
 }

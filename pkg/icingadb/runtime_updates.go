@@ -387,7 +387,7 @@ func (r *RuntimeUpdates) xRead(
 }
 
 // structifyStream gets Redis stream messages (redis.XMessage) via the updateMessages channel and converts
-// those messages into Icinga DB entities (contracts.Entity) using the provided structifier.
+// those messages into Icinga DB entities (database.Entity) using the provided structifier.
 // Converted entities are inserted into the upsertEntities or deleteIds channel depending on the "runtime_type" message field.
 func structifyStream(
 	ctx context.Context,
