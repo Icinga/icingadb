@@ -198,11 +198,9 @@ func run() int {
 		logger.Info("Starting history sync")
 
 		var extraStages map[string]history.StageFunc
-		//if notificationsSource != nil {
-		// We don't need to subscribe to the history pipelines anymore, so disabling them temporarily until
-		// someone works on implementing https://github.com/Icinga/icinga-notifications/issues/409.
-		//extraStages = notificationsSource.SyncExtraStages(ctx)
-		//}
+		if notificationsSource != nil {
+			extraStages = notificationsSource.SyncExtraStages(ctx)
+		}
 
 		if err := hs.Sync(ctx, extraStages); err != nil && !utils.IsContextCanceled(err) {
 			logger.Fatalf("%+v", err)

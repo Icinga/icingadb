@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"maps"
+	"math"
 	"reflect"
 	"slices"
 	"strings"
@@ -868,11 +869,9 @@ func (client *Client) sendHeartbeatBlocking(ctx context.Context, alive types.Boo
 // This function is used by all event builders to create a common event structure that includes the host and service
 // names, an Icinga DB Web reference, and the tags for the event.
 // Any event type-specific information (like severity, message, etc.) is added by the specific event builders.
-//
-// The eventTime is used within Event.ID to distinguish two otherwise identical events.
 func (client *Client) buildCommonEvent(
 	ctx context.Context,
-	hostId, serviceId types.Binary,
+	envId, hostId, serviceId types.Binary,
 ) (*fetchableEvent, error) {
 	rel, err := client.fetchHostServiceData(ctx, hostId, serviceId)
 	if err != nil {
@@ -895,6 +894,11 @@ func (client *Client) buildCommonEvent(
 		return nil, errors.New("unpopulated API client")
 	}
 
+	objectTags = map[string]string{
+		"environment": envId.String(),
+		"host":        rel.Host.Name,
+	}
+
 	if serviceId != nil {
 		if len(rel.Services) == 0 {
 			return nil, errors.New("relations does not contain a service")
@@ -907,17 +911,11 @@ func (client *Client) buildCommonEvent(
 			objectUrl += "?name=" + utils.RawUrlEncode(serviceName) +
 				"&host.name=" + utils.RawUrlEncode(rel.Host.Name)
 		}
-		objectTags = map[string]string{
-			"host":    rel.Host.Name,
-			"service": serviceName,
-		}
+		objectTags["service"] = serviceName
 	} else {
 		if current.cfg.Icingaweb2UrlParsed != nil {
 			objectUrl = current.cfg.Icingaweb2UrlParsed.JoinPath("/icingadb/host").String()
 			objectUrl += "?name=" + utils.RawUrlEncode(rel.Host.Name)
-		}
-		objectTags = map[string]string{
-			"host": rel.Host.Name,
 		}
 	}
 
@@ -936,12 +934,10 @@ func (client *Client) buildCommonEvent(
 // The resulted event will have all the necessary information for a state change event, and must
 // not be further modified by the caller.
 func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, serviceId types.Binary) (*fetchableEvent, error) {
-	ev, err := client.buildCommonEvent(ctx, hostId, serviceId)
+	ev, err := client.buildCommonEvent(ctx, s.EnvironmentId, hostId, serviceId)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostId, serviceId)
 	}
-
-	ev.Tags["environment"] = s.EnvironmentId.String()
 
 	var objectName string
 	var isVolatile bool
@@ -1083,28 +1079,89 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 	return ev, nil
 }
 
+// formatMilli formats a [types.UnixMilli] as an RFC3339 string.
+func formatMilli(t types.UnixMilli) string {
+	return t.Time().Format(time.RFC3339)
+}
+
 // buildDowntimeHistoryMetaEvent from a downtime history entry.
 func (client *Client) buildDowntimeHistoryMetaEvent(ctx context.Context, h *v1history.DowntimeHistoryMeta) (*fetchableEvent, error) {
-	defer func() { panic("downtime history event generation is incomplete and not yet implemented") }()
-
-	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+	ev, err := client.buildCommonEvent(ctx, h.EnvironmentId, h.HostId, h.ServiceId)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
 
+	ev.Incident = types.MakeBool(false)
+	ev.Type = h.EventType
+
+	isFlexible := h.IsFlexible.Valid && h.IsFlexible.Bool
+
+	actualStart := h.StartTime
+	if !h.TriggerTime.Time().IsZero() {
+		actualStart = h.TriggerTime
+	}
+
+	var comment string
+	if h.Comment != "" && (!h.ScheduledBy.Valid || h.ScheduledBy.String == "") {
+		comment = fmt.Sprintf("\n\n%s commented: %s", Ternary(h.Author != "", h.Author, "Someone"), h.Comment)
+	}
+
 	switch h.EventType {
 	case "downtime_start":
-		ev.Message = h.Comment
+		ev.Message = "Downtime started\n\n"
+		if isFlexible {
+			if h.FlexibleDuration > math.MaxInt64/uint64(time.Millisecond) {
+				return nil, fmt.Errorf("flexible_duration %d ms exceeds maximum duration", h.FlexibleDuration)
+			}
+
+			ev.Message += fmt.Sprintf(
+				"A flexible downtime of %s started at %s and ends at %s. "+
+					"It could have been triggered between %s and %s.",
+				time.Duration(h.FlexibleDuration)*time.Millisecond,
+				formatMilli(actualStart),
+				formatMilli(h.EndTime),
+				formatMilli(h.ScheduledStartTime),
+				formatMilli(h.ScheduledEndTime))
+		} else {
+			ev.Message += fmt.Sprintf(
+				"A fixed downtime started at %s and ends at %s. "+
+					"It is scheduled from %s to %s (%s).",
+				formatMilli(actualStart),
+				formatMilli(h.EndTime),
+				formatMilli(h.ScheduledStartTime),
+				formatMilli(h.ScheduledEndTime),
+				h.ScheduledEndTime.Time().Sub(h.ScheduledStartTime.Time()))
+		}
+		ev.Message += comment
 
 	case "downtime_end":
+		kind := Ternary(isFlexible, "flexible", "fixed")
+
 		if h.HasBeenCancelled.Valid && h.HasBeenCancelled.Bool {
-			ev.Message = "Downtime was cancelled"
-			if h.CancelledBy.Valid {
-				ev.Message += " (cancelled by " + h.CancelledBy.String + ")"
+			actualEnd := h.EndTime
+			if !h.CancelTime.Time().IsZero() {
+				actualEnd = h.CancelTime
+			}
+
+			ev.Message = fmt.Sprintf(
+				"Downtime was cancelled\n\n"+
+					"The %s downtime started at %s and was cancelled at %s.",
+				kind,
+				formatMilli(actualStart),
+				formatMilli(actualEnd))
+
+			if h.CancelledBy.Valid && h.CancelledBy.String != "" {
+				ev.Message += fmt.Sprintf(" It was cancelled by %s.", h.CancelledBy.String)
 			}
 		} else {
-			ev.Message = "Downtime expired"
+			ev.Message = fmt.Sprintf(
+				"Downtime expired\n\n"+
+					"The %s downtime started at %s and ended at %s.",
+				kind,
+				formatMilli(actualStart),
+				formatMilli(h.EndTime))
 		}
+		ev.Message += comment
 
 	default:
 		return nil, fmt.Errorf("unexpected event type %q", h.EventType)
@@ -1115,50 +1172,34 @@ func (client *Client) buildDowntimeHistoryMetaEvent(ctx context.Context, h *v1hi
 
 // buildFlappingHistoryEvent from a flapping history entry.
 func (client *Client) buildFlappingHistoryEvent(ctx context.Context, h *v1history.FlappingHistory) (*fetchableEvent, error) {
-	defer func() { panic("flapping history event generation is incomplete and not yet implemented") }()
-
-	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
+	ev, err := client.buildCommonEvent(ctx, h.EnvironmentId, h.HostId, h.ServiceId)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
 	}
+
+	ev.Incident = types.MakeBool(false)
 
 	if h.PercentStateChangeEnd.Valid {
+		ev.Type = "flapping_end"
 		ev.Message = fmt.Sprintf(
-			"Checkable stopped flapping (Current flapping value %.2f%% < low threshold %.2f%%)",
-			h.PercentStateChangeEnd.Float64, h.FlappingThresholdLow)
+			"Checkable stopped flapping\n\n"+
+				"Current flapping value %.2f%% is below the low threshold %.2f%%.\n"+
+				"Flapping started at %s and stopped at %s.",
+			h.PercentStateChangeEnd.Float64,
+			h.FlappingThresholdLow,
+			formatMilli(h.StartTime),
+			formatMilli(h.EndTime))
 	} else if h.PercentStateChangeStart.Valid {
+		ev.Type = "flapping_start"
 		ev.Message = fmt.Sprintf(
-			"Checkable started flapping (Current flapping value %.2f%% > high threshold %.2f%%)",
-			h.PercentStateChangeStart.Float64, h.FlappingThresholdHigh)
+			"Checkable started flapping\n\n"+
+				"Current flapping value %.2f%% is above the high threshold %.2f%%.\n"+
+				"Flapping just started at %s.",
+			h.PercentStateChangeStart.Float64,
+			h.FlappingThresholdHigh,
+			formatMilli(h.StartTime))
 	} else {
 		return nil, errors.New("flapping history entry has neither percent_state_change_start nor percent_state_change_end")
-	}
-
-	return ev, nil
-}
-
-// buildAcknowledgementHistoryEvent from an acknowledgment history entry.
-func (client *Client) buildAcknowledgementHistoryEvent(ctx context.Context, h *v1history.AcknowledgementHistory) (*fetchableEvent, error) {
-	defer func() { panic("acknowledgement history event generation is incomplete and not yet implemented") }()
-
-	ev, err := client.buildCommonEvent(ctx, h.HostId, h.ServiceId)
-	if err != nil {
-		return nil, errors.Wrapf(err, "cannot build event for %q,%q", h.HostId, h.ServiceId)
-	}
-
-	if !h.ClearTime.Time().IsZero() {
-		ev.Message = "Acknowledgement was cleared"
-		if h.ClearedBy.Valid {
-			ev.Message += " (cleared by " + h.ClearedBy.String + ")"
-		}
-	} else if !h.SetTime.Time().IsZero() {
-		if h.Comment.Valid {
-			ev.Message = h.Comment.String
-		} else {
-			ev.Message = "Checkable was acknowledged"
-		}
-	} else {
-		return nil, errors.New("acknowledgment history entry has neither a set_time nor a clear_time")
 	}
 
 	return ev, nil
@@ -1197,9 +1238,6 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 	}
 
 	switch h := entity.(type) {
-	case *v1history.AcknowledgementHistory:
-		ev, eventErr = client.buildAcknowledgementHistoryEvent(ctx, h)
-
 	case *v1history.DowntimeHistoryMeta:
 		ev, eventErr = client.buildDowntimeHistoryMetaEvent(ctx, h)
 
@@ -1346,9 +1384,8 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 // from the Icinga DB history stream to Icinga Notifications after being resorted via the StreamSorter.
 func (client *Client) SyncExtraStages(ctx context.Context) map[string]history.StageFunc {
 	var syncKeyStructPtrs = map[string]any{
-		history.SyncPipelineAcknowledgement: (*v1history.AcknowledgementHistory)(nil),
-		history.SyncPipelineDowntime:        (*v1history.DowntimeHistoryMeta)(nil),
-		history.SyncPipelineFlapping:        (*v1history.FlappingHistory)(nil),
+		history.SyncPipelineDowntime: (*v1history.DowntimeHistoryMeta)(nil),
+		history.SyncPipelineFlapping: (*v1history.FlappingHistory)(nil),
 	}
 
 	sorterCallbackFn := func(msg redis.XMessage, key string) bool {
