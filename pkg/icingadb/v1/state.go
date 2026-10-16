@@ -54,6 +54,7 @@ type EphemeralStateInfo struct {
 	ExecutionEnd           types.UnixMilli `json:"execution_end"`
 	DowntimeTransitionType types.String    `json:"downtime_transition_type"`
 	AckTransitionType      types.String    `json:"ack_transition_type"`
+	AckSetTime             types.UnixMilli `json:"ack_set_time"`
 
 	LastTriggeredDowntimeName types.String `json:"last_triggered_downtime_name"`
 	LastRemovedDowntimeName   types.String `json:"last_removed_downtime_name"`
