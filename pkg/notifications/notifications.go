@@ -1041,7 +1041,9 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 		eventType := meta.AckTransitionType.String
 		// See https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2511 and
 		// https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2561
-		ev.ID, historyID, err = DeriveDeterministicEventUUID(s.EnvironmentId, eventType, objectName, s.AcknowledgementSetTime)
+		//
+		// DO NOT USE s.AcknowledgementSetTime here: https://github.com/Icinga/icinga2/pull/11035#discussion_r4285080137
+		ev.ID, historyID, err = DeriveDeterministicEventUUID(s.EnvironmentId, eventType, objectName, meta.AckSetTime)
 		if err != nil {
 			return nil, errors.Wrap(err, "cannot generate event ID")
 		}
