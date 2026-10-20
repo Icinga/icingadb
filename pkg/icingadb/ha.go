@@ -18,6 +18,7 @@ import (
 	icingaredisv1 "github.com/icinga/icingadb/pkg/icingaredis/v1"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/sys/unix"
 	"os"
 	"os/user"
@@ -45,6 +46,10 @@ type NotificationsState struct {
 
 	// The discovered Icinga Notifications listener socket path, if any.
 	socketPath types.String
+
+	// socketPathWarned indicates [HA.probeNotificationsSocketPath] already logged something at warning level.
+	// Later log messages will be degraded to debug to minimize flooding the log.
+	socketPathWarned bool
 
 	// lastProblemLoggedAt is the last time a problem with the Icinga Notifications component was logged.
 	// This is used to suppress recurring log messages.
@@ -690,7 +695,15 @@ func (h *HA) probeNotificationsSocketPath() (socketPath types.String) {
 	if h.notifications.socketPath.Valid && h.notifications.socketPath.String != "" {
 		return h.notifications.socketPath
 	}
-	defer func() { h.notifications.socketPath = socketPath }()
+	defer func() {
+		h.notifications.socketPath = socketPath
+		h.notifications.socketPathWarned = true
+	}()
+
+	warnLevel := zapcore.WarnLevel
+	if h.notifications.socketPathWarned {
+		warnLevel = zapcore.DebugLevel
+	}
 
 	path := os.Getenv("ICINGA_NOTIFICATIONS_LISTENER_SOCKET")
 	if path == "" {
@@ -699,20 +712,27 @@ func (h *HA) probeNotificationsSocketPath() (socketPath types.String) {
 	}
 
 	path = filepath.Clean(path)
-	info, err := os.Stat(path)
+	info, err := os.Stat(path) // #nosec G703 -- Path comes from trusted (by def) environment variable
 	if err != nil {
-		h.logger.Warnw("Failed to stat Icinga Notifications listener socket", zap.String("path", path), zap.Error(err))
+		h.logger.Logw(warnLevel,
+			"Failed to stat Icinga Notifications listener socket",
+			zap.String("path", path),
+			zap.Error(err))
 		return types.MakeString("", types.TransformEmptyStringToNull)
 	}
 
 	if info.Mode()&os.ModeSocket == 0 {
-		h.logger.Warnw("Icinga Notifications listener socket path is not a socket", zap.String("path", path))
+		h.logger.Logw(warnLevel,
+			"Icinga Notifications listener socket path is not a socket",
+			zap.String("path", path))
 		return types.MakeString("", types.TransformEmptyStringToNull)
 	}
 
 	if err := unix.Access(path, unix.R_OK|unix.W_OK); err != nil {
-		h.logger.Warnw("Icinga DB user has no permissions to access Icinga Notifications listener socket",
-			zap.String("path", path), zap.Error(err))
+		h.logger.Logw(warnLevel,
+			"Icinga DB user has no permissions to access Icinga Notifications listener socket",
+			zap.String("path", path),
+			zap.Error(err))
 		return types.MakeString("", types.TransformEmptyStringToNull)
 	}
 
