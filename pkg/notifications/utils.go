@@ -22,9 +22,9 @@ func StateToSeverity(s *v1.State, isService bool) (event.Severity, error) {
 		case 1:
 			return event.SeverityWarning, nil
 		case 2:
-			return event.SeverityCrit, nil
+			return event.SeverityCritical, nil
 		case 3:
-			return event.SeverityErr, nil
+			return event.SeverityError, nil
 		default:
 			return event.SeverityNone, fmt.Errorf("unexpected service state %d", s.HardState)
 		}
@@ -33,7 +33,7 @@ func StateToSeverity(s *v1.State, isService bool) (event.Severity, error) {
 		case 0:
 			return event.SeverityOK, nil
 		case 1:
-			return event.SeverityCrit, nil
+			return event.SeverityCritical, nil
 		default:
 			return event.SeverityNone, fmt.Errorf("unexpected host state %d", s.HardState)
 		}
