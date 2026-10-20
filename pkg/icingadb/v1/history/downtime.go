@@ -12,17 +12,17 @@ type DowntimeHistoryEntity struct {
 	DowntimeId types.Binary `json:"downtime_id"`
 }
 
-// Fingerprint implements part of the contracts.Entity interface.
+// Fingerprint implements part of the database.Entity interface.
 func (dhe DowntimeHistoryEntity) Fingerprint() database.Fingerprinter {
 	return dhe
 }
 
-// ID implements part of the contracts.Entity interface.
+// ID implements part of the database.Entity interface.
 func (dhe DowntimeHistoryEntity) ID() database.ID {
 	return dhe.DowntimeId
 }
 
-// SetID implements part of the contracts.Entity interface.
+// SetID implements part of the database.Entity interface.
 //
 // The id must be of type types.Binary. Otherwise, the method will panic.
 func (dhe *DowntimeHistoryEntity) SetID(id database.ID) {

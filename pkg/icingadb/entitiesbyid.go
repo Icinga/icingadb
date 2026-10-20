@@ -5,7 +5,7 @@ import (
 	"github.com/icinga/icinga-go-library/database"
 )
 
-// EntitiesById is a map of key-contracts.Entity pairs.
+// EntitiesById is a map of key-database.Entity pairs.
 type EntitiesById map[string]database.Entity
 
 // Keys returns the keys.

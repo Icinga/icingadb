@@ -13,17 +13,17 @@ type CommentHistoryEntity struct {
 	CommentId types.Binary `json:"comment_id"`
 }
 
-// Fingerprint implements part of the contracts.Entity interface.
+// Fingerprint implements part of the database.Entity interface.
 func (che CommentHistoryEntity) Fingerprint() database.Fingerprinter {
 	return che
 }
 
-// ID implements part of the contracts.Entity interface.
+// ID implements part of the database.Entity interface.
 func (che CommentHistoryEntity) ID() database.ID {
 	return che.CommentId
 }
 
-// SetID implements part of the contracts.Entity interface.
+// SetID implements part of the database.Entity interface.
 //
 // The id must be of type types.Binary. Otherwise, the method will panic.
 func (che *CommentHistoryEntity) SetID(id database.ID) {

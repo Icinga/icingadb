@@ -16,7 +16,6 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/sync/errgroup"
 	"reflect"
-	"slices"
 	"sync"
 )
 
@@ -39,7 +38,8 @@ func NewSync(db *database.DB, redis *redis.Client, logger *logging.Logger) *Sync
 // Sync synchronizes Redis history streams from s.redis to s.db and deletes the original data on success.
 //
 // The optional extraStages parameter allows specifying an additional extra stage for each pipeline, identified by their
-// key. This stage is executed after every other stage, but before the entry gets deleted from Redis.
+// key. This stage runs in parallel to the pipeline and consumes the same messages. An entry is deleted from Redis after
+// both pipelines and the extra stage finished processing.
 func (s Sync) Sync(ctx context.Context, extraStages map[string]StageFunc) error {
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -61,22 +61,12 @@ func (s Sync) Sync(ctx context.Context, extraStages map[string]StageFunc) error 
 		//     deleteFromRedis()  After all stages have processed a message successfully, this final stage deletes
 		//                        the history entry from the Redis stream as it is now persisted in the database.
 		//
-		// Each history entry is processed by at most one stage at each time. Each state must forward the entry after
-		// it has processed it, even if the stage itself does not do anything with this specific entry. It should only
-		// forward the entry after it has completed its own sync so that later stages can rely on previous stages being
-		// executed successfully.
+		// Each history entry is processed by at most one pipeline stage at each time. Each state must forward the entry
+		// after it has processed it, even if the stage itself does not do anything with this specific entry. It should
+		// only forward the entry after it has completed its own sync so that later stages can rely on previous stages
+		// being executed successfully.
 		//
-		// If an extra stage exists for this key, it will be appended to the pipeline. Thus, it is executed after every
-		// other pipeline action, but before deleteFromRedis.
-
-		// Shadowed variable to allow appending custom callbacks.
-		pipeline := pipeline
-		if extraStages != nil {
-			extraStage, ok := extraStages[key]
-			if ok {
-				pipeline = append(slices.Clip(pipeline), extraStage)
-			}
-		}
+		// If an extra stage exists for this key, it starts a parallel pipeline, synced in deleteFromRedis.
 
 		ch := make([]chan redis.XMessage, len(pipeline)+1)
 		for i := range ch {
@@ -87,6 +77,17 @@ func (s Sync) Sync(ctx context.Context, extraStages map[string]StageFunc) error 
 			} else {
 				ch[i] = make(chan redis.XMessage)
 			}
+		}
+
+		deleteInputs := []<-chan redis.XMessage{ch[len(pipeline)]}
+		if extraStage, ok := extraStages[key]; ok {
+			extraStageIn := make(chan redis.XMessage, s.redis.Options.XReadCount)
+			extraStageOut := make(chan redis.XMessage)
+
+			deleteInputs = append(deleteInputs, extraStageOut)
+
+			g.Go(func() error { return s.readFromRedis(ctx, key, extraStageIn) })
+			g.Go(func() error { return extraStage(ctx, s, key, extraStageIn, extraStageOut) })
 		}
 
 		g.Go(func() error {
@@ -100,7 +101,7 @@ func (s Sync) Sync(ctx context.Context, extraStages map[string]StageFunc) error 
 		}
 
 		g.Go(func() error {
-			return s.deleteFromRedis(ctx, key, ch[len(pipeline)])
+			return s.deleteFromRedis(ctx, key, deleteInputs...)
 		})
 	}
 
@@ -137,9 +138,9 @@ func (s Sync) readFromRedis(ctx context.Context, key string, output chan<- redis
 	}
 }
 
-// deleteFromRedis is the last stage of the history sync pipeline. It receives history entries from the second to last
-// pipeline stage and then deletes the stream entry from Redis as all pipeline stages successfully processed the entry.
-func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redis.XMessage) error {
+// deleteFromRedis is the last stage of the history sync pipeline. It receives history entries from the last pipeline
+// stage and, if present, the extra stage. The stream entry is deleted from Redis after all inputs acknowledged it.
+func (s Sync) deleteFromRedis(ctx context.Context, key string, inputs ...<-chan redis.XMessage) error {
 	var counter com.Counter
 	defer periodic.Start(ctx, s.logger.Interval(), func(_ periodic.Tick) {
 		if count := counter.Reset(); count > 0 {
@@ -147,30 +148,29 @@ func (s Sync) deleteFromRedis(ctx context.Context, key string, input <-chan redi
 		}
 	}).Stop()
 
-	bulks := com.Bulk(ctx, input, s.redis.Options.HScanCount, com.NeverSplit[redis.XMessage])
-	stream := "icinga:history:stream:" + key
-	for {
-		select {
-		case bulk, ok := <-bulks:
-			if !ok {
-				return nil
-			}
+	xRedisMessageAcks := make([]<-chan string, len(inputs))
+	for i, input := range inputs {
+		ids := make(chan string)
+		xRedisMessageAcks[i] = ids
 
-			ids := make([]string, len(bulk))
-			for i := range bulk {
-				ids[i] = bulk[i].ID
-			}
+		go func() {
+			defer close(ids)
 
-			cmd := s.redis.XDel(ctx, stream, ids...)
-			if _, err := cmd.Result(); err != nil {
-				return redis.WrapCmdErr(cmd)
-			}
+			for msg := range input {
+				select {
+				case ids <- msg.ID:
+				case <-ctx.Done():
+					return
+				}
 
-			counter.Add(uint64(len(ids)))
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+				if i == 0 {
+					counter.Inc()
+				}
+			}
+		}()
 	}
+
+	return s.redis.XDelOnAllConsumersAck(ctx, "icinga:history:stream:"+key, xRedisMessageAcks...)
 }
 
 // StageFunc is a function type that represents a sync pipeline stage. It is called with a context (it should stop

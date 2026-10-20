@@ -44,7 +44,7 @@ func (s SyncSubject) Entity() database.Entity {
 	return s.entity
 }
 
-// Factory returns the entity factory function that calls Init() on the created contracts.Entity if applicable.
+// Factory returns the entity factory function that calls Init() on the created database.Entity if applicable.
 func (s SyncSubject) Factory() database.EntityFactoryFunc {
 	return s.factory
 }

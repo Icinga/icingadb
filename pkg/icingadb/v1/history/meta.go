@@ -29,17 +29,17 @@ type HistoryEntity struct {
 	Id types.Binary `json:"event_id"`
 }
 
-// Fingerprint implements part of the contracts.Entity interface.
+// Fingerprint implements part of the database.Entity interface.
 func (he HistoryEntity) Fingerprint() database.Fingerprinter {
 	return he
 }
 
-// ID implements part of the contracts.Entity interface.
+// ID implements part of the database.Entity interface.
 func (he HistoryEntity) ID() database.ID {
 	return he.Id
 }
 
-// SetID implements part of the contracts.Entity interface.
+// SetID implements part of the database.Entity interface.
 //
 // The id must be of type types.Binary. Otherwise, the method will panic.
 func (he *HistoryEntity) SetID(id database.ID) {
