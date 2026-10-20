@@ -625,7 +625,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 				}
 
 				// If the entity is new or has a different state than the existing incident, submit it to Icinga
-				// Notifications via the regular /process-event endpoint. Though, in case the API isn't healthy,
+				// Notifications via the regular /v1/process-event endpoint. Though, in case the API isn't healthy,
 				// it will retry it endlessly, so set a timeout to avoid blocking the entire config dump.
 				func() {
 					ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
