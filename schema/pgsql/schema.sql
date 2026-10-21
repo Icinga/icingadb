@@ -2133,7 +2133,7 @@ CREATE TABLE alert_history_ref (
 
   last_update biguint NOT NULL, -- unix timestamp of the last insert or update of this row.
 
-  CONSTRAINT pk_alert_history_ref PRIMARY KEY (history_id),
+  CONSTRAINT pk_alert_history_ref PRIMARY KEY (history_id_uuid, history_id),
   CONSTRAINT uq_alert_history_ref_history_id_uuid UNIQUE (history_id_uuid)
 );
 

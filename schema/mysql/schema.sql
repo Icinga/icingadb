@@ -1332,7 +1332,7 @@ CREATE TABLE alert_history_ref (
 
   last_update bigint unsigned NOT NULL, -- unix timestamp of the last insert or update of this row.
 
-  PRIMARY KEY (history_id),
+  PRIMARY KEY (history_id_uuid, history_id),
 
   UNIQUE INDEX uq_alert_history_ref_history_id_uuid (history_id_uuid),
   INDEX idx_alert_history_ref_host_id_service_id (host_id, service_id),
