@@ -1019,6 +1019,7 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 	// If none of the above applies, then this is probably a useless event that Icinga Notifications doesn't
 	// need to care about, so we just skip it.
 	var historyID types.Binary
+	var historyIDUUID types.UUID
 	switch meta := s.MetaData; true {
 	case !meta.IsStateChange.Valid:
 		// User is probably using an older Icinga 2 version or this is from the initial config
@@ -1033,13 +1034,15 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 			return nil, errors.Wrap(err, "cannot generate event ID")
 		}
 
+		historyIDUUID = ev.ID
+
 	case meta.AckTransitionType.Valid:
 		eventType := meta.AckTransitionType.String
 		// See https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2511 and
 		// https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2561
 		//
 		// DO NOT USE s.AcknowledgementSetTime here: https://github.com/Icinga/icinga2/pull/11035#discussion_r4285080137
-		_, historyID, err = DeriveDeterministicEventUUID(s.EnvironmentId, eventType, objectName, meta.AckSetTime)
+		historyIDUUID, historyID, err = DeriveDeterministicEventUUID(s.EnvironmentId, eventType, objectName, meta.AckSetTime)
 		if err != nil {
 			return nil, errors.Wrap(err, "cannot generate event ID")
 		}
@@ -1054,6 +1057,8 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 			if err != nil {
 				return nil, errors.Wrap(err, "cannot generate event ID")
 			}
+
+			historyIDUUID = ev.ID
 			break
 		}
 
@@ -1071,7 +1076,7 @@ func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, 
 		// Prepare the alert history reference for the Submit function to persist the mapping after successful submission.
 		ev.alertHistoryRef = &AlertHistoryRef{
 			HistoryID:     historyID,
-			HistoryIDUUID: ev.ID,
+			HistoryIDUUID: historyIDUUID,
 			HostID:        hostId,
 			ServiceID:     serviceId,
 			LastUpdate:    types.UnixMilli(time.Now()),
