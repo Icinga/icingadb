@@ -1096,6 +1096,13 @@ func (client *Client) buildDowntimeHistoryMetaEvent(ctx context.Context, h *v1hi
 	ev.ID = DeriveDeterministicHistoryEventUUID(h.Id)
 	ev.Incident = types.MakeBool(false)
 	ev.Type = h.EventType
+	ev.alertHistoryRef = &AlertHistoryRef{
+		HistoryID:     h.Id,
+		HistoryIDUUID: ev.ID,
+		HostID:        h.HostId,
+		ServiceID:     h.ServiceId,
+		LastUpdate:    types.UnixMilli(time.Now()),
+	}
 
 	isFlexible := h.IsFlexible.Valid && h.IsFlexible.Bool
 
@@ -1222,6 +1229,13 @@ func (client *Client) buildFlappingHistoryEvent(ctx context.Context, h *v1histor
 
 	ev.ID = DeriveDeterministicHistoryEventUUID(h.Id)
 	ev.Incident = types.MakeBool(false)
+	ev.alertHistoryRef = &AlertHistoryRef{
+		HistoryID:     h.Id,
+		HistoryIDUUID: ev.ID,
+		HostID:        h.HostId,
+		ServiceID:     h.ServiceId,
+		LastUpdate:    types.UnixMilli(time.Now()),
+	}
 
 	if h.PercentStateChangeEnd.Valid {
 		ev.Type = "flapping_end"
