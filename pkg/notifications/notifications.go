@@ -615,14 +615,28 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 					return nil
 				}
 
+				var s *v1.State
+				var isService bool
+				switch e := entity.(type) {
+				case *v1.HostState:
+					s = &e.State
+				case *v1.ServiceState:
+					s = &e.State
+					isService = true
+				default:
+					panic("unreachable")
+				}
+
 				if ir, exists := client.incidentsByObjId[entity.ID().String()]; exists {
-					if same, err := HaveSameState(ir.Incident, entity); err != nil {
+					if same, err := HaveSameState(ir.Incident, s, isService); err != nil {
 						return err
 					} else if same {
 						// Same state, but not necessarily the same output/message, and since we have a separate
 						// worker for syncing check outputs (see Client.SyncCheckOutputs), skip it entirely here.
 						continue
 					}
+				} else if s.HardState == 0 {
+					continue // No existing incident to close, and the new state is OK, so nothing to do.
 				}
 
 				// If the entity is new or has a different state than the existing incident, submit it to Icinga

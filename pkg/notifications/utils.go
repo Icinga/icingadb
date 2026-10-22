@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/icinga/icinga-go-library/database"
 	"github.com/icinga/icinga-go-library/notifications/event"
 	"github.com/icinga/icinga-go-library/notifications/source"
 	"github.com/icinga/icinga-go-library/objectpacker"
@@ -45,19 +44,7 @@ func StateToSeverity(s *v1.State, isService bool) (event.Severity, error) {
 // This function is used to determine if an incident in Icinga Notifications corresponds to the current state
 // of a checkable in Icinga DB. It compares the severity and muted status of the incident with the state of the
 // entity and returns true if they match, false otherwise. If the entity type is unsupported, an error is returned.
-func HaveSameState(incident source.Incident, entity database.Entity) (bool, error) {
-	var s *v1.State
-	var isService bool
-	switch e := entity.(type) {
-	case *v1.HostState:
-		s = &e.State
-	case *v1.ServiceState:
-		s = &e.State
-		isService = true
-	default:
-		return false, fmt.Errorf("unsupported entity type %T", entity)
-	}
-
+func HaveSameState(incident source.Incident, s *v1.State, isService bool) (bool, error) {
 	severity, err := StateToSeverity(s, isService)
 	if err != nil {
 		return false, err
