@@ -158,6 +158,7 @@ func (client *Client) SyncAlertHistories(ctx context.Context) error {
 				ChannelName:      nh.ChannelName,
 				TriggeredAt:      nh.TriggeredAt,
 				EventMessage:     nh.EventMessage,
+				EventSummary:     nh.EventSummary,
 			}
 
 			err := retry.WithBackoff(
@@ -293,6 +294,7 @@ type AlertHistory struct {
 	ChannelName      string          `db:"channel_name"`
 	TriggeredAt      types.UnixMilli `db:"triggered_at"`
 	EventMessage     string          `db:"event_message"`
+	EventSummary     string          `db:"event_summary"`
 }
 
 // AlertHistoryRef maps a history.id to the deterministic event UUID submitted to Icinga Notifications.

@@ -1353,6 +1353,7 @@ CREATE TABLE alert_history (
   channel_name text DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   triggered_at bigint unsigned NOT NULL,
   event_message longtext NOT NULL,
+  event_summary longtext NOT NULL,
 
   PRIMARY KEY (id),
 

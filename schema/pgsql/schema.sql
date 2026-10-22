@@ -2158,6 +2158,7 @@ CREATE TABLE alert_history (
   channel_name citext,
   triggered_at biguint NOT NULL,
   event_message text NOT NULL,
+  event_summary text NOT NULL,
 
   CONSTRAINT pk_alert_history PRIMARY KEY (id),
 
