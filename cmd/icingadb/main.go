@@ -3,8 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+
 	"github.com/icinga/icinga-go-library/logging"
 	"github.com/icinga/icinga-go-library/redis"
+	"github.com/icinga/icinga-go-library/types"
 	"github.com/icinga/icinga-go-library/utils"
 	"github.com/icinga/icingadb/internal"
 	"github.com/icinga/icingadb/internal/command"
@@ -20,12 +28,6 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
-	"os"
-	"os/signal"
-	"sync"
-	"sync/atomic"
-	"syscall"
-	"time"
 )
 
 const (
@@ -142,7 +144,8 @@ func run() int {
 			db,
 			heartbeat,
 			logs.GetChildLogger("high-availability"),
-			cmd.Config.Notifications.SynchronizeWithDatabase)
+			cmd.Config.Notifications.SynchronizeWithDatabase,
+			notifications.CheckIcinga2Version)
 
 		telemetryLogger := logs.GetChildLogger("telemetry")
 		telemetrySyncStats = telemetry.StartHeartbeat(ctx, rc, telemetryLogger, ha, heartbeat)
@@ -240,6 +243,27 @@ func run() int {
 						// Decided once per sync round, so that everything within agrees on whether Icinga Notifications
 						// is available. Any later change of the Client cancels synctx and starts a new round.
 						notificationsConfigured := notificationsSource != nil && notificationsSource.IsConfigured()
+						// The version is only valid for this round, so a change of it starts a new one as well.
+						icinga2Version, icinga2VersionChangedCh := ha.Icinga2Version()
+						if notificationsConfigured {
+							// Without a recent enough Icinga 2, Icinga DB can't submit correct events.
+							if err := notifications.CheckIcinga2Version(icinga2Version); err != nil {
+								logger.Warnw("Not submitting events to Icinga Notifications", zap.Error(err))
+								notificationsConfigured = false
+
+								// Nothing else is going to report the component's health, so do it here. This is a
+								// state rather than an event, hence it must not be dropped.
+								select {
+								case ha.NotificationsHeartbeat() <- types.MakeBool(false):
+								case <-synctx.Done():
+								}
+							}
+						} else {
+							// The version is irrelevant without Icinga Notifications. Don't restart for a change of it,
+							// a nil channel blocks forever. If Icinga Notifications gets configured later on, this
+							// round is restarted anyway and the version is checked again.
+							icinga2VersionChangedCh = nil
+						}
 
 						// Clear the runtime update streams before starting anything else (rather than after the sync),
 						// otherwise updates may be lost.
@@ -274,6 +298,10 @@ func run() int {
 								return nil
 							case <-notificationsReconfiguredCh:
 								logger.Info("Icinga Notifications component has been reconfigured, restarting sync")
+								cancelSynctx()
+								return nil
+							case <-icinga2VersionChangedCh:
+								logger.Info("Icinga 2 version has changed, restarting sync")
 								cancelSynctx()
 								return nil
 							case <-synctx.Done():

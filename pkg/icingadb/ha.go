@@ -5,6 +5,13 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
+	"os"
+	"os/user"
+	"path/filepath"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/database"
@@ -20,12 +27,6 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"golang.org/x/sys/unix"
-	"os"
-	"os/user"
-	"path/filepath"
-	"sync"
-	"sync/atomic"
-	"time"
 )
 
 // peerTimeout defines the timeout for HA heartbeats, being used to detect absent nodes.
@@ -79,7 +80,9 @@ type HA struct {
 	done        chan struct{}
 	errOnce     sync.Once
 	err         error
-	mu          sync.Mutex // protects environment, endpointId, and err
+	icinga2Ver  string
+	verChanged  chan struct{} // closed and replaced whenever icinga2Ver changes
+	mu          sync.Mutex    // protects environment, endpointId, icinga2Ver, verChanged, and err
 
 	// notificationsHeartbeat is a channel that signals the status of the Icinga Notifications component.
 	//
@@ -89,6 +92,9 @@ type HA struct {
 	notificationsHeartbeatCh             chan types.Bool
 	notifications                        NotificationsState
 	notificationsSynchronizeWithDatabase types.Bool
+
+	// icinga2VersionCheck returns an error if the Icinga 2 version is too old to be used with Icinga Notifications.
+	icinga2VersionCheck func(version string) error
 }
 
 // NewHA returns a new HA and starts the controller loop.
@@ -98,6 +104,7 @@ func NewHA(
 	heartbeat *icingaredis.Heartbeat,
 	logger *logging.Logger,
 	notificationsSynchronizeWithDatabase bool,
+	icinga2VersionCheck func(version string) error,
 ) *HA {
 	ctx, cancelCtx := context.WithCancel(ctx)
 
@@ -113,9 +120,11 @@ func NewHA(
 		handover:   make(chan string),
 		takeover:   make(chan string),
 		done:       make(chan struct{}),
+		verChanged: make(chan struct{}),
 
 		notificationsHeartbeatCh:             make(chan types.Bool),
 		notificationsSynchronizeWithDatabase: types.MakeBool(notificationsSynchronizeWithDatabase),
+		icinga2VersionCheck:                  icinga2VersionCheck,
 	}
 
 	ha.state.Store(&haState{})
@@ -156,6 +165,15 @@ func (h *HA) EndpointID() types.Binary {
 	defer h.mu.Unlock()
 
 	return h.endpointId
+}
+
+// Icinga2Version returns the Icinga 2 version from the last received heartbeat, which is empty as long as no heartbeat
+// has been processed, and a channel that is closed as soon as a heartbeat reports a different version.
+func (h *HA) Icinga2Version() (string, <-chan struct{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	return h.icinga2Ver, h.verChanged
 }
 
 // Err returns an error if Done has been closed and there is an error. Otherwise returns nil.
@@ -253,6 +271,11 @@ func (h *HA) controller() {
 							zap.String("new", s.EndpointId.String()))
 					}
 					h.endpointId = s.EndpointId
+				}
+				if h.icinga2Ver != s.Version {
+					h.icinga2Ver = s.Version
+					close(h.verChanged)
+					h.verChanged = make(chan struct{})
 				}
 				h.mu.Unlock()
 
@@ -673,7 +696,7 @@ func (h *HA) verifyNotificationsState() bool {
 		// If we're indeed running in a multi-instance environment, we should hand over responsibility
 		// to another instance, otherwise there's no other instance to take over, so we let this retry
 		// its connection attempts to the Icinga Notifications API.
-		if h.instanceCount() > 1 {
+		if h.icinga2VersionCheck(h.icinga2Ver) == nil && h.instanceCount() > 1 {
 			h.signalHandover("notifications component has been unhealthy for a long time")
 			h.realizeLostHeartbeat()
 
