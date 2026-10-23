@@ -193,6 +193,12 @@ If configured, Icinga DB will submit events to the Icinga Notifications API.
 
 !!! important
 
+    Icinga DB requires Icinga 2 v2.16.6 or later to submit events to Icinga Notifications. If the Icinga 2 version
+    is too old, Icinga DB logs a warning, marks the Notifications component as unhealthy and does not launch the
+    Icinga Notifications integration.
+
+!!! important
+
     When using Icinga DB with SELinux, please enable the `icingadb_can_connect_all` SELinux boolean to allow Icinga DB to connect to the Icinga Notifications API.
 
     ```

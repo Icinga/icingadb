@@ -228,10 +228,12 @@ func (client *Client) exchangeAPIClientSession(cfg config.NotificationsConfig, w
 // or unconfigured, the provided ctx is canceled, or when the returned canceler is called, whichever happens first.
 // If a non-nil session is returned, the canceler must always be called to release the associated resources.
 //
-// If the client is unconfigured, nil values are returned for all three return values.
+// If the client is unconfigured or Icinga 2 is too old, nil values are returned for all three return values.
+// The latter must be checked here, as not everything using the client is bound to the sync round deciding about it,
+// e.g., the history sync stages from SyncExtraStages.
 func (client *Client) apiClient(ctx context.Context) (*source.Client, context.Context, context.CancelFunc) {
 	current := client.currentAPIClient.Load()
-	if current.client == nil {
+	if current.client == nil || client.icinga2TooOld() {
 		return nil, nil, nil
 	}
 
@@ -245,6 +247,16 @@ func (client *Client) apiClient(ctx context.Context) (*source.Client, context.Co
 //
 // If DB synchronization is disabled, a nil channel is returned and waiters will block forever.
 func (client *Client) ReconfiguredCh() <-chan struct{} { return client.reconfiguredCh }
+
+// icinga2TooOld reports whether Icinga 2 is known to be too old to submit correct events.
+//
+// An unknown version, as before the first heartbeat, is not considered too old. Otherwise, the history sync, which
+// starts right away, would drop all the events from its backlog.
+func (client *Client) icinga2TooOld() bool {
+	version, _ := client.ha.Icinga2Version()
+
+	return version != "" && CheckIcinga2Version(version) != nil
+}
 
 // IsConfigured reports whether the Icinga Notifications API client is available.
 func (client *Client) IsConfigured() bool { return client.currentAPIClient.Load().client != nil }
@@ -1028,9 +1040,10 @@ func (client *Client) buildStateEvent(
 	// for each state, so that the SyncAlertHistories background worker can map the resulting notifications
 	// back to the original Icinga 2 event in the history table.
 	//
-	// First and foremost, if we don't have a recent enough Icinga 2 version (somewhere after v2.16.5 and v2.15.6),
-	// it's impossible to reconstruct the original event ID, so we just leave it empty and let Icinga Notifications
-	// generate one on its own. Otherwise, we can derive our own deterministic event ID by apply the following priority:
+	// First and foremost, if we don't have all the required metadata, e.g., for an Icinga 2 version older than v2.16.6
+	// (which is rejected by CheckIcinga2Version before getting here), it's impossible to reconstruct the original
+	// event ID, so we just leave it empty and let Icinga Notifications generate one on its own. Otherwise, we can
+	// derive our own deterministic event ID by apply the following priority:
 	//
 	// 1. If this is a real state change update that we haven't seen before, the event ID must match the corresponding
 	//    Icinga 2 state change history ID. This is the most important case, and it must be handled first.
@@ -1043,9 +1056,8 @@ func (client *Client) buildStateEvent(
 	var historyIDUUID types.UUID
 	switch meta := s.MetaData; true {
 	case !meta.IsStateChange.Valid:
-		// User is probably using an older Icinga 2 version or this is from the initial config
-		// dump (see Client.ApplyDelta), so we cannot derive a deterministic event ID.
-		// Let Icinga Notifications generate one.
+		// This is probably from the initial config dump (see Client.ApplyDelta), so we cannot derive
+		// a deterministic event ID. Let Icinga Notifications generate one.
 
 	case meta.IsStateChange.Bool:
 		ts := meta.ExecutionEnd
