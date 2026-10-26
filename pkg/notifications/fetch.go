@@ -11,7 +11,6 @@ import (
 	"github.com/icinga/icinga-go-library/backoff"
 	"github.com/icinga/icinga-go-library/com"
 	"github.com/icinga/icinga-go-library/database"
-	"github.com/icinga/icinga-go-library/redis"
 	"github.com/icinga/icinga-go-library/retry"
 	"github.com/icinga/icinga-go-library/types"
 	"github.com/jmoiron/sqlx"
@@ -33,9 +32,8 @@ func panicForInvalidType(allowList []string, request string) {
 //
 // This function is used to stream generic objects, such as hosts, host states, etc., from Redis.
 // The visitor function is called for each object, and can return an error to stop the streaming.
-func streamRedisHashObjects[T any](
+func (client *Client) streamRedisHashObjects[T any](
 	ctx context.Context,
-	redisClient *redis.Client,
 	key string,
 	visitor func(*T, string) error,
 	ids ...string,
@@ -43,7 +41,7 @@ func streamRedisHashObjects[T any](
 	return retry.WithBackoff(
 		ctx,
 		func(ctx context.Context) error {
-			pairCh, errCh := redisClient.HMYield(ctx, key, ids...)
+			pairCh, errCh := client.redisClient.HMYield(ctx, key, ids...)
 
 			g, ctx := errgroup.WithContext(ctx)
 
@@ -96,9 +94,7 @@ func (client *Client) fetchObjectsFromRedis(
 	}
 
 	objects := make(map[string]*icingaObject)
-	err := streamRedisHashObjects(ctx, client.redisClient, "icinga:"+typ, func(obj *icingaObject, field string) error {
-		obj.isVolatile = obj.IsVolatile.Valid && obj.IsVolatile.Bool
-		obj.IsVolatile = types.Bool{} // Reset it, so that it is omitted from the JSON output.
+	err := client.streamRedisHashObjects(ctx, "icinga:"+typ, func(obj *icingaObject, field string) error {
 		objects[field] = obj
 		return nil
 	}, strIds...)
@@ -270,9 +266,7 @@ type icingaObject struct {
 	Name        string `json:"name" db:"name"`
 	DisplayName string `json:"display_name" db:"display_name"`
 	// Vars might be unpopulated for certain types, such as host or service groups.
-	Vars       map[string]any `json:"vars,omitempty" db:"-"`
-	IsVolatile types.Bool     `json:"is_volatile,omitzero" db:"-"`
-	isVolatile bool           // internal representation of IsVolatile, so that it can be omitted from generated JSON
+	Vars map[string]any `json:"vars,omitempty" db:"-"`
 }
 
 // relations of an object to be passed to Icinga Notifications.

@@ -797,7 +797,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 			var wg sync.WaitGroup
 			if len(hostIncidents) > 0 {
 				wg.Go(func() {
-					_ = streamRedisHashObjects(ctx, client.redisClient, "icinga:host:state", func(hs *v1.HostState, _ string) error {
+					_ = client.streamRedisHashObjects(ctx, "icinga:host:state", func(hs *v1.HostState, _ string) error {
 						return modify(ctx, nc, &hs.State, hostIncidents[hs.HostId.String()].ObjectTags)
 					}, slices.Collect(maps.Keys(hostIncidents))...)
 				})
@@ -805,7 +805,7 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 
 			if len(serviceIncidents) > 0 {
 				wg.Go(func() {
-					_ = streamRedisHashObjects(ctx, client.redisClient, "icinga:service:state", func(ss *v1.ServiceState, _ string) error {
+					_ = client.streamRedisHashObjects(ctx, "icinga:service:state", func(ss *v1.ServiceState, _ string) error {
 						return modify(ctx, nc, &ss.State, serviceIncidents[ss.ServiceId.String()].ObjectTags)
 					}, slices.Collect(maps.Keys(serviceIncidents))...)
 				})
@@ -964,20 +964,9 @@ func (client *Client) buildStateEvent(
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostId, serviceId)
 	}
 
-	var objectName string
-	var isVolatile bool
+	objectName := ev.Host.Name
 	if serviceId != nil {
-		isVolatile = ev.Services[0].isVolatile
-		objectName = ev.Host.Name + "!" + ev.Services[0].Name
-	} else {
-		isVolatile = ev.Host.isVolatile
-		objectName = ev.Host.Name
-	}
-
-	// If the checkable is volatile, it's always treated as a hard state change, but `StateType` is still set
-	// to `SOFT` due to an Icinga 2 bug (see https://github.com/Icinga/icinga2/issues/10879).
-	if s.StateType != common.HardState && !isVolatile {
-		return nil, errIrrelevantStateChange
+		objectName += "!" + ev.Services[0].Name
 	}
 
 	if sev, err := StateToSeverity(s, serviceId != nil); err != nil {
@@ -1014,7 +1003,7 @@ func (client *Client) buildStateEvent(
 		}
 		ev.MutedReason += "."
 	} else {
-		ev.MutedReason = "Checkable is not muted (no active downtime, no acknowledgement, and not flapping)"
+		ev.MutedReason = "Checkable is not muted (no active downtime, no acknowledgement, and not flapping)."
 	}
 
 	ev.Incident = types.MakeBool(true)
@@ -1348,6 +1337,10 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 	)
 
 	canIgnoreStateUpdate := func(s *v1.State) bool {
+		// Only hard states are relevant. Volatile checks are always reported as hard since Icinga 2 v2.16.6.
+		if s.StateType != common.HardState {
+			return true
+		}
 		// Ignore soft PROBLEM -> OK state changes, as these are not relevant for notifications.
 		if s.PreviousHardState == 0 && s.HardState == 0 {
 			return true
