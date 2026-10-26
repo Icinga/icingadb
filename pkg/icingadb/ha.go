@@ -52,6 +52,9 @@ type NotificationsState struct {
 	// Later log messages will be degraded to debug to minimize flooding the log.
 	socketPathWarned bool
 
+	// socketPathProbedOnce indicates whether the Icinga Notifications listener socket path has been probed at least once.
+	socketPathProbedOnce bool
+
 	// lastProblemLoggedAt is the last time a problem with the Icinga Notifications component was logged.
 	// This is used to suppress recurring log messages.
 	lastProblemLoggedAt time.Time
@@ -81,8 +84,7 @@ type HA struct {
 	errOnce     sync.Once
 	err         error
 	icinga2Ver  string
-	verChanged  chan struct{} // closed and replaced whenever icinga2Ver changes
-	mu          sync.Mutex    // protects environment, endpointId, icinga2Ver, verChanged, and err
+	mu          sync.Mutex // protects environment, endpointId, icinga2Ver, and err
 
 	// notificationsHeartbeat is a channel that signals the status of the Icinga Notifications component.
 	//
@@ -120,7 +122,6 @@ func NewHA(
 		handover:   make(chan string),
 		takeover:   make(chan string),
 		done:       make(chan struct{}),
-		verChanged: make(chan struct{}),
 
 		notificationsHeartbeatCh:             make(chan types.Bool),
 		notificationsSynchronizeWithDatabase: types.MakeBool(notificationsSynchronizeWithDatabase),
@@ -167,13 +168,13 @@ func (h *HA) EndpointID() types.Binary {
 	return h.endpointId
 }
 
-// Icinga2Version returns the Icinga 2 version from the last received heartbeat, which is empty as long as no heartbeat
-// has been processed, and a channel that is closed as soon as a heartbeat reports a different version.
-func (h *HA) Icinga2Version() (string, <-chan struct{}) {
+// Icinga2Version returns the Icinga 2 version from the last received heartbeat, which might be empty
+// if none was received yet.
+func (h *HA) Icinga2Version() string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	return h.icinga2Ver, h.verChanged
+	return h.icinga2Ver
 }
 
 // Err returns an error if Done has been closed and there is an error. Otherwise returns nil.
@@ -272,11 +273,7 @@ func (h *HA) controller() {
 					}
 					h.endpointId = s.EndpointId
 				}
-				if h.icinga2Ver != s.Version {
-					h.icinga2Ver = s.Version
-					close(h.verChanged)
-					h.verChanged = make(chan struct{})
-				}
+				h.icinga2Ver = s.Version
 				h.mu.Unlock()
 
 				envId, err := m.EnvironmentID()
@@ -684,6 +681,13 @@ func (h *HA) signalTakeover(reason string) {
 //
 // It returns true if a handover was triggered, false otherwise.
 func (h *HA) verifyNotificationsState() bool {
+	// Don't do anything if the Icinga 2 version is too old to be used with Icinga Notifications, otherwise this
+	// will cause a handover ping-pong between HA instances with Icinga 2 versions that are too old. This is just
+	// a safety check, as there should be no one reporting a heartbeat about Icinga Notifications in this case.
+	if h.icinga2VersionCheck(h.Icinga2Version()) != nil {
+		return false
+	}
+
 	now := time.Now()
 	if h.notifications.IsValidUnhealthy() && now.After(h.notifications.unhealthySince.Add(retry.DefaultTimeout)) {
 		lastLogged := h.notifications.lastProblemLoggedAt
@@ -696,7 +700,7 @@ func (h *HA) verifyNotificationsState() bool {
 		// If we're indeed running in a multi-instance environment, we should hand over responsibility
 		// to another instance, otherwise there's no other instance to take over, so we let this retry
 		// its connection attempts to the Icinga Notifications API.
-		if h.icinga2VersionCheck(h.icinga2Ver) == nil && h.instanceCount() > 1 {
+		if h.instanceCount() > 1 {
 			h.signalHandover("notifications component has been unhealthy for a long time")
 			h.realizeLostHeartbeat()
 
@@ -718,8 +722,15 @@ func (h *HA) probeNotificationsSocketPath() (socketPath types.String) {
 	if h.notifications.socketPath.Valid && h.notifications.socketPath.String != "" {
 		return h.notifications.socketPath
 	}
+
+	// Don't do anything after the first time if the Icinga 2 version is too old to be used with Icinga Notifications.
+	if h.notifications.socketPathProbedOnce && h.icinga2VersionCheck(h.Icinga2Version()) != nil {
+		return types.String{}
+	}
+
 	defer func() {
 		h.notifications.socketPath = socketPath
+		h.notifications.socketPathProbedOnce = true
 		h.notifications.socketPathWarned = true
 	}()
 

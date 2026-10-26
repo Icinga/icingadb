@@ -228,12 +228,10 @@ func (client *Client) exchangeAPIClientSession(cfg config.NotificationsConfig, w
 // or unconfigured, the provided ctx is canceled, or when the returned canceler is called, whichever happens first.
 // If a non-nil session is returned, the canceler must always be called to release the associated resources.
 //
-// If the client is unconfigured or Icinga 2 is too old, nil values are returned for all three return values.
-// The latter must be checked here, as not everything using the client is bound to the sync round deciding about it,
-// e.g., the history sync stages from SyncExtraStages.
+// If the client is unconfigured, nil values are returned for all three return values.
 func (client *Client) apiClient(ctx context.Context) (*source.Client, context.Context, context.CancelFunc) {
 	current := client.currentAPIClient.Load()
-	if current.client == nil || client.icinga2TooOld() {
+	if current.client == nil {
 		return nil, nil, nil
 	}
 
@@ -247,16 +245,6 @@ func (client *Client) apiClient(ctx context.Context) (*source.Client, context.Co
 //
 // If DB synchronization is disabled, a nil channel is returned and waiters will block forever.
 func (client *Client) ReconfiguredCh() <-chan struct{} { return client.reconfiguredCh }
-
-// icinga2TooOld reports whether Icinga 2 is known to be too old to submit correct events.
-//
-// An unknown version, as before the first heartbeat, is not considered too old. Otherwise, the history sync, which
-// starts right away, would drop all the events from its backlog.
-func (client *Client) icinga2TooOld() bool {
-	version, _ := client.ha.Icinga2Version()
-
-	return version != "" && CheckIcinga2Version(version) != nil
-}
 
 // IsConfigured reports whether the Icinga Notifications API client is available.
 func (client *Client) IsConfigured() bool { return client.currentAPIClient.Load().client != nil }
@@ -433,6 +421,10 @@ func (client *Client) SynchronizeConfigWithDatabase(ctx context.Context) error {
 		WHERE "environment_id" = ? AND "endpoint_id" = ?`)
 
 	performSync := func() {
+		if CheckIcinga2Version(client.ha.Icinga2Version()) != nil {
+			return
+		}
+
 		client.syncMu.Lock()
 		defer client.syncMu.Unlock()
 
@@ -1527,11 +1519,38 @@ func (client *Client) SyncExtraStages() map[string]history.StageFunc {
 			"json",
 			contracts.SafeInit)
 
+		// Wait for the Icinga 2 version to be available from the HA controller before proceeding.
+		// It shouldn't take that long, since the heartbeat's pace is 3 seconds.
+		for icinga2Version := client.ha.Icinga2Version(); icinga2Version == ""; {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(2 * time.Second):
+				icinga2Version = client.ha.Icinga2Version()
+			}
+		}
+
+		forwardMsg := func(msg redis.XMessage) error {
+			select {
+			case out <- msg:
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+			return nil
+		}
+
 		for {
 			select {
 			case msg, ok := <-in:
 				if !ok {
 					return nil
+				}
+
+				if CheckIcinga2Version(client.ha.Icinga2Version()) != nil {
+					if err := forwardMsg(msg); err != nil {
+						return err
+					}
+					continue
 				}
 
 				val, err := structifier(msg.Values)
@@ -1550,10 +1569,8 @@ func (client *Client) SyncExtraStages() map[string]history.StageFunc {
 					}
 				}
 
-				select {
-				case out <- msg:
-				case <-ctx.Done():
-					return ctx.Err()
+				if err := forwardMsg(msg); err != nil {
+					return err
 				}
 
 			case <-ctx.Done():
