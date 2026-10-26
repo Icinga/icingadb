@@ -421,7 +421,8 @@ func (client *Client) SynchronizeConfigWithDatabase(ctx context.Context) error {
 		WHERE "environment_id" = ? AND "endpoint_id" = ?`)
 
 	performSync := func() {
-		if CheckIcinga2Version(client.ha.Icinga2Version()) != nil {
+		if err := CheckIcinga2Version(client.ha.Icinga2Version()); err != nil {
+			client.logger.Debugw("Skipping synchronization because of an invalid Icinga 2 version", zap.Error(err))
 			return
 		}
 
