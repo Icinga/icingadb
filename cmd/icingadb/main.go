@@ -243,7 +243,12 @@ func run() int {
 						// Decided once per sync round, so that everything within agrees on whether Icinga Notifications
 						// is available. Any later change of the Client cancels synctx and starts a new round unless
 						// the Icinga 2 version is too old, in which case the Client is ignored until the next round.
-						notificationsConfigured := notificationsSource != nil && notificationsSource.IsConfigured()
+						//
+						// When Icinga 2 is too old, the Notifications Client will never be marked as configured. So,
+						// the user will never be notified that their setup cannot work. Adding the static URL to the
+						// check allows raising the alarm, and directly unconfiguring the flag afterward.
+						notificationsConfigured := notificationsSource != nil &&
+							(notificationsSource.IsConfigured() || cmd.Config.Notifications.Config.Url != "")
 						if notificationsConfigured {
 							// Without a recent enough Icinga 2, Icinga DB can't submit correct events.
 							if err := notifications.CheckIcinga2Version(ha.Icinga2Version()); err != nil {

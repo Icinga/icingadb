@@ -146,12 +146,12 @@ redis:
 # submit events to the Icinga Notifications API.
 #notifications:
   # URL to the API root. Different URI schemes are possible.
-	# - http: Unencrypted HTTP connection. Requires username and password/password_file to be set.
-	#   For example: http://example.com:5680
-	# - https: HTTPS connection. Either username and password/password_file or cert and key are required.
-	#   For example: https://example.com:5680
-	# - unix: HTTP connection over a Unix Domain Socket. Authentication is based on the operating system user.
-	#   For example: unix:///path/to/socket
+  # - http: Unencrypted HTTP connection. Requires username and password/password_file to be set.
+  #   For example: http://example.com:5680
+  # - https: HTTPS connection. Either username and password/password_file or cert and key are required.
+  #   For example: https://example.com:5680
+  # - unix: HTTP connection over a Unix Domain Socket. Authentication is based on the operating system user.
+  #   For example: unix:///path/to/socket
 #  url:
 
   # Base URL of the Icinga Web 2 setup in front of this Icinga DB. It is used to build the absolute object URLs
