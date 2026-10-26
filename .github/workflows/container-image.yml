@@ -20,6 +20,7 @@ on:
   release:
     types:
       - published
+  workflow_dispatch:
 
 env:
   # The variable ${{ github.repository }} is not suitable for container image names in our case because
@@ -58,7 +59,7 @@ jobs:
       # whether the current release tag is the greatest overall and/or
       # within its major version.
       - name: Prepare metadata (release tags)
-        if: github.event_name == 'release' && github.event.action == 'published'
+        if: (github.event_name == 'release' && github.event.action == 'published') || (github.event_name == 'workflow_dispatch' && github.ref_type == 'tag')
         run: |
           # Retrieve the greatest existing tag in the repository by sorting tags in descending order.
           # Options used:
