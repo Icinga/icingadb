@@ -17,7 +17,8 @@ ALTER TABLE host_state
   ALTER COLUMN latency TYPE float,
   ALTER COLUMN latency SET DEFAULT NULL,
   ALTER COLUMN check_timeout TYPE float,
-  ALTER COLUMN check_timeout SET DEFAULT NULL;
+  ALTER COLUMN check_timeout SET DEFAULT NULL,
+  ADD COLUMN acknowledgement_set_time biguint DEFAULT NULL;
 
 ALTER TABLE service
   ALTER COLUMN check_timeout TYPE float,
@@ -31,20 +32,20 @@ ALTER TABLE service_state
   ALTER COLUMN latency TYPE float,
   ALTER COLUMN latency SET DEFAULT NULL,
   ALTER COLUMN check_timeout TYPE float,
-  ALTER COLUMN check_timeout SET DEFAULT NULL;
+  ALTER COLUMN check_timeout SET DEFAULT NULL,
+  ADD COLUMN acknowledgement_set_time biguint DEFAULT NULL;
 
 -- Probe notifications socket & monitor API health
 
 ALTER TABLE icingadb_instance
   ADD COLUMN icingadb_service_user varchar(255) NOT NULL DEFAULT 'icingadb',
   ADD COLUMN notifications_healthy boolenum DEFAULT NULL,
-  ADD COLUMN notifications_discovered_socket_path text;
+  ADD COLUMN notifications_discovered_socket_path text,
+  ADD COLUMN notifications_synchronize_with_database boolenum NOT NULL DEFAULT 'n';
 
 ALTER TABLE icingadb_instance ALTER COLUMN icingadb_service_user DROP DEFAULT;
 
 -- Notifications: Load Configuration from Database
-
-ALTER TABLE icingadb_instance ADD COLUMN notifications_synchronize_with_database boolenum NOT NULL DEFAULT 'n';
 
 CREATE TABLE icingadb_config (
   environment_id bytea20 NOT NULL,
@@ -67,9 +68,6 @@ COMMENT ON COLUMN icingadb_config.locked IS 'static config from Icinga DB config
 
 -- Correlate Icinga Notifications history with our history table
 
-ALTER TABLE host_state ADD COLUMN acknowledgement_set_time biguint DEFAULT NULL;
-ALTER TABLE service_state ADD COLUMN acknowledgement_set_time biguint DEFAULT NULL;
-
 ALTER TABLE history ADD COLUMN alert_count biguint DEFAULT NULL;
 
 -- alert_history_ref contains a reference to the history.id of rows that are of interest to the alert_history table.
@@ -84,7 +82,7 @@ CREATE TABLE alert_history_ref (
 
   last_update biguint NOT NULL, -- unix timestamp of the last insert or update of this row.
 
-  CONSTRAINT pk_alert_history_ref PRIMARY KEY (history_id),
+  CONSTRAINT pk_alert_history_ref PRIMARY KEY (history_id_uuid, history_id),
   CONSTRAINT uq_alert_history_ref_history_id_uuid UNIQUE (history_id_uuid)
 );
 
@@ -109,6 +107,7 @@ CREATE TABLE alert_history (
   channel_name citext,
   triggered_at biguint NOT NULL,
   event_message text NOT NULL,
+  event_summary text NOT NULL,
 
   CONSTRAINT pk_alert_history PRIMARY KEY (id),
 
@@ -121,19 +120,6 @@ CREATE INDEX idx_alert_history_environment_id_triggered_at ON alert_history (env
 ALTER TABLE alert_history ALTER COLUMN id SET STORAGE PLAIN;
 ALTER TABLE alert_history ALTER COLUMN history_id SET STORAGE PLAIN;
 ALTER TABLE alert_history ALTER COLUMN environment_id SET STORAGE PLAIN;
-
--- notifications: populate `alert_history_ref` for downtime and flapping events
-
-ALTER TABLE alert_history_ref
-  DROP CONSTRAINT pk_alert_history_ref;
-ALTER TABLE alert_history_ref
-  ADD CONSTRAINT pk_alert_history_ref PRIMARY KEY (history_id_uuid, history_id);
-
--- Include `event_summary` in the `alert_history` table
-
-ALTER TABLE alert_history ADD COLUMN event_summary text;
-UPDATE alert_history SET event_summary = COALESCE(NULLIF(LEFT(BTRIM(SPLIT_PART(event_message, E'\n', 1)), 1024), ''), 'no summary');
-ALTER TABLE alert_history ALTER COLUMN event_summary SET NOT NULL;
 
 -- Bump schema
 

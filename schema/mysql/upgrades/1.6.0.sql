@@ -12,7 +12,8 @@ ALTER TABLE host
 ALTER TABLE host_state
   MODIFY COLUMN execution_time float DEFAULT NULL,
   MODIFY COLUMN latency float DEFAULT NULL,
-  MODIFY COLUMN check_timeout float DEFAULT NULL;
+  MODIFY COLUMN check_timeout float DEFAULT NULL,
+  ADD COLUMN acknowledgement_set_time bigint unsigned DEFAULT NULL AFTER is_sticky_acknowledgement;
 
 ALTER TABLE service
   MODIFY COLUMN check_timeout float DEFAULT NULL,
@@ -22,20 +23,20 @@ ALTER TABLE service
 ALTER TABLE service_state
   MODIFY COLUMN execution_time float DEFAULT NULL,
   MODIFY COLUMN latency float DEFAULT NULL,
-  MODIFY COLUMN check_timeout float DEFAULT NULL;
+  MODIFY COLUMN check_timeout float DEFAULT NULL,
+  ADD COLUMN acknowledgement_set_time bigint unsigned DEFAULT NULL AFTER is_sticky_acknowledgement;
 
 -- Probe notifications socket & monitor API health
 
 ALTER TABLE icingadb_instance
   ADD COLUMN icingadb_service_user varchar(255) NOT NULL DEFAULT 'icingadb',
   ADD COLUMN notifications_healthy enum('n', 'y') DEFAULT NULL,
-  ADD COLUMN notifications_discovered_socket_path mediumtext;
+  ADD COLUMN notifications_discovered_socket_path mediumtext,
+  ADD COLUMN notifications_synchronize_with_database enum('n', 'y') NOT NULL;
 
 ALTER TABLE icingadb_instance MODIFY COLUMN icingadb_service_user varchar(255) NOT NULL;
 
 -- Notifications: Load Configuration from Database
-
-ALTER TABLE icingadb_instance ADD COLUMN notifications_synchronize_with_database enum('n', 'y') NOT NULL;
 
 CREATE TABLE icingadb_config (
   environment_id binary(20) NOT NULL COMMENT 'environment.id',
@@ -51,9 +52,6 @@ CREATE TABLE icingadb_config (
 
 -- Correlate Icinga Notifications history with our history table
 
-ALTER TABLE host_state ADD COLUMN acknowledgement_set_time bigint unsigned DEFAULT NULL AFTER is_sticky_acknowledgement;
-ALTER TABLE service_state ADD COLUMN acknowledgement_set_time bigint unsigned DEFAULT NULL AFTER is_sticky_acknowledgement;
-
 ALTER TABLE history ADD COLUMN alert_count bigint unsigned DEFAULT NULL;
 
 -- alert_history_ref contains a reference to the history.id of rows that are of interest to the alert_history table.
@@ -68,7 +66,7 @@ CREATE TABLE alert_history_ref (
 
   last_update bigint unsigned NOT NULL, -- unix timestamp of the last insert or update of this row.
 
-  PRIMARY KEY (history_id),
+  PRIMARY KEY (history_id_uuid, history_id),
 
   UNIQUE INDEX uq_alert_history_ref_history_id_uuid (history_id_uuid),
   INDEX idx_alert_history_ref_host_id_service_id (host_id, service_id),
@@ -89,6 +87,7 @@ CREATE TABLE alert_history (
   channel_name text DEFAULT NULL COLLATE utf8mb4_unicode_ci,
   triggered_at bigint unsigned NOT NULL,
   event_message longtext NOT NULL,
+  event_summary longtext NOT NULL,
 
   PRIMARY KEY (id),
 
@@ -96,18 +95,6 @@ CREATE TABLE alert_history (
 
   INDEX idx_alert_history_environment_id_triggered_at (environment_id, triggered_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin ROW_FORMAT=DYNAMIC;
-
--- notifications: populate `alert_history_ref` for downtime and flapping events
-
-ALTER TABLE alert_history_ref DROP PRIMARY KEY;
-ALTER TABLE alert_history_ref
-  ADD PRIMARY KEY (history_id_uuid, history_id);
-
--- Include `event_summary` in the `alert_history` table
-
-ALTER TABLE alert_history ADD COLUMN event_summary longtext;
-UPDATE alert_history SET event_summary = COALESCE(NULLIF(LEFT(TRIM(SUBSTRING_INDEX(event_message, '\n', 1)), 1024), ''), 'no summary');
-ALTER TABLE alert_history MODIFY COLUMN event_summary longtext NOT NULL;
 
 -- Bump schema
 
