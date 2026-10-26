@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 // CheckIcinga2Version returns an error if the given Icinga 2 version is too old to be used with Icinga Notifications.
@@ -17,7 +15,7 @@ func CheckIcinga2Version(version string) error {
 	// Icinga 2 reports versions like "v2.16.5", "r2.14.2-1" or "v2.17.0-rc1-12-g0123abc".
 	// Anything following the patch level is ignored.
 	if _, err := fmt.Sscanf(strings.TrimLeft(version, "vr"), "%d.%d.%d", &v[0], &v[1], &v[2]); err != nil {
-		return errors.Wrapf(err, "unexpected Icinga 2 version %q", version)
+		return fmt.Errorf("unexpected Icinga 2 version %q: %w", version, err)
 	}
 
 	if slices.Equal(v[:], []int{2, 16, 0}) {
@@ -30,5 +28,5 @@ func CheckIcinga2Version(version string) error {
 		return nil
 	}
 
-	return errors.Errorf("Icinga 2 version %q is too old, v2.16.6 or later is required", version)
+	return fmt.Errorf("Icinga 2 version %q is too old, v2.16.6 or later is required", version)
 }

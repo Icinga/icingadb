@@ -241,14 +241,14 @@ func run() int {
 						stateInitSync := &sync.WaitGroup{}
 
 						// Decided once per sync round, so that everything within agrees on whether Icinga Notifications
-						// is available. Any later change of the Client cancels synctx and starts a new round.
+						// is available. Any later change of the Client cancels synctx and starts a new round unless
+						// the Icinga 2 version is too old, in which case the Client is ignored until the next round.
 						notificationsConfigured := notificationsSource != nil && notificationsSource.IsConfigured()
-						// The version is only valid for this round, so a change of it starts a new one as well.
-						icinga2Version, icinga2VersionChangedCh := ha.Icinga2Version()
 						if notificationsConfigured {
 							// Without a recent enough Icinga 2, Icinga DB can't submit correct events.
-							if err := notifications.CheckIcinga2Version(icinga2Version); err != nil {
-								logger.Warnw("Not submitting events to Icinga Notifications", zap.Error(err))
+							if err := notifications.CheckIcinga2Version(ha.Icinga2Version()); err != nil {
+								logger.Warnw("Cannot use Icinga Notifications with this Icinga 2 version, disabling it",
+									zap.Error(err))
 								notificationsConfigured = false
 
 								// Nothing else is going to report the component's health, so do it here. This is a
@@ -258,11 +258,6 @@ func run() int {
 								case <-synctx.Done():
 								}
 							}
-						} else {
-							// The version is irrelevant without Icinga Notifications. Don't restart for a change of it,
-							// a nil channel blocks forever. If Icinga Notifications gets configured later on, this
-							// round is restarted anyway and the version is checked again.
-							icinga2VersionChangedCh = nil
 						}
 
 						// Clear the runtime update streams before starting anything else (rather than after the sync),
@@ -288,6 +283,10 @@ func run() int {
 						g.Go(func() error {
 							var notificationsReconfiguredCh <-chan struct{}
 							if notificationsSource != nil {
+								// With a too old Icinga 2, the database-stored configuration isn't synchronized,
+								// so no reconfiguration is signaled and the Client stays ignored for this round.
+								// We will only receive a reconfiguration signal if the Icinga 2 version changes
+								// to a new version that is recent enough to support Icinga Notifications.
 								notificationsReconfiguredCh = notificationsSource.ReconfiguredCh()
 							}
 
@@ -298,10 +297,6 @@ func run() int {
 								return nil
 							case <-notificationsReconfiguredCh:
 								logger.Info("Icinga Notifications component has been reconfigured, restarting sync")
-								cancelSynctx()
-								return nil
-							case <-icinga2VersionChangedCh:
-								logger.Info("Icinga 2 version has changed, restarting sync")
 								cancelSynctx()
 								return nil
 							case <-synctx.Done():
