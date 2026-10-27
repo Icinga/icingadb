@@ -141,7 +141,9 @@ type Client struct {
 	// lastEndpointId is the last known endpoint ID, fetched via Client.endpointId.
 	lastEndpointId types.Binary
 
-	// incidentsByObjId is a map of object IDs to incidents populated by the first call to ApplyDelta.
+	// incidentsByObjId is a map of object IDs to incidents populated by the first successful call to
+	// environmentIncidents (via ApplyDelta). Nil means that the incidents have not been fetched yet, whereas
+	// an empty map means that there are no incidents. Guarded by incidentsMu.
 	incidentsByObjId map[string]incidentResp
 	incidentsMu      sync.Mutex
 
@@ -546,15 +548,38 @@ func (client *Client) SynchronizeConfigWithDatabase(ctx context.Context) error {
 // to force a re-fetch of the incidents from the Icinga Notifications API on the next config dump, e.g. due to
 // HA take over or the like.
 //
-// This function is not safe to call concurrently with [Client.ApplyDelta], but it is safe to call concurrently
-// with itself. The [Client.ApplyDelta] function accesses the internal cache in a read-only manner without any
-// synchronization once it has been populated, so you should ensure that all calls to [Client.ApplyDelta] have
-// completed before calling this function.
+// This function is safe to call concurrently with [Client.ApplyDelta] and with itself. A running ApplyDelta call
+// keeps using the incidents it already obtained, but any later call fetches them again, so this should only be
+// called once all ApplyDelta calls of the current config dump have completed.
 func (client *Client) ClearIncidents() {
 	client.incidentsMu.Lock()
 	defer client.incidentsMu.Unlock()
 
 	client.incidentsByObjId = nil
+}
+
+// environmentIncidents returns the incidents of the current environment, fetching them only once.
+//
+// The result is cached in Client.incidentsByObjId until [Client.ClearIncidents] is called, as ApplyDelta
+// is called in parallel for each entity type, and the incidents must only be fetched once per environment.
+// An empty map is a valid result, but it's not an error. If fetching fails, an error is returned and nothing
+// is cached, so that a subsequent call tries again.
+func (client *Client) environmentIncidents(ctx context.Context, nc *source.Client) (map[string]incidentResp, error) {
+	client.incidentsMu.Lock()
+	defer client.incidentsMu.Unlock()
+
+	// A nil map means not fetched yet, so retrieveEnvironmentIncidents must always return a non-nil map on success.
+	if client.incidentsByObjId != nil {
+		return client.incidentsByObjId, nil
+	}
+
+	incidents, err := client.retrieveEnvironmentIncidents(ctx, nc)
+	if err != nil {
+		return nil, err
+	}
+
+	client.incidentsByObjId = incidents
+	return incidents, nil
 }
 
 // ApplyDelta applies the given delta to the Icinga Notifications API.
@@ -580,20 +605,19 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 	}
 	defer cancel()
 
-	func() {
-		client.incidentsMu.Lock()
-		defer client.incidentsMu.Unlock()
-
-		// ApplyDelta is called in parallel for each entity type, so we need to ensure
-		// that we only fetch the incidents once per environment.
-		if client.incidentsByObjId != nil {
-			return
-		}
-		client.incidentsByObjId = client.retrieveEnvironmentIncidents(ctx, nc)
-	}()
-	if len(client.incidentsByObjId) == 0 {
+	incidents, err := client.environmentIncidents(ctx, nc)
+	if err != nil {
+		// Without knowing the existing incidents, we can neither tell which objects need to be submitted nor
+		// which incidents are obsolete. Unless the context is done, the error has already been logged. As nothing
+		// was cached, the incidents are fetched again by the next ApplyDelta call, but until then, the objects
+		// of this delta are not submitted. That is either the call for the other entity type, if it starts later,
+		// or the one of the next config dump, e.g., after an HA takeover. So, if Icinga Notifications is
+		// unavailable during the initial config dump, existing problems might not be submitted until then.
 		return nil
 	}
+	// Note that there being no incidents at all is a perfectly valid and common case, e.g. for a freshly installed
+	// Icinga Notifications. In that case, all objects in a problem state still have to be submitted below, so
+	// do not return early here.
 
 	client.logger.Infof("Fetching %d entities of type %s from Redis for submission to Icinga Notifications",
 		len(delta.RedisSnapshot),
@@ -632,16 +656,10 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 					panic("unreachable")
 				}
 
-				if ir, exists := client.incidentsByObjId[entity.ID().String()]; exists {
-					if same, err := HaveSameState(ir.Incident, s, isService); err != nil {
-						return err
-					} else if same {
-						// Same state, but not necessarily the same output/message, and since we have a separate
-						// worker for syncing check outputs (see Client.SyncCheckOutputs), skip it entirely here.
-						continue
-					}
-				} else if s.HardState == 0 {
-					continue // No existing incident to close, and the new state is OK, so nothing to do.
+				if submit, err := needsSubmission(incidents, entity.ID().String(), s, isService); err != nil {
+					return err
+				} else if !submit {
+					continue
 				}
 
 				// If the entity is new or has a different state than the existing incident, submit it to Icinga
@@ -660,7 +678,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		var deletedIds []types.Binary
 		var filter []any
 		_, isServiceState := delta.Subject.Entity().(*v1.ServiceState)
-		for id, incident := range client.incidentsByObjId {
+		for id, incident := range incidents {
 			_, isServiceIncident := incident.ObjectTags["service"]
 			_, deleted := delta.Delete[id]
 			// We may have missed the initial config dump with the corresponding entity deletion, in which case we
@@ -694,7 +712,7 @@ func (client *Client) ApplyDelta(ctx context.Context, delta *icingadb.Delta) err
 		return nil
 	})
 
-	err := g.Wait()
+	err = g.Wait()
 	if errors.Is(context.Cause(ctx), errClientReset) {
 		client.logger.Debug("Stopped applying delta as the Icinga Notifications client was replaced")
 		return nil
@@ -782,7 +800,10 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 
 			hostIncidents := make(map[string]incidentResp)
 			serviceIncidents := make(map[string]incidentResp)
-			for id, incident := range client.retrieveEnvironmentIncidents(ctx, nc) {
+			// Unless the context is done, an error is already logged. The incidents fetched so far are still
+			// worth syncing.
+			incidents, _ := client.retrieveEnvironmentIncidents(ctx, nc)
+			for id, incident := range incidents {
 				if _, exists := incident.ObjectTags["service"]; exists {
 					serviceIncidents[id] = incident
 				} else {
@@ -827,7 +848,10 @@ func (client *Client) SyncCheckOutputs(ctx context.Context) error {
 // The incidents are returned as a map of object IDs to incidents. The object IDs are generated based on the
 // environment ID and the host/service names, mimicking the Icinga 2 ID generation behavior used to generate
 // all Icinga DB related object IDs.
-func (client *Client) retrieveEnvironmentIncidents(ctx context.Context, nc *source.Client) map[string]incidentResp {
+//
+// If fetching the incidents fails, the error is logged and returned together with the incidents fetched so far.
+// Having no incidents at all is not an error, in which case an empty, non-nil map is returned.
+func (client *Client) retrieveEnvironmentIncidents(ctx context.Context, nc *source.Client) (map[string]incidentResp, error) {
 	environment, ok := v1.EnvironmentFromContext(ctx)
 	if !ok {
 		panic("cannot get environment from context")
@@ -849,11 +873,14 @@ func (client *Client) retrieveEnvironmentIncidents(ctx context.Context, nc *sour
 		incidentsByID[hex.EncodeToString(id)] = incidentResp{Incident: incident, ObjectID: id}
 	}
 
-	if err := <-errCh; err != nil && ctx.Err() == nil {
-		client.sendHeartbeat(types.MakeBool(false))
-		client.logger.Errorw("Failed to fetch incidents", zap.String("error", err.Error()))
+	if err := <-errCh; err != nil {
+		if ctx.Err() == nil {
+			client.sendHeartbeat(types.MakeBool(false))
+			client.logger.Errorw("Failed to fetch incidents", zap.String("error", err.Error()))
+		}
+		return incidentsByID, err
 	}
-	return incidentsByID
+	return incidentsByID, nil
 }
 
 // sendHeartbeat sends a heartbeat signal to the HA controller.

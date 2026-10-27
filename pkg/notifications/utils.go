@@ -63,6 +63,29 @@ func HaveSameState(incident source.Incident, s *v1.State, isService bool) (bool,
 	return true, nil
 }
 
+// needsSubmission reports whether the given state of the object with the given ID has to be submitted to
+// Icinga Notifications, given the currently known incidents (keyed by object ID, see retrieveEnvironmentIncidents).
+//
+//   - If there is an incident for the object, the state is only submitted if it differs from the incident.
+//   - If there is none, the state is only submitted if the object is not OK, i.e., if it opens a new incident.
+//     In particular, this means that an empty incidents map (e.g. a freshly installed Icinga Notifications)
+//     requires all problem states to be submitted.
+func needsSubmission(incidents map[string]incidentResp, objectID string, s *v1.State, isService bool) (bool, error) {
+	if ir, exists := incidents[objectID]; exists {
+		same, err := HaveSameState(ir.Incident, s, isService)
+		if err != nil {
+			return false, err
+		}
+
+		// A state which is the same as the incident's doesn't necessarily have the same output/message, but since
+		// we have a separate worker for syncing check outputs (see Client.SyncCheckOutputs), skip it entirely here.
+		return !same, nil
+	}
+
+	// No existing incident to close, and if the new state is OK, there's nothing to do.
+	return s.HardState != 0, nil
+}
+
 // DeriveDeterministicEventUUID generates a UUID based on the given environment ID, object name, event type, and timestamp.
 //
 // The generated UUID is deterministic and can be used to uniquely identify events in Icinga Notifications.
