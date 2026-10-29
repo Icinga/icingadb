@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	expectedMysqlSchemaVersion    = 7
-	expectedPostgresSchemaVersion = 5
+	expectedMysqlSchemaVersion    = 8
+	expectedPostgresSchemaVersion = 6
 )
 
 // ErrSchemaNotExists implies that no Icinga DB schema has been imported.
