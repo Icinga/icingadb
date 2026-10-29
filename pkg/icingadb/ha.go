@@ -762,7 +762,7 @@ func (h *HA) probeNotificationsSocketPath() (socketPath types.String) {
 		return types.MakeString("", types.TransformEmptyStringToNull)
 	}
 
-	if err := unix.Access(path, unix.R_OK|unix.W_OK); err != nil {
+	if err := unix.Access(path, unix.W_OK); err != nil {
 		h.logger.Logw(warnLevel,
 			"Icinga DB user has no permissions to access Icinga Notifications listener socket",
 			zap.String("path", path),
