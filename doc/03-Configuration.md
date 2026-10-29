@@ -179,42 +179,59 @@ ICINGADB_RETENTION_OPTIONS=comment:356
 | count        | **Optional.** Number of old historical data a single query can delete in a `"DELETE FROM ... LIMIT count"` manner. Defaults to `5000`.                                                                        |
 | options      | **Optional.** Map of history category to number of days to retain its data. Available categories are `acknowledgement`, `comment`, `downtime`, `flapping`, `notification` and `state`.                        |
 
-## Notifications Configuration
-
-!!! tip
-
-    If the `ICINGA_NOTIFICATIONS_LISTENER_SOCKET` environment variable is set, Icinga DB will automatically detect the
-    Icinga Notifications API Unix Domain Socket availability and persist the result in the database. This allows
-    Icinga DB Web to provide a one-click configure button for Icinga Notifications, which will automatically configure
-    this component, and create the corresponding Icinga Notifications source configuration on your behalf.
+## Icinga Notifications Configuration
 
 Icinga DB can act as an event source for [Icinga Notifications](https://icinga.com/docs/icinga-notifications/).
-If configured, Icinga DB will submit events to the Icinga Notifications API.
+When this is configured, Icinga DB sends host and service events to the Icinga Notifications API, and Icinga
+Notifications decides who to notify and how.
 
 !!! important
 
-    Icinga DB requires Icinga 2 v2.16.6 or later to submit events to Icinga Notifications. If the Icinga 2 version
-    is too old, Icinga DB logs a warning, marks the Notifications component as unhealthy and does not launch the
-    Icinga Notifications integration.
+    Icinga DB requires Icinga 2 v2.16.6 or later to send events to Icinga Notifications. With an older Icinga 2
+    version, Icinga DB logs a warning, reports the Icinga Notifications integration as unhealthy, and disables
+    the integration.
 
 !!! important
 
-    When using Icinga DB with SELinux, please enable the `icingadb_can_connect_all` SELinux boolean to allow Icinga DB to connect to the Icinga Notifications API.
+    When using Icinga DB with SELinux, please enable the `icingadb_can_connect_all` SELinux boolean to allow Icinga DB
+    to connect to the Icinga Notifications API.
 
     ```
     setsebool -P icingadb_can_connect_all on
     ```
+
+### Automatic Setup via Icinga DB Web
+
+If Icinga Notifications runs on the same host as Icinga DB, Icinga DB can find its Unix socket and let
+[Icinga DB Web set up](https://icinga.com/docs/icinga-db-web/latest/doc/03-Configuration/#icinga-notifications-configuration)
+the connection for you with a single click.
+
+The official Icinga packages set the `ICINGA_NOTIFICATIONS_LISTENER_SOCKET` environment variable in the systemd
+service file. Otherwise, set this variable for the Icinga DB process to the path of the Icinga Notifications listener
+socket, for example `/run/icinga-notifications/api.sock`. Icinga DB then checks that:
+
+* the path exists and is a Unix socket, and
+* the user Icinga DB runs as can read from and write to it.
+
+Until both conditions are met, Icinga DB repeats the checks in the background. It logs a warning explaining what is
+wrong only the first time a check fails. If the variable is not set, Icinga DB skips the checks, and you can still
+configure the integration manually.
+
+Once both checks pass, Icinga DB stores the socket path in the database. Icinga DB Web then offers a
+one-click configure button that creates the Icinga Notifications source for Icinga DB and enables the integration.
+No manual configuration is needed.
+
+The automatic setup stores its configuration in the database. It therefore requires `synchronize_with_database` to be
+enabled (the default). Any `notifications` option you set in the YAML file or via environment variables is locked and
+cannot be changed by Icinga DB Web, so leave them unset when using the automatic setup.
+
+### Manual Setup
 
 Different URI schemes are possible for the configured URL, depending on how Icinga DB should connect to the Icinga Notifications API.
 
 * `http`: Unencrypted HTTP connection. Requires `username` and `password`/`password_file` to be set. For example: `http://example.com:5680`
 * `https`: HTTPS connection. Either `username` and `password`/`password_file` or `cert` and `key` are required. For example: `https://example.com:5680`
 * `unix`: HTTP connection over a Unix Domain Socket. Authentication is based on the operating system user. For example: `unix:///path/to/socket`
-
-Icinga DB synchronizes the Icinga Notifications configuration with the database.
-This allows Icinga Notifications Web to configure this source.
-Any option set in either the YAML or environment variable configuration takes precedence over everything which might be configured in the database.
-To disable a database-bound configuration, set `synchronize_with_database` to `false`.
 
 Each event is submitted with a URL pointing at the affected host or service in Icinga Web 2, which Icinga Notifications
 passes on to the notified contacts. Since Icinga Notifications does not know where your Icinga Web 2 lives, this URL has
@@ -236,7 +253,17 @@ For environment variables, each option is prefixed with `ICINGADB_NOTIFICATIONS_
 | insecure                  | **Optional.** Whether not to verify the peer.                                                                         |
 | default_relations         | **Optional.** List of relations as a JSONPath to resolve and include in the events submitted to Icinga Notifications. |
 | icingaweb2_url            | **Optional.** Base URL of your Icinga Web 2, e.g. `https://example.com/icingaweb2`. Must be absolute.                 |
-| synchronize_with_database | **Optional.** Synchronize complete Notifications Configuration with the database. Enabled by default.                 |
+| synchronize_with_database | **Optional.** Allow Icinga DB Web to configure this integration. Defaults to `true`.                                  |
+
+By default, Icinga DB Web can configure the Icinga Notifications integration for you, so you don't have to edit the
+configuration file. This is what the [automatic setup](#automatic-setup-via-icinga-db-web) uses. Icinga DB reads
+the values set in Icinga DB Web from the database and applies changes within about 15 seconds, without a restart.
+Only `url`, `default_relations` and `icingaweb2_url` can be set this way. Credentials such as `username`, `password`,
+`cert` and `key` are never read from the database and must be set in the YAML file or via environment variables.
+
+Any option you set in the YAML file or via environment variables is locked and cannot be changed by Icinga DB Web.
+To turn off configuration through Icinga DB Web completely, set `synchronize_with_database` to `false`.
+The Icinga Notifications integration is then only enabled if `url` is set in the YAML file or via environment variables.
 
 ## Appendix
 

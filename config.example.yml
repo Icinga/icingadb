@@ -175,6 +175,7 @@ redis:
   # For example '$.host.vars' and '$.services[*].vars'.
 #  default_relations:
 
-  # Synchronize the configuration with the database. This allows Icinga Notifications Web to configure this source.
-  # If set, all other fields can be left empty. However, if set, they take precedence.
+  # Allow Icinga DB Web to configure this integration, e.g. via its one-click setup. Options set in this file or via
+  # environment variables are locked and cannot be changed by Icinga DB Web. Set to false to configure Icinga
+  # Notifications only here.
 #  synchronize_with_database: true
