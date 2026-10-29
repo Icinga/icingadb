@@ -1,5 +1,39 @@
 # Icinga DB Changelog
 
+## 1.6.0 (2026-10-29)
+
+This Icinga DB release completes the [Icinga Notifications](https://icinga.com/docs/icinga-notifications/latest/) integration.
+Additionally, several bugs were fixed, including HA and history issues.
+
+For the Icinga Notifications version 1.0.0 release, the integration was largely reworked.
+State change events are now taken from the Icinga 2 runtime updates,
+making the component HA aware and providing information about downtimes, flapping, and acknowledgements.
+Furthermore, Icinga DB's Icinga Notifications configuration can now be set in Icinga DB Web,
+and notifications sent by Icinga Notifications can be correlated with the Icinga DB history.
+Next to HTTP, the transport to the Icinga Notifications API now supports HTTPS or Unix domain sockets.
+
+Notable changes and fixes outside of Notifications include the following.
+
+* Allow reading passwords from files via `password_file` or `*_PASSWORD_FILE` environment variables. #1072
+* Close history of Comments and Downtimes for objects vanished from Icinga 2, e.g., after a Director deployment. #913
+* Drain runtime update streams on passive HA instances to prevent an ever-growing Redis®[\*](doc/TRADEMARKS.md#redis). #1192
+* Keep HA alive for internal database deadline errors. #1138
+* Store floating point Icinga 2 attributes as such, fixing crashes with check intervals below one second. #1063
+* Retry more SQL queries, preventing crashes during a database restart. #1060
+* Only use Redis® keys in the `icinga:` and `icingadb:` namespaces and document Redis® ACLs. #1058, #1064
+
+### Requirements
+
+Using Icinga DB as an Icinga Notifications source requires Icinga 2 v2.16.6 or later and Icinga Notifications v1.0.0 or later.
+With an older Icinga 2 version, the Icinga Notifications integration is disabled.
+
+More information is available in the [upgrading documentation](doc/04-Upgrading.md#upgrading-to-icinga-db-v160).
+
+### Schema
+
+The `1.6.0.sql` schema upgrade is available and must be applied.
+Please follow the [schema upgrade documentation](doc/04-Upgrading.md#database-schema-upgrades).
+
 ## 1.5.1 (2025-12-15)
 
 This Icinga DB release addresses the issue of leaking SQL prepared statements when Icinga DB is configured as a source for Icinga Notifications.

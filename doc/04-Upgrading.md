@@ -62,6 +62,21 @@ Afterwards, restart Icinga DB. If you have an HA setup, restart all Icinga DB in
 systemctl start icingadb
 ```
 
+## Upgrading to Icinga DB v1.6.0
+
+### Icinga Notifications v1.0.0 Support
+
+Icinga DB 1.6.0, Icinga DB Web 1.5.0, and Icinga 2 2.16.6 can act together as an integration for
+[Icinga Notifications](https://icinga.com/docs/icinga-notifications/latest/).
+
+The [Icinga Notifications configuration](03-Configuration.md#icinga-notifications-configuration) was extended.
+Prior setups should set `notifications.icingaweb2_url` to the base URL of your Icinga Web 2.
+
+### Schema
+
+The upgrade script `1.6.0.sql` must be applied as described in the [schema upgrade section](#database-schema-upgrades).
+Since the `history` table schema is altered, the upgrade might take a few minutes, depending on your history size.
+
 ## Upgrading to Icinga DB v1.4.0
 
 ### Requirements
