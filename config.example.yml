@@ -20,7 +20,7 @@ database:
   # Database user.
   user: icingadb
 
-  # Database password.
+  # Database password. Wrap password in single quotes if it contains special characters like exclamation marks
   password: CHANGEME
 #  password_file: /run/secerets/icingadb_database_password
 
