@@ -17,6 +17,10 @@ Only one of these two options can be used.
 
 ## Database Configuration
 
+!!! important
+
+    When using the YAML configuration, please be aware of how YAML handles strings. If your input field contains special characters - which is common for passwords - enclose it in single quotes.
+
 Connection configuration for the SQL database to which Icinga DB synchronizes monitoring data.
 This is also the database used in
 [Icinga DB Web](https://icinga.com/docs/icinga-db-web) to view and work with the data.

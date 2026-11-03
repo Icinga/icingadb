@@ -21,7 +21,7 @@ database:
   user: icingadb
 
   # Database password.
-  password: CHANGEME
+  password: 'CHANGEME'
 #  password_file: /run/secerets/icingadb_database_password
 
   # List of low-level database options that can be set to influence some Icinga DB internal default behaviours.
