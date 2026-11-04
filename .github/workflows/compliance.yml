@@ -9,5 +9,8 @@ permissions:
   contents: read
 
 jobs:
-  compliance:
+  go-license:
     uses: Icinga/github-actions/.github/workflows/go-license.yml@main
+
+  sbom:
+      uses: Icinga/github-actions/.github/workflows/sbom.yml@sbom-init # TODO: change to main branch
