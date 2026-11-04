@@ -6,26 +6,8 @@ on:
   pull_request: {}
 
 permissions:
-  # https://docs.github.com/en/rest/overview/permissions-required-for-github-apps?apiVersion=2022-11-28#repository-permissions-for-contents
   contents: read
 
 jobs:
   compliance:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v7
-    - uses: actions/setup-go@v7
-      with:
-        go-version: stable
-
-    - name: Download modules to local cache
-      run: go mod download
-
-    - name: Install go-licenses
-      run: go install github.com/google/go-licenses@latest
-
-    - name: Check licenses against allow list
-      run: |
-        # Pass allowed licenses as SPDX Identifiers: https://spdx.org/licenses/
-        go-licenses check github.com/icinga/icingadb/... \
-          --allowed_licenses BSD-2-Clause,BSD-3-Clause,GPL-2.0,ISC,MIT,MPL-2.0,Unlicense
+    uses: Icinga/github-actions/.github/workflows/go-license.yml@main
