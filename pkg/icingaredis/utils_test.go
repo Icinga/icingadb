@@ -111,8 +111,8 @@ func TestCreateEntities(t *testing.T) {
 						case actual, ok := <-entities:
 							require.True(t, ok, "entities channel should not be closed, yet")
 							require.Equal(t, expected, actual)
-						case <-errs:
-							require.Fail(t, "errors channel should not be ready (yet)")
+						case err, ok := <-errs:
+							require.Failf(t, "errors channel should not be ready (yet)", "got %v (ok=%t)", err, ok)
 						case <-time.After(time.Second):
 							require.Fail(t, "entities channel should not block")
 						}
