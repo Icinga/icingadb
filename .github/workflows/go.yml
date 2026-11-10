@@ -1,4 +1,5 @@
 name: Go
+
 on:
   push:
     branches:
@@ -6,105 +7,9 @@ on:
       - 'support/*'
   pull_request: {}
 
+permissions:
+  contents: read
+
 jobs:
-  build-test:
-
-    strategy:
-      matrix:
-        os: [ macos-latest, ubuntu-latest ]
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: stable
-
-      - run: go build ./...
-
-      - run: go test -v -race ./...
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: stable
-
-      - uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
-          only-new-issues: true
-
-  vet:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: stable
-
-      - run: go vet ./...
-
-  fmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: stable
-
-      - name: Run gofmt -d .
-        run: |
-            fmtvar="$(gofmt -d .)"
-            echo "$fmtvar"
-            test -z "$fmtvar"
-
-  modtidy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-go@v7
-        with:
-          go-version: stable
-
-      - name: Run go mod tidy
-        run: |
-            go mod tidy
-            gitdiff="$(git diff -U0)"
-            echo "$gitdiff"
-            test -z "$gitdiff"
-
-  vendor-diff:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/setup-go@v7
-      with:
-        go-version: stable
-
-    - name: Checkout base commit
-      uses: actions/checkout@v7
-      with:
-        path: a
-        ref: ${{ github.base_ref }}
-    - name: Download dependencies of base commit
-      run: go mod vendor
-      working-directory: a
-
-    - name: Checkout PR
-      uses: actions/checkout@v7
-      with:
-        path: b
-    - name: Download dependencies of PR
-      run: go mod vendor
-      working-directory: b
-
-    - name: Diff of dependencies
-      run: diff -ur --color=always a/vendor b/vendor || true
+  go:
+    uses: Icinga/github-actions/.github/workflows/go.yml@main
