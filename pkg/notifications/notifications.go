@@ -978,15 +978,8 @@ func (client *Client) buildCommonEvent(
 // buildStateEvent builds a fully initialized event.Event from a state history entry.
 //
 // The resulting event contains everything needed for a state change event and must not be modified further
-// by the caller. For downtime transitions that would close an incident, the nc client is used to check the
-// Icinga Notifications API for an open incident of the checkable. If there is none, errIrrelevantStateChange
-// is returned, so we don't create an incident only to close it right away.
-func (client *Client) buildStateEvent(
-	ctx context.Context,
-	nc *source.Client,
-	s *v1.State,
-	hostId, serviceId types.Binary,
-) (*fetchableEvent, error) {
+// by the caller.
+func (client *Client) buildStateEvent(ctx context.Context, s *v1.State, hostId, serviceId types.Binary) (*fetchableEvent, error) {
 	ev, err := client.buildCommonEvent(ctx, s.EnvironmentId, hostId, serviceId)
 	if err != nil {
 		return nil, errors.Wrapf(err, "cannot build event for %q,%q", hostId, serviceId)
@@ -1093,25 +1086,14 @@ func (client *Client) buildStateEvent(
 		eventType := meta.DowntimeTransitionType.String
 		if ev.CloseIncident() {
 			// Muted checkables keep their incident open even after recovering to OK (see where ev.Close is set
-			// above), so a closing event here may or may not have an incident to close. Ask the API first, so we
-			// don't create an incident only to close it right away.
-			filter := map[string]any{"environment": s.EnvironmentId.String(), "host": ev.Host.Name}
-			if serviceId != nil {
-				filter["service"] = ev.Services[0].Name
-			} else {
-				filter["service"] = nil // Match only the host's own incidents, not those of its services.
-			}
-			incidents, err := nc.GetIncidents(ctx, filter)
-			if err != nil {
-				return nil, errors.Wrap(err, "cannot query incidents for checkable")
-			}
-
-			if len(incidents) == 0 {
-				return nil, errIrrelevantStateChange
-			}
+			// above), so a closing event here may or may not have an incident to close. Therefore, we must leave
+			// the incident field unset, so that Icinga Notifications doesn't create a new one just to close
+			// it right away.
+			ev.Incident = types.Bool{}
+			ev.Severity = event.SeverityNone
 		}
 
-		if ev.Severity != event.SeverityOK || (!ev.IsMuted() && eventType == "downtime_end") {
+		if ev.Severity != event.SeverityOK {
 			downtimeName := Ternary(eventType == "downtime_start", meta.LastTriggeredDowntimeName, meta.LastRemovedDowntimeName).String
 			// See https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2103 and
 			// https://github.com/Icinga/icinga2/blob/v2.16.5/lib/icingadb/icingadb-objects.cpp#L2193
@@ -1389,13 +1371,13 @@ func (client *Client) Submit(ctx context.Context, entity database.Entity) error 
 		if canIgnoreStateUpdate(&h.State) {
 			return nil
 		}
-		ev, eventErr = client.buildStateEvent(ctx, nc, &h.State, h.Id, nil)
+		ev, eventErr = client.buildStateEvent(ctx, &h.State, h.Id, nil)
 
 	case *v1.ServiceState:
 		if canIgnoreStateUpdate(&h.State) {
 			return nil
 		}
-		ev, eventErr = client.buildStateEvent(ctx, nc, &h.State, h.HostId, h.ServiceId)
+		ev, eventErr = client.buildStateEvent(ctx, &h.State, h.HostId, h.ServiceId)
 
 	case *v1.DependencyEdgeState, *v1.RedundancygroupState:
 		// Nothing to do here, we only received these because they're part of the runtime state update pipeline.
